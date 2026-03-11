@@ -19,6 +19,7 @@ interface HistorySnapshot {
   scales: Record<number, ScaleCalibration>;
   selectedClassification: string | null;
   selectedPolygon: string | null;
+  selectedPolygonId: string | null;
 }
 
 export type Tool =
@@ -38,6 +39,7 @@ export interface Store extends ProjectState {
   setShowScalePopup: (show: boolean) => void;
   selectedClassification: string | null;
   selectedPolygon: string | null;
+  selectedPolygonId: string | null;
   hiddenClassificationIds: string[];
   toggleClassificationVisibility: (id: string) => void;
   // Mobile UI state
@@ -96,6 +98,7 @@ function snapshot(state: Store): HistorySnapshot {
     scales: structuredClone(state.scales),
     selectedClassification: state.selectedClassification,
     selectedPolygon: state.selectedPolygon,
+    selectedPolygonId: state.selectedPolygonId,
   };
 }
 
@@ -114,6 +117,7 @@ export const useStore = create<Store>((set, get) => ({
   setShowScalePopup: (show) => set({ showScalePopup: show }),
   selectedClassification: null,
   selectedPolygon: null,
+  selectedPolygonId: null,
   hiddenClassificationIds: [],
   toggleClassificationVisibility: (id) =>
     set((state) => ({
@@ -174,6 +178,7 @@ export const useStore = create<Store>((set, get) => ({
       polygons: s.polygons.filter((p) => p.classificationId !== id),
       selectedClassification: s.selectedClassification === id ? null : s.selectedClassification,
       selectedPolygon: s.selectedPolygon && s.polygons.find((p) => p.id === s.selectedPolygon && p.classificationId === id) ? null : s.selectedPolygon,
+      selectedPolygonId: s.selectedPolygonId && s.polygons.find((p) => p.id === s.selectedPolygonId && p.classificationId === id) ? null : s.selectedPolygonId,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -226,12 +231,13 @@ export const useStore = create<Store>((set, get) => ({
     set({
       polygons: s.polygons.filter((p) => p.id !== id),
       selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
+      selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
   },
 
-  setSelectedPolygon: (id) => set({ selectedPolygon: id }),
+  setSelectedPolygon: (id) => set({ selectedPolygon: id, selectedPolygonId: id }),
 
   // Geometry actions (wired by higher-level tools calling polygon-utils)
   mergePolygons: (id1, id2) => {
@@ -250,6 +256,7 @@ export const useStore = create<Store>((set, get) => ({
     set({
       polygons: s.polygons.filter((p) => p.id !== id1 && p.id !== id2).concat(merged),
       selectedPolygon: merged.id,
+      selectedPolygonId: merged.id,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -267,6 +274,7 @@ export const useStore = create<Store>((set, get) => ({
     set({
       polygons: s.polygons.filter((p) => p.id !== id).concat([a, b]),
       selectedPolygon: a.id,
+      selectedPolygonId: a.id,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -278,6 +286,7 @@ export const useStore = create<Store>((set, get) => ({
     set({
       polygons: s.polygons.filter((p) => p.id !== id),
       selectedPolygon: null,
+      selectedPolygonId: null,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -312,6 +321,7 @@ export const useStore = create<Store>((set, get) => ({
       redoStack: [],
       selectedClassification: null,
       selectedPolygon: null,
+      selectedPolygonId: null,
       hiddenClassificationIds: [],
     });
   },
@@ -330,6 +340,7 @@ export const useStore = create<Store>((set, get) => ({
       scales: prev.scales,
       selectedClassification: prev.selectedClassification,
       selectedPolygon: prev.selectedPolygon,
+      selectedPolygonId: prev.selectedPolygonId,
       undoStack: rest,
       redoStack: [...s.redoStack, now],
     });
@@ -347,6 +358,7 @@ export const useStore = create<Store>((set, get) => ({
       scales: next.scales,
       selectedClassification: next.selectedClassification,
       selectedPolygon: next.selectedPolygon,
+      selectedPolygonId: next.selectedPolygonId,
       redoStack: rest,
       undoStack: [...s.undoStack, now],
     });
