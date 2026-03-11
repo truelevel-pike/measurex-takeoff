@@ -2,41 +2,143 @@ import * as XLSX from 'xlsx';
 import type { Classification, Polygon, ScaleCalibration } from './types';
 import { calculateLinearFeet } from './polygon-utils';
 
+type ClassificationType = Classification['type'];
+type ExportRow = [string, string, number, number, string];
+
+const SECTION_ORDER: ClassificationType[] = ['area', 'linear', 'count'];
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function titleForType(type: ClassificationType): string {
+  if (type === 'area') return 'AREA CLASSIFICATIONS';
+  if (type === 'linear') return 'LINEAR CLASSIFICATIONS';
+  return 'COUNT CLASSIFICATIONS';
+}
+
+function unitForType(type: ClassificationType, baseUnit: string): string {
+  if (type === 'area') return `sq ${baseUnit}`;
+  if (type === 'linear') return baseUnit;
+  return 'ea';
+}
+
+function pickScaleForPage(
+  pageNumber: number,
+  scales: Record<number, ScaleCalibration> | undefined,
+  fallbackScale: ScaleCalibration | null
+): ScaleCalibration | null {
+  if (scales && scales[pageNumber]) return scales[pageNumber];
+  return fallbackScale;
+}
+
+function pageNumbersFromPolygons(polygons: Polygon[]): number[] {
+  return Array.from(new Set(polygons.map((p) => p.pageNumber ?? 1))).sort((a, b) => a - b);
+}
+
+function toSectionRows(
+  type: ClassificationType,
+  pagePolygons: Polygon[],
+  classifications: Classification[],
+  pageScale: ScaleCalibration | null
+): { rows: ExportRow[]; totalCount: number; totalValue: number; unit: string } {
+  const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
+  const baseUnit = pageScale?.unit ?? 'px';
+  const sectionUnit = unitForType(type, baseUnit);
+
+  const classTotals = new Map<string, { count: number; totalValue: number }>();
+
+  for (const poly of pagePolygons) {
+    const cls = classifications.find((c) => c.id === poly.classificationId);
+    if (!cls || cls.type !== type) continue;
+
+    const current = classTotals.get(cls.id) ?? { count: 0, totalValue: 0 };
+    current.count += 1;
+
+    if (type === 'area') {
+      current.totalValue += poly.area / (ppu * ppu);
+    } else if (type === 'linear') {
+      current.totalValue += calculateLinearFeet(poly.points, ppu, false);
+    } else {
+      current.totalValue += 1;
+    }
+    classTotals.set(cls.id, current);
+  }
+
+  const rows: ExportRow[] = [];
+  for (const cls of classifications) {
+    if (cls.type !== type) continue;
+    const totals = classTotals.get(cls.id);
+    if (!totals) continue;
+    rows.push([cls.name, cls.type.toUpperCase(), totals.count, round2(totals.totalValue), sectionUnit]);
+  }
+
+  const totalCount = rows.reduce((sum, r) => sum + r[2], 0);
+  const totalValue = round2(rows.reduce((sum, r) => sum + r[3], 0));
+
+  return { rows, totalCount, totalValue, unit: sectionUnit };
+}
+
+function buildPageSheet(
+  pageNumber: number,
+  pagePolygons: Polygon[],
+  classifications: Classification[],
+  pageScale: ScaleCalibration | null
+): XLSX.WorkSheet {
+  const aoa: Array<Array<string | number>> = [];
+
+  aoa.push([`Page ${pageNumber}`]);
+  aoa.push([]);
+
+  for (const sectionType of SECTION_ORDER) {
+    const section = toSectionRows(sectionType, pagePolygons, classifications, pageScale);
+    aoa.push([titleForType(sectionType)]);
+    aoa.push(['Name', 'Type', 'Count', 'Total Value', 'Unit']);
+
+    if (section.rows.length === 0) {
+      aoa.push([`No ${sectionType} items`, '', 0, 0, unitForType(sectionType, pageScale?.unit ?? 'px')]);
+    } else {
+      for (const row of section.rows) aoa.push(row);
+    }
+
+    aoa.push(['TOTAL', sectionType.toUpperCase(), section.totalCount, section.totalValue, section.unit]);
+    aoa.push([]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [
+    { wch: 28 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 12 },
+  ];
+  return ws;
+}
+
 export function exportToExcel(
   classifications: Classification[],
   polygons: Polygon[],
-  scale: ScaleCalibration | null
+  scale: ScaleCalibration | null,
+  scales?: Record<number, ScaleCalibration>
 ): XLSX.WorkBook {
-  const unit = scale?.unit ?? 'px';
-  const ppu = scale?.pixelsPerUnit ?? 1;
+  const wb = XLSX.utils.book_new();
 
-  const byType: Record<'area'|'linear'|'count', any[]> = { area: [], linear: [], count: [] };
-
-  for (const cls of classifications) {
-    const clsPolys = polygons.filter(p => p.classificationId === cls.id);
-    for (const p of clsPolys) {
-      const realArea = p.area / (ppu * ppu);
-      const lf = calculateLinearFeet(p.points, ppu, cls.type !== 'linear' ? true : false);
-      const row = {
-        Page: p.pageNumber ?? '-',
-        Classification: cls.name,
-        Type: cls.type.toUpperCase(),
-        [`Area (sq ${unit})`]: cls.type === 'area' ? round2(realArea) : 0,
-        [`Perimeter (${unit})`]: cls.type !== 'count' ? round2(lf) : 0,
-        Count: cls.type === 'count' ? 1 : 0,
-        'Polygon ID': p.id.slice(0, 8),
-      };
-      byType[cls.type].push(row);
-    }
+  const pageNumbers = pageNumbersFromPolygons(polygons);
+  if (pageNumbers.length === 0) {
+    const ws = XLSX.utils.aoa_to_sheet([['No takeoff data available']]);
+    ws['!cols'] = [{ wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+    return wb;
   }
 
-  const wb = XLSX.utils.book_new();
-  (['area','linear','count'] as const).forEach((t) => {
-    const rows = byType[t];
-    const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Note: 'No data' }]);
-    autoWidth(ws, rows);
-    XLSX.utils.book_append_sheet(wb, ws, t === 'area' ? 'Areas' : t === 'linear' ? 'Linear' : 'Counts');
-  });
+  for (const pageNumber of pageNumbers) {
+    const pagePolygons = polygons.filter((p) => (p.pageNumber ?? 1) === pageNumber);
+    const pageScale = pickScaleForPage(pageNumber, scales, scale);
+    const ws = buildPageSheet(pageNumber, pagePolygons, classifications, pageScale);
+    XLSX.utils.book_append_sheet(wb, ws, `Page ${pageNumber}`.slice(0, 31));
+  }
+
   return wb;
 }
 
@@ -44,9 +146,10 @@ export function downloadExcel(
   classifications: Classification[],
   polygons: Polygon[],
   scale: ScaleCalibration | null,
+  scales?: Record<number, ScaleCalibration>,
   filename = 'measurex-takeoff.xlsx'
 ) {
-  const wb = exportToExcel(classifications, polygons, scale);
+  const wb = exportToExcel(classifications, polygons, scale, scales);
   try {
     XLSX.writeFile(wb, filename);
   } catch {
@@ -66,14 +169,4 @@ export function downloadExcel(
     }
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
-}
-
-function round2(n: number) { return Math.round(n * 100) / 100; }
-
-function autoWidth(ws: XLSX.WorkSheet, rows: Record<string, any>[]) {
-  const hdrs = Object.keys(rows[0] || { A: '' });
-  ws['!cols'] = hdrs.map((h) => {
-    const maxLen = Math.max(h.length, ...rows.map(r => String(r[h] ?? '').length));
-    return { wch: Math.min(maxLen + 2, 40) };
-  });
 }

@@ -56,6 +56,7 @@ function PageInner() {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
 
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
@@ -279,8 +280,8 @@ function PageInner() {
   }, [projectId, currentPageNum]);
 
   const handleExport = useCallback(() => {
-    downloadExcel(classifications, polygons, scale);
-  }, [classifications, polygons, scale]);
+    downloadExcel(classifications, polygons, scale, scales);
+  }, [classifications, polygons, scale, scales]);
 
   // AI Takeoff flow
   const handleAITakeoff = useCallback(async () => {
@@ -300,6 +301,14 @@ function PageInner() {
         classifications: useStore.getState().classifications,
         scale: useStore.getState().scale,
         currentPage: useStore.getState().currentPage,
+        getState: () => {
+          const s = useStore.getState();
+          return {
+            classifications: s.classifications,
+            scale: s.scale,
+            currentPage: s.currentPage,
+          };
+        },
       });
       setAiStatus(`Done! ${stats.areas} rooms, ${stats.lines} walls, ${stats.counts} fixtures`);
       setTimeout(() => setAiStatus(null), 5000);

@@ -11,14 +11,26 @@ export const DetectedElementSchema = z.object({
 export const DetectedElementsSchema = z.array(DetectedElementSchema);
 export type DetectedElement = z.infer<typeof DetectedElementSchema>;
 
+const AiTakeoffResponseSchema = z.object({
+  results: DetectedElementsSchema,
+});
+
+function toPngDataUrl(imageBase64: string): string {
+  return imageBase64.startsWith('data:image/') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+}
+
 function downscaleCanvasToMax(canvas: HTMLCanvasElement, maxEdge = 2048): string {
   const { width, height } = canvas;
   const scale = Math.min(1, maxEdge / Math.max(width, height));
   if (scale === 1) return canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+
   const off = document.createElement('canvas');
   off.width = Math.round(width * scale);
   off.height = Math.round(height * scale);
-  const ctx = off.getContext('2d')!;
+  const ctx = off.getContext('2d');
+  if (!ctx) {
+    throw new Error('Could not create 2D canvas context for downscaling');
+  }
   ctx.drawImage(canvas, 0, 0, off.width, off.height);
   return off.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
 }
@@ -27,23 +39,41 @@ export function capturePageScreenshot(canvas: HTMLCanvasElement): string {
   return downscaleCanvasToMax(canvas, 2048);
 }
 
-async function callOpenAI(imageBase64: string, scale: ScaleCalibration | null, pageWidth: number, pageHeight: number) {
+async function callOpenAIVision(
+  imageBase64: string,
+  scale: ScaleCalibration | null,
+  pageWidth: number,
+  pageHeight: number
+): Promise<DetectedElement[]> {
   const res = await fetch('/api/ai-takeoff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64, scale: scale ? { pixelsPerUnit: scale.pixelsPerUnit, unit: scale.unit } : null, pageWidth, pageHeight }),
+    body: JSON.stringify({
+      imageBase64: toPngDataUrl(imageBase64),
+      scale: scale ? { pixelsPerUnit: scale.pixelsPerUnit, unit: scale.unit } : null,
+      pageWidth,
+      pageHeight,
+    }),
   });
+
+  const payload = await res.json().catch(() => null);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error || `OpenAI route returned ${res.status}`);
+    const msg = payload && typeof payload === 'object' && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
+      ? (payload as { error: string }).error
+      : `OpenAI route returned ${res.status}`;
+    throw new Error(msg);
   }
-  const data = await res.json();
-  return data.elements;
+
+  const parsed = AiTakeoffResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error(`Invalid AI takeoff response: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+  }
+
+  return parsed.data.results;
 }
 
-async function callGemini(imageBase64: string, scale: ScaleCalibration | null, pageWidth: number, pageHeight: number) {
-  // Placeholder: same API route for now; backend can switch provider
-  return callOpenAI(imageBase64, scale, pageWidth, pageHeight);
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function triggerAITakeoff(
@@ -52,23 +82,18 @@ export async function triggerAITakeoff(
   pageWidth: number,
   pageHeight: number
 ): Promise<DetectedElement[]> {
-  // Retry policy: 2 attempts, 3s backoff; then fallback to Gemini once
   let lastErr: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const elements = await callOpenAI(imageBase64, scale, pageWidth, pageHeight);
-      const parsed = DetectedElementsSchema.parse(elements);
-      return parsed;
-    } catch (e) {
-      lastErr = e;
-      await new Promise((r) => setTimeout(r, 3000));
+      return await callOpenAIVision(imageBase64, scale, pageWidth, pageHeight);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 2) {
+        await delay(3000);
+      }
     }
   }
-  try {
-    const elements = await callGemini(imageBase64, scale, pageWidth, pageHeight);
-    const parsed = DetectedElementsSchema.parse(elements);
-    return parsed;
-  } catch (e) {
-    throw new Error((e as Error).message || (lastErr as Error)?.message || 'AI takeoff failed');
-  }
+
+  throw new Error((lastErr as Error)?.message || 'AI takeoff failed');
 }

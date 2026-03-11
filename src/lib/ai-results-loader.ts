@@ -3,7 +3,7 @@ import type { Classification, Point, ScaleCalibration } from './types';
 import { calculatePolygonArea, calculateLinearFeet } from './polygon-utils';
 
 /**
- * Load AI takeoff results into the zustand store synchronously (no timeouts).
+ * Load AI takeoff results into the zustand store synchronously.
  */
 export function loadAIResults(
   results: DetectedElement[],
@@ -13,32 +13,53 @@ export function loadAIResults(
     classifications: Classification[];
     scale: ScaleCalibration | null;
     currentPage: number;
+    getState?: () => { classifications: Classification[]; scale: ScaleCalibration | null; currentPage: number };
   },
   opts?: { zoom?: number }
 ): { areas: number; lines: number; counts: number } {
   const stats = { areas: 0, lines: 0, counts: 0 };
   if (!results?.length) return stats;
 
-  // Create any missing classifications and collect name→id map
+  const readState = () => store.getState?.() ?? {
+    classifications: store.classifications,
+    scale: store.scale,
+    currentPage: store.currentPage,
+  };
+
+  // Create any missing classifications and collect name->id map.
   const nameToId = new Map<string, string>();
-  const existing = new Map(store.classifications.map(c => [c.name, c.id] as [string, string]));
+  const seed = new Map(readState().classifications.map((c) => [c.name, c.id] as [string, string]));
+
   for (const el of results) {
     const name = el.classification || (el.type === 'area' ? 'Areas' : el.type === 'linear' ? 'Linear' : 'Counts');
-    if (existing.has(name) && !nameToId.has(name)) nameToId.set(name, existing.get(name)!);
-  }
-  for (const el of results) {
-    const name = el.classification || (el.type === 'area' ? 'Areas' : el.type === 'linear' ? 'Linear' : 'Counts');
-    if (!nameToId.has(name)) {
-      const id = store.addClassification({ name, type: el.type, color: el.color || '#3b82f6', visible: true });
-      nameToId.set(name, id);
+    if (seed.has(name) && !nameToId.has(name)) {
+      nameToId.set(name, seed.get(name)!);
     }
   }
 
-  const ppu = store.scale?.pixelsPerUnit ?? 1;
-  const page = store.currentPage || 1;
+  for (const el of results) {
+    const name = el.classification || (el.type === 'area' ? 'Areas' : el.type === 'linear' ? 'Linear' : 'Counts');
+    if (nameToId.has(name)) continue;
+
+    const id = store.addClassification({
+      name,
+      type: el.type,
+      color: el.color || '#3b82f6',
+      visible: true,
+    });
+
+    // Synchronous zustand read after mutation to avoid stale classification lists.
+    const fresh = readState().classifications;
+    const resolvedId = fresh.find((c) => c.id === id || c.name === name)?.id ?? id;
+    nameToId.set(name, resolvedId);
+  }
+
+  const state = readState();
+  const ppu = state.scale?.pixelsPerUnit ?? 1;
+  const page = state.currentPage || 1;
   const r = Math.max(5, Math.round((opts?.zoom ? 6 / opts.zoom : 6))); // count marker radius
 
-  // Areas → then linear → then counts
+  // Areas -> linear -> counts
   const order = { area: 0, linear: 1, count: 2 } as const;
   const sorted = [...results].sort((a, b) => order[a.type] - order[b.type]);
 

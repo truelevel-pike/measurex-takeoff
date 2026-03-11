@@ -8,18 +8,35 @@ export interface DetectedScaleResult {
 
 const PDF_DPI = 72; // PDF points per inch
 
-// Try to parse imperial scales like 1/4" = 1'-0" with optional spaces/dashes
+function normalizeScaleText(text: string): string {
+  return text
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\bfeet\b/gi, 'foot')
+    .replace(/\binches\b/gi, 'inch')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Try to parse imperial scales like 1/4" = 1'-0" or 1/8 inch = 1 foot-0 inch
 function parseImperial(text: string): DetectedScaleResult | null {
-  const regex = /(\d+(?:\/\d+)?)\s*["”]?\s*=\s*(\d+)\s*['’]\s*(?:[-–—]?\s*0\s*["”]?)?/i;
+  const regex = /(\d+(?:\/\d+)?(?:\.\d+)?)\s*(?:"|inch)?\s*=\s*(\d+(?:\.\d+)?)\s*(?:'|foot)\s*(?:-\s*0\s*(?:"|inch)?)?/i;
   const m = regex.exec(text);
   if (!m) return null;
+
   const scaleStr = m[1];
   const feet = parseFloat(m[2]);
-  if (!feet || feet <= 0) return null;
+  if (!Number.isFinite(feet) || feet <= 0) return null;
+
   const inches = scaleStr.includes('/')
-    ? (() => { const [n, d] = scaleStr.split('/').map(Number); return n / d; })()
+    ? (() => {
+        const [n, d] = scaleStr.split('/').map(Number);
+        return n / d;
+      })()
     : parseFloat(scaleStr);
-  if (!inches || inches <= 0) return null;
+  if (!Number.isFinite(inches) || inches <= 0) return null;
+
   const inchesPerFoot = inches / feet; // paper inches per real foot
   const pixelsPerUnit = inchesPerFoot * PDF_DPI; // points per foot
   const label = `${scaleStr}" = ${feet}'-0"`;
@@ -36,7 +53,7 @@ function parseMetric(text: string): DetectedScaleResult | null {
   if (!m) return null;
   const ratio = parseInt(m[1], 10);
   if (!ratio || ratio <= 0) return null;
-  // 1:100 → 1 paper unit = 100 real units; 1 meter = 39.3701 inches
+  // 1:100 -> 1 paper unit = 100 real units; 1 meter = 39.3701 inches
   const pixelsPerUnit = (PDF_DPI * 39.3701) / ratio; // points per meter
   return {
     scale: { pixelsPerUnit, unit: 'm', label: `1:${ratio}`, source: 'auto', confidence: 0.85 },
@@ -55,7 +72,6 @@ export function detectedToCalibration(d: DetectedScaleResult): ScaleCalibration 
 
 export function detectScaleFromText(raw: string): DetectedScaleResult | null {
   if (!raw) return null;
-  // Normalize newlines → spaces; keep dashes
-  const t = raw.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const t = normalizeScaleText(raw.replace(/[\n\r]+/g, ' '));
   return parseImperial(t) || parseMetric(t);
 }
