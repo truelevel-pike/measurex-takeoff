@@ -3,6 +3,7 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { File as FileIcon } from 'lucide-react';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
 import type { DetectedElement, PDFViewerHandle, ProjectState } from '@/lib/types';
@@ -12,6 +13,7 @@ import { useIsMobile } from '@/lib/utils';
 import { loadAIResults } from '@/lib/ai-results-loader';
 import { downloadExcel } from '@/lib/export';
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
+import { installMeasurexAPI } from '@/lib/measurex-api';
 
 import TopNavBar from '@/components/TopNavBar';
 import LeftToolbar from '@/components/LeftToolbar';
@@ -42,8 +44,10 @@ function PageInner() {
   const currentTool = useStore((s) => s.currentTool);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
+  const setSelectedClassification = useStore((s) => s.setSelectedClassification);
   const deletePolygon = useStore((s) => s.deletePolygon);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
+  const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const setScale = useStore((s) => s.setScale);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const setShowScalePopup = useStore((s) => s.setShowScalePopup);
@@ -55,9 +59,13 @@ function PageInner() {
 
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
-  const threeData = React.useMemo(() => convertTakeoffTo3D(polygons, classifications), [polygons, classifications]);
+  const threeData = React.useMemo(
+    () => convertTakeoffTo3D(polygons, classifications),
+    [polygons, classifications, scale]
+  );
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [currentPageNum, setCurrentPageNum] = useState(1);
   const [showCalModal, setShowCalModal] = useState(false);
@@ -107,10 +115,13 @@ function PageInner() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
-      const isForm = el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+      const isForm = el && ['INPUT', 'TEXTAREA'].includes(el.tagName);
       if (isForm) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         redo();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -118,6 +129,8 @@ function PageInner() {
         undo();
       } else if (e.key === 'Escape') {
         setTool('select');
+        setSelectedPolygon(null);
+        setSelectedClassification(null);
         setShowCalModal(false);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedPolygon) deletePolygon(selectedPolygon);
@@ -129,24 +142,57 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, deletePolygon, selectedPolygon, setShowCalModal]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, setShowCalModal, toggleShow3D]);
+
+  // Store a PDF doc reference for texture rendering.
+  useEffect(() => {
+    if (!pdfFile) {
+      pdfDocRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const pdfjsLib: any = await import('pdfjs-dist');
+        const arrayBuffer = await pdfFile.arrayBuffer();
+        const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        if (cancelled) return;
+        pdfDocRef.current = doc;
+      } catch (e) {
+        console.warn('Could not load PDF document for 3D texture capture:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      pdfDocRef.current = null;
+    };
+  }, [pdfFile]);
 
   // Capture PDF texture whenever page renders or changes (so it's ready for 3D)
   const lastCapturedPage = useRef<number>(0);
   useEffect(() => {
-    if (!pdfFile || !pdfViewerRef.current) return;
+    if (!pdfFile) return;
     // Capture on every page change or when file loads, regardless of 3D state
     const timer = setTimeout(() => {
-      const canvas = pdfViewerRef.current?.getPageCanvas?.();
-      if (canvas && canvas.width > 0) {
+      void (async () => {
+        const doc = pdfDocRef.current;
+        if (!doc) return;
         try {
-          const url = canvas.toDataURL("image/png");
-          setPdfTextureUrl(url);
+          const page = await doc.getPage(currentPageNum);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = viewport.width;
+          offCanvas.height = viewport.height;
+          const canvasContext = offCanvas.getContext('2d');
+          if (!canvasContext) return;
+
+          await (page as any).render({ canvasContext, viewport }).promise;
+          setPdfTextureUrl(offCanvas.toDataURL('image/png'));
           lastCapturedPage.current = currentPageNum;
         } catch (e) {
-          console.warn("Could not capture PDF texture:", e);
+          console.warn('Could not capture PDF texture:', e);
         }
-      }
+      })();
     }, 500); // small delay to ensure pdf.js has rendered
     return () => clearTimeout(timer);
   }, [pdfFile, currentPageNum]);
@@ -181,6 +227,11 @@ function PageInner() {
     setDetectedScale(null);
     setShowCalModal(true);
   }, [setShowScalePopup]);
+
+  // Install automation API for browser/AI drivers
+  useEffect(() => {
+    installMeasurexAPI();
+  }, []);
 
   // Save project
   const handleSave = useCallback(async () => {

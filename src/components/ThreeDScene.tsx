@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { useStore } from '@/lib/store';
+import { generateSampleRoom } from '@/lib/takeoff-to-3d';
 import ThreeDViewer from './ThreeDViewer';
 import WallMesh, { type WallSegment } from './WallMesh';
 import FloorAreaMesh, { type FloorAreaItem } from './FloorAreaMesh';
@@ -33,6 +34,13 @@ export default function ThreeDScene({
   className,
   pdfTextureUrl,
 }: ThreeDSceneProps) {
+  const { walls: effectiveWalls, areas: effectiveAreas, labels: effectiveLabels } = React.useMemo(() => {
+    if (walls.length === 0 && areas.length === 0) {
+      return generateSampleRoom();
+    }
+    return { walls, areas, labels };
+  }, [walls, areas, labels]);
+
   const { show3D, setShow3D } = useStore();
   const selectedPolygon = useStore((s) => s.selectedPolygon);
   const hiddenClassificationIds = useStore((s) => s.hiddenClassificationIds);
@@ -45,18 +53,18 @@ export default function ThreeDScene({
       pdfTextureUrl={pdfTextureUrl}
     >
       {/* Wall extrusions */}
-      {walls.length > 0 && (
+      {effectiveWalls.length > 0 && (
         <WallMesh
-          segments={walls}
+          segments={effectiveWalls}
           defaultHeight={8}
           defaultThickness={0.5}
         />
       )}
 
       {/* Floor area polygons */}
-      {areas.length > 0 && (
+      {effectiveAreas.length > 0 && (
         <FloorAreaMesh
-          areas={areas}
+          areas={effectiveAreas}
           selectedIds={selectedPolygon ? [selectedPolygon] : []}
           hiddenClassificationIds={hiddenClassificationIds}
           opacity={0.45}
@@ -64,7 +72,7 @@ export default function ThreeDScene({
       )}
 
       {/* Measurement labels */}
-      {labels.map((label) => (
+      {effectiveLabels.map((label) => (
         <MeasurementLabel3D
           key={label.id}
           position={label.position}

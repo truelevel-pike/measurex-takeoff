@@ -1,7 +1,7 @@
 // skills/togal-takeoff/src/components/ThreeDViewer.tsx
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -24,10 +24,24 @@ interface ThreeDViewerProps {
 }
 
 function GroundPlane({ textureUrl }: { textureUrl?: string | null }) {
+  const groundSize = 100;
+  const [aspectRatio, setAspectRatio] = useState(1);
+
+  useEffect(() => {
+    if (!textureUrl) setAspectRatio(1);
+  }, [textureUrl]);
+
   const texture = useMemo(() => {
     if (!textureUrl) return null;
     const loader = new THREE.TextureLoader();
-    const t = loader.load(textureUrl);
+    const t = loader.load(textureUrl, (loadedTexture) => {
+      const image = loadedTexture.image as { width?: number; height?: number } | undefined;
+      const width = image?.width ?? 0;
+      const height = image?.height ?? 0;
+      if (width > 0 && height > 0) {
+        setAspectRatio(width / height);
+      }
+    });
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
     t.anisotropy = 4;
     return t;
@@ -35,7 +49,7 @@ function GroundPlane({ textureUrl }: { textureUrl?: string | null }) {
 
   return (
     <Plane
-      args={[300, 300]}
+      args={[aspectRatio * groundSize, groundSize]}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, 0, 0]}
       receiveShadow
