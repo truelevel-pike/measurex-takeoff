@@ -1,7 +1,7 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { File as FileIcon } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
@@ -19,6 +19,9 @@ import TopNavBar from '@/components/TopNavBar';
 import LeftToolbar from '@/components/LeftToolbar';
 import PDFViewer from '@/components/PDFViewer';
 import CanvasOverlay from '@/components/CanvasOverlay';
+import type { PolygonContextMenuPayload } from '@/components/CanvasOverlay';
+import ContextMenu from '@/components/ContextMenu';
+import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
@@ -28,15 +31,36 @@ import ScalePopup from '@/components/ScalePopup';
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 
-const toolKeys: Record<string, 'select'|'pan'|'draw'|'measure'> = {
+const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'measure'> = {
   v: 'select',
   h: 'pan',
   d: 'draw',
   m: 'measure',
 };
 
+const EMPTY_STATE: ProjectState = {
+  classifications: [],
+  polygons: [],
+  scale: null,
+  scales: {},
+  currentPage: 1,
+  totalPages: 1,
+};
+
+function normalizeProjectState(raw: unknown): ProjectState {
+  const candidate = (raw && typeof raw === 'object') ? (raw as Partial<ProjectState>) : {};
+
+  return {
+    classifications: Array.isArray(candidate.classifications) ? candidate.classifications : [],
+    polygons: Array.isArray(candidate.polygons) ? candidate.polygons : [],
+    scale: candidate.scale ?? null,
+    scales: (candidate.scales && typeof candidate.scales === 'object') ? candidate.scales : {},
+    currentPage: typeof candidate.currentPage === 'number' && candidate.currentPage > 0 ? candidate.currentPage : 1,
+    totalPages: typeof candidate.totalPages === 'number' && candidate.totalPages > 0 ? candidate.totalPages : 1,
+  };
+}
+
 function PageInner() {
-  const router = useRouter();
   const search = useSearchParams();
 
   // Store bindings
@@ -52,18 +76,18 @@ function PageInner() {
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const setShowScalePopup = useStore((s) => s.setShowScalePopup);
   const showScalePopup = useStore((s) => s.showScalePopup);
+  const setCurrentPage = useStore((s) => s.setCurrentPage);
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
+  const totalPages = useStore((s) => s.totalPages);
+  const currentPage = useStore((s) => s.currentPage);
 
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
-  const threeData = React.useMemo(
-    () => convertTakeoffTo3D(polygons, classifications),
-    [polygons, classifications, scale]
-  );
+  const threeData = React.useMemo(() => convertTakeoffTo3D(polygons, classifications), [polygons, classifications]);
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
@@ -72,6 +96,10 @@ function PageInner() {
   const [showCalModal, setShowCalModal] = useState(false);
   const [detectedScale, setDetectedScale] = useState<DetectedScale | null>(null);
   const [pdfTextureUrl, setPdfTextureUrl] = useState<string | null>(null);
+
+  // Context menu + properties panel state
+  const [menuState, setMenuState] = useState<{ polygonId: string; x: number; y: number } | null>(null);
+  const [showProperties, setShowProperties] = useState(false);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -83,6 +111,92 @@ function PageInner() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
+  const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+
+  const persistSaveStatus = useCallback((text: string, clearMs = 2200) => {
+    setSaveStatus(text);
+    if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current);
+    saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus(null), clearMs);
+  }, []);
+
+  const buildStatePayload = useCallback((pageOverride?: number): ProjectState => {
+    const s = useStore.getState();
+    return {
+      classifications: s.classifications,
+      polygons: s.polygons,
+      scale: s.scale,
+      scales: s.scales,
+      currentPage: pageOverride ?? s.currentPage,
+      totalPages: s.totalPages || 1,
+    };
+  }, []);
+
+  const flushSave = useCallback(async (showToast: boolean) => {
+    if (!projectId) return;
+
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+
+    isSavingRef.current = true;
+    setSaving(true);
+
+    try {
+      const payload = buildStatePayload(currentPageNum);
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: payload }),
+      });
+      if (!res.ok) throw new Error(`Update failed (${res.status})`);
+
+      if (showToast) persistSaveStatus('Saved!');
+      else persistSaveStatus('Auto-saved', 1200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Save failed';
+      persistSaveStatus(`Error: ${message}`, 3500);
+    } finally {
+      isSavingRef.current = false;
+      setSaving(false);
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        void flushSave(false);
+      }
+    }
+  }, [projectId, buildStatePayload, currentPageNum, persistSaveStatus]);
+
+  const requestAutoSave = useCallback(() => {
+    if (!projectId) return;
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      void flushSave(false);
+    }, 1200);
+  }, [projectId, flushSave]);
+
+  const closeContextMenu = useCallback(() => setMenuState(null), []);
+
+  const clampContextMenuPosition = useCallback((x: number, y: number) => {
+    const menuWidth = 240;
+    const menuHeight = 320;
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    return {
+      x: Math.max(pad, Math.min(x, vw - menuWidth - pad)),
+      y: Math.max(pad, Math.min(y, vh - menuHeight - pad)),
+    };
+  }, []);
+
+  const handlePolygonContextMenu = useCallback((payload: PolygonContextMenuPayload) => {
+    const clamped = clampContextMenuPosition(payload.x, payload.y);
+    setMenuState({ polygonId: payload.polygonId, x: clamped.x, y: clamped.y });
+  }, [clampContextMenuPosition]);
+
   // Load project by URL param
   useEffect(() => {
     const pid = search.get('project');
@@ -93,24 +207,33 @@ function PageInner() {
         const res = await fetch(`/api/projects/${pid}`);
         if (!res.ok) throw new Error(`Load failed (${res.status})`);
         const data = await res.json();
-        if (data?.project?.state) {
-          const raw = data.project.state;
-          useStore.getState().hydrateState({
-            classifications: raw.classifications || [],
-            polygons: raw.polygons || [],
-            scale: raw.scale || null,
-            scales: raw.scales || {},
-            currentPage: raw.currentPage || 1,
-            totalPages: raw.totalPages || 1,
-          } as ProjectState);
-          setProjectId(data.project.id);
-          setProjectName(data.project.name || 'Untitled');
-        }
+        const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
+
+        useStore.getState().hydrateState(normalized);
+        setCurrentPageNum(normalized.currentPage || 1);
+        setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+        setProjectId(data.project.id);
+        setProjectName(data.project.name || 'Untitled');
       } catch (err) {
         console.error(err);
       }
     })();
-  }, [search]);
+  }, [search, setCurrentPage]);
+
+  // Global close behavior for context menu
+  useEffect(() => {
+    if (!menuState) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeContextMenu();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuState, closeContextMenu]);
 
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
@@ -133,9 +256,10 @@ function PageInner() {
         setSelectedPolygon(null);
         setSelectedClassification(null);
         setShowCalModal(false);
+        closeContextMenu();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedPolygon) deletePolygon(selectedPolygon);
-      } else if (e.key === "3") {
+      } else if (e.key === '3') {
         toggleShow3D();
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
@@ -143,7 +267,7 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, setShowCalModal, toggleShow3D]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu]);
 
   // Store a PDF doc reference for texture rendering.
   useEffect(() => {
@@ -154,7 +278,7 @@ function PageInner() {
     let cancelled = false;
     (async () => {
       try {
-        const pdfjsLib: any = await import('pdfjs-dist');
+        const pdfjsLib = await import('pdfjs-dist');
         const arrayBuffer = await pdfFile.arrayBuffer();
         const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         if (cancelled) return;
@@ -170,10 +294,8 @@ function PageInner() {
   }, [pdfFile]);
 
   // Capture PDF texture whenever page renders or changes (so it's ready for 3D)
-  const lastCapturedPage = useRef<number>(0);
   useEffect(() => {
     if (!pdfFile) return;
-    // Capture on every page change or when file loads, regardless of 3D state
     const timer = setTimeout(() => {
       void (async () => {
         const doc = pdfDocRef.current;
@@ -187,16 +309,38 @@ function PageInner() {
           const canvasContext = offCanvas.getContext('2d');
           if (!canvasContext) return;
 
-          await (page as any).render({ canvasContext, viewport }).promise;
+          await page.render({ canvas: offCanvas as HTMLCanvasElement, canvasContext, viewport } as Parameters<typeof page.render>[0]).promise;
           setPdfTextureUrl(offCanvas.toDataURL('image/png'));
-          lastCapturedPage.current = currentPageNum;
         } catch (e) {
           console.warn('Could not capture PDF texture:', e);
         }
       })();
-    }, 500); // small delay to ensure pdf.js has rendered
+    }, 500);
     return () => clearTimeout(timer);
   }, [pdfFile, currentPageNum]);
+
+  // Autosave on state changes (project loaded)
+  const autosaveFingerprint = useMemo(() => JSON.stringify({
+    projectId,
+    classifications,
+    polygons,
+    scale,
+    scales,
+    currentPage,
+    totalPages,
+  }), [projectId, classifications, polygons, scale, scales, currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    requestAutoSave();
+  }, [autosaveFingerprint, projectId, requestAutoSave]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+      if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current);
+    };
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -209,9 +353,10 @@ function PageInner() {
     if (detected) {
       setDetectedScale(detected);
       setCurrentPageNum(pageNum);
+      setCurrentPage(pageNum, useStore.getState().totalPages);
       setShowScalePopup(true);
     }
-  }, [setShowScalePopup]);
+  }, [setShowScalePopup, setCurrentPage]);
 
   const handleAcceptScale = useCallback(() => {
     if (detectedScale) {
@@ -234,50 +379,46 @@ function PageInner() {
     installMeasurexAPI();
   }, []);
 
-  // Save project
+  // Manual save
   const handleSave = useCallback(async () => {
-    const state: ProjectState = {
-      classifications: useStore.getState().classifications,
-      polygons: useStore.getState().polygons,
-      scale: useStore.getState().scale,
-      scales: useStore.getState().scales,
-      currentPage: currentPageNum,
-      totalPages: pdfViewerRef.current?.pageDimensions?.height ? 0 : 0, // TODO: wire actual totalPages
-    };
-
     setSaving(true);
     try {
       if (!projectId) {
         const name = prompt('Project name:');
-        if (!name) { setSaving(false); return; }
+        if (!name) {
+          setSaving(false);
+          return;
+        }
+
+        const payload = buildStatePayload(currentPageNum);
         const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state }),
+          body: JSON.stringify({ name, state: payload }),
         });
+
         if (!res.ok) throw new Error(`Create failed (${res.status})`);
+
         const data = await res.json();
+        const normalized = normalizeProjectState(data?.project?.state ?? payload);
+        useStore.getState().hydrateState(normalized);
+        setCurrentPageNum(normalized.currentPage || 1);
+        setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+
         setProjectId(data.project.id);
-        setProjectName(name);
+        setProjectName(data.project.name || name);
         window.history.replaceState({}, '', `/?project=${data.project.id}`);
-        setSaveStatus('Saved!');
+        persistSaveStatus('Saved!');
       } else {
-        const res = await fetch(`/api/projects/${projectId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state }),
-        });
-        if (!res.ok) throw new Error(`Update failed (${res.status})`);
-        setSaveStatus('Saved!');
+        await flushSave(true);
       }
-    } catch (err: any) {
-      console.error(err);
-      setSaveStatus(`Error: ${err.message || 'Save failed'}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Save failed';
+      persistSaveStatus(`Error: ${message}`, 3500);
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveStatus(null), 3000);
     }
-  }, [projectId, currentPageNum]);
+  }, [projectId, currentPageNum, buildStatePayload, setCurrentPage, persistSaveStatus, flushSave]);
 
   const handleExport = useCallback(() => {
     downloadExcel(classifications, polygons, scale, scales);
@@ -312,60 +453,112 @@ function PageInner() {
       });
       setAiStatus(`Done! ${stats.areas} rooms, ${stats.lines} walls, ${stats.counts} fixtures`);
       setTimeout(() => setAiStatus(null), 5000);
-    } catch (err: any) {
-      console.error(err);
-      setAiStatus(`Error: ${err.message || 'AI failed'}`);
+    } catch (error) {
+      console.error(error);
+      setAiStatus(`Error: ${error instanceof Error ? error.message : 'AI failed'}`);
       setTimeout(() => setAiStatus(null), 7000);
     } finally {
       setAiLoading(false);
     }
   }, []);
 
-  const isMobile = useIsMobile();
+  useIsMobile();
+
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#0a0a0f] text-white">
-      <TopNavBar onAITakeoff={handleAITakeoff} aiLoading={aiLoading} onExport={handleExport} onSave={handleSave} saving={saving} projectName={projectName || undefined} />
-      <div className={show3D ? "flex-1 min-h-0" : "hidden"}>
+    <div className="flex flex-col h-screen w-screen bg-[#0a0a0f] text-white" onClick={closeContextMenu}>
+      <TopNavBar
+        onAITakeoff={handleAITakeoff}
+        aiLoading={aiLoading}
+        onExport={handleExport}
+        onSave={handleSave}
+        saving={saving}
+        projectName={projectName || undefined}
+      />
+
+      <div className={show3D ? 'flex-1 min-h-0' : 'hidden'}>
         <ThreeDScene className="h-full w-full" walls={threeData.walls} areas={threeData.areas} labels={threeData.labels} pdfTextureUrl={pdfTextureUrl} />
       </div>
-      <div className={show3D ? "hidden" : "flex flex-1 min-h-0 flex-col lg:flex-row"}>
-          {/* Left toolbar: vertical on desktop, bottom bar on mobile */}
-          <div className="hidden lg:block"><LeftToolbar /></div>
-          {/* Main content */}
-          <div className="flex flex-col flex-1 min-h-0 order-1">
-            <div className="flex flex-1 min-h-0 relative">
-              {!pdfFile ? (
-                <div className="flex-1 flex items-center justify-center p-4" role="region" aria-describedby="upload-help"
-                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                     onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer.files?.[0]; if (f && f.type==='application/pdf') setPdfFile(f); }}>
-                  <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">
-                    <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
-                    <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
-                    <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
-                    <input type="file" accept=".pdf" onChange={onFileChange} className="hidden" />
-                  </label>
-                </div>
-              ) : (
-                <>
-                  <PDFViewer ref={pdfViewerRef} file={pdfFile} onTextExtracted={handleTextExtracted} onPageChange={(page) => setCurrentPageNum(page)} />
-                  <CanvasOverlay />
-                  {currentTool === 'draw' && <DrawingTool />}
-                  {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
-                  {currentTool === 'measure' && <MeasurementTool />}
-                </>
-              )}
-            </div>
-            <BottomStatusBar onScaleClick={() => setShowCalModal(true)} />
+
+      <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row'}>
+        <div className="hidden lg:block"><LeftToolbar /></div>
+
+        <div className="flex flex-col flex-1 min-h-0 order-1">
+          <div className="flex flex-1 min-h-0 relative">
+            {!pdfFile ? (
+              <div
+                className="flex-1 flex items-center justify-center p-4"
+                role="region"
+                aria-describedby="upload-help"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && f.type === 'application/pdf') setPdfFile(f);
+                }}
+              >
+                <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">
+                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
+                  <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
+                  <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
+                  <input type="file" accept=".pdf" onChange={onFileChange} className="hidden" />
+                </label>
+              </div>
+            ) : (
+              <>
+                <PDFViewer
+                  ref={pdfViewerRef}
+                  file={pdfFile}
+                  onTextExtracted={handleTextExtracted}
+                  onPageChange={(page) => {
+                    setCurrentPageNum(page);
+                    setCurrentPage(page, useStore.getState().totalPages);
+                  }}
+                />
+
+                <CanvasOverlay
+                  onPolygonContextMenu={handlePolygonContextMenu}
+                  onCanvasPointerDown={closeContextMenu}
+                />
+
+                {menuState && (
+                  <ContextMenu
+                    polygonId={menuState.polygonId}
+                    x={menuState.x}
+                    y={menuState.y}
+                    onClose={closeContextMenu}
+                    onOpenProperties={(polygonId) => {
+                      setSelectedPolygon(polygonId);
+                      setShowProperties(true);
+                    }}
+                  />
+                )}
+
+                {showProperties && (
+                  <div className="absolute top-3 right-3 z-40" onClick={(e) => e.stopPropagation()}>
+                    <PolygonProperties onClose={() => setShowProperties(false)} />
+                  </div>
+                )}
+
+                {currentTool === 'draw' && <DrawingTool />}
+                {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
+                {currentTool === 'measure' && <MeasurementTool />}
+              </>
+            )}
           </div>
-          {/* QuantitiesPanel: component handles its own mobile (drawer) vs desktop (sidebar) layout */}
-          <QuantitiesPanel />
+
+          <BottomStatusBar onScaleClick={() => setShowCalModal(true)} />
         </div>
-      {/* Mobile bottom toolbar */}
+
+        <QuantitiesPanel />
+      </div>
+
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 border-t">
         <LeftToolbar />
       </div>
-      {/* Mobile quantities drawer toggle (simple placeholder tab) */}
-      {/* A7 to wire real drawer: using store.showQuantitiesDrawer */}
 
       {showScalePopup && detectedScale && (
         <ScalePopup detectedScaleText={detectedScale.scale.label} onAccept={handleAcceptScale} onManual={handleManualScale} />

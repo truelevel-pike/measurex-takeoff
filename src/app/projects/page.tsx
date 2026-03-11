@@ -39,7 +39,17 @@ export default function ProjectsPage() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), state: {} as ProjectState }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          state: {
+            classifications: [],
+            polygons: [],
+            scale: null,
+            scales: {},
+            currentPage: 1,
+            totalPages: 1,
+          } as ProjectState,
+        }),
       });
       if (!res.ok) throw new Error(`Create failed (${res.status})`);
       const data = await res.json();

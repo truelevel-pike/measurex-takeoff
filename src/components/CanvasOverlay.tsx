@@ -5,7 +5,18 @@ import { Canvas, Polygon as FabricPolygon } from 'fabric';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
-export default function CanvasOverlay() {
+export interface PolygonContextMenuPayload {
+  polygonId: string;
+  x: number;
+  y: number;
+}
+
+interface CanvasOverlayProps {
+  onPolygonContextMenu?: (payload: PolygonContextMenuPayload) => void;
+  onCanvasPointerDown?: () => void;
+}
+
+export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown }: CanvasOverlayProps = {}) {
   const canvasEl = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
 
@@ -18,16 +29,22 @@ export default function CanvasOverlay() {
 
   useEffect(() => {
     if (!canvasEl.current) return;
-    const parent = canvasEl.current.parentElement as HTMLElement | null;
+    const canvasNode = canvasEl.current;
+    const parent = canvasNode.parentElement as HTMLElement | null;
     if (!parent) return;
 
-    const fc = new Canvas(canvasEl.current, {
+    const fc = new Canvas(canvasNode, {
       width: parent.clientWidth,
       height: parent.clientHeight,
       selection: currentTool === 'select',
       backgroundColor: 'transparent',
     });
     fabricRef.current = fc;
+
+    const preventNativeContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+    canvasNode.addEventListener('contextmenu', preventNativeContextMenu);
 
     const resize = () => {
       fc.setDimensions({ width: parent.clientWidth, height: parent.clientHeight });
@@ -43,6 +60,7 @@ export default function CanvasOverlay() {
     window.addEventListener('orientationchange', onOrientation);
 
     return () => {
+      canvasNode.removeEventListener('contextmenu', preventNativeContextMenu);
       window.removeEventListener('orientationchange', onOrientation);
       ro.disconnect();
       fc.dispose();
@@ -63,7 +81,7 @@ export default function CanvasOverlay() {
       const color = cls?.color || '#93c5fd';
 
       const fp = new FabricPolygon(poly.points as Point[], {
-        fill: color + '22', // translucent fill on dark bg
+        fill: color + '22',
         stroke: isSelected ? '#00ff88' : '#00d4ff',
         strokeWidth: isSelected ? 3 : 1,
         shadow: isSelected ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 6px rgba(0,212,255,0.3)',
@@ -82,25 +100,48 @@ export default function CanvasOverlay() {
     fc.off('selection:created');
     fc.off('selection:updated');
     fc.off('mouse:up');
+    fc.off('mouse:down');
     fc.off('object:modified');
 
     fc.on('selection:created', (e: any) => {
       const obj = e.selected?.[0];
       if (obj && (obj as any)._polygonId) setSelectedPolygon((obj as any)._polygonId);
     });
+
     fc.on('selection:updated', (e: any) => {
       const obj = e.selected?.[0];
       if (obj && (obj as any)._polygonId) setSelectedPolygon((obj as any)._polygonId);
     });
+
     fc.on('mouse:up', (e: any) => {
       if (!e.target) setSelectedPolygon(null);
+    });
+
+    fc.on('mouse:down', (e: any) => {
+      onCanvasPointerDown?.();
+
+      const nativeEvent = e.e as MouseEvent | undefined;
+      if (!nativeEvent) return;
+
+      const isRightClick = nativeEvent.button === 2;
+      const targetPolygonId = (e.target as any)?._polygonId as string | undefined;
+
+      if (!isRightClick || !targetPolygonId) return;
+
+      nativeEvent.preventDefault();
+      nativeEvent.stopPropagation();
+      setSelectedPolygon(targetPolygonId);
+      onPolygonContextMenu?.({
+        polygonId: targetPolygonId,
+        x: nativeEvent.clientX,
+        y: nativeEvent.clientY,
+      });
     });
 
     fc.on('object:modified', (e: any) => {
       const obj = e.target;
       if (!(obj as any)?._polygonId) return;
       if (obj instanceof FabricPolygon) {
-        // Transform object points back to absolute space
         const matrix = obj.calcTransformMatrix();
         const pts: Point[] = (obj.points || []).map((p: any) => {
           const x = p.x - (obj.pathOffset?.x || 0);
@@ -115,12 +156,19 @@ export default function CanvasOverlay() {
     });
 
     fc.renderAll();
-  }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon]);
+  }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown]);
 
   return (
     <canvas
       ref={canvasEl}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: currentTool === 'pan' ? 'none' : 'auto', zIndex: 10 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: currentTool === 'pan' ? 'none' : 'auto',
+        zIndex: 10,
+      }}
     />
   );
 }

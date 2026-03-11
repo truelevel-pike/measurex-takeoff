@@ -44,6 +44,13 @@ export default function ThreeDScene({
   const { show3D, setShow3D } = useStore();
   const selectedPolygon = useStore((s) => s.selectedPolygon);
   const hiddenClassificationIds = useStore((s) => s.hiddenClassificationIds);
+  const classifications = useStore((s) => s.classifications);
+
+  const visibilityHiddenIds = React.useMemo(() => {
+    const hiddenByVisibleFlag = classifications.filter((c) => c.visible === false).map((c) => c.id);
+    const merged = new Set<string>([...hiddenClassificationIds, ...hiddenByVisibleFlag]);
+    return Array.from(merged);
+  }, [hiddenClassificationIds, classifications]);
 
   return (
     <ThreeDViewer
@@ -66,7 +73,7 @@ export default function ThreeDScene({
         <FloorAreaMesh
           areas={effectiveAreas}
           selectedIds={selectedPolygon ? [selectedPolygon] : []}
-          hiddenClassificationIds={hiddenClassificationIds}
+          hiddenClassificationIds={visibilityHiddenIds}
           opacity={0.45}
         />
       )}
