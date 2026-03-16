@@ -16,6 +16,9 @@ import { downloadExcel } from '@/lib/export';
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
 import { installMeasurexAPI } from '@/lib/measurex-api';
 
+import { connectToProject, disconnectFromProject } from '@/lib/ws-client';
+import * as api from '@/lib/api-client';
+import AIActivityLog from '@/components/AIActivityLog';
 import AutoScalePopup from '@/components/AutoScalePopup';
 import TopNavBar from '@/components/TopNavBar';
 import LeftToolbar from '@/components/LeftToolbar';
@@ -234,6 +237,13 @@ function PageInner() {
     })();
   }, [search, setCurrentPage]);
 
+  // Connect SSE when project is loaded
+  useEffect(() => {
+    if (!projectId) return;
+    connectToProject(projectId);
+    return () => disconnectFromProject();
+  }, [projectId]);
+
   // Global close behavior for context menu
   useEffect(() => {
     if (!menuState) return;
@@ -272,7 +282,12 @@ function PageInner() {
         setShowCalModal(false);
         closeContextMenu();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedPolygon) deletePolygon(selectedPolygon);
+        if (selectedPolygon) {
+          deletePolygon(selectedPolygon);
+          if (projectId) {
+            api.deletePolygon(projectId, selectedPolygon).catch((err) => console.error('API deletePolygon failed:', err));
+          }
+        }
       } else if (e.key === '3') {
         toggleShow3D();
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
@@ -556,9 +571,9 @@ function PageInner() {
                   ref={pdfViewerRef}
                   file={pdfFile}
                   onTextExtracted={handleTextExtracted}
-                  onPageChange={(page) => {
+                  onPageChange={(page, total) => {
                     setCurrentPageNum(page);
-                    setCurrentPage(page, useStore.getState().totalPages);
+                    setCurrentPage(page, total);
                   }}
                 />
 
@@ -641,6 +656,13 @@ function PageInner() {
       {!aiLoading && aiStatus && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium">
           {aiStatus}
+        </div>
+      )}
+
+      {/* AI Activity Log — bottom-left corner */}
+      {projectId && (
+        <div className="fixed bottom-16 left-2 z-30 hidden lg:block">
+          <AIActivityLog />
         </div>
       )}
 
