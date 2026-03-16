@@ -173,13 +173,15 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     }, []);
 
     const fitToPage = useCallback(() => {
-      if (!containerRef.current || !pageDimensions.width) return;
+      if (!containerRef.current || !basePageSize.current.width) return;
       const container = containerRef.current;
-      const scaleX = (container.clientWidth - 40) / pageDimensions.width;
-      const scaleY = (container.clientHeight - 40) / pageDimensions.height;
+      // Use unscaled base dimensions (at scale 1.5) so the calculation
+      // doesn't depend on the current zoom level
+      const scaleX = (container.clientWidth - 40) / basePageSize.current.width;
+      const scaleY = (container.clientHeight - 40) / basePageSize.current.height;
       setZoom(Math.min(scaleX, scaleY, 2));
       setPan({ x: 0, y: 0 });
-    }, [pageDimensions, setZoom]);
+    }, [setZoom]);
 
     // Zoom to cursor
     const handleWheel = useCallback(
@@ -228,8 +230,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     useEffect(() => {
       if (!initialFitDone.current && pageDimensions.width > 0 && containerRef.current) {
         initialFitDone.current = true;
-        // Use rAF to ensure the container has its layout dimensions
-        requestAnimationFrame(() => fitToPage());
+        // Small timeout to let the DOM settle and container get real dimensions
+        const t = setTimeout(() => fitToPage(), 50);
+        return () => clearTimeout(t);
       }
     }, [pageDimensions, fitToPage]);
 
