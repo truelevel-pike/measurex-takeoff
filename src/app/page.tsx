@@ -100,6 +100,7 @@ function PageInner() {
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+  const [pdfDocState, setPdfDocState] = useState<PDFDocumentProxy | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [currentPageNum, setCurrentPageNum] = useState(1);
   const [showCalModal, setShowCalModal] = useState(false);
@@ -312,6 +313,7 @@ function PageInner() {
         const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         if (cancelled) return;
         pdfDocRef.current = doc;
+        setPdfDocState(doc);
       } catch (e) {
         console.warn('Could not load PDF document for 3D texture capture:', e);
       }
@@ -319,6 +321,7 @@ function PageInner() {
     return () => {
       cancelled = true;
       pdfDocRef.current = null;
+      setPdfDocState(null);
     };
   }, [pdfFile]);
 
@@ -538,6 +541,7 @@ function PageInner() {
           <PageThumbnailSidebar
             totalPages={totalPages}
             currentPage={currentPageNum}
+            pdfDoc={pdfDocState}
             onPageSelect={(page) => {
               setCurrentPageNum(page);
               setCurrentPage(page, totalPages);
@@ -547,7 +551,11 @@ function PageInner() {
         )}
 
         <div className="flex flex-col flex-1 min-h-0 order-1">
-          <div className="flex flex-1 min-h-0 relative">
+          <div className={`flex flex-1 min-h-0 relative ${
+            currentTool === 'draw' || currentTool === 'measure' ? 'cursor-crosshair' :
+            currentTool === 'pan' ? 'cursor-grab' :
+            'cursor-default'
+          }`}>
             {!pdfFile ? (
               <div
                 className="flex-1 flex items-center justify-center p-4"

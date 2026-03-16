@@ -29,6 +29,8 @@ export interface PDFProcessResult {
 async function getPdfjs(): Promise<typeof import('pdfjs-dist')> {
   // Use the legacy build which has broader Node.js compat
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs') as unknown as typeof import('pdfjs-dist');
+  // Disable worker for server-side usage (no DOM, no worker threads)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
   return pdfjsLib;
 }
 
@@ -43,7 +45,7 @@ export async function processPDF(
 ): Promise<PDFProcessResult> {
   const pdfjsLib = await getPdfjs();
   const data = new Uint8Array(await fs.readFile(filePath));
-  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, disableWorker: true } as any).promise;
 
   const pages: PDFPageInfo[] = [];
 
@@ -82,7 +84,7 @@ export async function extractPageText(
 ): Promise<string> {
   const pdfjsLib = await getPdfjs();
   const data = new Uint8Array(await fs.readFile(filePath));
-  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, disableWorker: true } as any).promise;
 
   if (pageNum < 1 || pageNum > doc.numPages) return '';
 
@@ -142,7 +144,7 @@ export async function renderPageAsImage(
 
   const pdfjsLib = await getPdfjs();
   const data = new Uint8Array(await fs.readFile(filePath));
-  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, disableWorker: true } as any).promise;
 
   if (pageNum < 1 || pageNum > doc.numPages) return null;
 

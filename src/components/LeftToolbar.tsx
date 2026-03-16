@@ -168,15 +168,17 @@ export default function LeftToolbar() {
                   width: 36,
                   height: 36,
                   margin: '6px 0',
-                  background: '#12121a',
-                  color: active ? '#00d4ff' : '#b9bedc',
-                  border: `1px solid ${active ? 'rgba(0,212,255,0.5)' : 'rgba(0,212,255,0.15)'}`,
+                  background: active ? '#2563eb' : '#12121a',
+                  color: active ? '#ffffff' : '#b9bedc',
+                  border: `1px solid ${active ? '#3b82f6' : 'rgba(0,212,255,0.15)'}`,
+                  borderLeft: active ? '3px solid #60a5fa' : '1px solid rgba(0,212,255,0.15)',
                   borderRadius: 8,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: active ? '0 0 10px rgba(0,212,255,0.22) inset' : 'none',
+                  boxShadow: active ? '0 0 12px rgba(59,130,246,0.5), 0 0 4px rgba(59,130,246,0.3) inset' : 'none',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 <b.icon size={20} aria-hidden="true" />

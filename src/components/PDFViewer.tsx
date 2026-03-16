@@ -45,6 +45,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const [loadError, setLoadError] = useState<string | null>(null);
     const [isOffline, setIsOffline] = useState(false);
     const pendingRender = useRef<number | null>(null);
+    const initialFitDone = useRef(false);
 
     // Offline detection
     useEffect(() => {
@@ -64,6 +65,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       if (!file) return;
       let cancelled = false;
       setLoadError(null);
+      initialFitDone.current = false;
       const loadPdf = async () => {
         try {
           const pdfjsLib: any = await import('pdfjs-dist');
@@ -216,6 +218,15 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     );
 
     const endPan = useCallback(() => setIsPanning(false), []);
+
+    // Auto fit-to-page on initial render
+    useEffect(() => {
+      if (!initialFitDone.current && pageDimensions.width > 0 && containerRef.current) {
+        initialFitDone.current = true;
+        // Use rAF to ensure the container has its layout dimensions
+        requestAnimationFrame(() => fitToPage());
+      }
+    }, [pageDimensions, fitToPage]);
 
     // ResizeObserver for container
     useEffect(() => {
