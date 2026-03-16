@@ -1,110 +1,156 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
-import type { Point } from '@/lib/types';
+import ScalePanel from '@/components/ScalePanel';
+import ManualCalibration from '@/components/ManualCalibration';
 
-// Manual scale calibration overlay (modal-style). Click two points, enter real distance, choose unit.
-export default function ScaleCalibration() {
-  const [pts, setPts] = useState<Point[]>([]);
-  const [distance, setDistance] = useState<string>('');
-  const [unit, setUnit] = useState<'ft'|'in'|'m'|'mm'>('ft');
+const DPI = 72;
 
+/**
+ * Convert a preset label string into a pixelsPerUnit value at 72 DPI.
+ */
+function labelToPixelsPerUnit(label: string): number {
+  // Ratio / Metric: "1 : 500"
+  const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
+  if (ratioMatch) {
+    const ratio = parseInt(ratioMatch[1], 10);
+    // 1:ratio means 1 unit on paper = ratio units real. At 72 DPI, 1 inch = 72 px.
+    // pixelsPerUnit (inches): 72 / ratio  → but we store per-foot so multiply by 12?
+    // Actually for ratio scales we treat "unit" as dimensionless; store as px per real-inch.
+    return DPI / ratio;
+  }
+
+  // Civil: "1" = X' 0""
+  const civilMatch = label.match(/^1"\s*=\s*(\d+)'\s*0?"?$/);
+  if (civilMatch) {
+    const feet = parseInt(civilMatch[1], 10);
+    // 1 inch on paper = feet real feet → pixelsPerUnit (per foot) = DPI / feet
+    return DPI / feet;
+  }
+
+  // Architectural: fraction or number + " = 1' 0""
+  const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
+  if (archMatch) {
+    const frac = parseFraction(archMatch[1].trim());
+    // frac inches on paper = 1 foot real → pixelsPerUnit = frac * DPI per foot
+    return frac * DPI;
+  }
+
+  return DPI * 0.125; // fallback: 1/8" = 1'
+}
+
+/** Parse fraction strings like "3/64", "1 1/2", "1", "3" */
+function parseFraction(s: string): number {
+  // "1 1/2" → mixed number
+  const mixedMatch = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedMatch) {
+    return parseInt(mixedMatch[1], 10) + parseInt(mixedMatch[2], 10) / parseInt(mixedMatch[3], 10);
+  }
+  // "3/64"
+  const fracMatch = s.match(/^(\d+)\/(\d+)$/);
+  if (fracMatch) {
+    return parseInt(fracMatch[1], 10) / parseInt(fracMatch[2], 10);
+  }
+  // whole number "1", "3"
+  return parseFloat(s) || 0;
+}
+
+type View = 'presets' | 'manual';
+
+interface ScaleCalibrationProps {
+  onClose?: () => void;
+}
+
+export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
+  const [view, setView] = useState<View>('presets');
+
+  const scale = useStore((s) => s.scale);
   const setScale = useStore((s) => s.setScale);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const currentPage = useStore((s) => s.currentPage);
   const setTool = useStore((s) => s.setTool);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedLabel = scale?.label ?? null;
+  const isAutoDetected = scale?.source === 'auto' || scale?.source === 'ai';
 
-  const getCoords = useCallback((e: React.MouseEvent): Point => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  const handleClose = useCallback(() => {
+    setTool('select');
+    onClose?.();
+  }, [setTool, onClose]);
+
+  const handleSelectScale = useCallback(
+    (label: string) => {
+      const ppu = labelToPixelsPerUnit(label);
+      // Determine unit type based on label pattern
+      const isRatio = /^1\s*:/.test(label);
+      const unit: 'ft' | 'in' = isRatio ? 'in' : 'ft';
+
+      const cal = {
+        pixelsPerUnit: ppu,
+        unit,
+        label,
+        source: 'manual' as const,
+      };
+
+      setScale(cal);
+      if (currentPage >= 1) {
+        setScaleForPage(currentPage, cal);
+      }
+      handleClose();
+    },
+    [currentPage, setScale, setScaleForPage, handleClose],
+  );
+
+  const handleOpenManual = useCallback(() => {
+    setView('manual');
   }, []);
 
-  const onClick = useCallback((e: React.MouseEvent) => {
-    const p = getCoords(e);
-    setPts((prev) => (prev.length >= 2 ? [p] : [...prev, p]));
-  }, [getCoords]);
+  const handleManualSave = useCallback(
+    (label: string) => {
+      // Parse the label to compute pixelsPerUnit
+      const ppu = labelToPixelsPerUnit(label);
+      const cal = {
+        pixelsPerUnit: ppu,
+        unit: 'ft' as const,
+        label,
+        source: 'manual' as const,
+      };
+      setScale(cal);
+      if (currentPage >= 1) {
+        setScaleForPage(currentPage, cal);
+      }
+      handleClose();
+    },
+    [currentPage, setScale, setScaleForPage, handleClose],
+  );
 
-  const pxDistance = useMemo(() => {
-    if (pts.length < 2) return 0;
-    const a = pts[0], b = pts[1];
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  }, [pts]);
-
-  const onSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const real = parseFloat(distance);
-    if (!real || real <= 0 || pxDistance <= 0) return;
-
-    // pixelsPerUnit = pixels / realUnits
-    const pixelsPerUnit = pxDistance / real;
-    const label = unit === 'ft' ? `${real} ft` : unit === 'in' ? `${real} in` : unit === 'm' ? `${real} m` : `${real} mm`;
-
-    const cal = { pixelsPerUnit, unit, label, source: 'manual' as const };
-    setScale(cal);
-    const pageNo = (typeof currentPage === 'number') ? currentPage : (currentPage && (currentPage as any).pageNumber) ? (currentPage as any).pageNumber : 1;
-    setScaleForPage?.(pageNo, cal);
-    setTool('select');
-  }, [distance, unit, pxDistance, setScale, setScaleForPage, setTool, currentPage]);
-
-  const onCancel = useCallback(() => {
-    setTool('select');
-  }, [setTool]);
+  const handleManualCancel = useCallback(() => {
+    setView('presets');
+  }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 z-40" onClick={onClick}>
-      {/* Line preview */}
-      {pts.length >= 1 && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {pts[1] ? (
-            <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke="#22c55e" strokeWidth={2} />
-          ) : (
-            <circle cx={pts[0].x} cy={pts[0].y} r={6} fill="#22c55e" />
-          )}
-        </svg>
-      )}
-
-      {/* Modal card */}
-      <div className="absolute top-8 right-8 bg-white rounded-lg shadow-xl border border-zinc-200 p-4 w-80">
-        <div className="text-sm font-semibold text-zinc-800 mb-2">Manual Scale Calibration</div>
-        <div className="text-xs text-zinc-500 mb-3">
-          Click two known-distance points on the drawing, then enter the real distance and unit.
-        </div>
-        <div className="text-xs mb-3">
-          Pixel distance: <span className="font-mono">{pxDistance.toFixed(1)} px</span>
-        </div>
-        <form onSubmit={onSubmit} className="flex items-center gap-2">
-          <input
-            type="number"
-            className="flex-1 border rounded px-2 py-1 text-sm"
-            placeholder="Distance"
-            value={distance}
-            onChange={(e) => setDistance(e.target.value)}
-            min={0}
-            step="0.01"
-            required
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-start p-4 bg-black/40"
+      onClick={handleClose}
+    >
+      <div onClick={(e) => e.stopPropagation()}>
+        {view === 'presets' ? (
+          <ScalePanel
+            currentPage={currentPage}
+            selectedScale={selectedLabel}
+            autoDetected={isAutoDetected}
+            onSelectScale={handleSelectScale}
+            onOpenManual={handleOpenManual}
+            onClose={handleClose}
           />
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value as any)}
-          >
-            <option value="ft">ft</option>
-            <option value="in">in</option>
-            <option value="m">m</option>
-            <option value="mm">mm</option>
-          </select>
-          <button type="submit" className="bg-green-600 text-white rounded px-3 py-1 text-sm">Save</button>
-          <button type="button" onClick={onCancel} className="border rounded px-3 py-1 text-sm">Cancel</button>
-        </form>
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-        {pts.length < 1 ? 'Click first point' : pts.length < 2 ? 'Click second point' : 'Adjust or enter distance and Save'}
+        ) : (
+          <ManualCalibration
+            currentPage={currentPage}
+            onSave={handleManualSave}
+            onCancel={handleManualCancel}
+          />
+        )}
       </div>
     </div>
   );

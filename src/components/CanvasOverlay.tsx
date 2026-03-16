@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Canvas, Polygon as FabricPolygon } from 'fabric';
+import { Canvas, Polygon as FabricPolygon, Circle, Line } from 'fabric';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
@@ -26,6 +26,11 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const currentTool = useStore((s) => s.currentTool);
+
+  // Calibration state
+  const calibrationMode = useStore((s) => s.calibrationMode);
+  const calibrationPoints = useStore((s) => s.calibrationPoints);
+  const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
 
   useEffect(() => {
     if (!canvasEl.current) return;
@@ -97,6 +102,37 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       fc.add(fp);
     });
 
+    // Draw calibration overlays
+    if (calibrationPoints.length > 0) {
+      calibrationPoints.forEach((pt) => {
+        const dot = new Circle({
+          left: pt.x - 5,
+          top: pt.y - 5,
+          radius: 5,
+          fill: '#ef4444',
+          stroke: '#ffffff',
+          strokeWidth: 1,
+          selectable: false,
+          evented: false,
+        });
+        (dot as any)._calibrationOverlay = true;
+        fc.add(dot);
+      });
+
+      if (calibrationPoints.length === 2) {
+        const [p1, p2] = calibrationPoints;
+        const line = new Line([p1.x, p1.y, p2.x, p2.y], {
+          stroke: '#ef4444',
+          strokeWidth: 2,
+          strokeDashArray: [6, 4],
+          selectable: false,
+          evented: false,
+        });
+        (line as any)._calibrationOverlay = true;
+        fc.add(line);
+      }
+    }
+
     fc.off('selection:created');
     fc.off('selection:updated');
     fc.off('mouse:up');
@@ -122,6 +158,13 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
 
       const nativeEvent = e.e as MouseEvent | undefined;
       if (!nativeEvent) return;
+
+      // Calibration mode: capture clicks as calibration points
+      if (calibrationMode && calibrationPoints.length < 2) {
+        const pointer = fc.getScenePoint(nativeEvent);
+        addCalibrationPoint({ x: pointer.x, y: pointer.y });
+        return; // Don't process as polygon interaction
+      }
 
       const isRightClick = nativeEvent.button === 2;
       const targetPolygonId = (e.target as any)?._polygonId as string | undefined;
@@ -156,7 +199,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     });
 
     fc.renderAll();
-  }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown]);
+  }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]);
 
   return (
     <canvas
@@ -167,6 +210,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
         width: '100%',
         height: '100%',
         pointerEvents: currentTool === 'pan' ? 'none' : 'auto',
+        cursor: calibrationMode ? 'crosshair' : undefined,
         zIndex: 10,
       }}
     />

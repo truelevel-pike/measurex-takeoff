@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
-import { useIsMobile } from '@/lib/utils';
+import { useIsMobile, useIsTablet } from '@/lib/utils';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -61,8 +61,38 @@ export default function QuantitiesPanel() {
   const [editColorHex, setEditColorHex] = useState('#3b82f6');
   const [editError, setEditError] = useState<string | null>(null);
 
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const newClassNameRef = useRef<HTMLInputElement>(null);
+
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
+
+  // Focus first element in drawer when opened on mobile
+  useEffect(() => {
+    if (showQuantitiesDrawer && drawerRef.current) {
+      const firstFocusable = drawerRef.current.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus();
+    }
+  }, [showQuantitiesDrawer]);
+
+  // Focus new classification name input when form opens
+  useEffect(() => {
+    if (showNewClassification && newClassNameRef.current) {
+      newClassNameRef.current.focus();
+    }
+  }, [showNewClassification]);
+
+  // Escape to close drawer on mobile
+  const handleDrawerKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowQuantitiesDrawer(false);
+      }
+    },
+    [setShowQuantitiesDrawer]
+  );
 
   const filtered = useMemo(
     () => classifications.filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim())),
@@ -214,14 +244,14 @@ export default function QuantitiesPanel() {
     <>
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
         <span className="font-mono tracking-wider">QUANTITIES</span>
-        <span className="text-xs text-[#8892a0] font-normal">
+        <span className="text-xs text-gray-300 font-normal">
           {grand.count} items - {grand.areaReal.toFixed(1)} sq {unit} - {grand.lengthReal.toFixed(1)} {unit}
         </span>
       </div>
 
       <div className="px-2 pt-2 pb-1">
         <div className="flex items-center gap-2">
-          <Search size={14} className="text-[#8892a0]" />
+          <Search size={14} className="text-gray-300" aria-hidden="true" />
           <input
             placeholder="Search classifications"
             className="flex-1 border px-2 py-1 rounded bg-[#0e1016] text-[#e5e7eb] text-[13px] outline-none focus:border-[#00d4ff]/40"
@@ -303,7 +333,7 @@ export default function QuantitiesPanel() {
                 setShowNewClassification(false);
                 setNewClassificationError(null);
               }}
-              className="text-[#8892a0] text-xs"
+              className="text-gray-300 text-xs"
             >
               Cancel
             </button>
@@ -381,7 +411,7 @@ export default function QuantitiesPanel() {
                   {editError && <p className="text-[11px] text-red-400 mb-2">{editError}</p>}
 
                   <div className="flex gap-2 justify-end">
-                    <button type="button" onClick={cancelEditing} className="text-[#8892a0] text-xs inline-flex items-center gap-1">
+                    <button type="button" onClick={cancelEditing} className="text-gray-300 text-xs inline-flex items-center gap-1">
                       <X size={12} />
                       Cancel
                     </button>
@@ -406,9 +436,9 @@ export default function QuantitiesPanel() {
                 >
                   {totals.count > 0 ? (
                     isExpanded ? (
-                      <ChevronDown size={12} className="text-[#8892a0]" />
+                      <ChevronDown size={12} className="text-gray-300" />
                     ) : (
-                      <ChevronRight size={12} className="text-[#8892a0]" />
+                      <ChevronRight size={12} className="text-gray-300" />
                     )
                   ) : (
                     <div className="w-3" />
@@ -434,7 +464,7 @@ export default function QuantitiesPanel() {
                     className="focus:outline-none"
                     aria-label={isHidden ? 'Show classification' : 'Hide classification'}
                   >
-                    {isHidden ? <EyeOff size={13} className="text-[#8892a0]" /> : <Eye size={13} className="text-[#00d4ff]" />}
+                    {isHidden ? <EyeOff size={13} className="text-gray-300" /> : <Eye size={13} className="text-[#00d4ff]" />}
                   </button>
 
                   <button
@@ -443,7 +473,7 @@ export default function QuantitiesPanel() {
                       event.stopPropagation();
                       startEditing(classification);
                     }}
-                    className="hidden group-hover:inline-flex text-[#8892a0] hover:text-[#00d4ff]"
+                    className="hidden group-hover:inline-flex text-gray-300 hover:text-[#00d4ff]"
                     aria-label="Edit classification"
                   >
                     <Pencil size={13} />
@@ -465,7 +495,7 @@ export default function QuantitiesPanel() {
 
               {isExpanded && totals.count > 0 && !isEditing && (
                 <div className="ml-6 border-l border-[#00d4ff]/20 pl-2 mb-1">
-                  <div className="text-[10px] py-0.5 text-[#8892a0] font-mono">
+                  <div className="text-[10px] py-0.5 text-gray-300 font-mono">
                     Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq {unit} - {totals.lengthReal.toFixed(1)} {unit}
                   </div>
                   {polygonsForClassification.map((polygon, index) => {
@@ -473,7 +503,7 @@ export default function QuantitiesPanel() {
                     const lengthReal = polygon.linearFeet || 0;
 
                     return (
-                      <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2">
+                      <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
                         <span className="truncate">
                           {classification.name} #{index + 1}
                         </span>
@@ -490,7 +520,7 @@ export default function QuantitiesPanel() {
         })}
 
         {filtered.length === 0 && (
-          <div className="text-center text-xs py-8 text-[#8892a0]">
+          <div className="text-center text-xs py-8 text-gray-300">
             {search ? 'No matches' : 'No classifications yet. Click New Classification to add one.'}
           </div>
         )}
@@ -498,28 +528,62 @@ export default function QuantitiesPanel() {
     </>
   );
 
+  const isTablet = useIsTablet();
+
+  // Mobile: full-screen overlay when opened
   if (isMobile) {
     return (
-      <div aria-label="Quantities drawer">
-        <button
-          onClick={() => setShowQuantitiesDrawer(!showQuantitiesDrawer)}
-          className="mobile-only fixed left-1/2 -translate-x-1/2 bottom-[88px] bg-[rgba(18,18,26,0.8)] text-[#e5e7eb] border border-[#00d4ff]/20 rounded-t-lg px-4 py-1 text-xs z-30"
-          aria-label={showQuantitiesDrawer ? 'Hide quantities' : 'Show quantities'}
-        >
-          {showQuantitiesDrawer ? 'Hide Quantities' : 'Show Quantities'}
-        </button>
+      <>
         {showQuantitiesDrawer && (
-          <div className="fixed left-0 right-0 bottom-[88px] bg-[rgba(18,18,26,0.9)] backdrop-blur-md border-t border-[#00d4ff]/20 rounded-t-2xl p-3 max-h-[55vh] overflow-y-auto z-50">
-            {panel}
+          <div
+            className="fixed inset-0 z-50 bg-[rgba(10,10,15,0.95)] backdrop-blur-md flex flex-col max-h-screen overflow-y-auto"
+            aria-label="Quantities overlay"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#00d4ff]/20">
+              <span className="font-mono tracking-wider text-sm text-[#00d4ff]">QUANTITIES</span>
+              <button
+                onClick={() => setShowQuantitiesDrawer(false)}
+                className="text-gray-300 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Close quantities"
+                style={{ touchAction: 'manipulation' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto max-h-[90vh]">
+              {panel}
+            </div>
           </div>
         )}
-      </div>
+      </>
     );
   }
 
+  // Tablet: slide-over panel from right, hidden by default
+  if (isTablet) {
+    return (
+      <>
+        {showQuantitiesDrawer && (
+          <div className="fixed inset-0 z-40" onClick={() => setShowQuantitiesDrawer(false)}>
+            <div className="absolute inset-0 bg-black/30" />
+          </div>
+        )}
+        <aside
+          className={`fixed top-[54px] right-0 bottom-0 z-50 w-[280px] bg-[rgba(18,18,26,0.95)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col text-[13px] transition-transform duration-200 ease-in-out max-h-[calc(100vh-54px)] overflow-y-auto ${
+            showQuantitiesDrawer ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          aria-label="Quantities panel"
+        >
+          {panel}
+        </aside>
+      </>
+    );
+  }
+
+  // Desktop (lg+): always visible sidebar
   return (
     <aside
-      className="bg-[rgba(18,18,26,0.8)] md:w-[240px] lg:w-72 shrink-0 h-full flex flex-col border-l border-[#00d4ff]/20 text-[13px]"
+      className="hidden lg:flex bg-[rgba(18,18,26,0.8)] w-72 shrink-0 h-full flex-col border-l border-[#00d4ff]/20 text-[13px]"
       aria-label="Quantities panel"
     >
       {panel}

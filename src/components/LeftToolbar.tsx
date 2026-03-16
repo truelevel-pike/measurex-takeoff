@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { useStore } from '@/lib/store';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { useStore, type Tool } from '@/lib/store';
 import { useIsMobile } from '@/lib/utils';
 import {
   MousePointer2,
@@ -15,7 +15,10 @@ import {
   Undo2,
   Redo2,
   MessageCircle,
+  Wand2,
+  ChevronUp,
 } from 'lucide-react';
+import SmartTools from './SmartTools';
 
 const GROUPS = [
   [
@@ -44,10 +47,40 @@ export default function LeftToolbar() {
   const setTool = useStore((s) => s.setTool);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
+  const [smartOpen, setSmartOpen] = React.useState(false);
+
+  const smartPanelRef = useRef<HTMLDivElement>(null);
+  const smartTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Focus first interactive element in Smart Tools panel when opened
+  useEffect(() => {
+    if (smartOpen && smartPanelRef.current) {
+      const firstFocusable = smartPanelRef.current.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus();
+    }
+  }, [smartOpen]);
+
+  // Return focus to trigger on close
+  const closeSmartTools = useCallback(() => {
+    setSmartOpen(false);
+    smartTriggerRef.current?.focus();
+  }, []);
+
+  // Escape handler for Smart Tools panel
+  const handleSmartPanelKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeSmartTools();
+      }
+    },
+    [closeSmartTools]
+  );
 
   function onClick(btn: (typeof GROUPS)[number][number]) {
     if ('action' in btn) return btn.action === 'undo' ? undo() : redo();
-    setTool((btn as any).tool);
+    setTool((btn as { tool: Tool }).tool);
   }
 
   // Mobile: horizontal bottom toolbar with sword.army dark theme
@@ -59,7 +92,7 @@ export default function LeftToolbar() {
           position: 'fixed',
           left: 0,
           right: 0,
-          bottom: 40, // above bottom status bar (~32px)
+          bottom: 40,
           background: '#0a0a0f',
           borderTop: '1px solid rgba(0,212,255,0.2)',
           padding: '6px 8px',
@@ -72,13 +105,14 @@ export default function LeftToolbar() {
         }}
       >
         {GROUPS.flat().map((b) => {
-          const active = 'tool' in b && currentTool === (b as any).tool;
+          const active = 'tool' in b && currentTool === (b as { tool: string }).tool;
           return (
             <button
               key={b.label}
               aria-label={`${b.label} (${b.shortcut})`}
+              aria-pressed={'tool' in b ? active : undefined}
               title={`${b.label} (${b.shortcut})`}
-              onClick={() => onClick(b as any)}
+              onClick={() => onClick(b as (typeof GROUPS)[number][number])}
               style={{
                 minWidth: 44,
                 height: 44,
@@ -91,9 +125,11 @@ export default function LeftToolbar() {
                 justifyContent: 'center',
                 flex: '0 0 auto',
                 boxShadow: active ? '0 0 10px rgba(0,212,255,0.25) inset' : 'none',
+                touchAction: 'manipulation',
               }}
             >
-              <b.icon size={20} />
+              <b.icon size={20} aria-hidden="true" />
+              <span className="sr-only">{b.label}</span>
             </button>
           );
         })}
@@ -118,15 +154,16 @@ export default function LeftToolbar() {
     >
       {GROUPS.map((grp, gi) => (
         <React.Fragment key={gi}>
-          {gi > 0 && <div style={{ width: 34, height: 1, background: 'rgba(0,212,255,0.15)', margin: '10px 0' }} />}
+          {gi > 0 && <div style={{ width: 34, height: 1, background: 'rgba(0,212,255,0.15)', margin: '10px 0' }} aria-hidden="true" />}
           {grp.map((b) => {
-            const active = 'tool' in b && currentTool === (b as any).tool;
+            const active = 'tool' in b && currentTool === (b as { tool: string }).tool;
             return (
               <button
                 key={b.label}
                 aria-label={`${b.label} (${b.shortcut})`}
+                aria-pressed={'tool' in b ? active : undefined}
                 title={`${b.label} (${b.shortcut})`}
-                onClick={() => onClick(b as any)}
+                onClick={() => onClick(b as (typeof GROUPS)[number][number])}
                 style={{
                   width: 36,
                   height: 36,
@@ -142,12 +179,75 @@ export default function LeftToolbar() {
                   boxShadow: active ? '0 0 10px rgba(0,212,255,0.22) inset' : 'none',
                 }}
               >
-                <b.icon size={20} />
+                <b.icon size={20} aria-hidden="true" />
+                <span className="sr-only">{b.label}</span>
               </button>
             );
           })}
         </React.Fragment>
       ))}
+      {/* Smart Tools section */}
+      <div style={{ width: 34, height: 1, background: 'rgba(0,212,255,0.15)', margin: '10px 0' }} aria-hidden="true" />
+      <button
+        ref={smartTriggerRef}
+        aria-label="Smart Tools"
+        aria-expanded={smartOpen}
+        title="Smart Tools"
+        onClick={() => setSmartOpen((o) => !o)}
+        style={{
+          width: 36,
+          height: 36,
+          margin: '6px 0',
+          background: smartOpen ? 'rgba(0,212,255,0.12)' : '#12121a',
+          color: smartOpen ? '#00d4ff' : '#b9bedc',
+          border: `1px solid ${smartOpen ? 'rgba(0,212,255,0.5)' : 'rgba(0,212,255,0.15)'}`,
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: smartOpen ? '0 0 10px rgba(0,212,255,0.22) inset' : 'none',
+        }}
+      >
+        <Wand2 size={20} aria-hidden="true" />
+        <span className="sr-only">Smart Tools</span>
+      </button>
+      {smartOpen && (
+        <div
+          ref={smartPanelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="smart-tools-heading"
+          onKeyDown={handleSmartPanelKeyDown}
+          style={{
+            position: 'absolute',
+            left: 58,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 220,
+            background: '#0a0a0f',
+            border: '1px solid rgba(0,212,255,0.25)',
+            borderRadius: 10,
+            padding: 10,
+            zIndex: 50,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span id="smart-tools-heading" style={{ fontSize: 12, fontWeight: 600, color: '#00d4ff' }}>Smart Tools</span>
+            <button
+              onClick={closeSmartTools}
+              aria-label="Close Smart Tools"
+              style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer' }}
+            >
+              <ChevronUp size={14} aria-hidden="true" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+          <SmartTools />
+        </div>
+      )}
+
       <div style={{ flexGrow: 1 }} />
       <button
         aria-label="Open chat"
@@ -165,7 +265,8 @@ export default function LeftToolbar() {
           justifyContent: 'center',
         }}
       >
-        <MessageCircle size={20} />
+        <MessageCircle size={20} aria-hidden="true" />
+        <span className="sr-only">Open chat</span>
       </button>
     </aside>
   );

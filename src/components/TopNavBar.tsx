@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useIsMobile } from '@/lib/utils';
+import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import {
   LayoutGrid,
@@ -15,9 +15,12 @@ import {
   GitCompare,
   Download,
   Layers,
+  Search,
   Save as SaveIcon,
   Loader2,
   Ellipsis,
+  Menu,
+  PanelRightOpen,
 } from 'lucide-react';
 
 interface TopNavBarProps {
@@ -35,6 +38,7 @@ interface TopNavBarProps {
   saving?: boolean;
   projectName?: string;
   onChat?: () => void;
+  onToggleImageSearch?: () => void;
 }
 
 export default function TopNavBar({
@@ -47,6 +51,7 @@ export default function TopNavBar({
   onZoomOut,
   onAITakeoff,
   onChat,
+  onToggleImageSearch,
   aiLoading,
   onExport,
   onSave,
@@ -55,8 +60,11 @@ export default function TopNavBar({
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const showMobileMenu = useStore((s) => (s as any).showMobileMenu ?? false);
-  const setShowMobileMenu = useStore((s) => (s as any).setShowMobileMenu ?? (() => {}));
+  const isTablet = useIsTablet();
+  const showMobileMenu = useStore((s) => (s as { showMobileMenu?: boolean }).showMobileMenu ?? false);
+  const setShowMobileMenu = useStore((s) => (s as { setShowMobileMenu?: (v: boolean) => void }).setShowMobileMenu ?? (() => {}));
+  const showQuantitiesDrawer = useStore((s) => s.showQuantitiesDrawer);
+  const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
 
   const badge = typeof pageIndex === 'number' && typeof totalPages === 'number'
     ? isMobile
@@ -64,10 +72,19 @@ export default function TopNavBar({
       : `Page ${pageIndex + 1} of ${totalPages}`
     : sheetName;
 
+  // Close mobile menu on Escape
+  function handleHeaderKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    if (e.key === 'Escape' && showMobileMenu) {
+      setShowMobileMenu(false);
+    }
+  }
+
   return (
     <div className="w-full relative">
       <header
         className="w-full backdrop-blur-sm border-b"
+        role="banner"
+        onKeyDown={handleHeaderKeyDown}
         style={{
           height: 52,
           background: 'rgba(10,10,15,0.9)',
@@ -88,20 +105,21 @@ export default function TopNavBar({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <NavIconButton
             ariaLabel="Open projects"
-            icon={<LayoutGrid size={18} />}
+            icon={<LayoutGrid size={18} aria-hidden="true" />}
+            srLabel="Open projects"
             tooltip="Projects"
             onClick={() => router.push('/projects')}
           />
 
           {/* Brand */}
-          <div className="hidden md:flex items-baseline gap-2 select-none">
+          <div className="hidden md:flex items-baseline gap-2 select-none" aria-label="MeasureX Takeoff Engine">
             <span className="font-mono tracking-wider text-white text-sm">MEASUREX</span>
             <span className="font-mono tracking-wider text-[#00d4ff] text-[10px]">TAKEOFF ENGINE</span>
           </div>
 
           {!isMobile && onSave && (
             <button
-              aria-label={saving ? 'Saving project' : 'Save project'}
+              aria-label={saving ? 'Saving project, please wait' : 'Save project'}
               onClick={onSave}
               disabled={saving}
               className="ml-2"
@@ -121,18 +139,20 @@ export default function TopNavBar({
               onMouseEnter={(e) => !saving && (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.25)')}
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <SaveIcon size={14} />}
+              {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <SaveIcon size={14} aria-hidden="true" />}
               {saving ? 'Saving…' : 'Save'}
             </button>
           )}
           {projectName && !isMobile && (
-            <span style={{ color: '#8892a0', fontSize: 11, marginLeft: 6 }}>{projectName}</span>
+            <span style={{ color: '#8892a0', fontSize: 11, marginLeft: 6 }} aria-label={`Project: ${projectName}`}>{projectName}</span>
           )}
-          <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} />
-          <NavIconButton ariaLabel="Previous sheet" icon={<ChevronLeft size={16} />} tooltip="Previous Sheet" onClick={onPrev} />
-          <NavIconButton ariaLabel="Next sheet" icon={<ChevronRight size={16} />} tooltip="Next Sheet" onClick={onNext} />
+          <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
+          <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />
+          <NavIconButton ariaLabel="Next sheet" srLabel="Next sheet" icon={<ChevronRight size={16} aria-hidden="true" />} tooltip="Next Sheet" onClick={onNext} />
           <div
-            aria-label="Sheet badge"
+            aria-label={`Current sheet: ${badge}`}
+            role="status"
+            aria-live="polite"
             style={{
               background: 'rgba(0,212,255,0.1)',
               border: '1px solid rgba(0,212,255,0.35)',
@@ -148,17 +168,18 @@ export default function TopNavBar({
               boxShadow: '0 0 12px rgba(0,212,255,0.15) inset',
             }}
           >
-            <Layers size={13} />
+            <Layers size={13} aria-hidden="true" />
             {badge}
           </div>
         </div>
 
         {/* Right section */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <nav aria-label="Actions" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {!isMobile && (
             <>
               <button
-                aria-label="Run AI Takeoff"
+                aria-label={aiLoading ? 'AI Takeoff running, please wait' : 'Run AI Takeoff'}
+                aria-busy={aiLoading}
                 onClick={onAITakeoff}
                 disabled={aiLoading}
                 style={{
@@ -179,7 +200,7 @@ export default function TopNavBar({
                 onMouseEnter={(e) => !aiLoading && (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)')}
               >
-                {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {aiLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
                 {aiLoading ? 'Analyzing…' : 'AI Takeoff'}
               </button>
               <button
@@ -201,38 +222,141 @@ export default function TopNavBar({
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)')}
               >
-                <MessageSquare size={14} />
+                <MessageSquare size={14} aria-hidden="true" />
                 MX Chat
               </button>
-              <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} />
-              <NavIconButton ariaLabel="Show quantities" icon={<List size={17} />} tooltip="Quantities" />
-              <NavIconButton ariaLabel="Grid view" icon={<Grid3X3 size={17} />} tooltip="Grid View" />
-              <NavIconButton ariaLabel="Compare" icon={<GitCompare size={17} />} tooltip="Compare" />
-              <NavIconButton ariaLabel="Export to Excel" icon={<Download size={17} />} tooltip="Export to Excel" onClick={onExport} />
+              <button
+                aria-label="Toggle AI Image Search"
+                onClick={onToggleImageSearch}
+                style={{
+                  background: '#12121a',
+                  color: '#e0e0e0',
+                  border: '1px solid rgba(0,212,255,0.2)',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)')}
+              >
+                <Search size={14} aria-hidden="true" />
+                Image Search
+              </button>
+              <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
+              <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
+              <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
+              <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" />
+              <NavIconButton ariaLabel="Export to Excel" srLabel="Export to Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Export to Excel" onClick={onExport} />
             </>
+          )}
+          {isTablet && (
+            <NavIconButton
+              ariaLabel={showQuantitiesDrawer ? 'Hide quantities panel' : 'Show quantities panel'}
+              srLabel={showQuantitiesDrawer ? 'Hide quantities panel' : 'Show quantities panel'}
+              icon={<PanelRightOpen size={17} aria-hidden="true" />}
+              tooltip="Toggle Quantities"
+              onClick={() => setShowQuantitiesDrawer(!showQuantitiesDrawer)}
+              ariaExpanded={showQuantitiesDrawer}
+            />
           )}
           {isMobile && (
             <>
               {onSave && (
-                <NavIconButton ariaLabel={saving ? 'Saving' : 'Save'} icon={saving ? <Loader2 size={16} className="animate-spin" /> : <SaveIcon size={16} />} tooltip="Save" onClick={onSave} />
+                <NavIconButton
+                  ariaLabel={saving ? 'Saving' : 'Save'}
+                  srLabel={saving ? 'Saving project' : 'Save project'}
+                  icon={saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <SaveIcon size={16} aria-hidden="true" />}
+                  tooltip="Save"
+                  onClick={onSave}
+                />
               )}
-              <NavIconButton ariaLabel="More" icon={<Ellipsis size={18} />} tooltip="More" onClick={() => setShowMobileMenu(!showMobileMenu)} />
+              <NavIconButton
+                ariaLabel={showMobileMenu ? 'Close menu' : 'Open menu'}
+                srLabel={showMobileMenu ? 'Close menu' : 'Open menu'}
+                icon={<Menu size={18} aria-hidden="true" />}
+                tooltip="Menu"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                ariaExpanded={showMobileMenu}
+              />
             </>
           )}
-        </div>
+        </nav>
       </header>
       {/* Scanline bar */}
-      <div className="scanline" style={{ height: 2, background: 'linear-gradient(90deg, rgba(0,212,255,0) 0%, rgba(0,212,255,0.6) 50%, rgba(0,212,255,0) 100%)', position: 'relative' }} />
+      <div className="scanline" aria-hidden="true" style={{ height: 2, background: 'linear-gradient(90deg, rgba(0,212,255,0) 0%, rgba(0,212,255,0.6) 50%, rgba(0,212,255,0) 100%)', position: 'relative' }} />
+
+      {/* Mobile dropdown menu */}
+      {isMobile && showMobileMenu && (
+        <div
+          className="absolute top-[54px] left-0 right-0 z-50 bg-[#0a0a0f] border-b border-[rgba(0,212,255,0.2)] p-3 flex flex-col gap-2 max-h-[90vh] overflow-y-auto"
+          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+        >
+          <button
+            onClick={() => { onAITakeoff?.(); setShowMobileMenu(false); }}
+            disabled={aiLoading}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0faff] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {aiLoading ? 'Analyzing...' : 'AI Takeoff'}
+          </button>
+          <button
+            onClick={() => { onChat?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <MessageSquare size={16} /> MX Chat
+          </button>
+          <button
+            onClick={() => { onToggleImageSearch?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Search size={16} /> Image Search
+          </button>
+          <button
+            onClick={() => { onExport?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Download size={16} /> Export
+          </button>
+          <button
+            onClick={() => { setShowQuantitiesDrawer(!showQuantitiesDrawer); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <List size={16} /> Quantities
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function NavIconButton({ icon, tooltip, onClick, ariaLabel }: { icon: React.ReactNode; tooltip: string; onClick?: () => void; ariaLabel: string }) {
+interface NavIconButtonProps {
+  icon: React.ReactNode;
+  tooltip: string;
+  onClick?: () => void;
+  ariaLabel: string;
+  srLabel: string;
+  ariaExpanded?: boolean;
+  ariaPressed?: boolean;
+}
+
+function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed }: NavIconButtonProps) {
   return (
     <button
       aria-label={ariaLabel}
       title={tooltip}
       onClick={onClick}
+      aria-expanded={ariaExpanded}
+      aria-pressed={ariaPressed}
       style={{
         background: '#12121a',
         border: '1px solid rgba(0,212,255,0.15)',
@@ -244,6 +368,9 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel }: { icon: React.Reac
         alignItems: 'center',
         justifyContent: 'center',
         transition: 'all 150ms ease',
+        minWidth: 36,
+        minHeight: 36,
+        touchAction: 'manipulation',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'rgba(0,212,255,0.4)';
@@ -257,6 +384,7 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel }: { icon: React.Reac
       }}
     >
       {icon}
+      <span className="sr-only">{srLabel}</span>
     </button>
   );
 }

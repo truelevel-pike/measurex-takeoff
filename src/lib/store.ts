@@ -5,6 +5,9 @@ import type {
   Polygon,
   ScaleCalibration,
   Point,
+  Assembly,
+  ClassificationGroup,
+  Markup,
 } from './types';
 
 // Helpers
@@ -84,10 +87,40 @@ export interface Store extends ProjectState {
   undo: () => void;
   redo: () => void;
 
+  // Assemblies
+  assemblies: Assembly[];
+  addAssembly: (assembly: Assembly) => void;
+  updateAssembly: (id: string, updates: Partial<Assembly>) => void;
+  deleteAssembly: (id: string) => void;
+
   // 3D View
   show3D: boolean;
   toggleShow3D: () => void;
   setShow3D: (show: boolean) => void;
+
+  // Markups
+  markups: Markup[];
+  showMarkups: boolean;
+  addMarkup: (markup: Markup) => void;
+  deleteMarkup: (id: string) => void;
+  clearMarkups: (pageNumber?: number) => void;
+  toggleShowMarkups: () => void;
+
+  // Calibration (Draw Line mode)
+  calibrationMode: boolean;
+  calibrationPoints: Point[];
+  setCalibrationMode: (active: boolean) => void;
+  addCalibrationPoint: (p: Point) => void;
+  clearCalibrationPoints: () => void;
+
+  // Classification Groups
+  groups: ClassificationGroup[];
+  addGroup: (name: string, color: string) => void;
+  updateGroup: (id: string, patch: Partial<ClassificationGroup>) => void;
+  deleteGroup: (id: string) => void;
+  moveClassificationToGroup: (classificationId: string, groupId: string) => void;
+  addBreakdown: (groupId: string, name: string) => void;
+  deleteBreakdown: (groupId: string, breakdownId: string) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -102,7 +135,7 @@ function snapshot(state: Store): HistorySnapshot {
   };
 }
 
-export const useStore = create<Store>((set, get) => ({
+export const useStore = create<Store>()((set, get) => ({
   // ProjectState
   classifications: [],
   polygons: [],
@@ -364,8 +397,99 @@ export const useStore = create<Store>((set, get) => ({
     });
   },
 
+  // ─── Assemblies ───
+  assemblies: [],
+  addAssembly: (assembly) => set((s) => ({ assemblies: [...s.assemblies, assembly] })),
+  updateAssembly: (id, updates) =>
+    set((s) => ({
+      assemblies: s.assemblies.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+    })),
+  deleteAssembly: (id) => set((s) => ({ assemblies: s.assemblies.filter((a) => a.id !== id) })),
+
   // ─── 3D View ───
   show3D: false,
   toggleShow3D: () => set((s) => ({ show3D: !s.show3D })),
   setShow3D: (show: boolean) => set({ show3D: show }),
+
+  // ─── Markups ───
+  markups: [],
+  showMarkups: true,
+  addMarkup: (markup) => set((s) => ({ markups: [...s.markups, markup] })),
+  deleteMarkup: (id) => set((s) => ({ markups: s.markups.filter((m) => m.id !== id) })),
+  clearMarkups: (pageNumber) =>
+    set((s) => ({
+      markups: pageNumber !== undefined ? s.markups.filter((m) => m.pageNumber !== pageNumber) : [],
+    })),
+  toggleShowMarkups: () => set((s) => ({ showMarkups: !s.showMarkups })),
+
+  // ─── Calibration ───
+  calibrationMode: false,
+  calibrationPoints: [],
+  setCalibrationMode: (active) => set({ calibrationMode: active, calibrationPoints: active ? [] : get().calibrationPoints }),
+  addCalibrationPoint: (p) => {
+    const pts = get().calibrationPoints;
+    if (pts.length >= 2) return;
+    set({ calibrationPoints: [...pts, p] });
+  },
+  clearCalibrationPoints: () => set({ calibrationPoints: [], calibrationMode: false }),
+
+  // ─── Classification Groups ───
+  groups: [
+    { id: 'grp-drywall', name: 'Drywall', color: '#f59e0b', classificationIds: [], breakdowns: [] },
+    { id: 'grp-painting', name: 'Painting', color: '#3b82f6', classificationIds: [], breakdowns: [] },
+    { id: 'grp-flooring', name: 'Flooring', color: '#10b981', classificationIds: [], breakdowns: [] },
+    { id: 'grp-plumbing', name: 'Plumbing', color: '#6366f1', classificationIds: [], breakdowns: [] },
+    { id: 'grp-electrical', name: 'Electrical', color: '#ef4444', classificationIds: [], breakdowns: [] },
+    { id: 'grp-concrete', name: 'Concrete', color: '#8b5cf6', classificationIds: [], breakdowns: [] },
+    { id: 'grp-masonry', name: 'Masonry', color: '#d97706', classificationIds: [], breakdowns: [] },
+    { id: 'grp-framing', name: 'Framing', color: '#14b8a6', classificationIds: [], breakdowns: [] },
+  ],
+
+  addGroup: (name, color) => {
+    const id = crypto.randomUUID();
+    set((s) => ({
+      groups: [...s.groups, { id, name: name.trim(), color, classificationIds: [], breakdowns: [] }],
+    }));
+  },
+
+  updateGroup: (id, patch) =>
+    set((s) => ({
+      groups: s.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+    })),
+
+  deleteGroup: (id) =>
+    set((s) => ({
+      groups: s.groups.filter((g) => g.id !== id),
+    })),
+
+  moveClassificationToGroup: (classificationId, groupId) =>
+    set((s) => ({
+      groups: s.groups.map((g) => {
+        // Remove from all groups first
+        const filtered = g.classificationIds.filter((cid) => cid !== classificationId);
+        // Add to target group
+        if (g.id === groupId) {
+          return { ...g, classificationIds: [...filtered, classificationId] };
+        }
+        return { ...g, classificationIds: filtered };
+      }),
+    })),
+
+  addBreakdown: (groupId, name) =>
+    set((s) => ({
+      groups: s.groups.map((g) =>
+        g.id === groupId
+          ? { ...g, breakdowns: [...g.breakdowns, { id: crypto.randomUUID(), name: name.trim(), classificationIds: [] }] }
+          : g
+      ),
+    })),
+
+  deleteBreakdown: (groupId, breakdownId) =>
+    set((s) => ({
+      groups: s.groups.map((g) =>
+        g.id === groupId
+          ? { ...g, breakdowns: g.breakdowns.filter((b) => b.id !== breakdownId) }
+          : g
+      ),
+    })),
 }));

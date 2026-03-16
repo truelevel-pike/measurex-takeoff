@@ -5,11 +5,16 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Line } from '@react-three/drei';
 
+/** 2D point used by takeoff data and the conversion layer. */
 export interface FloorPoint {
   x: number;
   y: number;
 }
 
+/**
+ * Batch-level item kept for backward compat with takeoff-to-3d imports.
+ * ThreeDScene maps these into individual <FloorAreaMesh /> elements.
+ */
 export interface FloorAreaItem {
   id: string;
   label: string;
@@ -19,14 +24,36 @@ export interface FloorAreaItem {
   points: FloorPoint[];
 }
 
-interface FloorAreaMeshProps {
-  areas: FloorAreaItem[];
-  selectedIds?: string[];
-  hiddenClassificationIds?: string[];
-  onSelect?: (areaId: string, additive?: boolean) => void;
-  yOffset?: number;
-  opacity?: number;
-  strokeColor?: string;
+// ---------------------------------------------------------------------------
+// Props — per the Wave 6 spec
+// ---------------------------------------------------------------------------
+export interface FloorAreaMeshProps {
+  /** Polygon vertices — 2D {x,y} or 3-tuples [x,y,z]. */
+  points: FloorPoint[] | [number, number, number][];
+  /** Fill colour (hex string). Falls back to cyan. */
+  color?: string;
+  /** Whether this polygon is currently selected. */
+  selected?: boolean;
+  /** Numeric measurement value (used only for aria / future tooltip). */
+  measurement?: number;
+  /** Classification display name (used only for aria / future tooltip). */
+  classificationName?: string;
+  /** Click handler */
+  onClick?: (e: THREE.Event) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Normalise either point format into FloorPoint[]. */
+function normalizePoints(pts: FloorPoint[] | [number, number, number][]): FloorPoint[] {
+  if (pts.length === 0) return [];
+  const first = pts[0];
+  if (Array.isArray(first)) {
+    return (pts as [number, number, number][]).map(([x, , z]) => ({ x, y: z }));
+  }
+  return pts as FloorPoint[];
 }
 
 function buildShape(points: FloorPoint[]): THREE.Shape | null {
@@ -40,75 +67,88 @@ function buildShape(points: FloorPoint[]): THREE.Shape | null {
   return shape;
 }
 
-function pointArrayToVec3(points: FloorPoint[], y = 0.01) {
+function pointsToVec3(points: FloorPoint[], y: number): THREE.Vector3[] {
   return points.map((p) => new THREE.Vector3(p.x, y, p.y));
 }
 
-export default function FloorAreaMesh({
-  areas,
-  selectedIds = [],
-  hiddenClassificationIds = [],
-  onSelect,
-  yOffset = 0,
-  opacity = 0.45,
-  strokeColor = '#00d4ff',
-}: FloorAreaMeshProps) {
-  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const hiddenCls = useMemo(() => new Set(hiddenClassificationIds), [hiddenClassificationIds]);
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
-  const prepared = useMemo(() => {
-    return areas
-      .filter((a) => a.visible !== false)
-      .filter((a) => !hiddenCls.has(a.classificationId))
-      .map((area) => {
-        const shape = buildShape(area.points);
-        if (!shape) return null;
-        const geometry = new THREE.ShapeGeometry(shape);
-        geometry.rotateX(-Math.PI / 2); // XY -> XZ plane
-        geometry.translate(0, yOffset, 0);
-        return { area, geometry };
-      })
-      .filter(Boolean) as Array<{ area: FloorAreaItem; geometry: THREE.ShapeGeometry }>;
-  }, [areas, hiddenCls, yOffset]);
+export default function FloorAreaMesh({
+  points: rawPoints,
+  color = '#00d4ff',
+  selected = false,
+  measurement,
+  classificationName,
+  onClick,
+}: FloorAreaMeshProps) {
+  const points = useMemo(() => normalizePoints(rawPoints), [rawPoints]);
+
+  const geometry = useMemo(() => {
+    const shape = buildShape(points);
+    if (!shape) return null;
+    const geo = new THREE.ShapeGeometry(shape);
+    // Rotate from XY plane onto XZ ground plane
+    geo.rotateX(-Math.PI / 2);
+    // Slight lift to avoid z-fighting with ground
+    geo.translate(0, 0.01, 0);
+    return geo;
+  }, [points]);
+
+  if (!geometry) return null;
+
+  const fillColor = new THREE.Color(selected ? brighten(color) : color);
+  const opacity = selected ? 0.8 : 0.5;
+  const outlineY = 0.02; // slightly above fill
+
+  const outlinePoints = [
+    ...pointsToVec3(points, outlineY),
+    ...pointsToVec3(points, outlineY).slice(0, 1),
+  ];
 
   return (
-    <group name="floor-area-meshes">
-      {prepared.map(({ area, geometry }) => {
-        const isSelected = selected.has(area.id);
-        const fill = new THREE.Color(isSelected ? '#00ff88' : area.color || '#00d4ff');
-        const edge = isSelected ? '#00ff88' : strokeColor;
+    <group
+      name={classificationName ? `floor-${classificationName}` : 'floor-area'}
+      userData={{ measurement, classificationName }}
+    >
+      <mesh
+        geometry={geometry}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onClick?.(e as unknown as THREE.Event);
+        }}
+      >
+        <meshStandardMaterial
+          color={fillColor}
+          transparent
+          opacity={opacity}
+          emissive={selected ? new THREE.Color(color) : new THREE.Color('#000000')}
+          emissiveIntensity={selected ? 0.35 : 0}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
 
-        return (
-          <group key={area.id} name={`floor-area-${area.id}`}>
-            <mesh
-              geometry={geometry}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                onSelect?.(area.id, e.shiftKey);
-              }}
-            >
-              <meshStandardMaterial
-                color={fill}
-                transparent
-                opacity={isSelected ? Math.max(opacity, 0.62) : opacity}
-                emissive={isSelected ? new THREE.Color('#00ff88') : new THREE.Color('#000000')}
-                emissiveIntensity={isSelected ? 0.35 : 0}
-                depthWrite={false}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* outline */}
-            <Line
-              points={[...pointArrayToVec3(area.points, yOffset + 0.01), ...pointArrayToVec3(area.points, yOffset + 0.01).slice(0, 1)]}
-              color={edge}
-              lineWidth={isSelected ? 2.5 : 1.2}
-              transparent
-              opacity={isSelected ? 0.95 : 0.6}
-            />
-          </group>
-        );
-      })}
+      {/* Outline */}
+      <Line
+        points={outlinePoints}
+        color={selected ? brighten(color) : color}
+        lineWidth={selected ? 2.5 : 1.2}
+        transparent
+        opacity={selected ? 0.95 : 0.6}
+      />
     </group>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Utility
+// ---------------------------------------------------------------------------
+
+/** Simple brightening by blending toward white. */
+function brighten(hex: string, factor = 0.35): string {
+  const c = new THREE.Color(hex);
+  c.lerp(new THREE.Color('#ffffff'), factor);
+  return '#' + c.getHexString();
 }

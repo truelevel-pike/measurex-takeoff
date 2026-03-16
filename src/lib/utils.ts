@@ -26,3 +26,16 @@ export function useIsMobile(breakpoint = 768) {
   }, [breakpoint]);
   return isMobile;
 }
+
+export function useIsTablet() {
+  const [isTablet, setIsTablet] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('matchMedia' in window)) return;
+    const mql = window.matchMedia('(min-width: 769px) and (max-width: 1024px)');
+    setIsTablet(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsTablet(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return isTablet;
+}

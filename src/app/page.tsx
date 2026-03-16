@@ -30,6 +30,8 @@ import MergeSplitTool from '@/components/MergeSplitTool';
 import ScalePopup from '@/components/ScalePopup';
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
+import TogalChat from '@/components/TogalChat';
+import AIImageSearch from '@/components/AIImageSearch';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'measure'> = {
   v: 'select',
@@ -100,6 +102,10 @@ function PageInner() {
   // Context menu + properties panel state
   const [menuState, setMenuState] = useState<{ polygonId: string; x: number; y: number } | null>(null);
   const [showProperties, setShowProperties] = useState(false);
+
+  // Chat & Image Search panel state
+  const [showChat, setShowChat] = useState(false);
+  const [showImageSearch, setShowImageSearch] = useState(false);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -473,6 +479,8 @@ function PageInner() {
         onSave={handleSave}
         saving={saving}
         projectName={projectName || undefined}
+        onChat={() => setShowChat((v) => !v)}
+        onToggleImageSearch={() => setShowImageSearch((v) => !v)}
       />
 
       <div className={show3D ? 'flex-1 min-h-0' : 'hidden'}>
@@ -556,7 +564,8 @@ function PageInner() {
         <QuantitiesPanel />
       </div>
 
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 border-t">
+      {/* Mobile/Tablet bottom toolbar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0f]/95 backdrop-blur-sm border-t border-[rgba(0,212,255,0.2)]">
         <LeftToolbar />
       </div>
 
@@ -564,11 +573,11 @@ function PageInner() {
         <ScalePopup detectedScaleText={detectedScale.scale.label} onAccept={handleAcceptScale} onManual={handleManualScale} />
       )}
 
-      {showCalModal && <ScaleCalibration />}
+      {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
 
       {aiLoading && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-white rounded-xl p-8 shadow-2xl text-center max-w-md">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-8 shadow-2xl text-center max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
             <div className="text-lg font-semibold text-neutral-800">AI Takeoff in Progress</div>
             <div className="text-sm text-neutral-500 mt-2">{aiStatus}</div>
@@ -587,6 +596,9 @@ function PageInner() {
           {aiStatus}
         </div>
       )}
+
+      {showChat && <TogalChat onClose={() => setShowChat(false)} />}
+      {showImageSearch && <AIImageSearch onClose={() => setShowImageSearch(false)} />}
     </div>
   );
 }

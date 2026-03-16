@@ -17,6 +17,9 @@ export interface Classification {
   color: string; // hex color
   type: 'area' | 'linear' | 'count';
   visible: boolean;
+  formula?: string;
+  formulaUnit?: string;
+  formulaSavedToLibrary?: boolean;
 }
 
 export interface ScaleCalibration {
@@ -42,6 +45,66 @@ export interface DetectedElement {
   points: Point[];
   color?: string;
   confidence?: number;
+}
+
+export interface Material {
+  id: string;
+  name: string;
+  unitCost: number;
+  wasteFactor: number;
+  coverageRate: number;
+  unit: string;
+  formula?: string;
+}
+
+export interface Assembly {
+  id: string;
+  name: string;
+  classificationId: string;
+  materials: Material[];
+  isLibrary: boolean;
+}
+
+export interface ClassificationBreakdown {
+  id: string;
+  name: string;
+  classificationIds: string[];
+}
+
+export interface ClassificationGroup {
+  id: string;
+  name: string;
+  color: string;
+  classificationIds: string[];
+  breakdowns: ClassificationBreakdown[];
+}
+
+export interface Markup {
+  id: string;
+  type: "text" | "arrow" | "cloud" | "dimension" | "highlight" | "freehand";
+  points: { x: number; y: number }[];
+  text?: string;
+  color: string;
+  strokeWidth: number;
+  pageNumber: number;
+}
+
+export interface DrawingSet {
+  id: string;
+  name: string;
+  projectId: string;
+  drawings: Drawing[];
+  createdAt: string;
+}
+
+export interface Drawing {
+  id: string;
+  name: string;
+  setId: string;
+  pageCount: number;
+  thumbnailUrl?: string;
+  uploadedAt: string;
+  sheetNumber?: string;
 }
 
 export interface PDFViewerHandle {

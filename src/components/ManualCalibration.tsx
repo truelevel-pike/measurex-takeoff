@@ -1,345 +1,375 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { X, Crosshair, Hash } from 'lucide-react';
 
 type Mode = 'draw-line' | 'enter-number';
 
 interface ManualCalibrationProps {
   currentPage: number;
-  onClose: () => void;
-  containerRef?: React.RefObject<HTMLDivElement | null>;
+  onSave: (scale: string) => void;
+  onCancel: () => void;
 }
 
 export default function ManualCalibration({
   currentPage,
-  onClose,
-  containerRef,
+  onSave,
+  onCancel,
 }: ManualCalibrationProps) {
   const [mode, setMode] = useState<Mode>('draw-line');
 
   // Draw Line state
-  const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [distanceFt, setDistanceFt] = useState('');
-  const [distanceIn, setDistanceIn] = useState('');
+  const [drawFt, setDrawFt] = useState('');
+  const [drawIn, setDrawIn] = useState('');
 
-  // Enter Number state
+  // Enter Number state (ratio: [paperFt][paperIn] : [realFt][realIn])
   const [paperFt, setPaperFt] = useState('');
-  const [paperIn, setPaperIn] = useState('1');
+  const [paperIn, setPaperIn] = useState('');
   const [realFt, setRealFt] = useState('');
   const [realIn, setRealIn] = useState('');
 
-  const [error, setError] = useState<string | null>(null);
+  // Snapping toggles (Draw Line mode)
+  const [autoSnap, setAutoSnap] = useState(true);
+  const [snapEdges, setSnapEdges] = useState(false);
 
-  const setScale = useStore((s) => s.setScale);
+  // Store — calibration state
+  const calibrationMode = useStore((s) => s.calibrationMode);
+  const calibrationPoints = useStore((s) => s.calibrationPoints);
+  const setCalibrationMode = useStore((s) => s.setCalibrationMode);
+  const clearCalibrationPoints = useStore((s) => s.clearCalibrationPoints);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
+  const setScale = useStore((s) => s.setScale);
 
-  const listenerRef = useRef<((e: MouseEvent) => void) | null>(null);
-
-  // Pixel distance between two drawn points
-  const pixelDistance =
-    points.length === 2
-      ? Math.sqrt(
-          Math.pow(points[1].x - points[0].x, 2) +
-            Math.pow(points[1].y - points[0].y, 2)
-        )
-      : 0;
-
-  // Start drawing mode
-  const startDrawing = useCallback(() => {
-    setPoints([]);
-    setIsDrawing(true);
-    setError(null);
-
-    const el = containerRef?.current;
-    if (!el) {
-      setError('Canvas container not found');
-      return;
-    }
-
-    const handler = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      setPoints((prev) => {
-        if (prev.length >= 2) return prev;
-        const next = [...prev, { x, y }];
-        if (next.length === 2) {
-          setIsDrawing(false);
-          el.removeEventListener('click', handler);
-        }
-        return next;
-      });
-    };
-
-    listenerRef.current = handler;
-    el.addEventListener('click', handler);
-  }, [containerRef]);
-
-  // Cleanup listener on unmount
+  // Clean up calibration mode on unmount or mode switch
   useEffect(() => {
     return () => {
-      if (listenerRef.current && containerRef?.current) {
-        containerRef.current.removeEventListener('click', listenerRef.current);
+      clearCalibrationPoints();
+    };
+  }, [clearCalibrationPoints]);
+
+  useEffect(() => {
+    if (mode !== 'draw-line' && calibrationMode) {
+      clearCalibrationPoints();
+    }
+  }, [mode, calibrationMode, clearCalibrationPoints]);
+
+  // Computed pixel distance between calibration points
+  const pixelDistance = useMemo(() => {
+    if (calibrationPoints.length < 2) return 0;
+    const [p1, p2] = calibrationPoints;
+    return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+  }, [calibrationPoints]);
+
+  const hasBothPoints = calibrationPoints.length >= 2;
+
+  // Validation
+  const isDrawLineValid =
+    hasBothPoints &&
+    pixelDistance > 0 &&
+    ((parseFloat(drawFt) || 0) > 0 || (parseFloat(drawIn) || 0) > 0);
+
+  const isEnterNumberValid = (() => {
+    const pTotal = (parseFloat(paperFt) || 0) * 12 + (parseFloat(paperIn) || 0);
+    const rTotal = (parseFloat(realFt) || 0) * 12 + (parseFloat(realIn) || 0);
+    return pTotal > 0 && rTotal > 0;
+  })();
+
+  const canSave = mode === 'draw-line' ? isDrawLineValid : isEnterNumberValid;
+
+  const handleSave = () => {
+    if (!canSave) return;
+
+    if (mode === 'draw-line') {
+      const ft = parseFloat(drawFt) || 0;
+      const inches = parseFloat(drawIn) || 0;
+      const realWorldFeet = ft + inches / 12;
+      const pixelsPerUnit = pixelDistance / realWorldFeet;
+      const cal = {
+        pixelsPerUnit,
+        unit: 'ft' as const,
+        label: 'Manual (Draw Line)',
+        source: 'manual' as const,
+      };
+      setScale(cal);
+      if (currentPage >= 1) {
+        setScaleForPage(currentPage, cal);
       }
-    };
-  }, [containerRef]);
-
-  // Save draw-line calibration
-  const saveDrawLine = () => {
-    if (points.length !== 2) {
-      setError('Draw a line first by clicking two points on the plan');
-      return;
+      clearCalibrationPoints();
+      onSave(`${realWorldFeet.toFixed(2)} ft (drawn)`);
+    } else {
+      const pft = parseFloat(paperFt) || 0;
+      const pin = parseFloat(paperIn) || 0;
+      const rft = parseFloat(realFt) || 0;
+      const rin = parseFloat(realIn) || 0;
+      const paperTotal = pft * 12 + pin;
+      const realTotal = rft + rin / 12;
+      onSave(`${paperTotal}" = ${realTotal.toFixed(1)}'`);
     }
-
-    const ft = parseFloat(distanceFt) || 0;
-    const inches = parseFloat(distanceIn) || 0;
-    const totalFeet = ft + inches / 12;
-
-    if (totalFeet <= 0) {
-      setError('Enter a valid distance greater than 0');
-      return;
-    }
-
-    const ppu = pixelDistance / totalFeet;
-    const cal = {
-      pixelsPerUnit: ppu,
-      unit: 'ft' as const,
-      label: `${totalFeet.toFixed(1)} ft (drawn)`,
-      source: 'manual' as const,
-    };
-
-    setScale(cal);
-    if (currentPage >= 1) setScaleForPage(currentPage, cal);
-    onClose();
   };
 
-  // Save enter-number calibration
-  const saveEnterNumber = () => {
-    const pft = parseFloat(paperFt) || 0;
-    const pin = parseFloat(paperIn) || 0;
-    const rft = parseFloat(realFt) || 0;
-    const rin = parseFloat(realIn) || 0;
-
-    const paperTotal = pft * 12 + pin; // in inches
-    const realTotal = rft + rin / 12; // in feet
-
-    if (paperTotal <= 0 || realTotal <= 0) {
-      setError('Enter valid paper and real-world measurements');
-      return;
-    }
-
-    // At 72 DPI, paperTotal inches = paperTotal * 72 pixels
-    const pixelsOnPaper = paperTotal * 72;
-    const ppu = pixelsOnPaper / realTotal;
-
-    const cal = {
-      pixelsPerUnit: ppu,
-      unit: 'ft' as const,
-      label: `${paperTotal}" = ${realTotal.toFixed(1)}'`,
-      source: 'manual' as const,
-    };
-
-    setScale(cal);
-    if (currentPage >= 1) setScaleForPage(currentPage, cal);
-    onClose();
+  const handleCancel = () => {
+    clearCalibrationPoints();
+    onCancel();
   };
+
+  const handleStartDrawing = () => {
+    setCalibrationMode(true);
+  };
+
+  const handleResetPoints = () => {
+    clearCalibrationPoints();
+    setCalibrationMode(true);
+  };
+
+  // Status text for draw line mode
+  const drawLineStatus = () => {
+    if (!calibrationMode && !hasBothPoints) return null;
+    if (calibrationMode && calibrationPoints.length === 0)
+      return { text: 'Click point 1 on the drawing', color: 'text-amber-600' };
+    if (calibrationMode && calibrationPoints.length === 1)
+      return { text: 'Click point 2 on the drawing', color: 'text-amber-600' };
+    if (hasBothPoints)
+      return { text: `Pixel distance: ${pixelDistance.toFixed(1)} px`, color: 'text-green-600' };
+    return null;
+  };
+
+  const inputClass =
+    'w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-xl shadow-2xl w-[440px] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
-          <h2 className="text-base font-semibold text-zinc-800">Manual Calibration</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition"
-          >
-            <X size={18} />
-          </button>
-        </div>
+    <div className="bg-white rounded-xl shadow-2xl w-[420px] flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-3 border-b border-zinc-200">
+        <h2 className="text-base font-bold text-zinc-800">Set Scale Manually</h2>
+      </div>
 
-        {/* Mode Tabs */}
-        <div className="flex border-b border-zinc-200">
+      {/* Mode tabs — segmented control */}
+      <div className="px-5 pt-4 pb-2">
+        <div className="flex rounded-lg border border-zinc-200 overflow-hidden">
           <button
-            onClick={() => { setMode('draw-line'); setError(null); }}
-            className={`flex-1 py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 transition ${
+            onClick={() => setMode('draw-line')}
+            className={`flex-1 py-2 text-sm font-medium transition ${
               mode === 'draw-line'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-zinc-500 hover:text-zinc-700'
+                ? 'bg-green-600 text-white'
+                : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100'
             }`}
           >
-            <Crosshair size={15} /> Draw Line
+            Draw Line
           </button>
           <button
-            onClick={() => { setMode('enter-number'); setError(null); }}
-            className={`flex-1 py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 transition ${
+            onClick={() => setMode('enter-number')}
+            className={`flex-1 py-2 text-sm font-medium transition border-l border-zinc-200 ${
               mode === 'enter-number'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-zinc-500 hover:text-zinc-700'
+                ? 'bg-green-600 text-white'
+                : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100'
             }`}
           >
-            <Hash size={15} /> Enter Number
+            Enter Number
           </button>
         </div>
+      </div>
 
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
-          {mode === 'draw-line' ? (
-            <>
-              <p className="text-sm text-zinc-500">
-                Click two points on a known dimension, then enter the real distance.
-              </p>
+      {/* Body */}
+      <div className="px-5 py-4 space-y-4 flex-1">
+        {mode === 'draw-line' ? (
+          <>
+            {/* Instruction + Start Drawing button */}
+            <p className="text-sm text-zinc-600">
+              Click on canvas to place two points defining a known distance.
+            </p>
 
-              {points.length < 2 ? (
-                <button
-                  onClick={startDrawing}
-                  disabled={isDrawing}
-                  className={`w-full py-2.5 text-sm font-medium rounded-lg transition ${
-                    isDrawing
-                      ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                  }`}
-                >
-                  {isDrawing
-                    ? `Click point ${points.length + 1} of 2 on the drawing...`
-                    : 'Click to Start Drawing'}
-                </button>
-              ) : (
-                <div className="bg-green-50 rounded-lg px-3 py-2 text-sm text-green-700 flex items-center justify-between">
-                  <span>Line drawn: {pixelDistance.toFixed(1)} px</span>
-                  <button
-                    onClick={startDrawing}
-                    className="text-xs text-green-600 underline"
-                  >
-                    Redraw
-                  </button>
+            {!calibrationMode && !hasBothPoints && (
+              <button
+                onClick={handleStartDrawing}
+                className="w-full py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
+              >
+                Start Drawing
+              </button>
+            )}
+
+            {/* Live status */}
+            {(() => {
+              const status = drawLineStatus();
+              if (!status) return null;
+              return (
+                <div className={`text-sm font-medium ${status.color} bg-zinc-50 rounded-lg px-3 py-2`}>
+                  {status.text}
                 </div>
-              )}
+              );
+            })()}
 
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-xs text-zinc-500 mb-1 block">Feet</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={distanceFt}
-                    onChange={(e) => setDistanceFt(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-zinc-500 mb-1 block">Inches</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="11"
-                    value={distanceIn}
-                    onChange={(e) => setDistanceIn(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-zinc-500">
-                Enter the paper measurement and the real-world distance it represents.
-              </p>
+            {/* Reset button when points are placed */}
+            {hasBothPoints && (
+              <button
+                onClick={handleResetPoints}
+                className="text-xs text-zinc-500 hover:text-zinc-700 underline"
+              >
+                Reset points
+              </button>
+            )}
 
+            {/* Value inputs — shown after both points captured */}
+            {hasBothPoints && (
               <div>
-                <label className="text-xs font-medium text-zinc-600 mb-1.5 block">
-                  Paper Measurement
+                <label className="text-xs font-medium text-zinc-500 mb-2 block">
+                  Enter value of known linear
                 </label>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-xs text-zinc-400 mb-1 block">Feet</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={paperFt}
-                      onChange={(e) => setPaperFt(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={drawFt}
+                        onChange={(e) => setDrawFt(e.target.value)}
+                        placeholder="0"
+                        className={inputClass}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                        ft
+                      </span>
+                    </div>
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-zinc-400 mb-1 block">Inches</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={paperIn}
-                      onChange={(e) => setPaperIn(e.target.value)}
-                      placeholder="1"
-                      className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={drawIn}
+                        onChange={(e) => setDrawIn(e.target.value)}
+                        placeholder="0"
+                        className={inputClass}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                        in
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <label className="text-xs font-medium text-zinc-600 mb-1.5 block">
-                  Real-World Distance
-                </label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="text-xs text-zinc-400 mb-1 block">Feet</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={realFt}
-                      onChange={(e) => setRealFt(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs text-zinc-400 mb-1 block">Inches</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={realIn}
-                      onChange={(e) => setRealIn(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+            {/* Snapping toggles */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAutoSnap(!autoSnap)}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg border transition ${
+                  autoSnap
+                    ? 'bg-green-50 border-green-300 text-green-700'
+                    : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
+                }`}
+              >
+                Automatic snapping
+              </button>
+              <button
+                onClick={() => setSnapEdges(!snapEdges)}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg border transition ${
+                  snapEdges
+                    ? 'bg-green-50 border-green-300 text-green-700'
+                    : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
+                }`}
+              >
+                Snap to closed edges
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Ratio label */}
+            <label className="text-sm font-medium text-zinc-600 block">Ratio</label>
+
+            {/* Four inputs in ratio layout */}
+            <div className="flex items-center gap-2">
+              {/* Left side — drawing measurement */}
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={paperFt}
+                    onChange={(e) => setPaperFt(e.target.value)}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                    ft
+                  </span>
                 </div>
               </div>
-            </>
-          )}
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={paperIn}
+                    onChange={(e) => setPaperIn(e.target.value)}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                    in
+                  </span>
+                </div>
+              </div>
 
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
-          )}
-        </div>
+              {/* Colon separator */}
+              <span className="text-lg font-bold text-zinc-400 px-1">:</span>
 
-        {/* Footer */}
-        <div className="flex gap-3 px-5 py-4 border-t border-zinc-200">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={mode === 'draw-line' ? saveDrawLine : saveEnterNumber}
-            className="flex-1 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
-          >
-            Apply Scale
-          </button>
-        </div>
+              {/* Right side — real-world measurement */}
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={realFt}
+                    onChange={(e) => setRealFt(e.target.value)}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                    ft
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={realIn}
+                    onChange={(e) => setRealIn(e.target.value)}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                    in
+                  </span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Footer — Save / Cancel */}
+      <div className="flex gap-3 px-5 py-4 border-t border-zinc-200">
+        <button
+          onClick={handleCancel}
+          className="flex-1 py-2 text-sm font-medium text-zinc-600 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={!canSave}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
+            canSave
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+          }`}
+        >
+          Save
+        </button>
       </div>
     </div>
   );

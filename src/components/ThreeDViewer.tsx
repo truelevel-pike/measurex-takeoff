@@ -20,18 +20,88 @@ interface ThreeDViewerProps {
   show3D: boolean;
   onToggle3D: (value: boolean) => void;
   pdfTextureUrl?: string | null;
+  /** PDF page dimensions in pixels — used to scale ground plane to correct aspect ratio */
+  pageDimensions?: { width: number; height: number } | null;
   children?: React.ReactNode;
 }
 
-function GroundPlane({ textureUrl }: { textureUrl?: string | null }) {
+/** Build a procedural grid canvas texture as a fallback when no PDF is available */
+function makeGridFallbackTexture(): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+
+  // Dark background
+  ctx.fillStyle = '#0e1422';
+  ctx.fillRect(0, 0, size, size);
+
+  // Major grid lines every 64 px
+  ctx.strokeStyle = '#1e3a5f';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i <= size; i += 64) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, size);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(size, i);
+    ctx.stroke();
+  }
+
+  // Minor grid lines every 16 px
+  ctx.strokeStyle = '#132033';
+  ctx.lineWidth = 0.6;
+  for (let i = 0; i <= size; i += 16) {
+    if (i % 64 === 0) continue;
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, size);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(size, i);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  return tex;
+}
+
+interface GroundPlaneProps {
+  textureUrl?: string | null;
+  pageDimensions?: { width: number; height: number } | null;
+}
+
+function GroundPlane({ textureUrl, pageDimensions }: GroundPlaneProps) {
   const groundSize = 100;
-  const [aspectRatio, setAspectRatio] = useState(1);
 
+  // Derive initial aspect ratio from page dimensions prop if available,
+  // then override from the loaded image's natural dimensions.
+  const initAspect = useMemo(() => {
+    if (pageDimensions && pageDimensions.width > 0 && pageDimensions.height > 0) {
+      return pageDimensions.width / pageDimensions.height;
+    }
+    return 1;
+  }, [pageDimensions]);
+
+  const [aspectRatio, setAspectRatio] = useState(initAspect);
+
+  // Keep aspect in sync when the prop changes (e.g., page flip)
   useEffect(() => {
-    if (!textureUrl) setAspectRatio(1);
-  }, [textureUrl]);
+    setAspectRatio(initAspect);
+  }, [initAspect]);
 
-  const texture = useMemo(() => {
+  // Reset aspect to 1 when URL is cleared (so fallback texture looks square)
+  useEffect(() => {
+    if (!textureUrl && !pageDimensions) setAspectRatio(1);
+  }, [textureUrl, pageDimensions]);
+
+  const pdfTexture = useMemo(() => {
     if (!textureUrl) return null;
     const loader = new THREE.TextureLoader();
     const t = loader.load(textureUrl, (loadedTexture) => {
@@ -47,6 +117,15 @@ function GroundPlane({ textureUrl }: { textureUrl?: string | null }) {
     return t;
   }, [textureUrl]);
 
+  // Procedural grid texture used when no PDF is loaded
+  const fallbackTexture = useMemo(() => {
+    if (textureUrl) return null;
+    return makeGridFallbackTexture();
+  }, [textureUrl]);
+
+  const activeTexture = pdfTexture ?? fallbackTexture;
+  const hasPdf = Boolean(pdfTexture);
+
   return (
     <Plane
       args={[aspectRatio * groundSize, groundSize]}
@@ -55,10 +134,10 @@ function GroundPlane({ textureUrl }: { textureUrl?: string | null }) {
       receiveShadow
     >
       <meshStandardMaterial
-        color={texture ? '#ffffff' : '#1a1a2e'}
-        map={texture ?? undefined}
+        color="#ffffff"
+        map={activeTexture ?? undefined}
         transparent
-        opacity={texture ? 0.9 : 1}
+        opacity={hasPdf ? 0.9 : 0.75}
         metalness={0.05}
         roughness={0.95}
       />
@@ -89,6 +168,7 @@ export default function ThreeDViewer({
   show3D,
   onToggle3D,
   pdfTextureUrl,
+  pageDimensions,
   children,
 }: ThreeDViewerProps) {
   const [cameraMode, setCameraMode] = useState<CameraMode>('perspective');
@@ -183,7 +263,7 @@ export default function ThreeDViewer({
         <fog attach="fog" args={['#0a0a0f', 180, 380]} />
 
         <SceneLighting />
-        <GroundPlane textureUrl={pdfTextureUrl} />
+        <GroundPlane textureUrl={pdfTextureUrl} pageDimensions={pageDimensions} />
 
         {showGrid && <Grid
           args={[300, 300]}

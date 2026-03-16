@@ -1,184 +1,179 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useStore } from '@/lib/store';
-import { ScaleCalibration } from '@/lib/types';
-import { X, Check, Ruler } from 'lucide-react';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { X, Check, Sparkles, ChevronRight } from 'lucide-react';
 
-type Tab = 'architectural' | 'civil' | 'ratio';
+// ── Preset data (verbatim from Togal spec) ──────────────────────────────────
 
-interface Preset {
-  label: string;
-  pixelsPerUnit: number; // pixels per foot at 72 DPI
-  unit: 'ft' | 'in';
-}
-
-// 72 DPI PDF points. Scale "1/4" = 1'-0"" means 0.25 in on paper = 1 ft real.
-// At 72 DPI: 0.25 in = 18 px → 18 px per foot.
-const DPI = 72;
-const archPresets: Preset[] = [
-  { label: '1" = 1\'-0"', pixelsPerUnit: DPI, unit: 'ft' },
-  { label: '3/4" = 1\'-0"', pixelsPerUnit: DPI * 0.75, unit: 'ft' },
-  { label: '1/2" = 1\'-0"', pixelsPerUnit: DPI * 0.5, unit: 'ft' },
-  { label: '3/8" = 1\'-0"', pixelsPerUnit: DPI * 0.375, unit: 'ft' },
-  { label: '1/4" = 1\'-0"', pixelsPerUnit: DPI * 0.25, unit: 'ft' },
-  { label: '3/16" = 1\'-0"', pixelsPerUnit: DPI * 0.1875, unit: 'ft' },
-  { label: '1/8" = 1\'-0"', pixelsPerUnit: DPI * 0.125, unit: 'ft' },
-  { label: '3/32" = 1\'-0"', pixelsPerUnit: DPI * 0.09375, unit: 'ft' },
-  { label: '1/16" = 1\'-0"', pixelsPerUnit: DPI * 0.0625, unit: 'ft' },
-  { label: '1/32" = 1\'-0"', pixelsPerUnit: DPI / 32, unit: 'ft' },
-  { label: '1/64" = 1\'-0"', pixelsPerUnit: DPI / 64, unit: 'ft' },
-  { label: '1-1/2" = 1\'-0"', pixelsPerUnit: DPI * 1.5, unit: 'ft' },
-  { label: '3" = 1\'-0"', pixelsPerUnit: DPI * 3, unit: 'ft' },
+const architecturalPresets = [
+  '3/64" = 1\' 0"',
+  '1/32" = 1\' 0"',
+  '1/16" = 1\' 0"',
+  '3/32" = 1\' 0"',
+  '1/8" = 1\' 0"',
+  '3/16" = 1\' 0"',
+  '1/4" = 1\' 0"',
+  '3/8" = 1\' 0"',
+  '1/2" = 1\' 0"',
+  '3/4" = 1\' 0"',
+  '1" = 1\' 0"',
+  '1 1/2" = 1\' 0"',
+  '3" = 1\' 0"',
 ];
 
-const civilPresets: Preset[] = [
-  { label: '1" = 10\'', pixelsPerUnit: DPI / 10, unit: 'ft' },
-  { label: '1" = 20\'', pixelsPerUnit: DPI / 20, unit: 'ft' },
-  { label: '1" = 30\'', pixelsPerUnit: DPI / 30, unit: 'ft' },
-  { label: '1" = 40\'', pixelsPerUnit: DPI / 40, unit: 'ft' },
-  { label: '1" = 50\'', pixelsPerUnit: DPI / 50, unit: 'ft' },
-  { label: '1" = 60\'', pixelsPerUnit: DPI / 60, unit: 'ft' },
-  { label: '1" = 100\'', pixelsPerUnit: DPI / 100, unit: 'ft' },
-  { label: '1" = 200\'', pixelsPerUnit: DPI / 200, unit: 'ft' },
-  { label: '1" = 400\'', pixelsPerUnit: DPI / 400, unit: 'ft' },
-  { label: '1" = 500\'', pixelsPerUnit: DPI / 500, unit: 'ft' },
-  { label: '1" = 1000\'', pixelsPerUnit: DPI / 1000, unit: 'ft' },
+const civilPresets = [
+  '1" = 1\' 0"',
+  '1" = 10\' 0"',
+  '1" = 20\' 0"',
+  '1" = 30\' 0"',
+  '1" = 40\' 0"',
+  '1" = 50\' 0"',
+  '1" = 60\' 0"',
+  '1" = 70\' 0"',
+  '1" = 80\' 0"',
+  '1" = 90\' 0"',
+  '1" = 100\' 0"',
 ];
 
-const ratioPresets: Preset[] = [
-  { label: '1:1', pixelsPerUnit: DPI / 12, unit: 'ft' },
-  { label: '1:2', pixelsPerUnit: DPI / 24, unit: 'ft' },
-  { label: '1:5', pixelsPerUnit: DPI / 60, unit: 'ft' },
-  { label: '1:10', pixelsPerUnit: DPI / 120, unit: 'ft' },
-  { label: '1:20', pixelsPerUnit: DPI / 240, unit: 'ft' },
-  { label: '1:25', pixelsPerUnit: DPI / 300, unit: 'ft' },
-  { label: '1:50', pixelsPerUnit: DPI / 600, unit: 'ft' },
-  { label: '1:75', pixelsPerUnit: DPI / 900, unit: 'ft' },
-  { label: '1:100', pixelsPerUnit: DPI / 1200, unit: 'ft' },
-  { label: '1:125', pixelsPerUnit: DPI / 1500, unit: 'ft' },
-  { label: '1:150', pixelsPerUnit: DPI / 1800, unit: 'ft' },
-  { label: '1:200', pixelsPerUnit: DPI / 2400, unit: 'ft' },
-  { label: '1:250', pixelsPerUnit: DPI / 3000, unit: 'ft' },
-  { label: '1:500', pixelsPerUnit: DPI / 6000, unit: 'ft' },
-  { label: '1:1000', pixelsPerUnit: DPI / 12000, unit: 'ft' },
+const ratioMetricPresets = [
+  '1 : 1250',
+  '1 : 1000',
+  '1 : 750',
+  '1 : 500',
+  '1 : 300',
+  '1 : 250',
+  '1 : 200',
+  '1 : 150',
+  '1 : 125',
+  '1 : 100',
+  '1 : 60',
+  '1 : 50',
+  '1 : 20',
+  '1 : 10',
+  '1 : 5',
 ];
 
-const TABS: { key: Tab; label: string; presets: Preset[] }[] = [
-  { key: 'architectural', label: 'Architectural', presets: archPresets },
-  { key: 'civil', label: 'Civil', presets: civilPresets },
-  { key: 'ratio', label: 'Ratio', presets: ratioPresets },
-];
+// ── Props ───────────────────────────────────────────────────────────────────
 
 interface ScalePanelProps {
   currentPage: number;
+  selectedScale: string | null;
+  autoDetected: boolean;
+  onSelectScale: (scale: string) => void;
+  onOpenManual: () => void;
   onClose: () => void;
-  onManualCalibrate?: () => void;
 }
 
-export default function ScalePanel({ currentPage, onClose, onManualCalibrate }: ScalePanelProps) {
-  const [tab, setTab] = useState<Tab>('architectural');
-  const scale = useStore((s) => s.scale);
-  const setScaleForPage = useStore((s) => s.setScaleForPage);
-  const setScale = useStore((s) => s.setScale);
+// ── Component ───────────────────────────────────────────────────────────────
 
-  const activePresets = TABS.find((t) => t.key === tab)?.presets ?? [];
+export default function ScalePanel({
+  selectedScale,
+  autoDetected,
+  onSelectScale,
+  onOpenManual,
+  onClose,
+}: ScalePanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const handleSelect = useCallback(
-    (preset: Preset) => {
-      const cal = {
-        pixelsPerUnit: preset.pixelsPerUnit,
-        unit: preset.unit as 'ft' | 'in' | 'm' | 'mm',
-        label: preset.label,
-        source: 'manual' as const,
-      };
-      setScale(cal);
-      if (currentPage >= 1) {
-        setScaleForPage(currentPage, cal);
+  const columns: { title: string; presets: string[] }[] = [
+    { title: 'Architectural', presets: architecturalPresets },
+    { title: 'Civil', presets: civilPresets },
+    { title: 'Ratio / Metric', presets: ratioMetricPresets },
+  ];
+
+  // Focus close button when panel opens
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
+  // Escape to close
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
       }
-      onClose();
     },
-    [currentPage, setScale, setScaleForPage, onClose]
+    [onClose]
   );
-
-  const isSelected = (preset: Preset) =>
-    scale && Math.abs(scale.pixelsPerUnit - preset.pixelsPerUnit) < 0.001;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scale-panel-heading"
+      onKeyDown={handleKeyDown}
+      className="bg-white rounded-xl shadow-2xl w-[620px] max-h-[80vh] flex flex-col overflow-hidden"
     >
-      <div
-        className="bg-white rounded-xl shadow-2xl w-[420px] max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
-          <div className="flex items-center gap-2">
-            <Ruler size={18} className="text-blue-500" />
-            <h2 className="text-base font-semibold text-zinc-800">Set Scale</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition"
-          >
-            <X size={18} />
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200">
+        <h2 id="scale-panel-heading" className="text-base font-bold text-zinc-800">Scale</h2>
+        <button
+          ref={closeButtonRef}
+          onClick={onClose}
+          aria-label="Close scale panel"
+          className="p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition"
+        >
+          <X size={18} aria-hidden="true" />
+          <span className="sr-only">Close</span>
+        </button>
+      </div>
+
+      {/* Auto-detected badge */}
+      {autoDetected && (
+        <div className="flex items-center gap-2 px-5 py-2 bg-emerald-50 border-b border-emerald-100">
+          <Sparkles size={16} className="text-emerald-500" aria-hidden="true" />
+          <span className="text-sm text-emerald-700 font-medium">Auto-detected scale</span>
+          <button className="text-sm text-emerald-600 underline hover:text-emerald-800 ml-1" aria-label="More info about auto-detected scale">
+            More info
           </button>
         </div>
+      )}
 
-        {/* Tabs */}
-        <div className="flex border-b border-zinc-200">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 py-2.5 text-sm font-medium transition ${
-                tab === t.key
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Presets */}
-        <div className="flex-1 overflow-y-auto px-3 py-2">
-          {activePresets.map((preset) => {
-            const selected = isSelected(preset);
-            return (
-              <button
-                key={preset.label}
-                onClick={() => handleSelect(preset)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 text-sm transition ${
-                  selected
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'hover:bg-zinc-50 text-zinc-700'
-                }`}
-              >
-                <span className="font-medium">{preset.label}</span>
-                {selected && <Check size={16} className="text-green-600" />}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Manual calibration button */}
-        {onManualCalibrate && (
-          <div className="px-4 py-3 border-t border-zinc-200">
-            <button
-              onClick={() => {
-                onManualCalibrate();
-                onClose();
-              }}
-              className="w-full py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
-            >
-              Manual Calibration (Draw Line)
-            </button>
+      {/* 3-column preset layout */}
+      <div className="flex flex-1 min-h-0 overflow-y-auto" role="listbox" aria-label="Scale presets">
+        {columns.map((col) => (
+          <div key={col.title} className="flex-1 border-r last:border-r-0 border-zinc-100">
+            <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wide bg-zinc-50 border-b border-zinc-100 sticky top-0">
+              {col.title}
+            </div>
+            <div className="px-2 py-1">
+              {col.presets.map((scale) => {
+                const isSelected = selectedScale === scale;
+                return (
+                  <button
+                    key={scale}
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => onSelectScale(scale)}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md mb-0.5 text-sm transition ${
+                      isSelected
+                        ? 'bg-green-100 text-green-800 font-semibold'
+                        : 'hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    <span>{scale}</span>
+                    {isSelected && <Check size={14} className="text-green-600 flex-shrink-0" aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
+        ))}
+      </div>
+
+      {/* Manual section */}
+      <div className="px-5 py-3 border-t border-zinc-200 flex items-center justify-between">
+        <span className="text-sm font-medium text-zinc-500">Manual</span>
+        <button
+          onClick={onOpenManual}
+          aria-label="Set scale manually"
+          className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+        >
+          Set Scale Manually
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>
       </div>
     </div>
   );

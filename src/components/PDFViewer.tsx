@@ -8,6 +8,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
+import { FileX, WifiOff } from 'lucide-react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 
 interface PDFViewerProps {
@@ -41,27 +42,50 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const [pageDimensions, setPageDimensions] = useState({ width: 0, height: 0 });
     const [isRendering, setIsRendering] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [isOffline, setIsOffline] = useState(false);
     const pendingRender = useRef<number | null>(null);
+
+    // Offline detection
+    useEffect(() => {
+      const goOffline = () => setIsOffline(true);
+      const goOnline = () => setIsOffline(false);
+      setIsOffline(!navigator.onLine);
+      window.addEventListener('offline', goOffline);
+      window.addEventListener('online', goOnline);
+      return () => {
+        window.removeEventListener('offline', goOffline);
+        window.removeEventListener('online', goOnline);
+      };
+    }, []);
 
     // Load PDF from file with pdfjs-dist only
     useEffect(() => {
       if (!file) return;
       let cancelled = false;
+      setLoadError(null);
       const loadPdf = async () => {
-        const pdfjsLib: any = await import('pdfjs-dist');
-        if (pdfjsLib.GlobalWorkerOptions) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+        try {
+          const pdfjsLib: any = await import('pdfjs-dist');
+          if (pdfjsLib.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+          }
+          const arrayBuffer = await file.arrayBuffer();
+          const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          if (cancelled) return;
+          setPdfDoc(doc);
+          setTotalPages(doc.numPages);
+          setCurrentPage(1);
+          onPageChange?.(1, doc.numPages);
+        } catch (err) {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          setLoadError(msg);
+          console.error('PDF load error:', err);
         }
-        const arrayBuffer = await file.arrayBuffer();
-        const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        if (cancelled) return;
-        setPdfDoc(doc);
-        setTotalPages(doc.numPages);
-        setCurrentPage(1);
-        onPageChange?.(1, doc.numPages);
       };
-      loadPdf().catch(console.error);
+      loadPdf();
       return () => { cancelled = true; };
     }, [file, onPageChange]);
 
@@ -294,6 +318,34 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       pinchInfo.current = null;
     }, []);
 
+    const retryLoad = useCallback(() => {
+      setLoadError(null);
+      setPdfDoc(null);
+      setCurrentPage(1);
+      // Re-trigger load by forcing effect — toggle a render cycle
+      if (file) {
+        const loadPdf = async () => {
+          try {
+            const pdfjsLib: any = await import('pdfjs-dist');
+            if (pdfjsLib.GlobalWorkerOptions) {
+              pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+            }
+            const arrayBuffer = await file.arrayBuffer();
+            const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            setPdfDoc(doc);
+            setTotalPages(doc.numPages);
+            setCurrentPage(1);
+            onPageChange?.(1, doc.numPages);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            setLoadError(msg);
+          }
+        };
+        loadPdf();
+      }
+    }, [file, onPageChange]);
+
     return (
       <div
         ref={containerRef}
@@ -308,16 +360,43 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* HUD: zoom/pan pill */}
-        <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 20 }}>
-          <div className="font-mono text-xs px-3 py-1 rounded-full backdrop-blur-sm border border-[#00d4ff]/30 text-[#00d4ff] bg-[rgba(10,10,15,0.6)] shadow-[0_0_12px_rgba(0,212,255,0.15)]">
-            {Math.round(zoom * 100)}% · x{Math.round(pan.x)} y{Math.round(pan.y)}
+        {/* Offline banner */}
+        {isOffline && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-amber-600 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium">
+            <WifiOff size={16} />
+            You appear to be offline
           </div>
-        </div>
-        {pdfDoc && (
-          <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-            <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff' }} />
+        )}
+
+        {/* Error fallback */}
+        {loadError ? (
+          <div className="flex items-center justify-center w-full h-full">
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 text-center max-w-sm">
+              <FileX size={48} className="text-zinc-500 mx-auto mb-4" />
+              <div className="text-lg font-semibold text-zinc-200 mb-2">Could not load PDF</div>
+              <div className="text-sm text-zinc-400 mb-4">Please check the file and try again.</div>
+              <button
+                onClick={retryLoad}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           </div>
+        ) : (
+          <>
+            {/* HUD: zoom/pan pill */}
+            <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 20 }}>
+              <div className="font-mono text-xs px-3 py-1 rounded-full backdrop-blur-sm border border-[#00d4ff]/30 text-[#00d4ff] bg-[rgba(10,10,15,0.6)] shadow-[0_0_12px_rgba(0,212,255,0.15)]">
+                {Math.round(zoom * 100)}% · x{Math.round(pan.x)} y{Math.round(pan.y)}
+              </div>
+            </div>
+            {pdfDoc && (
+              <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff' }} />
+              </div>
+            )}
+          </>
         )}
       </div>
     );
