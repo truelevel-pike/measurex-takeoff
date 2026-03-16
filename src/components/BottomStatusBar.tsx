@@ -20,7 +20,9 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
   const isMobile = useIsMobile();
 
   const scaleText = scale ? scale.label : '';
-  const sheetLabel = sheetNames[currentPage] || `Sheet ${currentPage}`;
+  // QA-007: If no extracted text/sheet name available, show "Page N" (not "Sheet N")
+  // If text was extracted with a page code (e.g. A1.00), sheetNames will have that value
+  const sheetLabel = sheetNames[currentPage] || `Page ${currentPage}`;
 
   return (
     <div

@@ -378,12 +378,18 @@ function PageInner() {
 
   // Text extraction → auto-scale detection + sheet naming
   const handleTextExtracted = useCallback((text: string, pageNum: number) => {
-    // GAP-001: Extract sheet name from PDF text
+    // QA-006 / QA-007: Image-only PDFs (no text layer) produce empty text.
+    // Skip auto-scale detection silently — no popup, no error.
+    // Sheet naming falls back to "Page N" in BottomStatusBar when no name is stored.
+    if (!text?.trim()) return;
+
+    // QA-007: Extract sheet name from PDF text (e.g. page codes like A1.00, FLOOR PLAN, etc.)
     const sheetName = extractSheetName(text);
     if (sheetName) {
       setSheetName(pageNum, sheetName);
     }
 
+    // QA-006: Detect scale from text — only reached when text is non-empty
     const detected = detectScaleFromText(text);
     if (detected) {
       setDetectedScale(detected);
