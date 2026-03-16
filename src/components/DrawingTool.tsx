@@ -78,6 +78,15 @@ export default function DrawingTool() {
     [points, getCoords, getSelectedClassification, commitPolygon, addToast]
   );
 
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      commitPolygon();
+    },
+    [commitPolygon]
+  );
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => setCursor(getCoords(e)), [getCoords]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -94,6 +103,7 @@ export default function DrawingTool() {
       ref={containerRef}
       className="absolute inset-0 z-20 cursor-crosshair"
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -119,7 +129,7 @@ export default function DrawingTool() {
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-        {points.length === 0 ? 'Click to start drawing polygon' : points.length < 3 ? `${points.length} points — need ${3 - points.length} more to close` : 'Click first point (green) to close polygon · Esc to cancel'}
+        {points.length === 0 ? 'Click to start drawing polygon' : points.length < 3 ? `${points.length} points — need ${3 - points.length} more to close` : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
       </div>
     </div>
   );

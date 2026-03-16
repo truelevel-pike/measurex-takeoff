@@ -17,6 +17,7 @@ interface CanvasOverlayProps {
 }
 
 export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown }: CanvasOverlayProps = {}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasEl = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
 
@@ -38,12 +39,12 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   useEffect(() => {
     if (!canvasEl.current) return;
     const canvasNode = canvasEl.current;
-    const parent = canvasNode.parentElement as HTMLElement | null;
-    if (!parent) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
 
     const fc = new Canvas(canvasNode, {
-      width: parent.clientWidth,
-      height: parent.clientHeight,
+      width: wrapper.clientWidth,
+      height: wrapper.clientHeight,
       selection: currentTool === 'select',
       backgroundColor: 'transparent',
     });
@@ -55,14 +56,14 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     canvasNode.addEventListener('contextmenu', preventNativeContextMenu);
 
     const resize = () => {
-      fc.setDimensions({ width: parent.clientWidth, height: parent.clientHeight });
+      fc.setDimensions({ width: wrapper.clientWidth, height: wrapper.clientHeight });
       fc.renderAll();
     };
 
     const ro = new ResizeObserver(() => {
       resize();
     });
-    ro.observe(parent);
+    ro.observe(wrapper);
 
     const onOrientation = () => resize();
     window.addEventListener('orientationchange', onOrientation);
@@ -204,18 +205,29 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     fc.renderAll();
   }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]);
 
+  // Disable pointer events when draw/measure tools are active so their overlays receive clicks
+  const disablePointerEvents = currentTool === 'pan' || currentTool === 'draw' || currentTool === 'measure';
+
   return (
-    <canvas
-      ref={canvasEl}
+    <div
+      ref={wrapperRef}
       style={{
         position: 'absolute',
         inset: 0,
         width: '100%',
         height: '100%',
-        pointerEvents: currentTool === 'pan' ? 'none' : 'auto',
+        pointerEvents: disablePointerEvents ? 'none' : 'auto',
         cursor: calibrationMode ? 'crosshair' : undefined,
         zIndex: 10,
       }}
-    />
+    >
+      <canvas
+        ref={canvasEl}
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+      />
+    </div>
   );
 }

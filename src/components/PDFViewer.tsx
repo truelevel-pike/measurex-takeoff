@@ -46,6 +46,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const [isOffline, setIsOffline] = useState(false);
     const pendingRender = useRef<number | null>(null);
     const initialFitDone = useRef(false);
+    const basePageSize = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
 
     // Offline detection
     useEffect(() => {
@@ -111,6 +112,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           const dims = { width: viewport.width, height: viewport.height };
           setPageDimensions(dims);
           onDimensionsChange?.(dims);
+
+          // Store unscaled base dimensions for fitToPage calculation
+          const baseViewport = page.getViewport({ scale: 1.5 });
+          basePageSize.current = { width: baseViewport.width, height: baseViewport.height };
 
           await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
 
