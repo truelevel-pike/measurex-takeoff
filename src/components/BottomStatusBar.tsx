@@ -15,7 +15,7 @@ interface BottomStatusBarProps {
 const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPercent, cursor, activeToolName }) => {
   const scale = useStore((s) => s.scale);
   const currentPage = useStore((s) => s.currentPage);
-  const totalPages = useStore((s) => (s as any).totalPages || 0);
+  const totalPages = useStore((s) => s.totalPages ?? 0);
   const sheetNames = useStore((s) => s.sheetNames);
   const isMobile = useIsMobile();
 

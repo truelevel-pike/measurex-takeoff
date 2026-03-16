@@ -104,6 +104,10 @@ function PageInner() {
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+
+  // Track known polygon/classification IDs so we only POST truly new items
+  const knownPolygonIds = useRef<Set<string>>(new Set());
+  const knownClassificationIds = useRef<Set<string>>(new Set());
   const [pdfDocState, setPdfDocState] = useState<PDFDocumentProxy | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [currentPageNum, setCurrentPageNum] = useState(1);
@@ -232,6 +236,9 @@ function PageInner() {
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
 
         useStore.getState().hydrateState(normalized);
+        // Seed known IDs so the sync effects don't re-POST existing items
+        knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
+        knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
         setCurrentPageNum(normalized.currentPage || 1);
         setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
         setProjectId(data.project.id);
@@ -370,6 +377,36 @@ function PageInner() {
     if (!projectId) return;
     requestAutoSave();
   }, [autosaveFingerprint, projectId, requestAutoSave]);
+
+  // Sync new polygons to API individually
+  useEffect(() => {
+    if (!projectId) return;
+    const newPolygons = polygons.filter((p) => !knownPolygonIds.current.has(p.id));
+    for (const p of newPolygons) {
+      knownPolygonIds.current.add(p.id);
+      api.createPolygon(projectId, p).catch((err) => console.error('API createPolygon failed:', err));
+    }
+    // Prune deleted IDs from tracking set
+    const currentIds = new Set(polygons.map((p) => p.id));
+    for (const id of knownPolygonIds.current) {
+      if (!currentIds.has(id)) knownPolygonIds.current.delete(id);
+    }
+  }, [projectId, polygons]);
+
+  // Sync new classifications to API individually
+  useEffect(() => {
+    if (!projectId) return;
+    const newClassifications = classifications.filter((c) => !knownClassificationIds.current.has(c.id));
+    for (const c of newClassifications) {
+      knownClassificationIds.current.add(c.id);
+      api.createClassification(projectId, c).catch((err) => console.error('API createClassification failed:', err));
+    }
+    // Prune deleted IDs from tracking set
+    const currentIds = new Set(classifications.map((c) => c.id));
+    for (const id of knownClassificationIds.current) {
+      if (!currentIds.has(id)) knownClassificationIds.current.delete(id);
+    }
+  }, [projectId, classifications]);
 
   useEffect(() => {
     return () => {

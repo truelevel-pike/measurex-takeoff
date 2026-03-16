@@ -1,11 +1,11 @@
 /**
- * Server-side file-based persistence layer for MeasureX projects.
- * Stores JSON files under ./data/projects/{projectId}/.
- * Designed to swap to Supabase later without changing the API surface.
+ * Server-side persistence layer for MeasureX projects.
+ * Uses Supabase for storage.
+ *
+ * Tables: mx_projects, mx_pages, mx_scales, mx_classifications, mx_polygons
  */
 
-import fs from 'fs/promises';
-import path from 'path';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 
@@ -25,118 +25,144 @@ export interface PageInfo {
   text: string;
 }
 
-// ── Paths ──────────────────────────────────────────────────────────────
+// ── Supabase Client ────────────────────────────────────────────────────
 
-const DATA_ROOT = path.resolve(process.cwd(), 'data');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-function projectDir(projectId: string): string {
-  return path.join(DATA_ROOT, 'projects', projectId);
-}
+let _client: SupabaseClient | null = null;
 
-function filePath(projectId: string, file: string): string {
-  return path.join(projectDir(projectId), file);
+function getClient(): SupabaseClient {
+  if (!_client) {
+    _client = createClient(supabaseUrl, supabaseKey);
+  }
+  return _client;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+/** No-op — kept for callers that import it. Supabase needs no local dir init. */
 export async function initDataDir(): Promise<void> {
-  await fs.mkdir(path.join(DATA_ROOT, 'projects'), { recursive: true });
-}
-
-async function readJSON<T>(fp: string, fallback: T): Promise<T> {
-  try {
-    const raw = await fs.readFile(fp, 'utf-8');
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJSON(fp: string, data: unknown): Promise<void> {
-  await fs.mkdir(path.dirname(fp), { recursive: true });
-  await fs.writeFile(fp, JSON.stringify(data, null, 2), 'utf-8');
+  // no-op
 }
 
 // ── Projects CRUD ──────────────────────────────────────────────────────
 
 export async function createProject(name: string): Promise<ProjectMeta> {
-  await initDataDir();
+  const sb = getClient();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  const meta: ProjectMeta = { id, name, createdAt: now, updatedAt: now };
-  await writeJSON(filePath(id, 'project.json'), meta);
-  // Initialize empty collections
-  await writeJSON(filePath(id, 'classifications.json'), []);
-  await writeJSON(filePath(id, 'polygons.json'), []);
-  await writeJSON(filePath(id, 'pages.json'), []);
-  await writeJSON(filePath(id, 'scale.json'), null);
-  return meta;
+
+  const { error } = await sb.from('mx_projects').insert({
+    id,
+    name,
+    created_at: now,
+    updated_at: now,
+  });
+  if (error) throw new Error(`createProject: ${error.message}`);
+
+  return { id, name, createdAt: now, updatedAt: now };
 }
 
 export async function getProject(projectId: string): Promise<ProjectMeta | null> {
-  return readJSON<ProjectMeta | null>(filePath(projectId, 'project.json'), null);
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) throw new Error(`getProject: ${error.message}`);
+  if (!data) return null;
+  return {
+    id: data.id,
+    name: data.name,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
 }
 
 export async function listProjects(): Promise<ProjectMeta[]> {
-  await initDataDir();
-  const projectsDir = path.join(DATA_ROOT, 'projects');
-  let entries: string[];
-  try {
-    entries = await fs.readdir(projectsDir);
-  } catch {
-    return [];
-  }
-  const results: ProjectMeta[] = [];
-  for (const entry of entries) {
-    const meta = await readJSON<ProjectMeta | null>(
-      path.join(projectsDir, entry, 'project.json'),
-      null,
-    );
-    if (meta) results.push(meta);
-  }
-  return results;
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_projects')
+    .select('*')
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(`listProjects: ${error.message}`);
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 }
 
 export async function updateProject(
   projectId: string,
   patch: Partial<Pick<ProjectMeta, 'name'>>,
 ): Promise<ProjectMeta | null> {
-  const existing = await getProject(projectId);
-  if (!existing) return null;
-  const updated: ProjectMeta = {
-    ...existing,
-    ...patch,
-    updatedAt: new Date().toISOString(),
+  const sb = getClient();
+  const now = new Date().toISOString();
+  const { data, error } = await sb
+    .from('mx_projects')
+    .update({ ...patch, updated_at: now })
+    .eq('id', projectId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(`updateProject: ${error.message}`);
+  if (!data) return null;
+  return {
+    id: data.id,
+    name: data.name,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
   };
-  await writeJSON(filePath(projectId, 'project.json'), updated);
-  return updated;
 }
 
 export async function deleteProject(projectId: string): Promise<boolean> {
-  try {
-    await fs.rm(projectDir(projectId), { recursive: true, force: true });
-    return true;
-  } catch {
-    return false;
-  }
+  const sb = getClient();
+  // Delete child rows first (Supabase doesn't cascade by default unless FK set)
+  await sb.from('mx_polygons').delete().eq('project_id', projectId);
+  await sb.from('mx_classifications').delete().eq('project_id', projectId);
+  await sb.from('mx_pages').delete().eq('project_id', projectId);
+  await sb.from('mx_scales').delete().eq('project_id', projectId);
+
+  const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
+  if (error) throw new Error(`deleteProject: ${error.message}`);
+  return true;
 }
 
 // ── Pages CRUD ─────────────────────────────────────────────────────────
 
 export async function createPage(projectId: string, page: PageInfo): Promise<PageInfo> {
-  const pages = await getPages(projectId);
-  const idx = pages.findIndex((p) => p.pageNum === page.pageNum);
-  if (idx >= 0) {
-    pages[idx] = page;
-  } else {
-    pages.push(page);
-  }
-  await writeJSON(filePath(projectId, 'pages.json'), pages);
+  const sb = getClient();
+  const { error } = await sb.from('mx_pages').upsert(
+    {
+      project_id: projectId,
+      page_num: page.pageNum,
+      width: page.width,
+      height: page.height,
+      text: page.text,
+    },
+    { onConflict: 'project_id,page_num' },
+  );
+  if (error) throw new Error(`createPage: ${error.message}`);
   return page;
 }
 
 export async function getPages(projectId: string): Promise<PageInfo[]> {
-  return readJSON<PageInfo[]>(filePath(projectId, 'pages.json'), []);
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_pages')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('page_num', { ascending: true });
+  if (error) throw new Error(`getPages: ${error.message}`);
+  return (data || []).map((row: any) => ({
+    pageNum: row.page_num,
+    width: row.width,
+    height: row.height,
+    text: row.text,
+  }));
 }
 
 export async function updatePage(
@@ -144,12 +170,27 @@ export async function updatePage(
   pageNum: number,
   patch: Partial<PageInfo>,
 ): Promise<PageInfo | null> {
-  const pages = await getPages(projectId);
-  const idx = pages.findIndex((p) => p.pageNum === pageNum);
-  if (idx < 0) return null;
-  pages[idx] = { ...pages[idx], ...patch };
-  await writeJSON(filePath(projectId, 'pages.json'), pages);
-  return pages[idx];
+  const sb = getClient();
+  const updateData: Record<string, unknown> = {};
+  if (patch.width !== undefined) updateData.width = patch.width;
+  if (patch.height !== undefined) updateData.height = patch.height;
+  if (patch.text !== undefined) updateData.text = patch.text;
+
+  const { data, error } = await sb
+    .from('mx_pages')
+    .update(updateData)
+    .eq('project_id', projectId)
+    .eq('page_num', pageNum)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(`updatePage: ${error.message}`);
+  if (!data) return null;
+  return {
+    pageNum: data.page_num,
+    width: data.width,
+    height: data.height,
+    text: data.text,
+  };
 }
 
 // ── Classifications CRUD ───────────────────────────────────────────────
@@ -158,15 +199,41 @@ export async function createClassification(
   projectId: string,
   data: Omit<Classification, 'id'>,
 ): Promise<Classification> {
-  const list = await getClassifications(projectId);
-  const entry: Classification = { id: crypto.randomUUID(), ...data };
-  list.push(entry);
-  await writeJSON(filePath(projectId, 'classifications.json'), list);
-  return entry;
+  const sb = getClient();
+  const id = crypto.randomUUID();
+  const row = {
+    id,
+    project_id: projectId,
+    name: data.name,
+    color: data.color,
+    type: data.type,
+    visible: data.visible ?? true,
+    formula: data.formula ?? null,
+    formula_unit: data.formulaUnit ?? null,
+    formula_saved_to_library: data.formulaSavedToLibrary ?? false,
+  };
+  const { error } = await sb.from('mx_classifications').insert(row);
+  if (error) throw new Error(`createClassification: ${error.message}`);
+  return { id, ...data };
 }
 
 export async function getClassifications(projectId: string): Promise<Classification[]> {
-  return readJSON<Classification[]>(filePath(projectId, 'classifications.json'), []);
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_classifications')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) throw new Error(`getClassifications: ${error.message}`);
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    type: row.type,
+    visible: row.visible,
+    formula: row.formula ?? undefined,
+    formulaUnit: row.formula_unit ?? undefined,
+    formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
+  }));
 }
 
 export async function updateClassification(
@@ -174,23 +241,50 @@ export async function updateClassification(
   classificationId: string,
   patch: Partial<Classification>,
 ): Promise<Classification | null> {
-  const list = await getClassifications(projectId);
-  const idx = list.findIndex((c) => c.id === classificationId);
-  if (idx < 0) return null;
-  list[idx] = { ...list[idx], ...patch };
-  await writeJSON(filePath(projectId, 'classifications.json'), list);
-  return list[idx];
+  const sb = getClient();
+  const updateData: Record<string, unknown> = {};
+  if (patch.name !== undefined) updateData.name = patch.name;
+  if (patch.color !== undefined) updateData.color = patch.color;
+  if (patch.type !== undefined) updateData.type = patch.type;
+  if (patch.visible !== undefined) updateData.visible = patch.visible;
+  if (patch.formula !== undefined) updateData.formula = patch.formula;
+  if (patch.formulaUnit !== undefined) updateData.formula_unit = patch.formulaUnit;
+  if (patch.formulaSavedToLibrary !== undefined) updateData.formula_saved_to_library = patch.formulaSavedToLibrary;
+
+  const { data: row, error } = await sb
+    .from('mx_classifications')
+    .update(updateData)
+    .eq('id', classificationId)
+    .eq('project_id', projectId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(`updateClassification: ${error.message}`);
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    type: row.type,
+    visible: row.visible,
+    formula: row.formula ?? undefined,
+    formulaUnit: row.formula_unit ?? undefined,
+    formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
+  };
 }
 
 export async function deleteClassification(
   projectId: string,
   classificationId: string,
 ): Promise<boolean> {
-  const list = await getClassifications(projectId);
-  const filtered = list.filter((c) => c.id !== classificationId);
-  if (filtered.length === list.length) return false;
-  await writeJSON(filePath(projectId, 'classifications.json'), filtered);
-  return true;
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_classifications')
+    .delete()
+    .eq('id', classificationId)
+    .eq('project_id', projectId)
+    .select('id');
+  if (error) throw new Error(`deleteClassification: ${error.message}`);
+  return (data?.length ?? 0) > 0;
 }
 
 // ── Polygons CRUD ──────────────────────────────────────────────────────
@@ -199,15 +293,41 @@ export async function createPolygon(
   projectId: string,
   data: Omit<Polygon, 'id'>,
 ): Promise<Polygon> {
-  const list = await getPolygons(projectId);
-  const entry: Polygon = { id: crypto.randomUUID(), ...data };
-  list.push(entry);
-  await writeJSON(filePath(projectId, 'polygons.json'), list);
-  return entry;
+  const sb = getClient();
+  const id = crypto.randomUUID();
+  const row = {
+    id,
+    project_id: projectId,
+    classification_id: data.classificationId,
+    page_number: data.pageNumber,
+    points: data.points,
+    area: data.area ?? 0,
+    linear_feet: data.linearFeet ?? 0,
+    is_complete: data.isComplete ?? true,
+    label: data.label ?? null,
+  };
+  const { error } = await sb.from('mx_polygons').insert(row);
+  if (error) throw new Error(`createPolygon: ${error.message}`);
+  return { id, ...data };
 }
 
 export async function getPolygons(projectId: string): Promise<Polygon[]> {
-  return readJSON<Polygon[]>(filePath(projectId, 'polygons.json'), []);
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_polygons')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) throw new Error(`getPolygons: ${error.message}`);
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    points: row.points,
+    classificationId: row.classification_id,
+    pageNumber: row.page_number,
+    area: row.area,
+    linearFeet: row.linear_feet,
+    isComplete: row.is_complete,
+    label: row.label ?? undefined,
+  }));
 }
 
 export async function updatePolygon(
@@ -215,20 +335,47 @@ export async function updatePolygon(
   polygonId: string,
   patch: Partial<Polygon>,
 ): Promise<Polygon | null> {
-  const list = await getPolygons(projectId);
-  const idx = list.findIndex((p) => p.id === polygonId);
-  if (idx < 0) return null;
-  list[idx] = { ...list[idx], ...patch };
-  await writeJSON(filePath(projectId, 'polygons.json'), list);
-  return list[idx];
+  const sb = getClient();
+  const updateData: Record<string, unknown> = {};
+  if (patch.points !== undefined) updateData.points = patch.points;
+  if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
+  if (patch.pageNumber !== undefined) updateData.page_number = patch.pageNumber;
+  if (patch.area !== undefined) updateData.area = patch.area;
+  if (patch.linearFeet !== undefined) updateData.linear_feet = patch.linearFeet;
+  if (patch.isComplete !== undefined) updateData.is_complete = patch.isComplete;
+  if (patch.label !== undefined) updateData.label = patch.label;
+
+  const { data: row, error } = await sb
+    .from('mx_polygons')
+    .update(updateData)
+    .eq('id', polygonId)
+    .eq('project_id', projectId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(`updatePolygon: ${error.message}`);
+  if (!row) return null;
+  return {
+    id: row.id,
+    points: row.points,
+    classificationId: row.classification_id,
+    pageNumber: row.page_number,
+    area: row.area,
+    linearFeet: row.linear_feet,
+    isComplete: row.is_complete,
+    label: row.label ?? undefined,
+  };
 }
 
 export async function deletePolygon(projectId: string, polygonId: string): Promise<boolean> {
-  const list = await getPolygons(projectId);
-  const filtered = list.filter((p) => p.id !== polygonId);
-  if (filtered.length === list.length) return false;
-  await writeJSON(filePath(projectId, 'polygons.json'), filtered);
-  return true;
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_polygons')
+    .delete()
+    .eq('id', polygonId)
+    .eq('project_id', projectId)
+    .select('id');
+  if (error) throw new Error(`deletePolygon: ${error.message}`);
+  return (data?.length ?? 0) > 0;
 }
 
 // ── Scale CRUD ─────────────────────────────────────────────────────────
@@ -237,10 +384,36 @@ export async function setScale(
   projectId: string,
   scale: ScaleCalibration,
 ): Promise<ScaleCalibration> {
-  await writeJSON(filePath(projectId, 'scale.json'), scale);
+  const sb = getClient();
+  const { error } = await sb.from('mx_scales').upsert(
+    {
+      project_id: projectId,
+      pixels_per_unit: scale.pixelsPerUnit,
+      unit: scale.unit,
+      label: scale.label,
+      source: scale.source,
+      confidence: scale.confidence ?? null,
+    },
+    { onConflict: 'project_id' },
+  );
+  if (error) throw new Error(`setScale: ${error.message}`);
   return scale;
 }
 
 export async function getScale(projectId: string): Promise<ScaleCalibration | null> {
-  return readJSON<ScaleCalibration | null>(filePath(projectId, 'scale.json'), null);
+  const sb = getClient();
+  const { data, error } = await sb
+    .from('mx_scales')
+    .select('*')
+    .eq('project_id', projectId)
+    .maybeSingle();
+  if (error) throw new Error(`getScale: ${error.message}`);
+  if (!data) return null;
+  return {
+    pixelsPerUnit: data.pixels_per_unit,
+    unit: data.unit,
+    label: data.label,
+    source: data.source,
+    confidence: data.confidence ?? undefined,
+  };
 }

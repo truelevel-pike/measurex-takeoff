@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/components/Toast';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
 import type { Point } from '@/lib/types';
 
@@ -10,10 +11,12 @@ export default function DrawingTool() {
   const [cursor, setCursor] = useState<Point | null>(null);
   const addPolygon = useStore((s) => s.addPolygon);
   const classifications = useStore((s) => s.classifications);
+  const selectedClassification = useStore((s) => s.selectedClassification);
   const setTool = useStore((s) => s.setTool);
   const scale = useStore((s) => s.scale);
   const currentPage = useStore((s) => s.currentPage);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { addToast } = useToast();
 
   const CLOSE_THRESHOLD = 12;
 
@@ -23,40 +26,64 @@ export default function DrawingTool() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }, []);
 
+  const getSelectedClassification = useCallback(() => {
+    return classifications.find((c) => c.id === selectedClassification) ?? null;
+  }, [classifications, selectedClassification]);
+
+  const commitPolygon = useCallback(() => {
+    if (points.length < 3) return;
+    const cls = getSelectedClassification();
+    if (!cls) {
+      addToast('Please create or select a classification first', 'warning');
+      return;
+    }
+    const areaPx = calculatePolygonArea(points);
+    addPolygon({
+      points,
+      classificationId: cls.id,
+      pageNumber: currentPage || 1,
+      area: areaPx,
+      linearFeet: 0,
+      isComplete: true,
+      label: undefined,
+    });
+    setPoints([]);
+    setTool('select');
+  }, [points, getSelectedClassification, addPolygon, currentPage, setTool, addToast]);
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       const pt = getCoords(e);
-      // close polygon
+
+      // Guard: require a selected classification before first point
+      if (points.length === 0) {
+        const cls = getSelectedClassification();
+        if (!cls) {
+          addToast('Please create or select a classification first', 'warning');
+          return;
+        }
+      }
+
+      // Close polygon if clicking near the first point
       if (points.length >= 3) {
         const dx = pt.x - points[0].x;
         const dy = pt.y - points[0].y;
         if (Math.hypot(dx, dy) < CLOSE_THRESHOLD) {
-          const areaPx = calculatePolygonArea(points);
-          const cls = classifications[0];
-          const id = addPolygon({
-            points,
-            classificationId: cls?.id || '',
-            pageNumber: currentPage || 1,
-            area: areaPx,
-            linearFeet: 0,
-            isComplete: true,
-            label: undefined,
-          });
-          setPoints([]);
-          setTool('select');
+          commitPolygon();
           return;
         }
       }
       setPoints((prev) => [...prev, pt]);
     },
-    [points, getCoords, classifications, addPolygon, setTool, currentPage]
+    [points, getCoords, getSelectedClassification, commitPolygon, addToast]
   );
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => setCursor(getCoords(e)), [getCoords]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setPoints([]); setTool('select'); }
-  }, [setTool]);
+    if (e.key === 'Enter') { commitPolygon(); }
+  }, [setTool, commitPolygon]);
 
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';

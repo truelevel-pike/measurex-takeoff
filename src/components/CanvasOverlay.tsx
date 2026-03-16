@@ -20,12 +20,15 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const canvasEl = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
 
-  const polygons = useStore((s) => s.polygons);
+  const allPolygons = useStore((s) => s.polygons);
+  const currentPage = useStore((s) => s.currentPage);
   const classifications = useStore((s) => s.classifications);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const currentTool = useStore((s) => s.currentTool);
+
+  const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
 
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
@@ -86,8 +89,8 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       const color = cls?.color || '#93c5fd';
 
       const fp = new FabricPolygon(poly.points as Point[], {
-        fill: color + '22',
-        stroke: isSelected ? '#00ff88' : '#00d4ff',
+        fill: color + '4D',
+        stroke: isSelected ? '#00ff88' : color,
         strokeWidth: isSelected ? 3 : 1,
         shadow: isSelected ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 6px rgba(0,212,255,0.3)',
         selectable: currentTool === 'select',
