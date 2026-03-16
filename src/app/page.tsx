@@ -38,6 +38,7 @@ import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
+import { ToastProvider, useToast } from '@/components/Toast';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'measure'> = {
   v: 'select',
@@ -93,6 +94,9 @@ function PageInner() {
   const scales = useStore((s) => s.scales);
   const totalPages = useStore((s) => s.totalPages);
   const currentPage = useStore((s) => s.currentPage);
+  const sheetNames = useStore((s) => s.sheetNames);
+
+  const { addToast } = useToast();
 
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
@@ -263,9 +267,9 @@ function PageInner() {
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      const isForm = el && ['INPUT', 'TEXTAREA'].includes(el.tagName);
-      if (isForm) return;
+      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      const isEditable = tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (isEditable) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
@@ -462,16 +466,19 @@ function PageInner() {
         setProjectName(data.project.name || name);
         window.history.replaceState({}, '', `/?project=${data.project.id}`);
         persistSaveStatus('Saved!');
+        addToast('Project saved', 'success');
       } else {
         await flushSave(true);
+        addToast('Project saved', 'success');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Save failed';
       persistSaveStatus(`Error: ${message}`, 3500);
+      addToast('Failed to save project', 'error');
     } finally {
       setSaving(false);
     }
-  }, [projectId, currentPageNum, buildStatePayload, setCurrentPage, persistSaveStatus, flushSave]);
+  }, [projectId, currentPageNum, buildStatePayload, setCurrentPage, persistSaveStatus, flushSave, addToast]);
 
   const handleExport = useCallback(() => {
     downloadExcel(classifications, polygons, scale, scales);
@@ -528,6 +535,21 @@ function PageInner() {
         projectName={projectName || undefined}
         onChat={() => setShowChat((v) => !v)}
         onToggleImageSearch={() => setShowImageSearch((v) => !v)}
+        sheetName={sheetNames[currentPageNum] || `Page ${currentPageNum}`}
+        pageIndex={currentPageNum - 1}
+        totalPages={totalPages}
+        onPrev={() => {
+          const prev = Math.max(1, currentPageNum - 1);
+          setCurrentPageNum(prev);
+          setCurrentPage(prev, totalPages);
+          pdfViewerRef.current?.goToPage(prev);
+        }}
+        onNext={() => {
+          const next = Math.min(totalPages, currentPageNum + 1);
+          setCurrentPageNum(next);
+          setCurrentPage(next, totalPages);
+          pdfViewerRef.current?.goToPage(next);
+        }}
       />
 
       <div className={show3D ? 'flex-1 min-h-0' : 'hidden'}>
@@ -688,8 +710,10 @@ function PageInner() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#1a1a2e] text-white">Loading...</div>}>
-      <PageInner />
-    </Suspense>
+    <ToastProvider>
+      <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#1a1a2e] text-white">Loading...</div>}>
+        <PageInner />
+      </Suspense>
+    </ToastProvider>
   );
 }
