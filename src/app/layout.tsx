@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,8 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MeasureX Takeoff",
   description: "Internal construction takeoff platform",
-  themeColor: "#1a1a2e",
 };
+
+export function generateViewport(): Viewport {
+  return {
+    themeColor: "#1a1a2e",
+  };
+}
 
 export default function RootLayout({
   children,

@@ -113,6 +113,10 @@ export interface Store extends ProjectState {
   addCalibrationPoint: (p: Point) => void;
   clearCalibrationPoints: () => void;
 
+  // Sheet names (auto-detected from PDF text)
+  sheetNames: Record<number, string>;
+  setSheetName: (page: number, name: string) => void;
+
   // Classification Groups
   groups: ClassificationGroup[];
   addGroup: (name: string, color: string) => void;
@@ -121,6 +125,14 @@ export interface Store extends ProjectState {
   moveClassificationToGroup: (classificationId: string, groupId: string) => void;
   addBreakdown: (groupId: string, name: string) => void;
   deleteBreakdown: (groupId: string, breakdownId: string) => void;
+
+  // Snapping & Grid
+  snappingEnabled: boolean;
+  gridEnabled: boolean;
+  gridSize: number;
+  setSnapping: (enabled: boolean) => void;
+  setGrid: (enabled: boolean) => void;
+  setGridSize: (size: number) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -433,6 +445,10 @@ export const useStore = create<Store>()((set, get) => ({
   },
   clearCalibrationPoints: () => set({ calibrationPoints: [], calibrationMode: false }),
 
+  // ─── Sheet Names ───
+  sheetNames: {},
+  setSheetName: (page, name) => set((s) => ({ sheetNames: { ...s.sheetNames, [page]: name } })),
+
   // ─── Classification Groups ───
   groups: [
     { id: 'grp-drywall', name: 'Drywall', color: '#f59e0b', classificationIds: [], breakdowns: [] },
@@ -492,4 +508,12 @@ export const useStore = create<Store>()((set, get) => ({
           : g
       ),
     })),
+
+  // ─── Snapping & Grid ───
+  snappingEnabled: true,
+  gridEnabled: false,
+  gridSize: 20,
+  setSnapping: (enabled) => set({ snappingEnabled: enabled }),
+  setGrid: (enabled) => set({ gridEnabled: enabled }),
+  setGridSize: (size) => set({ gridSize: size }),
 }));

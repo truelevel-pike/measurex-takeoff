@@ -4,6 +4,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ChevronDown, ChevronRight, Eye, EyeOff, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
+import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 
 const TYPE_OPTIONS = [
@@ -49,6 +50,7 @@ export default function QuantitiesPanel() {
 
   const [search, setSearch] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -342,6 +344,48 @@ export default function QuantitiesPanel() {
             </button>
           </div>
         </form>
+      )}
+
+      <div className="px-2 pb-2">
+        <button
+          type="button"
+          onClick={() => setShowPresets((prev) => !prev)}
+          className="w-full border border-purple-500/30 rounded px-2 py-1.5 text-xs text-purple-300 hover:bg-purple-500/10 flex items-center justify-center gap-1"
+          aria-label="Preset Classifications"
+        >
+          <Plus size={13} />
+          Presets (Count)
+        </button>
+      </div>
+
+      {showPresets && (
+        <div className="mx-2 mb-2 p-2 bg-[#0e1016] border border-purple-500/20 rounded-lg">
+          <div className="text-[11px] text-gray-400 mb-2 font-mono">Quick-add count classifications:</div>
+          <div className="flex flex-wrap gap-1">
+            {PRESET_COUNT_CLASSIFICATIONS.map((preset) => {
+              const exists = classifications.some((c) => c.name.toLowerCase() === preset.name.toLowerCase());
+              return (
+                <button
+                  key={preset.name}
+                  type="button"
+                  disabled={exists}
+                  onClick={() => {
+                    addClassification({ name: preset.name, color: preset.color, type: preset.type, visible: true });
+                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border ${
+                    exists
+                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                      : 'border-purple-500/30 text-gray-200 hover:bg-purple-500/10 cursor-pointer'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: preset.color }} />
+                  {preset.name}
+                  {exists && <span className="text-[9px] text-gray-500 ml-0.5">(added)</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       <div className="flex-1 overflow-y-auto px-1">

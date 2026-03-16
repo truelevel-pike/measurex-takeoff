@@ -14,11 +14,27 @@ export async function POST(req: Request) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
 
-    const system = `You are a construction takeoff AI. Analyze this blueprint image. Identify every room, wall, door, window, and fixture. Return JSON array of detected elements. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, points: [{x, y}...] as pixel coordinates relative to the image dimensions, color: string (hex) }. For areas: return polygon points tracing the room boundary. For linear: return two endpoints. For counts: return center point.`;
+    const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements.
+
+COUNT items (type: "count") — return a single center point for each instance detected:
+- Doors: classify as "Single Door" (single-leaf swing) or "Double Door" (double-leaf / bi-parting swing)
+- Windows: classify as "Window" (all types: casement, sliding, awning, fixed)
+- Plumbing fixtures: "Toilet", "Sink", "Kitchen Sink", "Bathtub"
+- Furniture: "Chair", "Office Chair", "Table", "Dining Table", "Desk"
+- Parking: "Parking Space" (each individual stall)
+
+AREA items (type: "area") — return polygon points tracing the boundary:
+- Rooms, spaces (living room, bedroom, bathroom, kitchen, etc.)
+- Slabs, foundations, roof areas
+
+LINEAR items (type: "linear") — return two endpoints:
+- Walls, beams, fences, roads
+
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex) }. No prose, no markdown fences.`;
 
     const content = [
       { type: 'text', text: 'Analyze this blueprint and return JSON array only. No prose.' },
-      { type: 'input_image', image_url: { url: imageBase64 } as any },
+      { type: 'image_url', image_url: { url: imageBase64, detail: 'high' } },
     ];
 
     const resp = await fetch(OPENAI_URL, {

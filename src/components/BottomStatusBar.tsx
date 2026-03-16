@@ -16,9 +16,11 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
   const scale = useStore((s) => s.scale);
   const currentPage = useStore((s) => s.currentPage);
   const totalPages = useStore((s) => (s as any).totalPages || 0);
+  const sheetNames = useStore((s) => s.sheetNames);
   const isMobile = useIsMobile();
 
   const scaleText = scale ? scale.label : '';
+  const sheetLabel = sheetNames[currentPage] || `Sheet ${currentPage}`;
 
   return (
     <div
@@ -56,7 +58,7 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
 
       {typeof currentPage === 'number' && (
         <span className="font-mono tracking-wider" aria-label="Sheet indicator" style={{ color: '#e0e0e0' }}>
-          Sheet {currentPage}{totalPages ? ` / ${totalPages}` : ''}
+          {sheetLabel}{totalPages ? ` / ${totalPages}` : ''}
         </span>
       )}
 

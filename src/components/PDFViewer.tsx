@@ -69,7 +69,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           const pdfjsLib: any = await import('pdfjs-dist');
           if (pdfjsLib.GlobalWorkerOptions) {
             pdfjsLib.GlobalWorkerOptions.workerSrc =
-              `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+              `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
           }
           const arrayBuffer = await file.arrayBuffer();
           const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -329,7 +329,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             const pdfjsLib: any = await import('pdfjs-dist');
             if (pdfjsLib.GlobalWorkerOptions) {
               pdfjsLib.GlobalWorkerOptions.workerSrc =
-                `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+                `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
             }
             const arrayBuffer = await file.arrayBuffer();
             const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;

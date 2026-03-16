@@ -8,6 +8,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { useStore } from '@/lib/store';
 import type { DetectedElement, PDFViewerHandle, ProjectState } from '@/lib/types';
 import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
+import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
 import { useIsMobile } from '@/lib/utils';
 import { loadAIResults } from '@/lib/ai-results-loader';
@@ -15,6 +16,7 @@ import { downloadExcel } from '@/lib/export';
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
 import { installMeasurexAPI } from '@/lib/measurex-api';
 
+import AutoScalePopup from '@/components/AutoScalePopup';
 import TopNavBar from '@/components/TopNavBar';
 import LeftToolbar from '@/components/LeftToolbar';
 import PDFViewer from '@/components/PDFViewer';
@@ -32,6 +34,7 @@ import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
+import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'measure'> = {
   v: 'select',
@@ -79,6 +82,7 @@ function PageInner() {
   const setShowScalePopup = useStore((s) => s.setShowScalePopup);
   const showScalePopup = useStore((s) => s.showScalePopup);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
+  const setSheetName = useStore((s) => s.setSheetName);
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
@@ -102,6 +106,10 @@ function PageInner() {
   // Context menu + properties panel state
   const [menuState, setMenuState] = useState<{ polygonId: string; x: number; y: number } | null>(null);
   const [showProperties, setShowProperties] = useState(false);
+
+  // Auto-scale popup state (GAP-006)
+  const [showAutoScalePopup, setShowAutoScalePopup] = useState(false);
+  const [detectedScaleInfo, setDetectedScaleInfo] = useState<{ scale: string; confidence: number } | null>(null);
 
   // Chat & Image Search panel state
   const [showChat, setShowChat] = useState(false);
@@ -353,16 +361,31 @@ function PageInner() {
     if (f && f.type === 'application/pdf') setPdfFile(f);
   };
 
-  // Text extraction → auto-scale detection
+  // Text extraction → auto-scale detection + sheet naming
   const handleTextExtracted = useCallback((text: string, pageNum: number) => {
+    // GAP-001: Extract sheet name from PDF text
+    const sheetName = extractSheetName(text);
+    if (sheetName) {
+      setSheetName(pageNum, sheetName);
+    }
+
     const detected = detectScaleFromText(text);
     if (detected) {
       setDetectedScale(detected);
       setCurrentPageNum(pageNum);
       setCurrentPage(pageNum, useStore.getState().totalPages);
       setShowScalePopup(true);
+
+      // GAP-006: Show AutoScalePopup if confidence >= 0.65 and not permanently dismissed
+      if (detected.confidence >= 0.65) {
+        const hidden = typeof window !== 'undefined' && localStorage.getItem('measurex_hide_scale_popup') === 'true';
+        if (!hidden) {
+          setDetectedScaleInfo({ scale: detected.scale.label, confidence: detected.confidence });
+          setShowAutoScalePopup(true);
+        }
+      }
     }
-  }, [setShowScalePopup, setCurrentPage]);
+  }, [setShowScalePopup, setCurrentPage, setSheetName]);
 
   const handleAcceptScale = useCallback(() => {
     if (detectedScale) {
@@ -490,6 +513,18 @@ function PageInner() {
       <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row'}>
         <div className="hidden lg:block"><LeftToolbar /></div>
 
+        {pdfFile && (
+          <PageThumbnailSidebar
+            totalPages={totalPages}
+            currentPage={currentPageNum}
+            onPageSelect={(page) => {
+              setCurrentPageNum(page);
+              setCurrentPage(page, totalPages);
+              pdfViewerRef.current?.goToPage(page);
+            }}
+          />
+        )}
+
         <div className="flex flex-col flex-1 min-h-0 order-1">
           <div className="flex flex-1 min-h-0 relative">
             {!pdfFile ? (
@@ -512,7 +547,7 @@ function PageInner() {
                   <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
                   <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
                   <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
-                  <input type="file" accept=".pdf" onChange={onFileChange} className="hidden" />
+                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
                 </label>
               </div>
             ) : (
@@ -571,6 +606,18 @@ function PageInner() {
 
       {showScalePopup && detectedScale && (
         <ScalePopup detectedScaleText={detectedScale.scale.label} onAccept={handleAcceptScale} onManual={handleManualScale} />
+      )}
+
+      {showAutoScalePopup && detectedScaleInfo && (
+        <AutoScalePopup
+          detectedScale={detectedScaleInfo.scale}
+          confidence={detectedScaleInfo.confidence}
+          onDismiss={() => setShowAutoScalePopup(false)}
+          onDontShowAgain={() => {
+            localStorage.setItem('measurex_hide_scale_popup', 'true');
+            setShowAutoScalePopup(false);
+          }}
+        />
       )}
 
       {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
