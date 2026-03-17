@@ -52,6 +52,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
     const zoomRef = useRef(1);
     const isRenderingRef = useRef(false);
+    const currentPageRef = useRef(1);
 
     // Offline detection
     useEffect(() => {
@@ -161,24 +162,38 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       [actuallyRender]
     );
 
-    // Keep zoomRef in sync
+    // Keep zoomRef and currentPageRef in sync
     useEffect(() => {
       zoomRef.current = zoom;
     }, [zoom]);
 
     useEffect(() => {
-      if (pdfDocRef.current) renderPage(currentPage);
-    }, [currentPage, zoom, renderPage]);
+      currentPageRef.current = currentPage;
+    }, [currentPage]);
 
-    // Page navigation
+    // Re-render on zoom change (page changes are handled directly in goToPage)
+    useEffect(() => {
+      if (pdfDocRef.current) renderPage(currentPageRef.current);
+    }, [zoom, renderPage]);
+
+    // Initial render when PDF first loads
+    useEffect(() => {
+      if (pdfDocRef.current && currentPage === 1) renderPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pdfDoc]);
+
+    // Page navigation — update ref + state, then directly trigger render (don't wait for useEffect)
     const goToPage = useCallback(
       (page: number) => {
         const total = totalPagesRef.current;
-        const p = Math.max(1, Math.min(page, total));
+        const p = Math.max(1, Math.min(page, Math.max(total, 1)));
+        currentPageRef.current = p;
         setCurrentPage(p);
         onPageChange?.(p, total);
+        // Directly call renderPage so nav works even if React batches the state update
+        if (pdfDocRef.current) renderPage(p);
       },
-      [onPageChange]
+      [onPageChange, renderPage]
     );
 
     const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
@@ -246,32 +261,24 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
     const endPan = useCallback(() => setIsPanning(false), []);
 
-    // Auto fit-to-page on initial render using ResizeObserver
-    // Waits until the container has real layout dimensions before calculating zoom
+    // Auto fit-to-page on initial render — retry until container has layout
     useEffect(() => {
-      if (initialFitDone.current || basePageSize.current.width <= 0) return;
-      const el = containerRef.current;
-      if (!el) return;
-
-      // If the container already has dimensions, fit immediately
-      if (el.clientWidth > 0 && el.clientHeight > 0) {
-        initialFitDone.current = true;
-        fitToPage();
-        return;
-      }
-
-      // Otherwise wait for the container to get layout via ResizeObserver
-      const ro = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry || initialFitDone.current) return;
-        const { width, height } = entry.contentRect;
-        if (width <= 0 || height <= 0) return;
-        initialFitDone.current = true;
-        fitToPage();
-        ro.disconnect();
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
+      if (!pageDimensions.width) return;
+      if (initialFitDone.current) return;
+      let attempts = 0;
+      let rafId: number;
+      const tryFit = () => {
+        const container = containerRef.current;
+        if (container && container.clientWidth > 0 && basePageSize.current.width > 0) {
+          initialFitDone.current = true;
+          fitToPage();
+        } else if (attempts < 15) {
+          attempts++;
+          rafId = requestAnimationFrame(tryFit);
+        }
+      };
+      rafId = requestAnimationFrame(tryFit);
+      return () => cancelAnimationFrame(rafId);
     }, [pageDimensions, fitToPage]);
 
     // Keyboard navigation
