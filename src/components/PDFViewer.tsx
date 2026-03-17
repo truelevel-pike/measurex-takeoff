@@ -230,9 +230,11 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     useEffect(() => {
       if (!initialFitDone.current && pageDimensions.width > 0 && containerRef.current) {
         initialFitDone.current = true;
-        // Small timeout to let the DOM settle and container get real dimensions
-        const t = setTimeout(() => fitToPage(), 50);
-        return () => clearTimeout(t);
+        // Use requestAnimationFrame to ensure the container has fully laid out before measuring
+        const raf = requestAnimationFrame(() => {
+          fitToPage();
+        });
+        return () => cancelAnimationFrame(raf);
       }
     }, [pageDimensions, fitToPage]);
 
