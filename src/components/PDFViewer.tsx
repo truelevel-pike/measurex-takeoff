@@ -132,9 +132,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           setPageDimensions(dims);
           onDimensionsChange?.(dims);
 
-          // Store raw (scale=1) page dimensions for fitToPage calculation
+          // Store raw (scale=1) page dimensions for fitToPage calculation and zoom-independent overlays
           const baseViewport = page.getViewport({ scale: 1 });
           basePageSize.current = { width: baseViewport.width, height: baseViewport.height };
+          useStore.getState().setPageBaseDimensions({ width: baseViewport.width, height: baseViewport.height });
 
           await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
 

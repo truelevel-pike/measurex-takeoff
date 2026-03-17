@@ -48,6 +48,8 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const calibrationPoints = useStore((s) => s.calibrationPoints);
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
 
+  const baseDims = useStore((s) => s.pageBaseDimensions);
+
   const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
 
   // Handle right-click on a polygon via SVG element data attributes
@@ -55,15 +57,20 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     (e: React.MouseEvent<SVGSVGElement>) => {
       onCanvasPointerDown?.();
 
-      // Calibration mode: capture left clicks as calibration points
+      // Calibration mode: capture left clicks as calibration points (in base coordinate space)
       if (calibrationMode && calibrationPoints.length < 2) {
         const rect = wrapperRef.current?.getBoundingClientRect();
         if (!rect) return;
-        addCalibrationPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        addCalibrationPoint({
+          x: (clickX / rect.width) * baseDims.width,
+          y: (clickY / rect.height) * baseDims.height,
+        });
         return;
       }
     },
-    [onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]
+    [onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint, baseDims]
   );
 
   const handlePolygonClick = useCallback(
@@ -120,6 +127,8 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       }}
     >
       <svg
+        viewBox={`0 0 ${baseDims.width} ${baseDims.height}`}
+        preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
         onClick={handleSvgClick}
         onMouseDown={handleSvgMouseDown}
@@ -139,6 +148,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                 fill={hexToRgba(color, 0.3)}
                 stroke={isSelected ? '#00ff88' : color}
                 strokeWidth={isSelected ? 3 : 1.5}
+                vectorEffect="non-scaling-stroke"
                 style={{
                   cursor: currentTool === 'select' ? 'pointer' : 'default',
                   filter: isSelected

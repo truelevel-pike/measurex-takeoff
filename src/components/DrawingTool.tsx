@@ -15,6 +15,7 @@ export default function DrawingTool() {
   const setTool = useStore((s) => s.setTool);
   const scale = useStore((s) => s.scale);
   const currentPage = useStore((s) => s.currentPage);
+  const baseDims = useStore((s) => s.pageBaseDimensions);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
   // Track last click time to detect double-clicks in onClick (before onDoubleClick fires)
@@ -32,11 +33,18 @@ export default function DrawingTool() {
 
   const CLOSE_THRESHOLD = 12;
 
+  // Convert click coordinates to base (scale=1) PDF page coordinate space
+  // so polygon points are zoom-independent
   const getCoords = useCallback((e: React.MouseEvent): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    return {
+      x: (clickX / rect.width) * baseDims.width,
+      y: (clickY / rect.height) * baseDims.height,
+    };
+  }, [baseDims]);
 
   const getSelectedClassification = useCallback(() => {
     return classifications.find((c) => c.id === selectedClassification) ?? null;
@@ -117,6 +125,8 @@ export default function DrawingTool() {
   const unit = scale?.unit || 'ft';
   const previewArea = points.length >= 3 ? (calculatePolygonArea(points) / (ppu * ppu)) : 0;
 
+  const vb = `0 0 ${baseDims.width} ${baseDims.height}`;
+
   return (
     <div
       ref={containerRef}
@@ -128,14 +138,14 @@ export default function DrawingTool() {
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={vb} preserveAspectRatio="none">
         {/* Drawn edges */}
         {points.map((pt, i) => i > 0 ? (
-          <line key={`e-${i}`} x1={points[i-1].x} y1={points[i-1].y} x2={pt.x} y2={pt.y} stroke="#3b82f6" strokeWidth={2} />
+          <line key={`e-${i}`} x1={points[i-1].x} y1={points[i-1].y} x2={pt.x} y2={pt.y} stroke="#3b82f6" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         ) : null)}
         {/* Rubber-band line to cursor */}
         {points.length > 0 && cursor && (
-          <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="6 3" />
+          <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
         )}
         {/* In-progress fill preview */}
         {points.length >= 3 && (
@@ -143,20 +153,24 @@ export default function DrawingTool() {
         )}
         {/* Vertex dots */}
         {points.map((pt, i) => (
-          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >= 3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} />
+          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >= 3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         ))}
         {/* Crosshair cursor indicator */}
         {cursor && (
           <g>
-            <line x1={cursor.x - 10} y1={cursor.y} x2={cursor.x + 10} y2={cursor.y} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-            <line x1={cursor.x} y1={cursor.y - 10} x2={cursor.x} y2={cursor.y + 10} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-            <circle cx={cursor.x} cy={cursor.y} r={3} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
+            <line x1={cursor.x - 10} y1={cursor.y} x2={cursor.x + 10} y2={cursor.y} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
+            <line x1={cursor.x} y1={cursor.y - 10} x2={cursor.x} y2={cursor.y + 10} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
+            <circle cx={cursor.x} cy={cursor.y} r={3} fill="none" stroke="#3b82f6" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
           </g>
         )}
       </svg>
       {points.length >= 3 && (
         <div className="absolute bg-white/90 border border-blue-200 rounded px-2 py-1 text-xs font-mono text-blue-700 pointer-events-none"
-          style={{ left: points.reduce((s,p)=>s+p.x,0)/points.length, top: points.reduce((s,p)=>s+p.y,0)/points.length - 20, transform:'translateX(-50%)' }}>
+          style={{
+            left: `${(points.reduce((s,p)=>s+p.x,0)/points.length / baseDims.width) * 100}%`,
+            top: `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
+            transform:'translate(-50%, -20px)',
+          }}>
           {previewArea.toFixed(1)} sq {unit}
         </div>
       )}
