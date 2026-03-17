@@ -48,6 +48,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const initialFitDone = useRef(false);
     const basePageSize = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
     const totalPagesRef = useRef(0);
+    // Stable refs so callbacks never close over stale state
+    const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+    const zoomRef = useRef(1);
+    const isRenderingRef = useRef(false);
 
     // Offline detection
     useEffect(() => {
@@ -78,6 +82,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           const arrayBuffer = await file.arrayBuffer();
           const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
           if (cancelled) return;
+          pdfDocRef.current = doc;
           setPdfDoc(doc);
           setTotalPages(doc.numPages);
           totalPagesRef.current = doc.numPages;
@@ -94,13 +99,16 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       return () => { cancelled = true; };
     }, [file, onPageChange]);
 
+    // actuallyRender uses refs so it's always current — no stale closure issues
     const actuallyRender = useCallback(
       async (pageNum: number) => {
-        if (!pdfDoc || !canvasRef.current) return;
+        const doc = pdfDocRef.current;
+        if (!doc || !canvasRef.current) return;
+        isRenderingRef.current = true;
         setIsRendering(true);
         try {
-          const page: PDFPageProxy = await pdfDoc.getPage(pageNum);
-          const viewport = page.getViewport({ scale: zoom * 1.5 });
+          const page: PDFPageProxy = await doc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: zoomRef.current * 1.5 });
           const canvas = canvasRef.current;
           const ctx = canvas.getContext('2d')!;
           const dpr = window.devicePixelRatio || 1;
@@ -125,36 +133,42 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             const textContent = await page.getTextContent();
             const fullText = (textContent.items as any[])
               .map((item) => (item.str || '').trim())
-              .join('\n'); // preserve newlines for better parsing
+              .join('\n');
             onTextExtracted?.(fullText, pageNum);
           } catch {}
         } finally {
+          isRenderingRef.current = false;
           setIsRendering(false);
           if (pendingRender.current !== null) {
             const next = pendingRender.current;
             pendingRender.current = null;
-            actuallyRender(next);
+            void actuallyRender(next);
           }
         }
       },
-      [pdfDoc, zoom, onDimensionsChange, onTextExtracted]
+      [onDimensionsChange, onTextExtracted]
     );
 
-    // Render current page with simple render queue
+    // Render current page — stable deps: only re-runs when page or zoom actually changes
     const renderPage = useCallback(
       (pageNum: number) => {
-        if (isRendering) {
+        if (isRenderingRef.current) {
           pendingRender.current = pageNum;
           return;
         }
         void actuallyRender(pageNum);
       },
-      [isRendering, actuallyRender]
+      [actuallyRender]
     );
 
+    // Keep zoomRef in sync
     useEffect(() => {
-      if (pdfDoc) renderPage(currentPage);
-    }, [pdfDoc, currentPage, zoom, renderPage]);
+      zoomRef.current = zoom;
+    }, [zoom]);
+
+    useEffect(() => {
+      if (pdfDocRef.current) renderPage(currentPage);
+    }, [currentPage, zoom, renderPage]);
 
     // Page navigation
     const goToPage = useCallback(
@@ -360,6 +374,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             }
             const arrayBuffer = await file.arrayBuffer();
             const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            pdfDocRef.current = doc;
             setPdfDoc(doc);
             setTotalPages(doc.numPages);
             totalPagesRef.current = doc.numPages;
