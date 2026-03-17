@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   ProjectState,
   Classification,
@@ -148,7 +149,9 @@ function snapshot(state: Store): HistorySnapshot {
   };
 }
 
-export const useStore = create<Store>()((set, get) => ({
+export const useStore = create<Store>()(
+  persist(
+    (set, get) => ({
   // ProjectState
   classifications: [],
   polygons: [],
@@ -522,4 +525,35 @@ export const useStore = create<Store>()((set, get) => ({
   setSnapping: (enabled) => set({ snappingEnabled: enabled }),
   setGrid: (enabled) => set({ gridEnabled: enabled }),
   setGridSize: (size) => set({ gridSize: size }),
-}));
+    }),
+    {
+      name: 'measurex-state',
+      storage: createJSONStorage(() => {
+        // SSR-safe: return a no-op storage during server render
+        if (typeof window === 'undefined') {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return localStorage;
+      }),
+      // Only persist the project data — skip ephemeral UI state
+      partialize: (state) => ({
+        classifications: state.classifications,
+        polygons: state.polygons,
+        scale: state.scale,
+        scales: state.scales,
+        currentPage: state.currentPage,
+        totalPages: state.totalPages,
+        sheetNames: state.sheetNames,
+        groups: state.groups,
+        assemblies: state.assemblies,
+        snappingEnabled: state.snappingEnabled,
+        gridEnabled: state.gridEnabled,
+        gridSize: state.gridSize,
+      }),
+    }
+  )
+);

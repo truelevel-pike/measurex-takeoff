@@ -696,12 +696,12 @@ function PageInner() {
                       ? 'grab'
                       : 'default'
                   }
-                />
-
-                <CanvasOverlay
-                  onPolygonContextMenu={handlePolygonContextMenu}
-                  onCanvasPointerDown={closeContextMenu}
-                />
+                >
+                  <CanvasOverlay
+                    onPolygonContextMenu={handlePolygonContextMenu}
+                    onCanvasPointerDown={closeContextMenu}
+                  />
+                </PDFViewer>
 
                 {menuState && (
                   <ContextMenu

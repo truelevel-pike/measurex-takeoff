@@ -19,6 +19,8 @@ interface PDFViewerProps {
   onTextExtracted?: (text: string, pageNum: number) => void;
   /** CSS cursor value to apply when not actively panning (e.g. 'crosshair'). Defaults to 'default'. */
   cursor?: string;
+  /** Optional overlay content rendered inside the pan/zoom transform, co-located with the PDF canvas. */
+  children?: React.ReactNode;
 }
 
 export interface PDFViewerHandle {
@@ -33,7 +35,7 @@ export interface PDFViewerHandle {
 }
 
 const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
-  ({ file, onPageChange, onDimensionsChange, onTextExtracted, cursor = 'default' }, ref) => {
+  ({ file, onPageChange, onDimensionsChange, onTextExtracted, cursor = 'default', children }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
@@ -464,7 +466,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             </div>
             {pdfDoc && (
               <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff' }} />
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff', display: 'block' }} />
+                  {children}
+                </div>
               </div>
             )}
           </>
