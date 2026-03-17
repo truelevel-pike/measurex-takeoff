@@ -368,9 +368,22 @@ export const useStore = create<Store>()(
 
   hydrateState: (state) => {
     // DO NOT regenerate IDs — trust persisted state
+    // Dedup by ID to prevent any double-hydration artifacts
+    const seenCls = new Set<string>();
+    const dedupedClassifications = (state.classifications || []).filter((c) => {
+      if (!c?.id || seenCls.has(c.id)) return false;
+      seenCls.add(c.id);
+      return true;
+    });
+    const seenPoly = new Set<string>();
+    const dedupedPolygons = (state.polygons || []).filter((p) => {
+      if (!p?.id || seenPoly.has(p.id)) return false;
+      seenPoly.add(p.id);
+      return true;
+    });
     set({
-      classifications: structuredClone(state.classifications),
-      polygons: structuredClone(state.polygons),
+      classifications: structuredClone(dedupedClassifications),
+      polygons: structuredClone(dedupedPolygons),
       scale: state.scale ? structuredClone(state.scale) : null,
       scales: structuredClone(state.scales || {}),
       currentPage: state.currentPage || 1,

@@ -63,9 +63,27 @@ const EMPTY_STATE: ProjectState = {
 function normalizeProjectState(raw: unknown): ProjectState {
   const candidate = (raw && typeof raw === 'object') ? (raw as Partial<ProjectState>) : {};
 
+  const rawClassifications = Array.isArray(candidate.classifications) ? candidate.classifications : [];
+  const rawPolygons = Array.isArray(candidate.polygons) ? candidate.polygons : [];
+
+  // Dedup by ID to guard against any merge/hydration artifacts
+  const seenClassIds = new Set<string>();
+  const classifications = rawClassifications.filter((c: any) => {
+    if (!c?.id || seenClassIds.has(c.id)) return false;
+    seenClassIds.add(c.id);
+    return true;
+  });
+
+  const seenPolyIds = new Set<string>();
+  const polygons = rawPolygons.filter((p: any) => {
+    if (!p?.id || seenPolyIds.has(p.id)) return false;
+    seenPolyIds.add(p.id);
+    return true;
+  });
+
   return {
-    classifications: Array.isArray(candidate.classifications) ? candidate.classifications : [],
-    polygons: Array.isArray(candidate.polygons) ? candidate.polygons : [],
+    classifications,
+    polygons,
     scale: candidate.scale ?? null,
     scales: (candidate.scales && typeof candidate.scales === 'object') ? candidate.scales : {},
     currentPage: typeof candidate.currentPage === 'number' && candidate.currentPage > 0 ? candidate.currentPage : 1,
@@ -240,6 +258,11 @@ function PageInner() {
       if (res.ok) {
         const data = await res.json();
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
+
+        // Clear any stale Zustand-persisted localStorage data BEFORE hydrating.
+        // Without this, persist may have loaded old classifications/polygons that
+        // conflict with the API data — causing duplicates when the sync effects run.
+        try { (useStore as any).persist?.clearStorage?.(); } catch {}
 
         useStore.getState().hydrateState(normalized);
         knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
@@ -476,6 +499,12 @@ function PageInner() {
   const ensureProject = useCallback(async (fileName: string) => {
     if (projectId) return;
     try {
+      // Clear stale persisted Zustand state from any previous session before starting fresh
+      try { (useStore as any).persist?.clearStorage?.(); } catch {}
+      useStore.getState().hydrateState(EMPTY_STATE);
+      knownPolygonIds.current = new Set();
+      knownClassificationIds.current = new Set();
+
       const name = fileName.replace(/\.pdf$/i, '') || 'Untitled';
       const project = await api.createProject(name);
       setProjectId(project.id);
