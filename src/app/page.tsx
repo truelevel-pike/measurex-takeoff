@@ -697,10 +697,15 @@ function PageInner() {
                       : 'default'
                   }
                 >
+                  {/* All overlay tools live inside the PDF pan/zoom transform so coords align */}
                   <CanvasOverlay
                     onPolygonContextMenu={handlePolygonContextMenu}
                     onCanvasPointerDown={closeContextMenu}
                   />
+                  {currentTool === 'draw' && <DrawingTool />}
+                  {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
+                  {currentTool === 'cut' && <CutTool />}
+                  {currentTool === 'measure' && <MeasurementTool />}
                 </PDFViewer>
 
                 {menuState && (
@@ -721,11 +726,6 @@ function PageInner() {
                     <PolygonProperties onClose={() => setShowProperties(false)} />
                   </div>
                 )}
-
-                {currentTool === 'draw' && <DrawingTool />}
-                {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
-                {currentTool === 'cut' && <CutTool />}
-                {currentTool === 'measure' && <MeasurementTool />}
               </>
             )}
           </div>
