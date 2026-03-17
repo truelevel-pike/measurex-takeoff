@@ -1,12 +1,14 @@
 /**
  * Server-side persistence layer for MeasureX projects.
- * Uses Supabase for storage.
  *
- * Tables: mx_projects, mx_pages, mx_scales, mx_classifications, mx_polygons
+ * Dual mode:
+ * - If SUPABASE_SERVICE_ROLE_KEY is set → uses Supabase (tables: mx_projects, mx_pages, mx_scales, mx_classifications, mx_polygons)
+ * - Otherwise → uses file-based storage in data/projects/
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs/promises';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -25,144 +27,241 @@ export interface PageInfo {
   text: string;
 }
 
-// ── Supabase Client ────────────────────────────────────────────────────
+// ── Mode detection ────────────────────────────────────────────────────
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+function isSupabaseMode(): boolean {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+// ── Supabase Client (lazy, only created in Supabase mode) ─────────────
+
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 let _client: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
   if (!_client) {
-    _client = createClient(supabaseUrl, supabaseKey);
+    // Dynamic import would be cleaner but createClient is sync; require at call time
+    const { createClient } = require('@supabase/supabase-js');
+    _client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
   }
-  return _client;
+  return _client!;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// ── File-mode helpers ─────────────────────────────────────────────────
 
-/** No-op — kept for callers that import it. Supabase needs no local dir init. */
+const DATA_DIR = path.join(process.cwd(), 'data');
+const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
+
+function projectDir(projectId: string): string {
+  return path.join(PROJECTS_DIR, projectId);
+}
+
+async function readJson<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const raw = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJson(filePath: string, data: unknown): Promise<void> {
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ── initDataDir ───────────────────────────────────────────────────────
+
 export async function initDataDir(): Promise<void> {
-  // no-op
+  if (isSupabaseMode()) return;
+  await fs.mkdir(PROJECTS_DIR, { recursive: true });
 }
 
 // ── Projects CRUD ──────────────────────────────────────────────────────
 
 export async function createProject(name: string): Promise<ProjectMeta> {
-  const sb = getClient();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  const { error } = await sb.from('mx_projects').insert({
-    id,
-    name,
-    created_at: now,
-    updated_at: now,
-  });
-  if (error) throw new Error(`createProject: ${error.message}`);
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb.from('mx_projects').insert({
+      id,
+      name,
+      created_at: now,
+      updated_at: now,
+    });
+    if (error) throw new Error(`createProject: ${error.message}`);
+  } else {
+    const dir = projectDir(id);
+    await fs.mkdir(dir, { recursive: true });
+    await writeJson(path.join(dir, 'project.json'), { id, name, createdAt: now, updatedAt: now });
+    await writeJson(path.join(dir, 'classifications.json'), []);
+    await writeJson(path.join(dir, 'polygons.json'), []);
+    await writeJson(path.join(dir, 'pages.json'), []);
+    await writeJson(path.join(dir, 'scale.json'), null);
+  }
 
   return { id, name, createdAt: now, updatedAt: now };
 }
 
 export async function getProject(projectId: string): Promise<ProjectMeta | null> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_projects')
-    .select('*')
-    .eq('id', projectId)
-    .maybeSingle();
-  if (error) throw new Error(`getProject: ${error.message}`);
-  if (!data) return null;
-  return {
-    id: data.id,
-    name: data.name,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_projects')
+      .select('*')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (error) throw new Error(`getProject: ${error.message}`);
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  }
+
+  return readJson<ProjectMeta | null>(path.join(projectDir(projectId), 'project.json'), null);
 }
 
 export async function listProjects(): Promise<ProjectMeta[]> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_projects')
-    .select('*')
-    .order('updated_at', { ascending: false });
-  if (error) throw new Error(`listProjects: ${error.message}`);
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_projects')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    if (error) throw new Error(`listProjects: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  // File mode: read each project dir
+  let entries: string[];
+  try {
+    entries = await fs.readdir(PROJECTS_DIR);
+  } catch {
+    return [];
+  }
+  const projects: ProjectMeta[] = [];
+  for (const entry of entries) {
+    const meta = await readJson<ProjectMeta | null>(
+      path.join(PROJECTS_DIR, entry, 'project.json'),
+      null,
+    );
+    if (meta) projects.push(meta);
+  }
+  projects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return projects;
 }
 
 export async function updateProject(
   projectId: string,
   patch: Partial<Pick<ProjectMeta, 'name'>>,
 ): Promise<ProjectMeta | null> {
-  const sb = getClient();
   const now = new Date().toISOString();
-  const { data, error } = await sb
-    .from('mx_projects')
-    .update({ ...patch, updated_at: now })
-    .eq('id', projectId)
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(`updateProject: ${error.message}`);
-  if (!data) return null;
-  return {
-    id: data.id,
-    name: data.name,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_projects')
+      .update({ ...patch, updated_at: now })
+      .eq('id', projectId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(`updateProject: ${error.message}`);
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'project.json');
+  const existing = await readJson<ProjectMeta | null>(filePath, null);
+  if (!existing) return null;
+  const updated = { ...existing, ...patch, updatedAt: now };
+  await writeJson(filePath, updated);
+  return updated;
 }
 
 export async function deleteProject(projectId: string): Promise<boolean> {
-  const sb = getClient();
-  // Delete child rows first (Supabase doesn't cascade by default unless FK set)
-  await sb.from('mx_polygons').delete().eq('project_id', projectId);
-  await sb.from('mx_classifications').delete().eq('project_id', projectId);
-  await sb.from('mx_pages').delete().eq('project_id', projectId);
-  await sb.from('mx_scales').delete().eq('project_id', projectId);
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    await sb.from('mx_polygons').delete().eq('project_id', projectId);
+    await sb.from('mx_classifications').delete().eq('project_id', projectId);
+    await sb.from('mx_pages').delete().eq('project_id', projectId);
+    await sb.from('mx_scales').delete().eq('project_id', projectId);
+    const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
+    if (error) throw new Error(`deleteProject: ${error.message}`);
+    return true;
+  }
 
-  const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
-  if (error) throw new Error(`deleteProject: ${error.message}`);
-  return true;
+  try {
+    await fs.rm(projectDir(projectId), { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ── Pages CRUD ─────────────────────────────────────────────────────────
 
 export async function createPage(projectId: string, page: PageInfo): Promise<PageInfo> {
-  const sb = getClient();
-  const { error } = await sb.from('mx_pages').upsert(
-    {
-      project_id: projectId,
-      page_number: page.pageNum,
-      width: page.width,
-      height: page.height,
-      pdf_url: page.text ?? null,
-    },
-    { onConflict: 'project_id,page_number' },
-  );
-  if (error) throw new Error(`createPage: ${error.message}`);
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb.from('mx_pages').upsert(
+      {
+        project_id: projectId,
+        page_number: page.pageNum,
+        width: page.width,
+        height: page.height,
+        pdf_url: page.text ?? null,
+      },
+      { onConflict: 'project_id,page_number' },
+    );
+    if (error) throw new Error(`createPage: ${error.message}`);
+    return page;
+  }
+
+  const filePath = path.join(projectDir(projectId), 'pages.json');
+  const pages = await readJson<PageInfo[]>(filePath, []);
+  const idx = pages.findIndex((p) => p.pageNum === page.pageNum);
+  if (idx >= 0) pages[idx] = page;
+  else pages.push(page);
+  await writeJson(filePath, pages);
   return page;
 }
 
 export async function getPages(projectId: string): Promise<PageInfo[]> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_pages')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('page_number', { ascending: true });
-  if (error) throw new Error(`getPages: ${error.message}`);
-  return (data || []).map((row: any) => ({
-    pageNum: row.page_number,
-    width: row.width,
-    height: row.height,
-    text: row.pdf_url ?? '',
-  }));
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_pages')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('page_number', { ascending: true });
+    if (error) throw new Error(`getPages: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      pageNum: row.page_number,
+      width: row.width,
+      height: row.height,
+      text: row.pdf_url ?? '',
+    }));
+  }
+
+  return readJson<PageInfo[]>(path.join(projectDir(projectId), 'pages.json'), []);
 }
 
 export async function updatePage(
@@ -170,27 +269,37 @@ export async function updatePage(
   pageNum: number,
   patch: Partial<PageInfo>,
 ): Promise<PageInfo | null> {
-  const sb = getClient();
-  const updateData: Record<string, unknown> = {};
-  if (patch.width !== undefined) updateData.width = patch.width;
-  if (patch.height !== undefined) updateData.height = patch.height;
-  if (patch.text !== undefined) updateData.pdf_url = patch.text;
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const updateData: Record<string, unknown> = {};
+    if (patch.width !== undefined) updateData.width = patch.width;
+    if (patch.height !== undefined) updateData.height = patch.height;
+    if (patch.text !== undefined) updateData.pdf_url = patch.text;
 
-  const { data, error } = await sb
-    .from('mx_pages')
-    .update(updateData)
-    .eq('project_id', projectId)
-    .eq('page_number', pageNum)
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(`updatePage: ${error.message}`);
-  if (!data) return null;
-  return {
-    pageNum: data.page_number,
-    width: data.width,
-    height: data.height,
-    text: data.pdf_url ?? '',
-  };
+    const { data, error } = await sb
+      .from('mx_pages')
+      .update(updateData)
+      .eq('project_id', projectId)
+      .eq('page_number', pageNum)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(`updatePage: ${error.message}`);
+    if (!data) return null;
+    return {
+      pageNum: data.page_number,
+      width: data.width,
+      height: data.height,
+      text: data.pdf_url ?? '',
+    };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'pages.json');
+  const pages = await readJson<PageInfo[]>(filePath, []);
+  const idx = pages.findIndex((p) => p.pageNum === pageNum);
+  if (idx < 0) return null;
+  pages[idx] = { ...pages[idx], ...patch };
+  await writeJson(filePath, pages);
+  return pages[idx];
 }
 
 // ── Classifications CRUD ───────────────────────────────────────────────
@@ -199,35 +308,49 @@ export async function createClassification(
   projectId: string,
   data: Omit<Classification, 'id'>,
 ): Promise<Classification> {
-  const sb = getClient();
   const id = crypto.randomUUID();
-  const row = {
-    id,
-    project_id: projectId,
-    name: data.name,
-    color: data.color,
-    type: data.type,
-    visible: data.visible ?? true,
-  };
-  const { error } = await sb.from('mx_classifications').insert(row);
-  if (error) throw new Error(`createClassification: ${error.message}`);
-  return { id, ...data };
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const row = {
+      id,
+      project_id: projectId,
+      name: data.name,
+      color: data.color,
+      type: data.type,
+      visible: data.visible ?? true,
+    };
+    const { error } = await sb.from('mx_classifications').insert(row);
+    if (error) throw new Error(`createClassification: ${error.message}`);
+    return { id, ...data };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'classifications.json');
+  const list = await readJson<Classification[]>(filePath, []);
+  const cls: Classification = { id, ...data };
+  list.push(cls);
+  await writeJson(filePath, list);
+  return cls;
 }
 
 export async function getClassifications(projectId: string): Promise<Classification[]> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_classifications')
-    .select('*')
-    .eq('project_id', projectId);
-  if (error) throw new Error(`getClassifications: ${error.message}`);
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    type: row.type,
-    visible: row.visible,
-  }));
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_classifications')
+      .select('*')
+      .eq('project_id', projectId);
+    if (error) throw new Error(`getClassifications: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      type: row.type,
+      visible: row.visible,
+    }));
+  }
+
+  return readJson<Classification[]>(path.join(projectDir(projectId), 'classifications.json'), []);
 }
 
 export async function updateClassification(
@@ -235,44 +358,64 @@ export async function updateClassification(
   classificationId: string,
   patch: Partial<Classification>,
 ): Promise<Classification | null> {
-  const sb = getClient();
-  const updateData: Record<string, unknown> = {};
-  if (patch.name !== undefined) updateData.name = patch.name;
-  if (patch.color !== undefined) updateData.color = patch.color;
-  if (patch.type !== undefined) updateData.type = patch.type;
-  if (patch.visible !== undefined) updateData.visible = patch.visible;
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const updateData: Record<string, unknown> = {};
+    if (patch.name !== undefined) updateData.name = patch.name;
+    if (patch.color !== undefined) updateData.color = patch.color;
+    if (patch.type !== undefined) updateData.type = patch.type;
+    if (patch.visible !== undefined) updateData.visible = patch.visible;
 
-  const { data: row, error } = await sb
-    .from('mx_classifications')
-    .update(updateData)
-    .eq('id', classificationId)
-    .eq('project_id', projectId)
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(`updateClassification: ${error.message}`);
-  if (!row) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    type: row.type,
-    visible: row.visible,
-  };
+    const { data: row, error } = await sb
+      .from('mx_classifications')
+      .update(updateData)
+      .eq('id', classificationId)
+      .eq('project_id', projectId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(`updateClassification: ${error.message}`);
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      type: row.type,
+      visible: row.visible,
+    };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'classifications.json');
+  const list = await readJson<Classification[]>(filePath, []);
+  const idx = list.findIndex((c) => c.id === classificationId);
+  if (idx < 0) return null;
+  list[idx] = { ...list[idx], ...patch };
+  await writeJson(filePath, list);
+  return list[idx];
 }
 
 export async function deleteClassification(
   projectId: string,
   classificationId: string,
 ): Promise<boolean> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_classifications')
-    .delete()
-    .eq('id', classificationId)
-    .eq('project_id', projectId)
-    .select('id');
-  if (error) throw new Error(`deleteClassification: ${error.message}`);
-  return (data?.length ?? 0) > 0;
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_classifications')
+      .delete()
+      .eq('id', classificationId)
+      .eq('project_id', projectId)
+      .select('id');
+    if (error) throw new Error(`deleteClassification: ${error.message}`);
+    return (data?.length ?? 0) > 0;
+  }
+
+  const filePath = path.join(projectDir(projectId), 'classifications.json');
+  const list = await readJson<Classification[]>(filePath, []);
+  const before = list.length;
+  const filtered = list.filter((c) => c.id !== classificationId);
+  if (filtered.length === before) return false;
+  await writeJson(filePath, filtered);
+  return true;
 }
 
 // ── Polygons CRUD ──────────────────────────────────────────────────────
@@ -281,43 +424,57 @@ export async function createPolygon(
   projectId: string,
   data: Omit<Polygon, 'id'>,
 ): Promise<Polygon> {
-  const sb = getClient();
   const id = crypto.randomUUID();
-  const row = {
-    id,
-    project_id: projectId,
-    classification_id: data.classificationId,
-    page_number: data.pageNumber ?? 1,
-    points: data.points,
-    area_pixels: data.area ?? 0,
-    linear_pixels: data.linearFeet ?? 0,
-    is_complete: data.isComplete ?? true,
-    label: data.label ?? null,
-  };
-  const { error } = await sb.from('mx_polygons').insert(row);
-  if (error) throw new Error(`createPolygon: ${error.message}`);
-  return { id, ...data };
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const row = {
+      id,
+      project_id: projectId,
+      classification_id: data.classificationId,
+      page_number: data.pageNumber ?? 1,
+      points: data.points,
+      area_pixels: data.area ?? 0,
+      linear_pixels: data.linearFeet ?? 0,
+      is_complete: data.isComplete ?? true,
+      label: data.label ?? null,
+    };
+    const { error } = await sb.from('mx_polygons').insert(row);
+    if (error) throw new Error(`createPolygon: ${error.message}`);
+    return { id, ...data };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'polygons.json');
+  const list = await readJson<Polygon[]>(filePath, []);
+  const poly: Polygon = { id, ...data };
+  list.push(poly);
+  await writeJson(filePath, list);
+  return poly;
 }
 
 export async function getPolygons(projectId: string): Promise<Polygon[]> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_polygons')
-    .select('*')
-    .eq('project_id', projectId);
-  if (error) throw new Error(`getPolygons: ${error.message}`);
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    points: row.points,
-    classificationId: row.classification_id,
-    pageNumber: row.page_number,
-    area: row.area_pixels,
-    linearFeet: row.linear_pixels,
-    isComplete: row.is_complete,
-    label: row.label ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_polygons')
+      .select('*')
+      .eq('project_id', projectId);
+    if (error) throw new Error(`getPolygons: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      points: row.points,
+      classificationId: row.classification_id,
+      pageNumber: row.page_number,
+      area: row.area_pixels,
+      linearFeet: row.linear_pixels,
+      isComplete: row.is_complete,
+      label: row.label ?? undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  return readJson<Polygon[]>(path.join(projectDir(projectId), 'polygons.json'), []);
 }
 
 export async function updatePolygon(
@@ -325,49 +482,69 @@ export async function updatePolygon(
   polygonId: string,
   patch: Partial<Polygon>,
 ): Promise<Polygon | null> {
-  const sb = getClient();
-  const updateData: Record<string, unknown> = {};
-  if (patch.points !== undefined) updateData.points = patch.points;
-  if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
-  if (patch.pageNumber !== undefined) updateData.page_number = patch.pageNumber;
-  if (patch.area !== undefined) updateData.area_pixels = patch.area;
-  if (patch.linearFeet !== undefined) updateData.linear_pixels = patch.linearFeet;
-  if (patch.isComplete !== undefined) updateData.is_complete = patch.isComplete;
-  if (patch.label !== undefined) updateData.label = patch.label;
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const updateData: Record<string, unknown> = {};
+    if (patch.points !== undefined) updateData.points = patch.points;
+    if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
+    if (patch.pageNumber !== undefined) updateData.page_number = patch.pageNumber;
+    if (patch.area !== undefined) updateData.area_pixels = patch.area;
+    if (patch.linearFeet !== undefined) updateData.linear_pixels = patch.linearFeet;
+    if (patch.isComplete !== undefined) updateData.is_complete = patch.isComplete;
+    if (patch.label !== undefined) updateData.label = patch.label;
 
-  const { data: row, error } = await sb
-    .from('mx_polygons')
-    .update(updateData)
-    .eq('id', polygonId)
-    .eq('project_id', projectId)
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(`updatePolygon: ${error.message}`);
-  if (!row) return null;
-  return {
-    id: row.id,
-    points: row.points,
-    classificationId: row.classification_id,
-    pageNumber: row.page_number,
-    area: row.area_pixels,
-    linearFeet: row.linear_pixels,
-    isComplete: row.is_complete,
-    label: row.label ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+    const { data: row, error } = await sb
+      .from('mx_polygons')
+      .update(updateData)
+      .eq('id', polygonId)
+      .eq('project_id', projectId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(`updatePolygon: ${error.message}`);
+    if (!row) return null;
+    return {
+      id: row.id,
+      points: row.points,
+      classificationId: row.classification_id,
+      pageNumber: row.page_number,
+      area: row.area_pixels,
+      linearFeet: row.linear_pixels,
+      isComplete: row.is_complete,
+      label: row.label ?? undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'polygons.json');
+  const list = await readJson<Polygon[]>(filePath, []);
+  const idx = list.findIndex((p) => p.id === polygonId);
+  if (idx < 0) return null;
+  list[idx] = { ...list[idx], ...patch };
+  await writeJson(filePath, list);
+  return list[idx];
 }
 
 export async function deletePolygon(projectId: string, polygonId: string): Promise<boolean> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_polygons')
-    .delete()
-    .eq('id', polygonId)
-    .eq('project_id', projectId)
-    .select('id');
-  if (error) throw new Error(`deletePolygon: ${error.message}`);
-  return (data?.length ?? 0) > 0;
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_polygons')
+      .delete()
+      .eq('id', polygonId)
+      .eq('project_id', projectId)
+      .select('id');
+    if (error) throw new Error(`deletePolygon: ${error.message}`);
+    return (data?.length ?? 0) > 0;
+  }
+
+  const filePath = path.join(projectDir(projectId), 'polygons.json');
+  const list = await readJson<Polygon[]>(filePath, []);
+  const before = list.length;
+  const filtered = list.filter((p) => p.id !== polygonId);
+  if (filtered.length === before) return false;
+  await writeJson(filePath, filtered);
+  return true;
 }
 
 // ── Scale CRUD ─────────────────────────────────────────────────────────
@@ -376,37 +553,47 @@ export async function setScale(
   projectId: string,
   scale: ScaleCalibration,
 ): Promise<ScaleCalibration> {
-  const sb = getClient();
-  const { error } = await sb.from('mx_scales').upsert(
-    {
-      project_id: projectId,
-      page_number: scale.pageNumber ?? 1,
-      pixels_per_unit: scale.pixelsPerUnit,
-      unit: scale.unit,
-      label: scale.label ?? 'Custom',
-      source: scale.source,
-      confidence: scale.confidence ?? null,
-    },
-    { onConflict: 'project_id,page_number' },
-  );
-  if (error) throw new Error(`setScale: ${error.message}`);
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb.from('mx_scales').upsert(
+      {
+        project_id: projectId,
+        page_number: scale.pageNumber ?? 1,
+        pixels_per_unit: scale.pixelsPerUnit,
+        unit: scale.unit,
+        label: scale.label ?? 'Custom',
+        source: scale.source,
+        confidence: scale.confidence ?? null,
+      },
+      { onConflict: 'project_id,page_number' },
+    );
+    if (error) throw new Error(`setScale: ${error.message}`);
+    return scale;
+  }
+
+  const filePath = path.join(projectDir(projectId), 'scale.json');
+  await writeJson(filePath, scale);
   return scale;
 }
 
 export async function getScale(projectId: string): Promise<ScaleCalibration | null> {
-  const sb = getClient();
-  const { data, error } = await sb
-    .from('mx_scales')
-    .select('*')
-    .eq('project_id', projectId)
-    .maybeSingle();
-  if (error) throw new Error(`getScale: ${error.message}`);
-  if (!data) return null;
-  return {
-    pixelsPerUnit: data.pixels_per_unit,
-    unit: data.unit,
-    label: data.label,
-    source: data.source,
-    confidence: data.confidence ?? undefined,
-  };
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_scales')
+      .select('*')
+      .eq('project_id', projectId)
+      .maybeSingle();
+    if (error) throw new Error(`getScale: ${error.message}`);
+    if (!data) return null;
+    return {
+      pixelsPerUnit: data.pixels_per_unit,
+      unit: data.unit,
+      label: data.label,
+      source: data.source,
+      confidence: data.confidence ?? undefined,
+    };
+  }
+
+  return readJson<ScaleCalibration | null>(path.join(projectDir(projectId), 'scale.json'), null);
 }

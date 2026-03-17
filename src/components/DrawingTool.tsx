@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
@@ -17,6 +17,10 @@ export default function DrawingTool() {
   const currentPage = useStore((s) => s.currentPage);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
 
   const CLOSE_THRESHOLD = 12;
 
