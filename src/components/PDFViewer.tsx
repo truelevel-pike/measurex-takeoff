@@ -53,6 +53,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const zoomRef = useRef(1);
     const isRenderingRef = useRef(false);
     const currentPageRef = useRef(1);
+    // Keep onPageChange in a ref so goToPage always calls the latest version without needing it in deps
+    const onPageChangeRef = useRef(onPageChange);
+    useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
 
     // Offline detection
     useEffect(() => {
@@ -171,15 +174,20 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       currentPageRef.current = currentPage;
     }, [currentPage]);
 
-    // Re-render on zoom change (page changes are handled directly in goToPage)
+    // Re-render when zoom changes — use ref so we always render the correct current page
     useEffect(() => {
       if (pdfDocRef.current) renderPage(currentPageRef.current);
-    }, [zoom, renderPage]);
+      // Only zoom in deps — renderPage is stable (useCallback with stable deps)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zoom]);
 
-    // Initial render when PDF first loads
+    // Initial render when PDF first loads (currentPage resets to 1 on load)
     useEffect(() => {
-      if (pdfDocRef.current && currentPage === 1) renderPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (pdfDoc) {
+        currentPageRef.current = 1;
+        renderPage(1);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pdfDoc]);
 
     // Page navigation — update ref + state, then directly trigger render (don't wait for useEffect)
@@ -189,11 +197,12 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         const p = Math.max(1, Math.min(page, Math.max(total, 1)));
         currentPageRef.current = p;
         setCurrentPage(p);
-        onPageChange?.(p, total);
+        // Call via ref so we always use the latest callback without it being a dep
+        onPageChangeRef.current?.(p, total);
         // Directly call renderPage so nav works even if React batches the state update
         if (pdfDocRef.current) renderPage(p);
       },
-      [onPageChange, renderPage]
+      [renderPage]
     );
 
     const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
