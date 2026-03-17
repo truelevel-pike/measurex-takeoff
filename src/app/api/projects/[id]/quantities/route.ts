@@ -12,7 +12,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       getScale(id),
     ]);
 
-    const scaleConfig = { pixelsPerFoot: scale?.pixelsPerUnit || 1, unit: 'imperial' as const };
+    // pixelsPerUnit is the scale factor (pixels per real-world unit, e.g. pixels per foot).
+    // Always recalculate from points using the geometry engine — the stored area/linearFeet
+    // fields are in pixel-space (from the client DrawingTool) and must not be used directly.
+    const ppu = scale?.pixelsPerUnit || 1;
+    const scaleConfig = { pixelsPerFoot: ppu, unit: 'imperial' as const };
 
     const quantities = classifications.map((c) => {
       const classPolygons = polygons.filter((p) => p.classificationId === c.id);
@@ -22,9 +26,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
       for (const p of classPolygons) {
         if (c.type === 'area') {
-          totalArea += p.area ?? calculatePolygonArea(p.points, scaleConfig);
+          // Always compute from geometry — stored area is pixel² not real-world SF
+          totalArea += calculatePolygonArea(p.points, scaleConfig);
         } else if (c.type === 'linear') {
-          totalLinear += p.linearFeet ?? calculateLinearLength(p.points, scaleConfig);
+          totalLinear += calculateLinearLength(p.points, scaleConfig);
         }
       }
 

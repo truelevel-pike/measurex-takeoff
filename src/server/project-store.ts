@@ -322,7 +322,18 @@ export async function createClassification(
     };
     const { error } = await sb.from('mx_classifications').insert(row);
     if (error) throw new Error(`createClassification: ${error.message}`);
-    return { id, ...data };
+    // Build return object explicitly — spreading `data` (which may have id?: undefined)
+    // over { id } would overwrite id with undefined.
+    return {
+      id,
+      name: data.name,
+      color: data.color,
+      type: data.type,
+      visible: data.visible ?? true,
+      formula: data.formula,
+      formulaUnit: data.formulaUnit,
+      formulaSavedToLibrary: data.formulaSavedToLibrary,
+    };
   }
 
   const filePath = path.join(projectDir(projectId), 'classifications.json');
@@ -441,7 +452,18 @@ export async function createPolygon(
     };
     const { error } = await sb.from('mx_polygons').insert(row);
     if (error) throw new Error(`createPolygon: ${error.message}`);
-    return { id, ...data };
+    // Build return object explicitly — spreading `data` (which may have id?: undefined)
+    // over { id } would overwrite id with undefined.
+    return {
+      id,
+      points: data.points,
+      classificationId: data.classificationId,
+      pageNumber: data.pageNumber ?? 1,
+      area: row.area_pixels,
+      linearFeet: row.linear_pixels,
+      isComplete: data.isComplete ?? true,
+      label: data.label,
+    };
   }
 
   const filePath = path.join(projectDir(projectId), 'polygons.json');
