@@ -102,6 +102,8 @@ function PageInner() {
 
   const { addToast } = useToast();
 
+
+
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
   const threeData = React.useMemo(() => convertTakeoffTo3D(polygons, classifications), [polygons, classifications]);
@@ -138,6 +140,9 @@ function PageInner() {
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
+  // Show the full viewer layout (sidebars, panels, overlays) when a project has data,
+  // even if pdfFile is null (PDF isn't stored server-side, user needs to re-upload).
+  const hasProjectData = Boolean(projectId || classifications.length > 0 || polygons.length > 0);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
@@ -244,6 +249,17 @@ function PageInner() {
         setProjectId(data.project.id);
         setProjectName(data.project.name || 'Untitled');
         localStorage.setItem('measurex_project_id', data.project.id);
+
+        // Auto-fetch stored PDF so the viewer loads without re-upload
+        fetch(`/api/projects/${pid}/pdf`)
+          .then(async (pdfRes) => {
+            if (!pdfRes.ok) return;
+            const blob = await pdfRes.blob();
+            const file = new File([blob], `${data.project.name || pid}.pdf`, { type: 'application/pdf' });
+            setPdfFile(file);
+          })
+          .catch(() => null); // non-fatal — user can still upload manually
+
         return;
       }
 
@@ -662,7 +678,8 @@ function PageInner() {
       <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row'}>
         <div className="hidden lg:block"><LeftToolbar /></div>
 
-        {pdfFile && (
+        {/* Thumbnail sidebar: show when PDF is loaded OR when project has data (shows page count from store) */}
+        {(pdfFile || hasProjectData) && (
           <PageThumbnailSidebar
             totalPages={totalPages}
             currentPage={currentPageNum}
@@ -677,33 +694,8 @@ function PageInner() {
 
         <div className="flex flex-col flex-1 min-h-0 order-1">
           <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
-            {!pdfFile ? (
-              <div
-                className="flex-1 flex items-center justify-center p-4"
-                role="region"
-                aria-describedby="upload-help"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const f = e.dataTransfer.files?.[0];
-                  if (f && f.type === 'application/pdf') {
-                    setPdfFile(f);
-                    void ensureProject(f.name);
-                  }
-                }}
-              >
-                <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">
-                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
-                  <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
-                  <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
-                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
-                </label>
-              </div>
-            ) : (
+            {pdfFile ? (
+              /* ── PDF loaded — full viewer ── */
               <>
                 <PDFViewer
                   ref={pdfViewerRef}
@@ -748,6 +740,57 @@ function PageInner() {
                   </div>
                 )}
               </>
+            ) : hasProjectData ? (
+              /* ── Project loaded but no PDF file — show re-upload prompt ── */
+              /* PDF files aren't stored server-side; user must re-upload on each session. */
+              /* The viewer shell (sidebars, quantities, scale bar) remains visible. */
+              <div
+                className="flex-1 flex items-center justify-center p-4 bg-[#0a0a0f]"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && f.type === 'application/pdf') setPdfFile(f);
+                }}
+              >
+                <label className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]">
+                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
+                  <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
+                    {projectName || 'Project loaded'}
+                  </div>
+                  <div className="text-sm text-zinc-400 mb-3">
+                    {classifications.length} classification{classifications.length !== 1 ? 's' : ''} · {polygons.length} polygon{polygons.length !== 1 ? 's' : ''} · {totalPages} page{totalPages !== 1 ? 's' : ''}
+                  </div>
+                  <div className="text-sm text-zinc-500">Re-upload the PDF to view the blueprint</div>
+                  <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
+                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
+                </label>
+              </div>
+            ) : (
+              /* ── No project, no PDF — fresh upload screen ── */
+              <div
+                className="flex-1 flex items-center justify-center p-4"
+                role="region"
+                aria-describedby="upload-help"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && f.type === 'application/pdf') {
+                    setPdfFile(f);
+                    void ensureProject(f.name);
+                  }
+                }}
+              >
+                <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">
+                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
+                  <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
+                  <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
+                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
+                </label>
+              </div>
             )}
           </div>
 

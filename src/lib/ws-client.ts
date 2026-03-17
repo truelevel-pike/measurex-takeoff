@@ -12,6 +12,7 @@ type SSEEvent =
   | { event: 'polygon:deleted'; data: { id: string } }
   | { event: 'classification:created'; data: Classification }
   | { event: 'classification:updated'; data: Classification }
+  | { event: 'classification:deleted'; data: { id: string } }
   | { event: 'scale:updated'; data: ScaleCalibration }
   | { event: 'ai-takeoff:started'; data: { page: number } }
   | { event: 'ai-takeoff:complete'; data: unknown };
@@ -61,6 +62,16 @@ function handleSSEMessage(raw: MessageEvent) {
     case 'classification:updated': {
       const cls = parsed.data;
       store.updateClassification(cls.id, cls);
+      break;
+    }
+
+    case 'classification:deleted': {
+      const { id } = parsed.data;
+      useStore.setState((s) => ({
+        classifications: s.classifications.filter((c) => c.id !== id),
+        // Also remove any polygons that belonged to this classification
+        polygons: s.polygons.filter((p) => p.classificationId !== id),
+      }));
       break;
     }
 

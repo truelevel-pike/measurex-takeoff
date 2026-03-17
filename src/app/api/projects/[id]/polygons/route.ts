@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPolygons, createPolygon, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
+import { broadcastToProject } from '@/app/api/ws/route';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,6 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       isComplete: body.isComplete ?? true,
       label: body.label,
     });
+    broadcastToProject(id, 'polygon:created', polygon);
     return NextResponse.json({ polygon });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getScale, setScale, initDataDir } from '@/server/project-store';
+import { broadcastToProject } from '@/app/api/ws/route';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,6 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { pixelsPerUnit, unit, label, source, pageNumber } = body;
     if (!pixelsPerUnit || !unit) return NextResponse.json({ error: 'pixelsPerUnit and unit required' }, { status: 400 });
     const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual', pageNumber: pageNumber || 1 });
+    broadcastToProject(id, 'scale:updated', scale);
     return NextResponse.json({ scale });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

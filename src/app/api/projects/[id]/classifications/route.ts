@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
+import { broadcastToProject } from '@/app/api/ws/route';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       formulaUnit: body.formulaUnit,
       formulaSavedToLibrary: body.formulaSavedToLibrary,
     });
+    broadcastToProject(id, 'classification:created', classification);
     return NextResponse.json({ classification });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
