@@ -456,9 +456,27 @@ function PageInner() {
     };
   }, []);
 
+  // Auto-create a project when a PDF is loaded and no project exists yet
+  const ensureProject = useCallback(async (fileName: string) => {
+    if (projectId) return;
+    try {
+      const name = fileName.replace(/\.pdf$/i, '') || 'Untitled';
+      const project = await api.createProject(name);
+      setProjectId(project.id);
+      setProjectName(project.name || name);
+      localStorage.setItem('measurex_project_id', project.id);
+      window.history.replaceState({}, '', `/?project=${project.id}`);
+    } catch (err) {
+      console.error('Failed to auto-create project:', err);
+    }
+  }, [projectId]);
+
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f && f.type === 'application/pdf') setPdfFile(f);
+    if (f && f.type === 'application/pdf') {
+      setPdfFile(f);
+      void ensureProject(f.name);
+    }
   };
 
   // Text extraction → auto-scale detection + sheet naming
@@ -672,7 +690,10 @@ function PageInner() {
                   e.preventDefault();
                   e.stopPropagation();
                   const f = e.dataTransfer.files?.[0];
-                  if (f && f.type === 'application/pdf') setPdfFile(f);
+                  if (f && f.type === 'application/pdf') {
+                    setPdfFile(f);
+                    void ensureProject(f.name);
+                  }
                 }}
               >
                 <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">

@@ -306,9 +306,9 @@ export async function updatePage(
 
 export async function createClassification(
   projectId: string,
-  data: Omit<Classification, 'id'>,
+  data: Omit<Classification, 'id'> & { id?: string },
 ): Promise<Classification> {
-  const id = crypto.randomUUID();
+  const id = data.id || crypto.randomUUID();
 
   if (isSupabaseMode()) {
     const sb = getClient();
@@ -422,9 +422,9 @@ export async function deleteClassification(
 
 export async function createPolygon(
   projectId: string,
-  data: Omit<Polygon, 'id'>,
+  data: Omit<Polygon, 'id'> & { id?: string },
 ): Promise<Polygon> {
-  const id = crypto.randomUUID();
+  const id = data.id || crypto.randomUUID();
 
   if (isSupabaseMode()) {
     const sb = getClient();

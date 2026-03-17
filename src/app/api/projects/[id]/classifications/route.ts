@@ -17,9 +17,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await initDataDir();
     const { id } = await params;
     const body = await req.json();
-    const { name, type, color } = body;
+    const { name, type } = body;
     if (!name || !type) return NextResponse.json({ error: 'name and type required' }, { status: 400 });
-    const classification = await createClassification(id, { name, type, color: color || '#3b82f6', visible: true } as any);
+    const classification = await createClassification(id, {
+      id: body.id,
+      name,
+      type,
+      color: body.color || '#3b82f6',
+      visible: body.visible ?? true,
+      formula: body.formula,
+      formulaUnit: body.formulaUnit,
+      formulaSavedToLibrary: body.formulaSavedToLibrary,
+    });
     return NextResponse.json({ classification });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
