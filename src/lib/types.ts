@@ -5,10 +5,12 @@ export interface Polygon {
   points: Point[];
   classificationId: string;
   pageNumber: number;
-  area: number; // pixels; convert to real units via scale when displaying
-  linearFeet: number;
+  area: number;       // raw pixel area (stored as area_pixels in DB)
+  linearFeet: number; // raw pixel length (stored as linear_pixels in DB)
   isComplete: boolean;
   label?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Classification {
@@ -28,6 +30,7 @@ export interface ScaleCalibration {
   label: string;
   source: 'manual' | 'auto' | 'ai';
   confidence?: number;
+  pageNumber?: number;
 }
 
 export interface ProjectState {

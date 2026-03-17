@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const body = await req.json();
     const { pixelsPerUnit, unit, label, source, pageNumber } = body;
     if (!pixelsPerUnit || !unit) return NextResponse.json({ error: 'pixelsPerUnit and unit required' }, { status: 400 });
-    const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual' });
+    const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual', pageNumber: pageNumber || 1 });
     return NextResponse.json({ scale });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

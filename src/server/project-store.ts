@@ -289,8 +289,8 @@ export async function createPolygon(
     classification_id: data.classificationId,
     page_number: data.pageNumber ?? 1,
     points: data.points,
-    area_pixels: data.areaPixels ?? 0,
-    linear_pixels: data.linearPixels ?? 0,
+    area_pixels: data.area ?? 0,
+    linear_pixels: data.linearFeet ?? 0,
     is_complete: data.isComplete ?? true,
     label: data.label ?? null,
   };
@@ -311,8 +311,8 @@ export async function getPolygons(projectId: string): Promise<Polygon[]> {
     points: row.points,
     classificationId: row.classification_id,
     pageNumber: row.page_number,
-    areaPixels: row.area_pixels,
-    linearPixels: row.linear_pixels,
+    area: row.area_pixels,
+    linearFeet: row.linear_pixels,
     isComplete: row.is_complete,
     label: row.label ?? undefined,
     createdAt: row.created_at,
@@ -330,8 +330,8 @@ export async function updatePolygon(
   if (patch.points !== undefined) updateData.points = patch.points;
   if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
   if (patch.pageNumber !== undefined) updateData.page_number = patch.pageNumber;
-  if (patch.areaPixels !== undefined) updateData.area_pixels = patch.areaPixels;
-  if (patch.linearPixels !== undefined) updateData.linear_pixels = patch.linearPixels;
+  if (patch.area !== undefined) updateData.area_pixels = patch.area;
+  if (patch.linearFeet !== undefined) updateData.linear_pixels = patch.linearFeet;
   if (patch.isComplete !== undefined) updateData.is_complete = patch.isComplete;
   if (patch.label !== undefined) updateData.label = patch.label;
 
@@ -349,8 +349,8 @@ export async function updatePolygon(
     points: row.points,
     classificationId: row.classification_id,
     pageNumber: row.page_number,
-    areaPixels: row.area_pixels,
-    linearPixels: row.linear_pixels,
+    area: row.area_pixels,
+    linearFeet: row.linear_pixels,
     isComplete: row.is_complete,
     label: row.label ?? undefined,
     createdAt: row.created_at,

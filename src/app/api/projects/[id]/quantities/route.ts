@@ -22,9 +22,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
       for (const p of classPolygons) {
         if (c.type === 'area') {
-          totalArea += calculatePolygonArea(p.points, scaleConfig);
+          totalArea += p.area ?? calculatePolygonArea(p.points, scaleConfig);
         } else if (c.type === 'linear') {
-          totalLinear += calculateLinearLength(p.points, scaleConfig);
+          totalLinear += p.linearFeet ?? calculateLinearLength(p.points, scaleConfig);
         }
       }
 
