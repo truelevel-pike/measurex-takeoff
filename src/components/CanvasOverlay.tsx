@@ -5,6 +5,24 @@ import { Canvas, Polygon as FabricPolygon, Circle, Line } from 'fabric';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
+/** Convert any CSS hex color (#RGB, #RRGGBB, #RRGGBBAA) to rgba(r,g,b,a) string */
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  let r: number, g: number, b: number;
+  if (clean.length === 3) {
+    r = parseInt(clean[0] + clean[0], 16);
+    g = parseInt(clean[1] + clean[1], 16);
+    b = parseInt(clean[2] + clean[2], 16);
+  } else if (clean.length >= 6) {
+    r = parseInt(clean.slice(0, 2), 16);
+    g = parseInt(clean.slice(2, 4), 16);
+    b = parseInt(clean.slice(4, 6), 16);
+  } else {
+    return `rgba(147,197,253,${alpha})`;
+  }
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export interface PolygonContextMenuPayload {
   polygonId: string;
   x: number;
@@ -90,7 +108,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       const color = cls?.color || '#93c5fd';
 
       const fp = new FabricPolygon(poly.points as Point[], {
-        fill: color + '4D',
+        fill: hexToRgba(color, 0.3),
         stroke: isSelected ? '#00ff88' : color,
         strokeWidth: isSelected ? 3 : 1,
         shadow: isSelected ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 6px rgba(0,212,255,0.3)',
@@ -224,8 +242,9 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       <canvas
         ref={canvasEl}
         style={{
-          width: '100%',
-          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
         }}
       />
     </div>
