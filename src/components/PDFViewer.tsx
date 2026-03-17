@@ -47,6 +47,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const pendingRender = useRef<number | null>(null);
     const initialFitDone = useRef(false);
     const basePageSize = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+    const totalPagesRef = useRef(0);
 
     // Offline detection
     useEffect(() => {
@@ -79,6 +80,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           if (cancelled) return;
           setPdfDoc(doc);
           setTotalPages(doc.numPages);
+          totalPagesRef.current = doc.numPages;
           setCurrentPage(1);
           onPageChange?.(1, doc.numPages);
         } catch (err) {
@@ -157,11 +159,12 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // Page navigation
     const goToPage = useCallback(
       (page: number) => {
-        const p = Math.max(1, Math.min(page, totalPages));
+        const total = totalPagesRef.current;
+        const p = Math.max(1, Math.min(page, total));
         setCurrentPage(p);
-        onPageChange?.(p, totalPages);
+        onPageChange?.(p, total);
       },
-      [totalPages, onPageChange]
+      [onPageChange]
     );
 
     const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
@@ -230,11 +233,14 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     useEffect(() => {
       if (!initialFitDone.current && pageDimensions.width > 0 && containerRef.current) {
         initialFitDone.current = true;
-        // Use requestAnimationFrame to ensure the container has fully laid out before measuring
-        const raf = requestAnimationFrame(() => {
-          fitToPage();
+        // Use double requestAnimationFrame to ensure the container has fully laid out before measuring
+        let cancelled = false;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (!cancelled) fitToPage();
+          });
         });
-        return () => cancelAnimationFrame(raf);
+        return () => { cancelled = true; };
       }
     }, [pageDimensions, fitToPage]);
 
@@ -356,6 +362,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             setPdfDoc(doc);
             setTotalPages(doc.numPages);
+            totalPagesRef.current = doc.numPages;
             setCurrentPage(1);
             onPageChange?.(1, doc.numPages);
           } catch (err) {

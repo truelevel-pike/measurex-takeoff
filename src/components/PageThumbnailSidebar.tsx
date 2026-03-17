@@ -84,17 +84,17 @@ export default function PageThumbnailSidebar({
               <img
                 src={thumb}
                 alt={`Page ${page}`}
-                className={`w-14 h-auto rounded-sm border-2 ${
-                  isActive ? 'border-[#00d4ff]' : 'border-transparent'
+                className={`w-14 h-auto rounded-sm ${
+                  isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
                 }`}
                 draggable={false}
               />
             ) : (
               <div
-                className={`w-14 h-[52px] rounded-sm border-2 flex items-center justify-center text-xs font-mono ${
+                className={`w-14 h-[52px] rounded-sm flex items-center justify-center text-xs font-mono ${
                   isActive
-                    ? 'border-[#00d4ff] bg-[#00d4ff]/10 text-[#00d4ff]'
-                    : 'border-[#333] bg-[#1a1a2e] text-gray-500'
+                    ? 'ring-2 ring-blue-500 ring-offset-1 bg-[#00d4ff]/10 text-[#00d4ff]'
+                    : 'ring-1 ring-gray-700 bg-[#1a1a2e] text-gray-500'
                 }`}
               >
                 {page}
