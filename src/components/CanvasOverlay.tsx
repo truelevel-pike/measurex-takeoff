@@ -1,11 +1,21 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
-import { Canvas, Polygon as FabricPolygon, Circle, Line } from 'fabric';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
-/** Convert any CSS hex color (#RGB, #RRGGBB, #RRGGBBAA) to rgba(r,g,b,a) string */
+export interface PolygonContextMenuPayload {
+  polygonId: string;
+  x: number;
+  y: number;
+}
+
+interface CanvasOverlayProps {
+  onPolygonContextMenu?: (payload: PolygonContextMenuPayload) => void;
+  onCanvasPointerDown?: () => void;
+}
+
+/** Convert hex color to rgba string */
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
   let r: number, g: number, b: number;
@@ -23,208 +33,78 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export interface PolygonContextMenuPayload {
-  polygonId: string;
-  x: number;
-  y: number;
-}
-
-interface CanvasOverlayProps {
-  onPolygonContextMenu?: (payload: PolygonContextMenuPayload) => void;
-  onCanvasPointerDown?: () => void;
-}
-
 export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown }: CanvasOverlayProps = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const canvasEl = useRef<HTMLCanvasElement>(null);
-  const fabricRef = useRef<Canvas | null>(null);
 
   const allPolygons = useStore((s) => s.polygons);
   const currentPage = useStore((s) => s.currentPage);
   const classifications = useStore((s) => s.classifications);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
-  const updatePolygon = useStore((s) => s.updatePolygon);
   const currentTool = useStore((s) => s.currentTool);
-
-  const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
 
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
   const calibrationPoints = useStore((s) => s.calibrationPoints);
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
 
-  useEffect(() => {
-    if (!canvasEl.current) return;
-    const canvasNode = canvasEl.current;
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
+  const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
 
-    const fc = new Canvas(canvasNode, {
-      width: wrapper.clientWidth,
-      height: wrapper.clientHeight,
-      selection: currentTool === 'select',
-      backgroundColor: 'transparent',
-    });
-    fabricRef.current = fc;
-
-    const preventNativeContextMenu = (event: MouseEvent) => {
-      event.preventDefault();
-    };
-    canvasNode.addEventListener('contextmenu', preventNativeContextMenu);
-
-    const resize = () => {
-      fc.setDimensions({ width: wrapper.clientWidth, height: wrapper.clientHeight });
-      fc.renderAll();
-    };
-
-    const ro = new ResizeObserver(() => {
-      resize();
-    });
-    ro.observe(wrapper);
-
-    const onOrientation = () => resize();
-    window.addEventListener('orientationchange', onOrientation);
-
-    return () => {
-      canvasNode.removeEventListener('contextmenu', preventNativeContextMenu);
-      window.removeEventListener('orientationchange', onOrientation);
-      ro.disconnect();
-      fc.dispose();
-      fabricRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const fc = fabricRef.current;
-    if (!fc) return;
-
-    fc.clear();
-
-    polygons.forEach((poly) => {
-      const cls = classifications.find((c) => c.id === poly.classificationId);
-      if (cls && !cls.visible) return;
-      const isSelected = selectedPolygon === poly.id;
-      const color = cls?.color || '#93c5fd';
-
-      const fp = new FabricPolygon(poly.points as Point[], {
-        fill: hexToRgba(color, 0.3),
-        stroke: isSelected ? '#00ff88' : color,
-        strokeWidth: isSelected ? 3 : 1,
-        shadow: isSelected ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 6px rgba(0,212,255,0.3)',
-        selectable: currentTool === 'select',
-        hasControls: isSelected,
-        hasBorders: isSelected,
-        cornerColor: '#00d4ff',
-        cornerSize: 8,
-        transparentCorners: false,
-        objectCaching: false,
-      } as any);
-      (fp as any)._polygonId = poly.id;
-      fc.add(fp);
-    });
-
-    // Draw calibration overlays
-    if (calibrationPoints.length > 0) {
-      calibrationPoints.forEach((pt) => {
-        const dot = new Circle({
-          left: pt.x - 5,
-          top: pt.y - 5,
-          radius: 5,
-          fill: '#ef4444',
-          stroke: '#ffffff',
-          strokeWidth: 1,
-          selectable: false,
-          evented: false,
-        });
-        (dot as any)._calibrationOverlay = true;
-        fc.add(dot);
-      });
-
-      if (calibrationPoints.length === 2) {
-        const [p1, p2] = calibrationPoints;
-        const line = new Line([p1.x, p1.y, p2.x, p2.y], {
-          stroke: '#ef4444',
-          strokeWidth: 2,
-          strokeDashArray: [6, 4],
-          selectable: false,
-          evented: false,
-        });
-        (line as any)._calibrationOverlay = true;
-        fc.add(line);
-      }
-    }
-
-    fc.off('selection:created');
-    fc.off('selection:updated');
-    fc.off('mouse:up');
-    fc.off('mouse:down');
-    fc.off('object:modified');
-
-    fc.on('selection:created', (e: any) => {
-      const obj = e.selected?.[0];
-      if (obj && (obj as any)._polygonId) setSelectedPolygon((obj as any)._polygonId);
-    });
-
-    fc.on('selection:updated', (e: any) => {
-      const obj = e.selected?.[0];
-      if (obj && (obj as any)._polygonId) setSelectedPolygon((obj as any)._polygonId);
-    });
-
-    fc.on('mouse:up', (e: any) => {
-      if (!e.target) setSelectedPolygon(null);
-    });
-
-    fc.on('mouse:down', (e: any) => {
+  // Handle right-click on a polygon via SVG element data attributes
+  const handleSvgClick = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
       onCanvasPointerDown?.();
 
-      const nativeEvent = e.e as MouseEvent | undefined;
-      if (!nativeEvent) return;
-
-      // Calibration mode: capture clicks as calibration points
+      // Calibration mode: capture left clicks as calibration points
       if (calibrationMode && calibrationPoints.length < 2) {
-        const pointer = fc.getScenePoint(nativeEvent);
-        addCalibrationPoint({ x: pointer.x, y: pointer.y });
-        return; // Don't process as polygon interaction
+        const rect = wrapperRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        addCalibrationPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        return;
       }
+    },
+    [onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]
+  );
 
-      const isRightClick = nativeEvent.button === 2;
-      const targetPolygonId = (e.target as any)?._polygonId as string | undefined;
-
-      if (!isRightClick || !targetPolygonId) return;
-
-      nativeEvent.preventDefault();
-      nativeEvent.stopPropagation();
-      setSelectedPolygon(targetPolygonId);
-      onPolygonContextMenu?.({
-        polygonId: targetPolygonId,
-        x: nativeEvent.clientX,
-        y: nativeEvent.clientY,
-      });
-    });
-
-    fc.on('object:modified', (e: any) => {
-      const obj = e.target;
-      if (!(obj as any)?._polygonId) return;
-      if (obj instanceof FabricPolygon) {
-        const matrix = obj.calcTransformMatrix();
-        const pts: Point[] = (obj.points || []).map((p: any) => {
-          const x = p.x - (obj.pathOffset?.x || 0);
-          const y = p.y - (obj.pathOffset?.y || 0);
-          return {
-            x: matrix[0] * x + matrix[2] * y + matrix[4],
-            y: matrix[1] * x + matrix[3] * y + matrix[5],
-          };
-        });
-        updatePolygon((obj as any)._polygonId, { points: pts });
+  const handlePolygonClick = useCallback(
+    (e: React.MouseEvent<SVGPolygonElement>, polygonId: string) => {
+      e.stopPropagation();
+      onCanvasPointerDown?.();
+      if (currentTool === 'select') {
+        setSelectedPolygon(polygonId);
       }
-    });
+    },
+    [currentTool, setSelectedPolygon, onCanvasPointerDown]
+  );
 
-    fc.renderAll();
-  }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]);
+  const handlePolygonContextMenu = useCallback(
+    (e: React.MouseEvent<SVGPolygonElement>, polygonId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setSelectedPolygon(polygonId);
+      onPolygonContextMenu?.({ polygonId, x: e.clientX, y: e.clientY });
+    },
+    [setSelectedPolygon, onPolygonContextMenu]
+  );
 
-  // Disable pointer events when draw/measure tools are active so their overlays receive clicks
-  const disablePointerEvents = currentTool === 'pan' || currentTool === 'draw' || currentTool === 'measure' || currentTool === 'cut' || currentTool === 'merge' || currentTool === 'split';
+  const handleSvgMouseDown = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      // Deselect if clicking on empty SVG area in select mode
+      if (currentTool === 'select' && e.target === e.currentTarget) {
+        setSelectedPolygon(null);
+      }
+    },
+    [currentTool, setSelectedPolygon]
+  );
+
+  // Disable pointer events when draw/measure/cut/merge/split tools are active
+  const disablePointerEvents =
+    currentTool === 'pan' ||
+    currentTool === 'draw' ||
+    currentTool === 'measure' ||
+    currentTool === 'cut' ||
+    currentTool === 'merge' ||
+    currentTool === 'split';
 
   return (
     <div
@@ -235,18 +115,80 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
         width: '100%',
         height: '100%',
         pointerEvents: disablePointerEvents ? 'none' : 'auto',
-        cursor: calibrationMode || currentTool === 'draw' || currentTool === 'measure' ? 'crosshair' : undefined,
         zIndex: 10,
       }}
     >
-      <canvas
-        ref={canvasEl}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-        }}
-      />
+      <svg
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
+        onClick={handleSvgClick}
+        onMouseDown={handleSvgMouseDown}
+      >
+        {/* Polygons */}
+        {polygons.map((poly) => {
+          const cls = classifications.find((c) => c.id === poly.classificationId);
+          if (cls && !cls.visible) return null;
+          const color = cls?.color || '#93c5fd';
+          const isSelected = selectedPolygon === poly.id;
+          const pointsStr = poly.points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+
+          return (
+            <g key={poly.id}>
+              <polygon
+                points={pointsStr}
+                fill={hexToRgba(color, 0.3)}
+                stroke={isSelected ? '#00ff88' : color}
+                strokeWidth={isSelected ? 3 : 1.5}
+                style={{
+                  cursor: currentTool === 'select' ? 'pointer' : 'default',
+                  filter: isSelected
+                    ? 'drop-shadow(0 0 6px rgba(0,255,136,0.6))'
+                    : 'drop-shadow(0 0 4px rgba(0,212,255,0.25))',
+                }}
+                onClick={(e) => handlePolygonClick(e, poly.id)}
+                onContextMenu={(e) => handlePolygonContextMenu(e, poly.id)}
+              />
+              {/* Corner handles when selected */}
+              {isSelected &&
+                poly.points.map((pt: Point, i: number) => (
+                  <circle
+                    key={i}
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={5}
+                    fill="#00d4ff"
+                    stroke="#fff"
+                    strokeWidth={1.5}
+                    style={{ cursor: 'crosshair' }}
+                  />
+                ))}
+            </g>
+          );
+        })}
+
+        {/* Calibration overlays */}
+        {calibrationPoints.map((pt: Point, i: number) => (
+          <circle
+            key={`cal-${i}`}
+            cx={pt.x}
+            cy={pt.y}
+            r={6}
+            fill="#ef4444"
+            stroke="#ffffff"
+            strokeWidth={1.5}
+          />
+        ))}
+        {calibrationPoints.length === 2 && (
+          <line
+            x1={calibrationPoints[0].x}
+            y1={calibrationPoints[0].y}
+            x2={calibrationPoints[1].x}
+            y2={calibrationPoints[1].y}
+            stroke="#ef4444"
+            strokeWidth={2}
+            strokeDasharray="6 4"
+          />
+        )}
+      </svg>
     </div>
   );
 }

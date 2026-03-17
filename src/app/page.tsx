@@ -658,7 +658,7 @@ function PageInner() {
         )}
 
         <div className="flex flex-col flex-1 min-h-0 order-1">
-          <div className="flex flex-1 min-h-0 relative">
+          <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
             {!pdfFile ? (
               <div
                 className="flex-1 flex items-center justify-center p-4"

@@ -18,7 +18,13 @@ export default function DrawingTool() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
 
+  // Focus on mount so keyboard events (Esc, Enter) work immediately
   useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
+
+  // Re-focus when clicking anywhere in the draw area (so Esc/Enter always work)
+  const handleMouseDown = useCallback(() => {
     containerRef.current?.focus();
   }, []);
 
@@ -105,26 +111,39 @@ export default function DrawingTool() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-20 cursor-crosshair"
+      className="absolute inset-0 z-20 cursor-crosshair outline-none"
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
+      onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {/* Drawn edges */}
         {points.map((pt, i) => i > 0 ? (
           <line key={`e-${i}`} x1={points[i-1].x} y1={points[i-1].y} x2={pt.x} y2={pt.y} stroke="#3b82f6" strokeWidth={2} />
         ) : null)}
+        {/* Rubber-band line to cursor */}
         {points.length > 0 && cursor && (
           <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="6 3" />
         )}
+        {/* In-progress fill preview */}
         {points.length >= 3 && (
           <polygon points={points.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="none" />
         )}
+        {/* Vertex dots */}
         {points.map((pt, i) => (
-          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >=3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} />
+          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >= 3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} />
         ))}
+        {/* Crosshair cursor indicator */}
+        {cursor && (
+          <g>
+            <line x1={cursor.x - 10} y1={cursor.y} x2={cursor.x + 10} y2={cursor.y} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+            <line x1={cursor.x} y1={cursor.y - 10} x2={cursor.x} y2={cursor.y + 10} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+            <circle cx={cursor.x} cy={cursor.y} r={3} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
+          </g>
+        )}
       </svg>
       {points.length >= 3 && (
         <div className="absolute bg-white/90 border border-blue-200 rounded px-2 py-1 text-xs font-mono text-blue-700 pointer-events-none"
