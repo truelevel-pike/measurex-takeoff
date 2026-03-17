@@ -43,6 +43,14 @@ interface ProjectRow {
   state?: ProjectState;
 }
 
+/** Format a project date — handles camelCase and snake_case API fields */
+function fmtDate(p: ProjectRow): string {
+  const raw = p.updatedAt || p.createdAt || p.updated_at || p.created_at;
+  if (!raw) return '—';
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+}
+
 interface FolderItem {
   id: string;
   name: string;
@@ -596,7 +604,7 @@ export default function ProjectsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-zinc-400">
-                        <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{new Date(p.updatedAt || p.createdAt || p.updated_at || p.created_at || '').toLocaleDateString()}</span>
+                        <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{fmtDate(p)}</span>
                         {polyCount > 0 && <span>{polyCount} drawings</span>}
                         {clsCount > 0 && <span>{clsCount} cls</span>}
                       </div>
@@ -638,7 +646,7 @@ export default function ProjectsPage() {
                           </button>
                         </td>
                         <td className="px-4 py-3 font-medium text-white">{p.name}</td>
-                        <td className="px-4 py-3 text-zinc-400">{new Date(p.updatedAt || p.createdAt || p.updated_at || p.created_at || '').toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-zinc-400">{fmtDate(p)}</td>
                         <td className="px-4 py-3 text-zinc-400">{polyCount}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -265,14 +265,12 @@ function PageInner() {
         const data = await res.json();
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
 
-        // Clear any stale Zustand-persisted localStorage data BEFORE hydrating.
-        // Without this, persist may have loaded old classifications/polygons that
-        // conflict with the API data — causing duplicates when the sync effects run.
-        try { useStore.persist.clearStorage(); } catch { /* non-fatal */ }
-
-        useStore.getState().hydrateState(normalized);
+        // Populate known IDs BEFORE hydrating so the sync effects never see
+        // API-loaded data as "new" and try to re-POST it (which would 500 on Supabase PK conflict).
         knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
         knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
+
+        useStore.getState().hydrateState(normalized);
         setCurrentPageNum(normalized.currentPage || 1);
         setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
         setProjectId(data.project.id);
@@ -315,10 +313,9 @@ function PageInner() {
         currentPage: 1,
         totalPages: 1,
       });
-      try { useStore.persist.clearStorage(); } catch { /* non-fatal */ }
-      useStore.getState().hydrateState(normalized);
       knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
       knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
+      useStore.getState().hydrateState(normalized);
       setCurrentPageNum(normalized.currentPage || 1);
       setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
       setProjectId(pid);
@@ -506,11 +503,10 @@ function PageInner() {
   const ensureProject = useCallback(async (fileName: string) => {
     if (projectId) return;
     try {
-      // Clear stale persisted Zustand state from any previous session before starting fresh
-      try { (useStore as any).persist?.clearStorage?.(); } catch {}
-      useStore.getState().hydrateState(EMPTY_STATE);
+      // Reset known IDs and hydrate empty state for a fresh project
       knownPolygonIds.current = new Set();
       knownClassificationIds.current = new Set();
+      useStore.getState().hydrateState(EMPTY_STATE);
 
       const name = fileName.replace(/\.pdf$/i, '') || 'Untitled';
       const project = await api.createProject(name);
