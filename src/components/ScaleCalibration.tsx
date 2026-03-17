@@ -4,8 +4,12 @@ import React, { useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
 import ScalePanel from '@/components/ScalePanel';
 import ManualCalibration from '@/components/ManualCalibration';
+import { useToast } from '@/components/Toast';
 
 const DPI = 72;
+
+// Common architectural ratio scales where 1 inch = X feet → unit should be 'ft'
+const ARCH_RATIOS_FT = new Set([5, 10, 20, 24, 48, 50, 60, 96, 100, 120, 125, 150, 200, 240, 250, 300, 480, 500]);
 
 /**
  * Convert a preset label string into a pixelsPerUnit value at 72 DPI.
@@ -70,6 +74,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const currentPage = useStore((s) => s.currentPage);
   const setTool = useStore((s) => s.setTool);
+  const { addToast } = useToast();
 
   const selectedLabel = scale?.label ?? null;
   const isAutoDetected = scale?.source === 'auto' || scale?.source === 'ai';
@@ -83,8 +88,12 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
       // Determine unit type based on label pattern
-      const isRatio = /^1\s*:/.test(label);
-      const unit: 'ft' | 'in' = isRatio ? 'in' : 'ft';
+      const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
+      let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
+      if (ratioMatch) {
+        const ratio = parseInt(ratioMatch[1], 10);
+        unit = ARCH_RATIOS_FT.has(ratio) ? 'ft' : 'm';
+      }
 
       const cal = {
         pixelsPerUnit: ppu,
@@ -97,9 +106,10 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       if (currentPage >= 1) {
         setScaleForPage(currentPage, cal);
       }
+      addToast(`Scale set to ${label}`, 'success', 3000);
       handleClose();
     },
-    [currentPage, setScale, setScaleForPage, handleClose],
+    [currentPage, setScale, setScaleForPage, handleClose, addToast],
   );
 
   const handleOpenManual = useCallback(() => {

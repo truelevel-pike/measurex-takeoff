@@ -74,7 +74,7 @@ export default function PageThumbnailSidebar({
             onClick={() => onPageSelect(page)}
             className={`flex flex-col items-center gap-1 px-1 py-2 transition-colors ${
               isActive
-                ? 'bg-[#00d4ff]/10'
+                ? 'bg-[#00d4ff]/10 ring-2 ring-blue-500'
                 : 'hover:bg-[#0e1016]'
             }`}
             aria-label={`Go to page ${page}`}

@@ -67,7 +67,6 @@ export default function QuantitiesPanel() {
   const newClassNameRef = useRef<HTMLInputElement>(null);
 
   const ppu = scale?.pixelsPerUnit || 1;
-  const unit = scale?.unit || 'ft';
 
   // Focus first element in drawer when opened on mobile
   useEffect(() => {
@@ -136,8 +135,8 @@ export default function QuantitiesPanel() {
   }, [polygons, ppu]);
 
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
-    if (classification.type === 'area') return `${totals.areaReal.toFixed(1)} sq ${unit}`;
-    if (classification.type === 'linear') return `${totals.lengthReal.toFixed(1)} ${unit}`;
+    if (classification.type === 'area') return `${totals.areaReal.toFixed(1)} sq ft`;
+    if (classification.type === 'linear') return `${totals.lengthReal.toFixed(1)} ft`;
     return `${totals.count} EA`;
   }
 
@@ -247,7 +246,7 @@ export default function QuantitiesPanel() {
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <span className="text-xs text-gray-300 font-normal">
-          {grand.count} items - {grand.areaReal.toFixed(1)} sq {unit} - {grand.lengthReal.toFixed(1)} {unit}
+          {grand.count} items - {grand.areaReal.toFixed(1)} sq ft - {grand.lengthReal.toFixed(1)} ft
         </span>
       </div>
 
@@ -540,7 +539,7 @@ export default function QuantitiesPanel() {
               {isExpanded && totals.count > 0 && !isEditing && (
                 <div className="ml-6 border-l border-[#00d4ff]/20 pl-2 mb-1">
                   <div className="text-[10px] py-0.5 text-gray-300 font-mono">
-                    Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq {unit} - {totals.lengthReal.toFixed(1)} {unit}
+                    Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq ft - {totals.lengthReal.toFixed(1)} ft
                   </div>
                   {polygonsForClassification.map((polygon, index) => {
                     const areaReal = polygon.area / (ppu * ppu);
@@ -552,7 +551,7 @@ export default function QuantitiesPanel() {
                           {classification.name} #{index + 1}
                         </span>
                         <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
-                          A {areaReal.toFixed(1)} sq {unit} | L {lengthReal.toFixed(1)} {unit}
+                          A {areaReal.toFixed(1)} sq ft | L {lengthReal.toFixed(1)} ft
                         </span>
                       </div>
                     );
