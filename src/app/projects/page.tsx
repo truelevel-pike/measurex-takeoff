@@ -35,8 +35,11 @@ import AutoNameTool from '@/components/AutoNameTool';
 interface ProjectRow {
   id: string;
   name: string;
-  created_at: string;
-  updated_at: string;
+  // API returns camelCase — support both for forward/backward compat
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   state?: ProjectState;
 }
 
@@ -593,7 +596,7 @@ export default function ProjectsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-zinc-400">
-                        <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{new Date(p.updated_at || p.created_at).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{new Date(p.updatedAt || p.createdAt || p.updated_at || p.created_at || '').toLocaleDateString()}</span>
                         {polyCount > 0 && <span>{polyCount} drawings</span>}
                         {clsCount > 0 && <span>{clsCount} cls</span>}
                       </div>
@@ -635,7 +638,7 @@ export default function ProjectsPage() {
                           </button>
                         </td>
                         <td className="px-4 py-3 font-medium text-white">{p.name}</td>
-                        <td className="px-4 py-3 text-zinc-400">{new Date(p.updated_at || p.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-zinc-400">{new Date(p.updatedAt || p.createdAt || p.updated_at || p.created_at || '').toLocaleDateString()}</td>
                         <td className="px-4 py-3 text-zinc-400">{polyCount}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

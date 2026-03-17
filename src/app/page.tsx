@@ -129,9 +129,15 @@ function PageInner() {
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
 
-  // Track known polygon/classification IDs so we only POST truly new items
-  const knownPolygonIds = useRef<Set<string>>(new Set());
-  const knownClassificationIds = useRef<Set<string>>(new Set());
+  // Track known polygon/classification IDs so we only POST truly new items.
+  // Initialize from the Zustand-persisted store state so that items rehydrated
+  // from localStorage are never treated as "new" by the sync effects.
+  const knownPolygonIds = useRef<Set<string>>(
+    new Set(useStore.getState().polygons.map((p) => p.id))
+  );
+  const knownClassificationIds = useRef<Set<string>>(
+    new Set(useStore.getState().classifications.map((c) => c.id))
+  );
   const [pdfDocState, setPdfDocState] = useState<PDFDocumentProxy | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [currentPageNum, setCurrentPageNum] = useState(1);
@@ -262,7 +268,7 @@ function PageInner() {
         // Clear any stale Zustand-persisted localStorage data BEFORE hydrating.
         // Without this, persist may have loaded old classifications/polygons that
         // conflict with the API data — causing duplicates when the sync effects run.
-        try { (useStore as any).persist?.clearStorage?.(); } catch {}
+        try { useStore.persist.clearStorage(); } catch { /* non-fatal */ }
 
         useStore.getState().hydrateState(normalized);
         knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
@@ -309,6 +315,7 @@ function PageInner() {
         currentPage: 1,
         totalPages: 1,
       });
+      try { useStore.persist.clearStorage(); } catch { /* non-fatal */ }
       useStore.getState().hydrateState(normalized);
       knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
       knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
