@@ -223,31 +223,68 @@ function PageInner() {
     setMenuState({ polygonId: payload.polygonId, x: clamped.x, y: clamped.y });
   }, [clampContextMenuPosition]);
 
-  // Load project by URL param
-  useEffect(() => {
-    const pid = search.get('project');
-    if (!pid) return;
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/projects/${pid}`);
-        if (!res.ok) throw new Error(`Load failed (${res.status})`);
+  // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
+  const hydrateProject = useCallback(async (pid: string) => {
+    try {
+      // Try full project endpoint first (returns all state in one call)
+      const res = await fetch(`/api/projects/${pid}`);
+      if (res.ok) {
         const data = await res.json();
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
 
         useStore.getState().hydrateState(normalized);
-        // Seed known IDs so the sync effects don't re-POST existing items
         knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
         knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
         setCurrentPageNum(normalized.currentPage || 1);
         setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
         setProjectId(data.project.id);
         setProjectName(data.project.name || 'Untitled');
-      } catch (err) {
-        console.error(err);
+        localStorage.setItem('measurex_project_id', data.project.id);
+        return;
       }
-    })();
-  }, [search, setCurrentPage]);
+
+      // Fallback: hydrate from granular endpoints
+      const [classRes, polyRes, scaleRes] = await Promise.all([
+        fetch(`/api/projects/${pid}/classifications`).catch(() => null),
+        fetch(`/api/projects/${pid}/polygons`).catch(() => null),
+        fetch(`/api/projects/${pid}/scale`).catch(() => null),
+      ]);
+
+      const classData = classRes?.ok ? await classRes.json() : {};
+      const polyData = polyRes?.ok ? await polyRes.json() : {};
+      const scaleData = scaleRes?.ok ? await scaleRes.json() : {};
+
+      const fetchedClassifications = Array.isArray(classData.classifications) ? classData.classifications : [];
+      const fetchedPolygons = Array.isArray(polyData.polygons) ? polyData.polygons : [];
+      const fetchedScale = scaleData.scale ?? null;
+
+      const normalized = normalizeProjectState({
+        classifications: fetchedClassifications,
+        polygons: fetchedPolygons,
+        scale: fetchedScale,
+        scales: {},
+        currentPage: 1,
+        totalPages: 1,
+      });
+      useStore.getState().hydrateState(normalized);
+      knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
+      knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
+      setCurrentPageNum(normalized.currentPage || 1);
+      setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+      setProjectId(pid);
+      setProjectName('Untitled');
+      localStorage.setItem('measurex_project_id', pid);
+    } catch (err) {
+      console.warn('Hydration failed:', err);
+    }
+  }, [setCurrentPage]);
+
+  // Load project by URL param or localStorage on mount
+  useEffect(() => {
+    const pid = search.get('project') || localStorage.getItem('measurex_project_id');
+    if (!pid) return;
+    hydrateProject(pid);
+  }, [search, hydrateProject]);
 
   // Connect SSE when project is loaded
   useEffect(() => {
@@ -507,6 +544,7 @@ function PageInner() {
 
         setProjectId(data.project.id);
         setProjectName(data.project.name || name);
+        localStorage.setItem('measurex_project_id', data.project.id);
         window.history.replaceState({}, '', `/?project=${data.project.id}`);
         persistSaveStatus('Saved!');
         addToast('Project saved', 'success');
