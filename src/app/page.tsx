@@ -503,10 +503,17 @@ function PageInner() {
   const ensureProject = useCallback(async (fileName: string) => {
     if (projectId) return;
     try {
-      // Reset known IDs and hydrate empty state for a fresh project
+      // Reset known IDs and hydrate empty state for a fresh project.
+      // Preserve totalPages if the PDF has already reported it (PDFViewer fires
+      // onPageChange before ensureProject completes, so the store may already
+      // hold the correct count — don't clobber it back to 1).
+      const preservedTotalPages = useStore.getState().totalPages;
       knownPolygonIds.current = new Set();
       knownClassificationIds.current = new Set();
-      useStore.getState().hydrateState(EMPTY_STATE);
+      useStore.getState().hydrateState({
+        ...EMPTY_STATE,
+        totalPages: preservedTotalPages > 1 ? preservedTotalPages : 1,
+      });
 
       const name = fileName.replace(/\.pdf$/i, '') || 'Untitled';
       const project = await api.createProject(name);
@@ -529,6 +536,9 @@ function PageInner() {
 
   // Text extraction → auto-scale detection + sheet naming
   // Stable callback — memoized so PDFViewer's goToPage dep array doesn't churn
+  // BUG-R5-001: PDFViewer is the authoritative source for totalPages.
+  // Always push the PDF-reported total into the store so it overrides any
+  // stale value left by API hydration or EMPTY_STATE initialization.
   const handlePDFPageChange = useCallback((page: number, total: number) => {
     setCurrentPageNum(page);
     setCurrentPage(page, total);

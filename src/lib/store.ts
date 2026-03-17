@@ -364,7 +364,15 @@ export const useStore = create<Store>()(
 
   // General
   setTool: (tool) => set({ currentTool: tool }),
-  setCurrentPage: (page, totalPages) => set((state) => ({ currentPage: page, totalPages: totalPages ?? state.totalPages })),
+  // PDF is the source of truth for totalPages: when an explicit totalPages > 1 is
+  // provided (e.g. from onPageChange after loading a multi-page PDF), always use it —
+  // even if hydration had previously written a stale value of 1.
+  setCurrentPage: (page, totalPages) => set((state) => ({
+    currentPage: page,
+    totalPages: (totalPages !== undefined && totalPages > 1)
+      ? totalPages
+      : (state.totalPages > 1 ? state.totalPages : (totalPages ?? state.totalPages)),
+  })),
 
   hydrateState: (state) => {
     // DO NOT regenerate IDs — trust persisted state
