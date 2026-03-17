@@ -16,6 +16,8 @@ interface PDFViewerProps {
   onPageChange?: (page: number, total: number) => void;
   onDimensionsChange?: (dims: { width: number; height: number }) => void;
   onTextExtracted?: (text: string, pageNum: number) => void;
+  /** CSS cursor value to apply when not actively panning (e.g. 'crosshair'). Defaults to 'default'. */
+  cursor?: string;
 }
 
 export interface PDFViewerHandle {
@@ -30,7 +32,7 @@ export interface PDFViewerHandle {
 }
 
 const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
-  ({ file, onPageChange, onDimensionsChange, onTextExtracted }, ref) => {
+  ({ file, onPageChange, onDimensionsChange, onTextExtracted, cursor = 'default' }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
@@ -127,8 +129,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           setPageDimensions(dims);
           onDimensionsChange?.(dims);
 
-          // Store unscaled base dimensions for fitToPage calculation
-          const baseViewport = page.getViewport({ scale: 1.5 });
+          // Store raw (scale=1) page dimensions for fitToPage calculation
+          const baseViewport = page.getViewport({ scale: 1 });
           basePageSize.current = { width: baseViewport.width, height: baseViewport.height };
 
           await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
@@ -219,12 +221,19 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       if (!container) return;
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
-      const pageWidth = basePageSize.current.width;
-      const pageHeight = basePageSize.current.height;
-      if (containerWidth <= 0 || containerHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) return;
-      const scaleX = (containerWidth - 40) / pageWidth;
-      const scaleY = (containerHeight - 40) / pageHeight;
-      setZoom(Math.min(scaleX, scaleY, 2));
+      // basePageSize stores raw (scale=1) PDF page dimensions.
+      // actuallyRender renders at zoom * 1.5, so rendered width = zoom * 1.5 * rawW.
+      // To fill horizontal width: zoom = (containerWidth - padding) / (1.5 * rawW).
+      const rawW = basePageSize.current.width;
+      const rawH = basePageSize.current.height;
+      if (containerWidth <= 0 || containerHeight <= 0 || rawW <= 0 || rawH <= 0) return;
+      const PADDING = 24;
+      const renderMultiplier = 1.5;
+      const scaleX = (containerWidth - PADDING) / (renderMultiplier * rawW);
+      const scaleY = (containerHeight - PADDING) / (renderMultiplier * rawH);
+      // Fit to width — the page should fill the horizontal width of the viewport.
+      const fitZoom = Math.min(scaleX, scaleY, 3);
+      setZoom(fitZoom);
       setPan({ x: 0, y: 0 });
     }, [setZoom]);
 
@@ -409,7 +418,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     return (
       <div
         ref={containerRef}
-        style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative', cursor: isPanning ? 'grabbing' : 'default', touchAction: 'none', background: '#12121a' }}
+        style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative', cursor: isPanning ? 'grabbing' : cursor, touchAction: 'none', background: '#12121a' }}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

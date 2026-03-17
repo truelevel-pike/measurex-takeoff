@@ -616,11 +616,7 @@ function PageInner() {
         )}
 
         <div className="flex flex-col flex-1 min-h-0 order-1">
-          <div className={`flex flex-1 min-h-0 relative ${
-            currentTool === 'draw' || currentTool === 'measure' ? 'cursor-crosshair' :
-            currentTool === 'pan' ? 'cursor-grab' :
-            'cursor-default'
-          }`}>
+          <div className="flex flex-1 min-h-0 relative">
             {!pdfFile ? (
               <div
                 className="flex-1 flex items-center justify-center p-4"
@@ -651,6 +647,13 @@ function PageInner() {
                   file={pdfFile}
                   onTextExtracted={handleTextExtracted}
                   onPageChange={handlePDFPageChange}
+                  cursor={
+                    currentTool === 'draw' || currentTool === 'measure'
+                      ? 'crosshair'
+                      : currentTool === 'pan'
+                      ? 'grab'
+                      : 'default'
+                  }
                 />
 
                 <CanvasOverlay
