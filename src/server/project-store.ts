@@ -138,12 +138,12 @@ export async function createPage(projectId: string, page: PageInfo): Promise<Pag
   const { error } = await sb.from('mx_pages').upsert(
     {
       project_id: projectId,
-      page_num: page.pageNum,
+      page_number: page.pageNum,
       width: page.width,
       height: page.height,
-      text: page.text,
+      pdf_url: page.text ?? null,
     },
-    { onConflict: 'project_id,page_num' },
+    { onConflict: 'project_id,page_number' },
   );
   if (error) throw new Error(`createPage: ${error.message}`);
   return page;
@@ -155,13 +155,13 @@ export async function getPages(projectId: string): Promise<PageInfo[]> {
     .from('mx_pages')
     .select('*')
     .eq('project_id', projectId)
-    .order('page_num', { ascending: true });
+    .order('page_number', { ascending: true });
   if (error) throw new Error(`getPages: ${error.message}`);
   return (data || []).map((row: any) => ({
-    pageNum: row.page_num,
+    pageNum: row.page_number,
     width: row.width,
     height: row.height,
-    text: row.text,
+    text: row.pdf_url ?? '',
   }));
 }
 
@@ -174,22 +174,22 @@ export async function updatePage(
   const updateData: Record<string, unknown> = {};
   if (patch.width !== undefined) updateData.width = patch.width;
   if (patch.height !== undefined) updateData.height = patch.height;
-  if (patch.text !== undefined) updateData.text = patch.text;
+  if (patch.text !== undefined) updateData.pdf_url = patch.text;
 
   const { data, error } = await sb
     .from('mx_pages')
     .update(updateData)
     .eq('project_id', projectId)
-    .eq('page_num', pageNum)
+    .eq('page_number', pageNum)
     .select('*')
     .maybeSingle();
   if (error) throw new Error(`updatePage: ${error.message}`);
   if (!data) return null;
   return {
-    pageNum: data.page_num,
+    pageNum: data.page_number,
     width: data.width,
     height: data.height,
-    text: data.text,
+    text: data.pdf_url ?? '',
   };
 }
 
@@ -208,9 +208,6 @@ export async function createClassification(
     color: data.color,
     type: data.type,
     visible: data.visible ?? true,
-    formula: data.formula ?? null,
-    formula_unit: data.formulaUnit ?? null,
-    formula_saved_to_library: data.formulaSavedToLibrary ?? false,
   };
   const { error } = await sb.from('mx_classifications').insert(row);
   if (error) throw new Error(`createClassification: ${error.message}`);
@@ -230,9 +227,6 @@ export async function getClassifications(projectId: string): Promise<Classificat
     color: row.color,
     type: row.type,
     visible: row.visible,
-    formula: row.formula ?? undefined,
-    formulaUnit: row.formula_unit ?? undefined,
-    formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
   }));
 }
 
@@ -247,9 +241,6 @@ export async function updateClassification(
   if (patch.color !== undefined) updateData.color = patch.color;
   if (patch.type !== undefined) updateData.type = patch.type;
   if (patch.visible !== undefined) updateData.visible = patch.visible;
-  if (patch.formula !== undefined) updateData.formula = patch.formula;
-  if (patch.formulaUnit !== undefined) updateData.formula_unit = patch.formulaUnit;
-  if (patch.formulaSavedToLibrary !== undefined) updateData.formula_saved_to_library = patch.formulaSavedToLibrary;
 
   const { data: row, error } = await sb
     .from('mx_classifications')
@@ -266,9 +257,6 @@ export async function updateClassification(
     color: row.color,
     type: row.type,
     visible: row.visible,
-    formula: row.formula ?? undefined,
-    formulaUnit: row.formula_unit ?? undefined,
-    formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
   };
 }
 
@@ -299,10 +287,10 @@ export async function createPolygon(
     id,
     project_id: projectId,
     classification_id: data.classificationId,
-    page_number: data.pageNumber,
+    page_number: data.pageNumber ?? 1,
     points: data.points,
-    area: data.area ?? 0,
-    linear_feet: data.linearFeet ?? 0,
+    area_pixels: data.areaPixels ?? 0,
+    linear_pixels: data.linearPixels ?? 0,
     is_complete: data.isComplete ?? true,
     label: data.label ?? null,
   };
@@ -323,10 +311,12 @@ export async function getPolygons(projectId: string): Promise<Polygon[]> {
     points: row.points,
     classificationId: row.classification_id,
     pageNumber: row.page_number,
-    area: row.area,
-    linearFeet: row.linear_feet,
+    areaPixels: row.area_pixels,
+    linearPixels: row.linear_pixels,
     isComplete: row.is_complete,
     label: row.label ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }));
 }
 
@@ -340,8 +330,8 @@ export async function updatePolygon(
   if (patch.points !== undefined) updateData.points = patch.points;
   if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
   if (patch.pageNumber !== undefined) updateData.page_number = patch.pageNumber;
-  if (patch.area !== undefined) updateData.area = patch.area;
-  if (patch.linearFeet !== undefined) updateData.linear_feet = patch.linearFeet;
+  if (patch.areaPixels !== undefined) updateData.area_pixels = patch.areaPixels;
+  if (patch.linearPixels !== undefined) updateData.linear_pixels = patch.linearPixels;
   if (patch.isComplete !== undefined) updateData.is_complete = patch.isComplete;
   if (patch.label !== undefined) updateData.label = patch.label;
 
@@ -359,10 +349,12 @@ export async function updatePolygon(
     points: row.points,
     classificationId: row.classification_id,
     pageNumber: row.page_number,
-    area: row.area,
-    linearFeet: row.linear_feet,
+    areaPixels: row.area_pixels,
+    linearPixels: row.linear_pixels,
     isComplete: row.is_complete,
     label: row.label ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -388,13 +380,14 @@ export async function setScale(
   const { error } = await sb.from('mx_scales').upsert(
     {
       project_id: projectId,
+      page_number: scale.pageNumber ?? 1,
       pixels_per_unit: scale.pixelsPerUnit,
       unit: scale.unit,
-      label: scale.label,
+      label: scale.label ?? 'Custom',
       source: scale.source,
       confidence: scale.confidence ?? null,
     },
-    { onConflict: 'project_id' },
+    { onConflict: 'project_id,page_number' },
   );
   if (error) throw new Error(`setScale: ${error.message}`);
   return scale;
