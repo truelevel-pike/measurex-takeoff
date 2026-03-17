@@ -25,12 +25,28 @@ export interface PDFProcessResult {
 /**
  * Lazily import pdfjs-dist legacy build for Node (no canvas dependency).
  * Returns the library module.
+ *
+ * The fake-worker path in pdfjs-dist does `await import(workerSrc)` which fails
+ * inside Turbopack/Next.js bundles where module resolution context is a compiled
+ * chunk rather than the project root.  The workaround is to pre-load the worker
+ * module ourselves and expose it via globalThis.pdfjsWorker — pdfjs checks that
+ * first and skips the dynamic import entirely.
  */
 async function getPdfjs(): Promise<typeof import('pdfjs-dist')> {
+  // Pre-register the worker handler on globalThis so pdfjs never has to
+  // dynamic-import workerSrc (which breaks in bundled/Turbopack contexts).
+  if (!(globalThis as Record<string, unknown>).pdfjsWorker) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs' as any) as { WorkerMessageHandler: unknown };
+    (globalThis as Record<string, unknown>).pdfjsWorker = worker;
+  }
   // Use the legacy build which has broader Node.js compat
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs') as unknown as typeof import('pdfjs-dist');
-  // Disable worker for server-side usage (no DOM, no worker threads)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  // workerSrc must be a non-empty string to pass the guard, even though we
+  // will override with disableWorker:true in every getDocument() call.
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
+  }
   return pdfjsLib;
 }
 
