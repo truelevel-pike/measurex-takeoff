@@ -17,6 +17,8 @@ export default function DrawingTool() {
   const currentPage = useStore((s) => s.currentPage);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
+  // Track last click time to detect double-clicks in onClick (before onDoubleClick fires)
+  const lastClickTime = useRef<number>(0);
 
   // Focus on mount so keyboard events (Esc, Enter) work immediately
   useEffect(() => {
@@ -63,6 +65,13 @@ export default function DrawingTool() {
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Detect double-click: if two clicks arrive within 300ms, treat as dblclick
+      // (the browser also fires onDoubleClick, but this prevents adding an extra point)
+      const now = Date.now();
+      const isDblClick = now - lastClickTime.current < 300;
+      lastClickTime.current = now;
+      if (isDblClick) return; // onDoubleClick will handle commit
+
       const pt = getCoords(e);
 
       // Guard: require a selected classification before first point

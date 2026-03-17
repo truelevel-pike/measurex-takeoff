@@ -115,6 +115,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
         width: '100%',
         height: '100%',
         pointerEvents: disablePointerEvents ? 'none' : 'auto',
+        cursor: currentTool === 'draw' || currentTool === 'measure' ? 'crosshair' : undefined,
         zIndex: 10,
       }}
     >

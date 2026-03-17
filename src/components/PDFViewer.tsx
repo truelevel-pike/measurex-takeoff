@@ -467,7 +467,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             {pdfDoc && (
               <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff', display: 'block' }} />
+                  <canvas ref={canvasRef} style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15)', borderRadius: 2, background: '#fff', display: 'block', cursor: 'inherit' }} />
                   {children}
                 </div>
               </div>
