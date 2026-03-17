@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale } from '@/server/project-store';
+import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale } from '@/server/project-store';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -38,7 +38,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await initDataDir();
     const { id } = await params;
     const body = await req.json();
-    const updated = await updateProject(id, body);
+
+    // If the body contains a `state` payload (autosave from client), persist
+    // the scale from that state. Polygons/classifications are synced individually
+    // via their own endpoints as they're created, so we only need to handle scale here.
+    const state = body.state;
+    if (state?.scale) {
+      const s = state.scale;
+      await setScale(id, {
+        pixelsPerUnit: s.pixelsPerUnit,
+        unit: s.unit,
+        label: s.label || 'Custom',
+        source: s.source || 'manual',
+        pageNumber: s.pageNumber || 1,
+        confidence: s.confidence,
+      }).catch(() => null); // non-fatal
+    }
+
+    // Update project metadata (name etc.) if provided — extract only safe fields
+    const metaPatch: { name?: string } = {};
+    if (typeof body.name === 'string') metaPatch.name = body.name;
+    const updated = await updateProject(id, metaPatch);
     return NextResponse.json({ project: updated });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
