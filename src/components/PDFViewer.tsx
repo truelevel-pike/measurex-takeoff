@@ -181,12 +181,13 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [zoom]);
 
-    // Initial render when PDF first loads (currentPage resets to 1 on load)
+    // Initial render when PDF first loads — pdfDoc state change triggers this once.
+    // We do NOT reset currentPageRef here; the load effect already set it to 1.
     useEffect(() => {
-      if (pdfDoc) {
-        currentPageRef.current = 1;
-        renderPage(1);
+      if (pdfDoc && currentPageRef.current >= 1) {
+        renderPage(currentPageRef.current);
       }
+      // renderPage is stable; pdfDoc only changes on new file load
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pdfDoc]);
 

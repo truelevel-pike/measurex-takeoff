@@ -421,6 +421,12 @@ function PageInner() {
   };
 
   // Text extraction → auto-scale detection + sheet naming
+  // Stable callback — memoized so PDFViewer's goToPage dep array doesn't churn
+  const handlePDFPageChange = useCallback((page: number, total: number) => {
+    setCurrentPageNum(page);
+    setCurrentPage(page, total);
+  }, [setCurrentPage]);
+
   const handleTextExtracted = useCallback((text: string, pageNum: number) => {
     // QA-006 / QA-007: Image-only PDFs (no text layer) produce empty text.
     // Skip auto-scale detection silently — no popup, no error.
@@ -644,10 +650,7 @@ function PageInner() {
                   ref={pdfViewerRef}
                   file={pdfFile}
                   onTextExtracted={handleTextExtracted}
-                  onPageChange={(page, total) => {
-                    setCurrentPageNum(page);
-                    setCurrentPage(page, total);
-                  }}
+                  onPageChange={handlePDFPageChange}
                 />
 
                 <CanvasOverlay
