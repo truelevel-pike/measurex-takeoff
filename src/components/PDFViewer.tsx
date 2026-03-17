@@ -190,12 +190,15 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     }, []);
 
     const fitToPage = useCallback(() => {
-      if (!containerRef.current || !basePageSize.current.width) return;
       const container = containerRef.current;
-      // Use unscaled base dimensions (at scale 1.5) so the calculation
-      // doesn't depend on the current zoom level
-      const scaleX = (container.clientWidth - 40) / basePageSize.current.width;
-      const scaleY = (container.clientHeight - 40) / basePageSize.current.height;
+      if (!container) return;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      const pageWidth = basePageSize.current.width;
+      const pageHeight = basePageSize.current.height;
+      if (containerWidth <= 0 || containerHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) return;
+      const scaleX = (containerWidth - 40) / pageWidth;
+      const scaleY = (containerHeight - 40) / pageHeight;
       setZoom(Math.min(scaleX, scaleY, 2));
       setPan({ x: 0, y: 0 });
     }, [setZoom]);
@@ -243,36 +246,33 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
     const endPan = useCallback(() => setIsPanning(false), []);
 
-    // Auto fit-to-page on initial render
+    // Auto fit-to-page on initial render using ResizeObserver
+    // Waits until the container has real layout dimensions before calculating zoom
     useEffect(() => {
-      if (!initialFitDone.current && pageDimensions.width > 0 && containerRef.current) {
-        initialFitDone.current = true;
-        // Use double requestAnimationFrame to ensure the container has fully laid out before measuring
-        let cancelled = false;
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (!cancelled) fitToPage();
-          });
-        });
-        return () => { cancelled = true; };
-      }
-    }, [pageDimensions, fitToPage]);
-
-    // ResizeObserver for container
-    useEffect(() => {
+      if (initialFitDone.current || basePageSize.current.width <= 0) return;
       const el = containerRef.current;
       if (!el) return;
-      let raf: number | null = null;
-      const ro = new ResizeObserver(() => {
-        if (raf) cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => fitToPage());
+
+      // If the container already has dimensions, fit immediately
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        initialFitDone.current = true;
+        fitToPage();
+        return;
+      }
+
+      // Otherwise wait for the container to get layout via ResizeObserver
+      const ro = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry || initialFitDone.current) return;
+        const { width, height } = entry.contentRect;
+        if (width <= 0 || height <= 0) return;
+        initialFitDone.current = true;
+        fitToPage();
+        ro.disconnect();
       });
       ro.observe(el);
-      return () => {
-        if (raf) cancelAnimationFrame(raf);
-        ro.disconnect();
-      };
-    }, [fitToPage]);
+      return () => ro.disconnect();
+    }, [pageDimensions, fitToPage]);
 
     // Keyboard navigation
     useEffect(() => {
