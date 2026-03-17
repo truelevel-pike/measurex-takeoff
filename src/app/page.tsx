@@ -32,6 +32,7 @@ import QuantitiesPanel from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import MergeSplitTool from '@/components/MergeSplitTool';
+import CutTool from '@/components/CutTool';
 import ScalePopup from '@/components/ScalePopup';
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
@@ -40,10 +41,13 @@ import AIImageSearch from '@/components/AIImageSearch';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import { ToastProvider, useToast } from '@/components/Toast';
 
-const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'measure'> = {
+const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure'> = {
   v: 'select',
   h: 'pan',
   d: 'draw',
+  g: 'merge',
+  s: 'split',
+  c: 'cut',
   m: 'measure',
 };
 
@@ -720,6 +724,7 @@ function PageInner() {
 
                 {currentTool === 'draw' && <DrawingTool />}
                 {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
+                {currentTool === 'cut' && <CutTool />}
                 {currentTool === 'measure' && <MeasurementTool />}
               </>
             )}

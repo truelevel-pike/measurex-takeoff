@@ -9,6 +9,7 @@ import type {
   ClassificationGroup,
   Markup,
 } from './types';
+import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea } from './polygon-utils';
 
 // Helpers
 const isHex = (c: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.trim());
@@ -291,13 +292,13 @@ export const useStore = create<Store>()((set, get) => ({
     const p2 = s.polygons.find((p) => p.id === id2);
     if (!p1 || !p2 || p1.classificationId !== p2.classificationId) return;
     const before = snapshot(s);
-    // Expect a higher-level util to compute merged points/area; here we do simple concat placeholder
+    const mergedPoints = mergePolygonPoints(p1.points, p2.points);
     const merged: Polygon = {
       ...p1,
       id: crypto.randomUUID(),
-      points: [...p1.points, ...p2.points],
-      // area recalculated by caller or subsequent update
-    } as Polygon;
+      points: mergedPoints,
+      area: calculatePolygonArea(mergedPoints),
+    };
     set({
       polygons: s.polygons.filter((p) => p.id !== id1 && p.id !== id2).concat(merged),
       selectedPolygon: merged.id,
@@ -312,14 +313,19 @@ export const useStore = create<Store>()((set, get) => ({
     const poly = s.polygons.find((p) => p.id === id);
     if (!poly) return;
     const before = snapshot(s);
-    // Placeholder: UI layer should compute proper split; here we produce two halves by index
-    const mid = Math.max(2, Math.floor(poly.points.length / 2));
-    const a: Polygon = { ...poly, id: crypto.randomUUID(), points: poly.points.slice(0, mid) };
-    const b: Polygon = { ...poly, id: crypto.randomUUID(), points: poly.points.slice(mid) };
+    const [ptsA, ptsB] = splitPolygonByLine(poly.points, lineStart, lineEnd);
+    const results: Polygon[] = [];
+    if (ptsA.length >= 3) {
+      results.push({ ...poly, id: crypto.randomUUID(), points: ptsA, area: calculatePolygonArea(ptsA) });
+    }
+    if (ptsB.length >= 3) {
+      results.push({ ...poly, id: crypto.randomUUID(), points: ptsB, area: calculatePolygonArea(ptsB) });
+    }
+    if (results.length === 0) return; // split produced nothing useful
     set({
-      polygons: s.polygons.filter((p) => p.id !== id).concat([a, b]),
-      selectedPolygon: a.id,
-      selectedPolygonId: a.id,
+      polygons: s.polygons.filter((p) => p.id !== id).concat(results),
+      selectedPolygon: results[0].id,
+      selectedPolygonId: results[0].id,
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });

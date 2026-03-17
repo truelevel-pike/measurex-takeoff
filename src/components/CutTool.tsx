@@ -1,0 +1,66 @@
+'use client';
+
+import React, { useCallback, useRef } from 'react';
+import { useStore } from '@/lib/store';
+import type { Point } from '@/lib/types';
+import { pointInPolygon } from '@/lib/polygon-utils';
+
+export default function CutTool() {
+  const polygons = useStore((s) => s.polygons);
+  const currentPage = useStore((s) => s.currentPage);
+  const cutPolygon = useStore((s) => s.cutPolygon);
+  const setTool = useStore((s) => s.setTool);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const pagePolygons = polygons.filter((p) => p.pageNumber === currentPage);
+
+  const getCoords = useCallback((e: React.MouseEvent): Point => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
+
+  const findPolygonAt = useCallback(
+    (pt: Point) => {
+      for (let i = pagePolygons.length - 1; i >= 0; i--) {
+        if (pointInPolygon(pt, pagePolygons[i].points)) return pagePolygons[i].id;
+      }
+      return null;
+    },
+    [pagePolygons]
+  );
+
+  const onClick = useCallback(
+    (e: React.MouseEvent) => {
+      const pt = getCoords(e);
+      const hit = findPolygonAt(pt);
+      if (hit) {
+        cutPolygon(hit, []);
+        setTool('select');
+      }
+    },
+    [getCoords, findPolygonAt, cutPolygon, setTool]
+  );
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') setTool('select');
+    },
+    [setTool]
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 z-30"
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      tabIndex={0}
+      style={{ cursor: 'crosshair' }}
+    >
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-[rgba(10,10,15,0.85)] border border-[#00d4ff]/30 text-[#e5e7eb] text-xs px-3 py-1.5 rounded-full pointer-events-none shadow-[0_0_12px_#00d4ff55]">
+        Click a polygon to remove it · Esc to cancel
+      </div>
+    </div>
+  );
+}

@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { FileX, WifiOff } from 'lucide-react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import { useStore } from '@/lib/store';
 
 interface PDFViewerProps {
   file?: File | null;
@@ -261,7 +262,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // Pan handlers with pointer cancel/out
     const handlePointerDown = useCallback(
       (e: React.PointerEvent) => {
-        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        const tool = useStore.getState().currentTool;
+        if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && tool === 'pan')) {
           setIsPanning(true);
           setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
           (e.target as HTMLElement).setPointerCapture(e.pointerId);

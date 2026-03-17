@@ -206,7 +206,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   }, [polygons, classifications, selectedPolygon, currentTool, setSelectedPolygon, updatePolygon, onPolygonContextMenu, onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint]);
 
   // Disable pointer events when draw/measure tools are active so their overlays receive clicks
-  const disablePointerEvents = currentTool === 'pan' || currentTool === 'draw' || currentTool === 'measure';
+  const disablePointerEvents = currentTool === 'pan' || currentTool === 'draw' || currentTool === 'measure' || currentTool === 'cut' || currentTool === 'merge' || currentTool === 'split';
 
   return (
     <div
