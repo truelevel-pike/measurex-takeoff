@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale } from '@/server/project-store';
+import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages } from '@/server/project-store';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -9,11 +9,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     // Bundle full state so the client can hydrate in a single round-trip
-    const [classifications, polygons, scale] = await Promise.all([
-      getClassifications(id).catch(() => []),
-      getPolygons(id).catch(() => []),
+    const [classifications, polygons, scale, pages] = await Promise.all([
+      getClassifications(id).catch(() => [] as any[]),
+      getPolygons(id).catch(() => [] as any[]),
       getScale(id).catch(() => null),
+      getPages(id).catch((e) => { console.error('getPages error:', e); return [] as any[]; }),
     ]);
+
+    // totalPages: prefer stored value (project.totalPages), fall back to mx_pages count
+    const totalPages = (project.totalPages && project.totalPages > 1)
+      ? project.totalPages
+      : (pages.length > 1 ? pages.length : (project.totalPages ?? 1));
 
     return NextResponse.json({
       project: {
@@ -24,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           scale,
           scales: {},
           currentPage: 1,
-          totalPages: 1,
+          totalPages,
         },
       },
     });
@@ -55,9 +61,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }).catch(() => null); // non-fatal
     }
 
-    // Update project metadata (name etc.) if provided — extract only safe fields
-    const metaPatch: { name?: string } = {};
+    // Update project metadata (name, totalPages) if provided — extract only safe fields
+    const metaPatch: { name?: string; totalPages?: number } = {};
     if (typeof body.name === 'string') metaPatch.name = body.name;
+    if (typeof state?.totalPages === 'number' && state.totalPages > 0) {
+      metaPatch.totalPages = state.totalPages;
+    }
     const updated = await updateProject(id, metaPatch);
     return NextResponse.json({ project: updated });
   } catch (err: any) {

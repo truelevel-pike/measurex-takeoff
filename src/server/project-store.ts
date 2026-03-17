@@ -18,6 +18,7 @@ export interface ProjectMeta {
   name: string;
   createdAt: string;
   updatedAt: string;
+  totalPages?: number;
 }
 
 export interface PageInfo {
@@ -118,11 +119,15 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
       .maybeSingle();
     if (error) throw new Error(`getProject: ${error.message}`);
     if (!data) return null;
+    // totalPages is stored in the `description` column as JSON: {"totalPages":7}
+    let totalPages: number | undefined;
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
     return {
       id: data.id,
       name: data.name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      totalPages,
     };
   }
 
@@ -166,25 +171,34 @@ export async function listProjects(): Promise<ProjectMeta[]> {
 
 export async function updateProject(
   projectId: string,
-  patch: Partial<Pick<ProjectMeta, 'name'>>,
+  patch: Partial<Pick<ProjectMeta, 'name' | 'totalPages'>>,
 ): Promise<ProjectMeta | null> {
   const now = new Date().toISOString();
 
   if (isSupabaseMode()) {
     const sb = getClient();
+    const updatePayload: Record<string, unknown> = { updated_at: now };
+    if (patch.name !== undefined) updatePayload.name = patch.name;
+    // Persist totalPages in description as JSON (no schema migration needed)
+    if (patch.totalPages !== undefined) {
+      updatePayload.description = JSON.stringify({ totalPages: patch.totalPages });
+    }
     const { data, error } = await sb
       .from('mx_projects')
-      .update({ ...patch, updated_at: now })
+      .update(updatePayload)
       .eq('id', projectId)
       .select('*')
       .maybeSingle();
     if (error) throw new Error(`updateProject: ${error.message}`);
     if (!data) return null;
+    let totalPages: number | undefined;
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
     return {
       id: data.id,
       name: data.name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      totalPages,
     };
   }
 

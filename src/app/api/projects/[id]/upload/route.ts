@@ -25,8 +25,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await createPage(id, page);
     }
 
-    // Update project name to include page count info
-    // (totalPages is tracked via the pages list itself)
+    // Persist totalPages on the project so GET /api/projects/:id returns it correctly
+    await updateProject(id, { totalPages: result.pages.length }).catch(() => null);
 
     return NextResponse.json({
       pages: result.pages.length,
