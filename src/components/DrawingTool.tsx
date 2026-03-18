@@ -4,12 +4,18 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
+import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
+
+const SNAP_RADIUS = 20;
+const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: false, gridSize: 0 } as const;
 
 export default function DrawingTool() {
   const [points, setPoints] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<Point | null>(null);
+  const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
   const addPolygon = useStore((s) => s.addPolygon);
+  const polygons = useStore((s) => s.polygons);
   const classifications = useStore((s) => s.classifications);
   const selectedClassification = useStore((s) => s.selectedClassification);
   const setTool = useStore((s) => s.setTool);
@@ -37,17 +43,18 @@ export default function DrawingTool() {
   const CLOSE_THRESHOLD_PX = 18;
 
   // Convert click coordinates to base (scale=1) PDF page coordinate space
-  // so polygon points are zoom-independent
+  // so polygon points are zoom-independent, then snap to nearest vertex/midpoint
   const getCoords = useCallback((e: React.MouseEvent): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
-    return {
-      x: (clickX / rect.width) * baseDims.width,
-      y: (clickY / rect.height) * baseDims.height,
-    };
-  }, [baseDims]);
+    const x = (clickX / rect.width) * baseDims.width;
+    const y = (clickY / rect.height) * baseDims.height;
+    const snap = findNearestSnapPoint(x, y, polygons, SNAP_RADIUS, SNAP_OPTIONS);
+    if (snap) return { x: snap.x, y: snap.y };
+    return { x, y };
+  }, [baseDims, polygons]);
 
   const getSelectedClassification = useCallback(() => {
     return classifications.find((c) => c.id === selectedClassification) ?? null;
@@ -113,7 +120,7 @@ export default function DrawingTool() {
         setPoints((prev) => [...prev, pt]);
       }, 250);
     },
-    [points, getCoords, getSelectedClassification, commitPolygon, addToast]
+    [points, getCoords, getSelectedClassification, commitPolygon, addToast, baseDims]
   );
 
   const handleDoubleClick = useCallback(
@@ -130,7 +137,22 @@ export default function DrawingTool() {
     [commitPolygon]
   );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => setCursor(getCoords(e)), [getCoords]);
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const x = (clickX / rect.width) * baseDims.width;
+    const y = (clickY / rect.height) * baseDims.height;
+    const snap = findNearestSnapPoint(x, y, polygons, SNAP_RADIUS, SNAP_OPTIONS);
+    if (snap) {
+      setCursor({ x: snap.x, y: snap.y });
+      setSnapIndicator(snap);
+    } else {
+      setCursor({ x, y });
+      setSnapIndicator(null);
+    }
+  }, [baseDims, polygons]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setPoints([]); setTool('select'); }
@@ -176,6 +198,10 @@ export default function DrawingTool() {
         {points.map((pt, i) => (
           <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >= 3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         ))}
+        {/* Snap indicator — yellow ring when cursor is snapped */}
+        {snapIndicator && cursor && (
+          <circle cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#fbbf24" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        )}
         {/* Crosshair cursor indicator */}
         {cursor && (
           <g>

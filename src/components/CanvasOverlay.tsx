@@ -43,6 +43,8 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
+  const scale = useStore((s) => s.scale);
+  const baseDims = useStore((s) => s.pageBaseDimensions);
 
   // Vertex drag state
   const [dragging, setDragging] = useState<{
@@ -112,8 +114,6 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const calibrationMode = useStore((s) => s.calibrationMode);
   const calibrationPoints = useStore((s) => s.calibrationPoints);
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
-
-  const baseDims = useStore((s) => s.pageBaseDimensions);
 
   const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
 
@@ -204,7 +204,9 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
           if (cls && !cls.visible) return null;
           const color = cls?.color || '#93c5fd';
           const isSelected = selectedPolygon === poly.id;
-          const pointsStr = poly.points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+          const isDraggingThis = dragging?.polygonId === poly.id;
+          const displayPoints = isDraggingThis && dragPoints ? dragPoints : poly.points;
+          const pointsStr = displayPoints.map((p: Point) => `${p.x},${p.y}`).join(' ');
 
           return (
             <g key={poly.id}>
@@ -225,7 +227,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
               />
               {/* Corner handles when selected */}
               {isSelected &&
-                poly.points.map((pt: Point, i: number) => (
+                (dragPoints || poly.points).map((pt: Point, i: number) => (
                   <circle
                     key={i}
                     cx={pt.x}
@@ -235,8 +237,46 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                     stroke="#fff"
                     strokeWidth={1.5}
                     style={{ cursor: 'crosshair' }}
+                    onMouseDown={(e) => handleVertexPointerDown(e, poly.id, i)}
                   />
                 ))}
+              {/* Polygon label: classification name + area */}
+              {(() => {
+                const pts = dragPoints && dragging?.polygonId === poly.id ? dragPoints : poly.points;
+                if (pts.length < 3 || !cls?.visible) return null;
+                if ((poly.area ?? 0) < 100) return null;
+                const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+                const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+                const ppu = scale?.pixelsPerUnit || 1;
+                const areaDisplay = ((poly.area ?? 0) / (ppu * ppu)).toFixed(1);
+                const labelW = 90;
+                const labelH = 28;
+                return (
+                  <>
+                    <rect
+                      x={cx - labelW / 2}
+                      y={cy - labelH / 2}
+                      width={labelW}
+                      height={labelH}
+                      fill="rgba(0,0,0,0.55)"
+                      rx={4}
+                      pointerEvents="none"
+                    />
+                    <text
+                      x={cx}
+                      y={cy}
+                      fontSize="11"
+                      fill="#fff"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      pointerEvents="none"
+                    >
+                      <tspan x={cx} dy="-0.5em">{cls.name}</tspan>
+                      <tspan x={cx} dy="1.1em">{areaDisplay} sq ft</tspan>
+                    </text>
+                  </>
+                );
+              })()}
             </g>
           );
         })}

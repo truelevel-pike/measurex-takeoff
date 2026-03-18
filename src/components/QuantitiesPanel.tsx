@@ -71,6 +71,7 @@ export default function QuantitiesPanel() {
   const [editType, setEditType] = useState<ClassificationType>('area');
   const [editColorHex, setEditColorHex] = useState('#3b82f6');
   const [editError, setEditError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const drawerRef = useRef<HTMLDivElement>(null);
   const newClassNameRef = useRef<HTMLInputElement>(null);
@@ -201,17 +202,19 @@ export default function QuantitiesPanel() {
   }
 
   function handleDeleteClassification(classification: Classification) {
-    const shouldDelete = window.confirm(`Delete "${classification.name}" and all its polygons?`);
-    if (!shouldDelete) return;
+    setPendingDeleteId(classification.id);
+  }
 
-    deleteClassification(classification.id);
+  function confirmDeleteClassification(classificationId: string) {
+    deleteClassification(classificationId);
+    setPendingDeleteId(null);
     setExpanded((prev) => {
-      if (!prev.has(classification.id)) return prev;
+      if (!prev.has(classificationId)) return prev;
       const next = new Set(prev);
-      next.delete(classification.id);
+      next.delete(classificationId);
       return next;
     });
-    if (editingId === classification.id) {
+    if (editingId === classificationId) {
       setEditingId(null);
       setEditError(null);
     }
@@ -586,27 +589,34 @@ export default function QuantitiesPanel() {
                 </div>
               )}
 
-              {pendingDeleteId === classification.id && (
-                <div className="mx-1 my-1 px-2 py-1.5 bg-[#0e1016] border border-red-500/30 rounded-lg flex items-center justify-between gap-2">
-                  <span className="text-[12px] text-[#e5e7eb] truncate">
-                    Delete &ldquo;{classification.name}&rdquo;?
+              {pendingDeleteId === classification.id && !isEditing && (
+                <div
+                  style={{ animation: 'fadeSlideIn 200ms ease-out' }}
+                  className="ml-6 flex items-center gap-2 px-2 py-1.5 rounded bg-[#0e1016] border border-red-500/30"
+                >
+                  <span className="text-[11px] text-gray-300 flex-1">
+                    Delete &ldquo;{classification.name}&rdquo; and all its polygons?
                   </span>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => confirmDeleteClassification(classification.id)}
-                      className="text-[11px] font-medium text-red-400 hover:text-red-300"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDeleteId(null)}
-                      className="text-[11px] text-gray-400 hover:text-gray-200"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmDeleteClassification(classification.id);
+                    }}
+                    className="px-2 py-0.5 text-[11px] font-medium rounded bg-red-500 hover:bg-red-600 text-white transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDeleteId(null);
+                    }}
+                    className="px-2 py-0.5 text-[11px] font-medium rounded border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
 

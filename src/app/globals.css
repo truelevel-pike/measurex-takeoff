@@ -186,3 +186,9 @@
 
 /* Selection */
 ::selection { background: #00d4ff55; color: #ffffff; }
+
+/* Delete confirmation slide-in */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
