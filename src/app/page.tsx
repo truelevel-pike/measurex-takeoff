@@ -129,6 +129,7 @@ function PageInner() {
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+  const hydrateGeneration = useRef(0);
 
   // Track known polygon/classification IDs so we only POST truly new items.
   // Initialize from the Zustand-persisted store state so that items rehydrated
@@ -263,12 +264,20 @@ function PageInner() {
   }, [clampContextMenuPosition]);
 
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
+  // Uses a generation counter to prevent stale responses from overwriting state
+  // when projectId changes while a fetch is in flight (rapid project switch).
   const hydrateProject = useCallback(async (pid: string) => {
+    const gen = ++hydrateGeneration.current;
+
     try {
       // Try full project endpoint first (returns all state in one call)
       const res = await fetch(`/api/projects/${pid}`);
+      if (gen !== hydrateGeneration.current) return;
+
       if (res.ok) {
         const data = await res.json();
+        if (gen !== hydrateGeneration.current) return;
+
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
 
         // Populate known IDs BEFORE hydrating so the sync effects never see
@@ -284,10 +293,14 @@ function PageInner() {
         localStorage.setItem('measurex_project_id', data.project.id);
 
         // Auto-fetch stored PDF so the viewer loads without re-upload
+        // Capture gen so the callback can check for staleness too.
+        const capturedGen = gen;
         fetch(`/api/projects/${pid}/pdf`)
           .then(async (pdfRes) => {
+            if (capturedGen !== hydrateGeneration.current) return;
             if (!pdfRes.ok) return;
             const blob = await pdfRes.blob();
+            if (capturedGen !== hydrateGeneration.current) return;
             const file = new File([blob], `${data.project.name || pid}.pdf`, { type: 'application/pdf' });
             // BUG-R6-002: Reset page count ready flag before setting new PDF file
             setPdfPageCountReady(false);
@@ -304,10 +317,12 @@ function PageInner() {
         fetch(`/api/projects/${pid}/polygons`).catch(() => null),
         fetch(`/api/projects/${pid}/scale`).catch(() => null),
       ]);
+      if (gen !== hydrateGeneration.current) return;
 
       const classData = classRes?.ok ? await classRes.json() : {};
       const polyData = polyRes?.ok ? await polyRes.json() : {};
       const scaleData = scaleRes?.ok ? await scaleRes.json() : {};
+      if (gen !== hydrateGeneration.current) return;
 
       const fetchedClassifications = Array.isArray(classData.classifications) ? classData.classifications : [];
       const fetchedPolygons = Array.isArray(polyData.polygons) ? polyData.polygons : [];
