@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Eye, EyeOff, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, EyeOff, History, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
+import VersionHistory from './VersionHistory';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -51,6 +52,7 @@ export default function QuantitiesPanel() {
   const [search, setSearch] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -245,10 +247,22 @@ export default function QuantitiesPanel() {
     <>
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
         <span className="font-mono tracking-wider">QUANTITIES</span>
-        <span className="text-xs text-gray-300 font-normal">
-          {grand.count} items - {grand.areaReal.toFixed(1)} sq ft - {grand.lengthReal.toFixed(1)} ft
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-300 font-normal">
+            {grand.count} items - {grand.areaReal.toFixed(1)} sq ft - {grand.lengthReal.toFixed(1)} ft
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
+            aria-label="Toggle version history"
+            title="Version History"
+          >
+            <History size={14} />
+          </button>
+        </div>
       </div>
+      {showHistory && <VersionHistory onClose={() => setShowHistory(false)} />}
 
       <div className="px-2 pt-2 pb-1">
         <div className="flex items-center gap-2">

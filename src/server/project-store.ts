@@ -466,9 +466,7 @@ export async function createPolygon(
     };
     const { error } = await sb.from('mx_polygons').insert(row);
     if (error) throw new Error(`createPolygon: ${error.message}`);
-    // Build return object explicitly — spreading `data` (which may have id?: undefined)
-    // over { id } would overwrite id with undefined.
-    return {
+    const created: Polygon = {
       id,
       points: data.points,
       classificationId: data.classificationId,
@@ -478,6 +476,8 @@ export async function createPolygon(
       isComplete: data.isComplete ?? true,
       label: data.label,
     };
+    recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: created });
+    return created;
   }
 
   const filePath = path.join(projectDir(projectId), 'polygons.json');
@@ -485,6 +485,7 @@ export async function createPolygon(
   const poly: Polygon = { id, ...data };
   list.push(poly);
   await writeJson(filePath, list);
+  recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: poly });
   return poly;
 }
 
@@ -520,6 +521,8 @@ export async function updatePolygon(
 ): Promise<Polygon | null> {
   if (isSupabaseMode()) {
     const sb = getClient();
+    // Fetch before-data
+    const { data: beforeRow } = await sb.from('mx_polygons').select('*').eq('id', polygonId).eq('project_id', projectId).maybeSingle();
     const updateData: Record<string, unknown> = {};
     if (patch.points !== undefined) updateData.points = patch.points;
     if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
@@ -538,7 +541,7 @@ export async function updatePolygon(
       .maybeSingle();
     if (error) throw new Error(`updatePolygon: ${error.message}`);
     if (!row) return null;
-    return {
+    const updated = {
       id: row.id,
       points: row.points,
       classificationId: row.classification_id,
@@ -550,20 +553,26 @@ export async function updatePolygon(
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+    recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: updated });
+    return updated;
   }
 
   const filePath = path.join(projectDir(projectId), 'polygons.json');
   const list = await readJson<Polygon[]>(filePath, []);
   const idx = list.findIndex((p) => p.id === polygonId);
   if (idx < 0) return null;
+  const beforeData = { ...list[idx] };
   list[idx] = { ...list[idx], ...patch };
   await writeJson(filePath, list);
+  recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData, afterData: list[idx] });
   return list[idx];
 }
 
 export async function deletePolygon(projectId: string, polygonId: string): Promise<boolean> {
   if (isSupabaseMode()) {
     const sb = getClient();
+    // Fetch before-data
+    const { data: beforeRow } = await sb.from('mx_polygons').select('*').eq('id', polygonId).eq('project_id', projectId).maybeSingle();
     const { data, error } = await sb
       .from('mx_polygons')
       .delete()
@@ -571,16 +580,96 @@ export async function deletePolygon(projectId: string, polygonId: string): Promi
       .eq('project_id', projectId)
       .select('id');
     if (error) throw new Error(`deletePolygon: ${error.message}`);
-    return (data?.length ?? 0) > 0;
+    const deleted = (data?.length ?? 0) > 0;
+    if (deleted) {
+      recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: null });
+    }
+    return deleted;
   }
 
   const filePath = path.join(projectDir(projectId), 'polygons.json');
   const list = await readJson<Polygon[]>(filePath, []);
-  const before = list.length;
+  const existing = list.find((p) => p.id === polygonId);
   const filtered = list.filter((p) => p.id !== polygonId);
-  if (filtered.length === before) return false;
+  if (filtered.length === list.length) return false;
   await writeJson(filePath, filtered);
+  recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: existing, afterData: null });
   return true;
+}
+
+// ── History ─────────────────────────────────────────────────────────────
+
+export interface HistoryEntry {
+  id: string;
+  projectId: string;
+  actionType: "create" | "update" | "delete";
+  entityType: "polygon" | "classification" | "scale";
+  entityId: string | null;
+  beforeData: unknown | null;
+  afterData: unknown | null;
+  createdAt: string;
+}
+
+export async function recordHistory(
+  entry: Omit<HistoryEntry, "id" | "createdAt">,
+): Promise<void> {
+  try {
+    if (isSupabaseMode()) {
+      const sb = getClient();
+      await sb.from('mx_history').insert({
+        project_id: entry.projectId,
+        action_type: entry.actionType,
+        entity_type: entry.entityType,
+        entity_id: entry.entityId ?? null,
+        before_data: entry.beforeData ?? null,
+        after_data: entry.afterData ?? null,
+      });
+    } else {
+      const filePath = path.join(projectDir(entry.projectId), 'history.json');
+      const list = await readJson<HistoryEntry[]>(filePath, []);
+      list.unshift({
+        id: crypto.randomUUID(),
+        ...entry,
+        createdAt: new Date().toISOString(),
+      });
+      if (list.length > 200) list.length = 200;
+      await writeJson(filePath, list);
+    }
+  } catch (err) {
+    console.error('[recordHistory] failed:', err);
+  }
+}
+
+export async function getHistory(
+  projectId: string,
+  limit: number = 100,
+): Promise<HistoryEntry[]> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_history')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(`getHistory: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      projectId: row.project_id,
+      actionType: row.action_type,
+      entityType: row.entity_type,
+      entityId: row.entity_id ?? null,
+      beforeData: row.before_data ?? null,
+      afterData: row.after_data ?? null,
+      createdAt: row.created_at,
+    }));
+  }
+
+  const list = await readJson<HistoryEntry[]>(
+    path.join(projectDir(projectId), 'history.json'),
+    [],
+  );
+  return list.slice(0, limit);
 }
 
 // ── Scale CRUD ─────────────────────────────────────────────────────────
