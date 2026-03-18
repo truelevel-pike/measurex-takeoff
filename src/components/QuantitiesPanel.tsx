@@ -132,18 +132,6 @@ export default function QuantitiesPanel() {
     return totals;
   }, [classifications, polygonsByClassification, ppu]);
 
-  const grand = useMemo(() => {
-    const visible = polygons.filter((polygon) => {
-      const cls = classifications.find((c) => c.id === polygon.classificationId);
-      return cls && cls.visible !== false;
-    });
-    return {
-      count: visible.length,
-      areaReal: visible.reduce((sum, polygon) => sum + polygon.area, 0) / (ppu * ppu),
-      lengthReal: visible.reduce((sum, polygon) => sum + (polygon.linearFeet || 0), 0),
-    };
-  }, [polygons, ppu, classifications]);
-
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
     if (classification.type === 'area') return `${totals.areaReal.toFixed(1)} sq ft`;
     if (classification.type === 'linear') return `${totals.lengthReal.toFixed(1)} ft`;
@@ -289,7 +277,7 @@ export default function QuantitiesPanel() {
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-300 font-normal">
-            {classifications.length} {classifications.length === 1 ? 'class' : 'classes'} - {grand.count} polygons
+            {classifications.length} {classifications.length === 1 ? 'item' : 'items'}
           </span>
           <button
             type="button"

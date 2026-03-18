@@ -5,7 +5,7 @@ let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let currentProjectId: string | null = null;
 let reconnectAttempt = 0;
-let lastEventId: string | null = null;
+let lastEventId = 0;
 
 // ---------------------------------------------------------------------------
 // Activity event bus — lets components subscribe to SSE-derived events
@@ -44,7 +44,12 @@ function handleSSEMessage(raw: MessageEvent) {
     return;
   }
 
-  if (raw.lastEventId) lastEventId = raw.lastEventId;
+  if (raw.lastEventId) {
+    const parsed = Number(raw.lastEventId);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      lastEventId = parsed;
+    }
+  }
 
   const store = useStore.getState();
 
@@ -115,11 +120,12 @@ export function connectToProject(projectId: string): void {
     return;
   }
 
-  disconnectFromProject();
+  const isProjectSwitch = currentProjectId !== null && currentProjectId !== projectId;
+  disconnectFromProject(isProjectSwitch);
   currentProjectId = projectId;
 
-  const url = lastEventId
-    ? `/api/ws?projectId=${encodeURIComponent(projectId)}&lastEventId=${encodeURIComponent(lastEventId)}`
+  const url = lastEventId > 0
+    ? `/api/ws?projectId=${encodeURIComponent(projectId)}&lastEventId=${lastEventId}`
     : `/api/ws?projectId=${encodeURIComponent(projectId)}`;
 
   eventSource = new EventSource(url);
@@ -145,7 +151,7 @@ export function connectToProject(projectId: string): void {
 }
 
 /** Disconnect from SSE stream */
-export function disconnectFromProject(): void {
+export function disconnectFromProject(resetLastEventId = true): void {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -155,7 +161,9 @@ export function disconnectFromProject(): void {
     eventSource = null;
   }
   currentProjectId = null;
-  lastEventId = null;
+  if (resetLastEventId) {
+    lastEventId = 0;
+  }
 }
 
 /** Get the current EventSource (for components that want to listen directly) */
@@ -169,6 +177,6 @@ export function getConnectedProjectId(): string | null {
 }
 
 /** Get the last received SSE event ID */
-export function getLastEventId(): string | null {
+export function getLastEventId(): number {
   return lastEventId;
 }
