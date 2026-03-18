@@ -8,8 +8,7 @@ import type { Classification, Polygon } from '@/lib/types';
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface ScaleConfig {
-  pixelsPerFoot: number;
-  pixelsPerMeter?: number;
+  pixelsPerFoot: number | null;
   unit: 'imperial' | 'metric';
 }
 
@@ -32,8 +31,9 @@ export interface QuantityRow {
 export function calculatePolygonArea(
   points: { x: number; y: number }[],
   scale: ScaleConfig,
-): number {
+): number | null {
   if (!points || points.length < 3) return 0;
+  if (!scale.pixelsPerFoot) return null;
   let sum = 0;
   for (let i = 0; i < points.length; i++) {
     const a = points[i];
@@ -41,11 +41,8 @@ export function calculatePolygonArea(
     sum += a.x * b.y - b.x * a.y;
   }
   const pixelArea = Math.abs(sum) / 2;
-  const pixelsPerUnit =
-    scale.unit === 'metric'
-      ? (scale.pixelsPerMeter || (scale.pixelsPerFoot ? scale.pixelsPerFoot * 3.28084 : 1))
-      : (scale.pixelsPerFoot || 1);
-  return pixelArea / (pixelsPerUnit * pixelsPerUnit);
+  const rawArea = pixelArea / (scale.pixelsPerFoot * scale.pixelsPerFoot);
+  return scale.unit === 'imperial' ? rawArea * 3.28084 * 3.28084 : rawArea;
 }
 
 /**
@@ -55,26 +52,22 @@ export function calculateLinearLength(
   points: { x: number; y: number }[],
   scale: ScaleConfig,
   closed = false,
-): number {
+): number | null {
   if (!points || points.length < 2) return 0;
+  if (!scale.pixelsPerFoot) return null;
   let total = 0;
   for (let i = 0; i < points.length - 1; i++) {
     const dx = points[i + 1].x - points[i].x;
     const dy = points[i + 1].y - points[i].y;
     total += Math.hypot(dx, dy);
   }
-  if (closed) {
+  if (closed && points.length >= 3) {
     const first = points[0];
     const last = points[points.length - 1];
-    const dx = first.x - last.x;
-    const dy = first.y - last.y;
-    total += Math.hypot(dx, dy);
+    total += Math.hypot(first.x - last.x, first.y - last.y);
   }
-  const pixelsPerUnit =
-    scale.unit === 'metric'
-      ? (scale.pixelsPerMeter || (scale.pixelsPerFoot ? scale.pixelsPerFoot * 3.28084 : 1))
-      : (scale.pixelsPerFoot || 1);
-  return total / pixelsPerUnit;
+  const rawLength = total / scale.pixelsPerFoot;
+  return scale.unit === 'imperial' ? rawLength * 3.28084 : rawLength;
 }
 
 /**
@@ -169,10 +162,10 @@ export function computeQuantities(
 
     switch (cls.type) {
       case 'area':
-        row.totalArea += calculatePolygonArea(poly.points, scale);
+        row.totalArea += calculatePolygonArea(poly.points, scale) ?? 0;
         break;
       case 'linear':
-        row.totalLinear += calculateLinearLength(poly.points, scale, true);
+        row.totalLinear += calculateLinearLength(poly.points, scale, true) ?? 0;
         break;
       case 'count':
         row.totalCount += 1;

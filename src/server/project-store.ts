@@ -330,6 +330,9 @@ export async function createClassification(
       color: data.color,
       type: data.type,
       visible: data.visible ?? true,
+      formula: data.formula ?? null,
+      formula_unit: data.formulaUnit ?? null,
+      formula_saved_to_library: data.formulaSavedToLibrary ?? null,
     };
     const { error } = await sb.from('mx_classifications').insert(row);
     if (error) throw new Error(`createClassification: ${error.message}`);
@@ -369,6 +372,9 @@ export async function getClassifications(projectId: string): Promise<Classificat
       color: row.color,
       type: row.type,
       visible: row.visible,
+      formula: row.formula ?? undefined,
+      formulaUnit: row.formula_unit ?? undefined,
+      formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
     }));
   }
 
@@ -387,6 +393,9 @@ export async function updateClassification(
     if (patch.color !== undefined) updateData.color = patch.color;
     if (patch.type !== undefined) updateData.type = patch.type;
     if (patch.visible !== undefined) updateData.visible = patch.visible;
+    if (patch.formula !== undefined) updateData.formula = patch.formula;
+    if (patch.formulaUnit !== undefined) updateData.formula_unit = patch.formulaUnit;
+    if (patch.formulaSavedToLibrary !== undefined) updateData.formula_saved_to_library = patch.formulaSavedToLibrary;
 
     const { data: row, error } = await sb
       .from('mx_classifications')
@@ -403,6 +412,9 @@ export async function updateClassification(
       color: row.color,
       type: row.type,
       visible: row.visible,
+      formula: row.formula ?? undefined,
+      formulaUnit: row.formula_unit ?? undefined,
+      formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
     };
   }
 
@@ -698,16 +710,15 @@ export async function setScale(
   return scale;
 }
 
-export async function getScale(projectId: string): Promise<ScaleCalibration | null> {
+export async function getScale(projectId: string, pageNumber: number = 1): Promise<ScaleCalibration | null> {
   if (isSupabaseMode()) {
     const sb = getClient();
     const { data, error } = await sb
       .from('mx_scales')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .then(({ data, error }) => ({ data: data?.[0], error }));
+      .eq('page_number', pageNumber)
+      .maybeSingle();
     if (error) throw new Error(`getScale: ${error.message}`);
     if (!data) return null;
     return {
@@ -716,6 +727,7 @@ export async function getScale(projectId: string): Promise<ScaleCalibration | nu
       label: data.label,
       source: data.source,
       confidence: data.confidence ?? undefined,
+      pageNumber: data.page_number,
     };
   }
 

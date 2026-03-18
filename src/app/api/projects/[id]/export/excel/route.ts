@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { getPolygons, getClassifications, getScale, getProject, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
+import type { ScaleConfig } from '@/server/geometry-engine';
 
 type ClassificationType = Classification['type'];
 
@@ -28,19 +29,17 @@ interface QuantityRow {
 function buildQuantityRows(
   classifications: Classification[],
   polygons: Polygon[],
-  pixelsPerFoot: number,
+  scaleConfig: ScaleConfig,
 ): QuantityRow[] {
-  const scaleConfig = { pixelsPerFoot: pixelsPerFoot || 1, unit: 'imperial' as const };
-
   return classifications.map((c) => {
     const classPolygons = polygons.filter((p) => p.classificationId === c.id);
     let totalValue = 0;
 
     for (const p of classPolygons) {
       if (c.type === 'area') {
-        totalValue += calculatePolygonArea(p.points, scaleConfig);
+        totalValue += calculatePolygonArea(p.points, scaleConfig) ?? 0;
       } else if (c.type === 'linear') {
-        totalValue += calculateLinearLength(p.points, scaleConfig);
+        totalValue += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
       } else {
         totalValue += 1;
       }
@@ -110,9 +109,8 @@ function buildTypeSheet(
   rows: QuantityRow[],
   polygons: Polygon[],
   classifications: Classification[],
-  pixelsPerFoot: number,
+  scaleConfig: ScaleConfig,
 ): XLSX.WorkSheet {
-  const scaleConfig = { pixelsPerFoot: pixelsPerFoot || 1, unit: 'imperial' as const };
   const aoa: Array<Array<string | number>> = [];
   const typeRows = rows.filter((r) => r.type === type);
 
@@ -128,7 +126,7 @@ function buildTypeSheet(
       const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
       for (let i = 0; i < clsPolygons.length; i++) {
         const p = clsPolygons[i];
-        const area = round2(calculatePolygonArea(p.points, scaleConfig));
+        const area = round2(calculatePolygonArea(p.points, scaleConfig) ?? 0);
         aoa.push([r.name, i + 1, area, p.pageNumber ?? 1]);
       }
       aoa.push([r.name + ' TOTAL', clsPolygons.length, r.totalValue, '']);
@@ -142,7 +140,7 @@ function buildTypeSheet(
       const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
       for (let i = 0; i < clsPolygons.length; i++) {
         const p = clsPolygons[i];
-        const length = round2(calculateLinearLength(p.points, scaleConfig));
+        const length = round2(calculateLinearLength(p.points, scaleConfig, true) ?? 0);
         aoa.push([r.name, i + 1, length, p.pageNumber ?? 1]);
       }
       aoa.push([r.name + ' TOTAL', clsPolygons.length, r.totalValue, '']);
@@ -189,9 +187,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const pixelsPerFoot = scale?.pixelsPerUnit || 1;
+    const ppu = scale?.pixelsPerUnit ?? null;
+    const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
+    const scaleConfig: ScaleConfig = { pixelsPerFoot: ppu, unit };
     const projectName = project.name || id;
-    const rows = buildQuantityRows(classifications, polygons, pixelsPerFoot);
+    const rows = buildQuantityRows(classifications, polygons, scaleConfig);
 
     const wb = XLSX.utils.book_new();
 
@@ -202,21 +202,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Sheet 2: Areas (if any)
     const areaRows = rows.filter((r) => r.type === 'area');
     if (areaRows.length > 0) {
-      const areaSheet = buildTypeSheet('area', rows, polygons, classifications, pixelsPerFoot);
+      const areaSheet = buildTypeSheet('area', rows, polygons, classifications, scaleConfig);
       XLSX.utils.book_append_sheet(wb, areaSheet, 'Areas');
     }
 
     // Sheet 3: Linear (if any)
     const linearRows = rows.filter((r) => r.type === 'linear');
     if (linearRows.length > 0) {
-      const linearSheet = buildTypeSheet('linear', rows, polygons, classifications, pixelsPerFoot);
+      const linearSheet = buildTypeSheet('linear', rows, polygons, classifications, scaleConfig);
       XLSX.utils.book_append_sheet(wb, linearSheet, 'Linear');
     }
 
     // Sheet 4: Counts (if any)
     const countRows = rows.filter((r) => r.type === 'count');
     if (countRows.length > 0) {
-      const countSheet = buildTypeSheet('count', rows, polygons, classifications, pixelsPerFoot);
+      const countSheet = buildTypeSheet('count', rows, polygons, classifications, scaleConfig);
       XLSX.utils.book_append_sheet(wb, countSheet, 'Counts');
     }
 
