@@ -169,6 +169,14 @@ export default function QuantitiesPanel() {
       return;
     }
 
+    const duplicate = classifications.some(
+      (c) => c.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      setNewClassificationError(`A classification named "${name}" already exists.`);
+      return;
+    }
+
     try {
       addClassification({ name, color, type: newType, visible: true });
       setNewName('');

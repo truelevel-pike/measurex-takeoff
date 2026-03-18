@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
@@ -42,6 +42,71 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const selectedPolygon = useStore((s) => s.selectedPolygon);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const currentTool = useStore((s) => s.currentTool);
+  const updatePolygon = useStore((s) => s.updatePolygon);
+
+  // Vertex drag state
+  const [dragging, setDragging] = useState<{
+    polygonId: string;
+    vertexIndex: number;
+  } | null>(null);
+  const [dragPoints, setDragPoints] = useState<Point[] | null>(null);
+
+  const toSvgCoords = useCallback(
+    (e: React.MouseEvent | MouseEvent): Point => {
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      return {
+        x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+        y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+      };
+    },
+    [baseDims]
+  );
+
+  const handleVertexPointerDown = useCallback(
+    (e: React.MouseEvent, polygonId: string, vertexIndex: number) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const poly = allPolygons.find((p) => p.id === polygonId);
+      if (!poly) return;
+      setDragging({ polygonId, vertexIndex });
+      setDragPoints([...poly.points]);
+    },
+    [allPolygons]
+  );
+
+  useEffect(() => {
+    if (!dragging) return;
+
+    const handleMove = (e: MouseEvent) => {
+      e.preventDefault();
+      const pt = toSvgCoords(e);
+      setDragPoints((prev) => {
+        if (!prev) return prev;
+        const updated = [...prev];
+        updated[dragging.vertexIndex] = pt;
+        return updated;
+      });
+    };
+
+    const handleUp = (e: MouseEvent) => {
+      e.preventDefault();
+      setDragPoints((prev) => {
+        if (prev) {
+          updatePolygon(dragging.polygonId, { points: prev });
+        }
+        return null;
+      });
+      setDragging(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [dragging, toSvgCoords, updatePolygon]);
 
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
