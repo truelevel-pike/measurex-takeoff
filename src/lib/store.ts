@@ -45,8 +45,6 @@ export interface Store extends ProjectState {
   selectedClassification: string | null;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
-  hiddenClassificationIds: string[];
-  toggleClassificationVisibility: (id: string) => void;
   // Mobile UI state
   showQuantitiesDrawer: boolean;
   setShowQuantitiesDrawer: (show: boolean) => void;
@@ -176,13 +174,6 @@ export const useStore = create<Store>()(
   selectedClassification: null,
   selectedPolygon: null,
   selectedPolygonId: null,
-  hiddenClassificationIds: [],
-  toggleClassificationVisibility: (id) =>
-    set((state) => ({
-      hiddenClassificationIds: state.hiddenClassificationIds.includes(id)
-        ? state.hiddenClassificationIds.filter((x) => x !== id)
-        : [...state.hiddenClassificationIds, id],
-    })),
   showQuantitiesDrawer: false,
   setShowQuantitiesDrawer: (show) => set({ showQuantitiesDrawer: show }),
   showMobileMenu: false,
@@ -237,7 +228,6 @@ export const useStore = create<Store>()(
       selectedClassification: s.selectedClassification === id ? null : s.selectedClassification,
       selectedPolygon: s.selectedPolygon && s.polygons.find((p) => p.id === s.selectedPolygon && p.classificationId === id) ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId && s.polygons.find((p) => p.id === s.selectedPolygonId && p.classificationId === id) ? null : s.selectedPolygonId,
-      hiddenClassificationIds: s.hiddenClassificationIds.filter((x) => x !== id),
       groups: s.groups.map((g) => ({
         ...g,
         classificationIds: g.classificationIds.filter((cid) => cid !== id),
@@ -417,7 +407,6 @@ export const useStore = create<Store>()(
       selectedClassification: null,
       selectedPolygon: null,
       selectedPolygonId: null,
-      hiddenClassificationIds: [],
     });
   },
 
