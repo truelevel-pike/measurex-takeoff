@@ -241,41 +241,51 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                     onMouseDown={(e) => handleVertexPointerDown(e, poly.id, i)}
                   />
                 ))}
-              {/* Polygon label: classification name + area */}
+              {/* Polygon label: classification name + measurement */}
               {(() => {
-                const pts = dragPoints && dragging?.polygonId === poly.id ? dragPoints : poly.points;
-                if (pts.length < 3 || !cls?.visible) return null;
-                if ((poly.area ?? 0) < 100) return null;
-                const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
-                const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
-                const ppu = scale?.pixelsPerUnit || 1;
-                const areaDisplay = ((poly.area ?? 0) / (ppu * ppu)).toFixed(1);
-                const labelW = 90;
-                const labelH = 28;
+                const pts = displayPoints;
+                if (pts.length < 3) return null;
+                const lxs = pts.map((p) => p.x);
+                const lys = pts.map((p) => p.y);
+                const bboxW = Math.max(...lxs) - Math.min(...lxs);
+                const bboxH = Math.max(...lys) - Math.min(...lys);
+                if (bboxW <= 30 || bboxH <= 30) return null;
+                const centX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+                const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+                const clsType = cls?.type || 'area';
+                const unit = clsType === 'linear' ? 'FT' : clsType === 'count' ? 'EA' : 'SF';
+                const ppu = scale?.pixelsPerUnit || 0;
+                const valueStr = ppu
+                  ? `${(poly.area / (ppu * ppu)).toFixed(1)} ${unit}`
+                  : `? ${unit}`;
+                const clsName = cls?.name || '';
+                const longestLen = Math.max(clsName.length, valueStr.length);
+                const labelW = Math.max(longestLen * 6.6 + 12, 50);
+                const labelH = 30;
                 return (
-                  <>
+                  <g pointerEvents="none">
                     <rect
-                      x={cx - labelW / 2}
-                      y={cy - labelH / 2}
+                      x={centX - labelW / 2}
+                      y={centY - labelH / 2}
                       width={labelW}
                       height={labelH}
-                      fill="rgba(0,0,0,0.55)"
-                      rx={4}
-                      pointerEvents="none"
+                      fill="rgba(0,0,0,0.65)"
+                      rx={3}
                     />
                     <text
-                      x={cx}
-                      y={cy}
+                      x={centX}
+                      y={centY}
                       fontSize="11"
                       fill="#fff"
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      pointerEvents="none"
+                      fontFamily="sans-serif"
+                      style={{ userSelect: 'none' }}
                     >
-                      <tspan x={cx} dy="-0.5em">{cls.name}</tspan>
-                      <tspan x={cx} dy="1.1em">{areaDisplay} sq ft</tspan>
+                      <tspan x={centX} dy="-0.5em">{clsName}</tspan>
+                      <tspan x={centX} dy="1.1em">{valueStr}</tspan>
                     </text>
-                  </>
+                  </g>
                 );
               })()}
             </g>
