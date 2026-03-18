@@ -179,7 +179,11 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
             unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
             quantityFormula: formulaType,
           }),
-        }).catch((err) => console.error('API updateAssembly failed:', err));
+        })
+          .then((res) => {
+            if (!res.ok) console.error('API updateAssembly failed:', res.status);
+          })
+          .catch((err) => console.error('API updateAssembly failed:', err));
       }
     } else {
       addAssembly(assembly);
@@ -195,8 +199,15 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
             quantityFormula: formulaType,
           }),
         })
-          .then((res) => res.json())
+          .then((res) => {
+            if (!res.ok) {
+              console.error('API createAssembly failed:', res.status);
+              return;
+            }
+            return res.json();
+          })
           .then((data) => {
+            if (!data) return;
             const serverId = data?.assembly?.id;
             if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
               updateAssembly(assembly.id, { id: serverId });
