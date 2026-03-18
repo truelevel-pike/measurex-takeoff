@@ -7,7 +7,7 @@ import { calculatePolygonArea } from '@/lib/polygon-utils';
 import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
 
-const SNAP_RADIUS = 20;
+const SNAP_SCREEN_PX = 15;
 const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: false, gridSize: 0 } as const;
 
 export default function DrawingTool() {
