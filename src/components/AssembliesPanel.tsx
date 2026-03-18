@@ -139,10 +139,20 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
 
   function handleDelete(id: string) {
     if (window.confirm('Delete this assembly?')) {
+      const saved = assemblies.find((a) => a.id === id);
       deleteAssembly(id);
       if (projectId) {
         fetch(`/api/projects/${projectId}/assemblies/${id}`, { method: 'DELETE' })
-          .catch((err) => console.error('API deleteAssembly failed:', err));
+          .then((res) => {
+            if (!res.ok && saved) {
+              console.error('API deleteAssembly failed:', res.status);
+              addAssembly(saved);
+            }
+          })
+          .catch((err) => {
+            console.error('API deleteAssembly failed:', err);
+            if (saved) addAssembly(saved);
+          });
       }
     }
   }
