@@ -228,6 +228,10 @@ export const useStore = create<Store>()(
     });
   },
 
+  /** Delete a classification and clean up all orphaned refs:
+   *  classifications, polygons, selectedClassification, selectedPolygon,
+   *  selectedPolygonId, hiddenClassificationIds, groups (including nested
+   *  breakdowns), and assemblies. */
   deleteClassification: (id) => {
     const s = get();
     const before = snapshot(s);
