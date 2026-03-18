@@ -180,6 +180,8 @@ function PageInner() {
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
+  const hydrateAbortRef = useRef<AbortController | null>(null);
+  const isCreatingProjectRef = useRef(false);
 
   const persistSaveStatus = useCallback((text: string, clearMs = 2200) => {
     setSaveStatus(text);
@@ -264,11 +266,18 @@ function PageInner() {
 
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
   const hydrateProject = useCallback(async (pid: string) => {
+    // Cancel any in-flight hydration to prevent stale data from overwriting newer requests
+    hydrateAbortRef.current?.abort();
+    const controller = new AbortController();
+    hydrateAbortRef.current = controller;
+
     try {
       // Try full project endpoint first (returns all state in one call)
-      const res = await fetch(`/api/projects/${pid}`);
+      const res = await fetch(`/api/projects/${pid}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       if (res.ok) {
         const data = await res.json();
+        if (controller.signal.aborted) return;
         const normalized = normalizeProjectState(data?.project?.state ?? EMPTY_STATE);
 
         // Populate known IDs BEFORE hydrating so the sync effects never see
@@ -284,10 +293,12 @@ function PageInner() {
         localStorage.setItem('measurex_project_id', data.project.id);
 
         // Auto-fetch stored PDF so the viewer loads without re-upload
-        fetch(`/api/projects/${pid}/pdf`)
+        fetch(`/api/projects/${pid}/pdf`, { signal: controller.signal })
           .then(async (pdfRes) => {
+            if (controller.signal.aborted) return;
             if (!pdfRes.ok) return;
             const blob = await pdfRes.blob();
+            if (controller.signal.aborted) return;
             const file = new File([blob], `${data.project.name || pid}.pdf`, { type: 'application/pdf' });
             // BUG-R6-002: Reset page count ready flag before setting new PDF file
             setPdfPageCountReady(false);
@@ -300,14 +311,16 @@ function PageInner() {
 
       // Fallback: hydrate from granular endpoints
       const [classRes, polyRes, scaleRes] = await Promise.all([
-        fetch(`/api/projects/${pid}/classifications`).catch(() => null),
-        fetch(`/api/projects/${pid}/polygons`).catch(() => null),
-        fetch(`/api/projects/${pid}/scale`).catch(() => null),
+        fetch(`/api/projects/${pid}/classifications`, { signal: controller.signal }).catch(() => null),
+        fetch(`/api/projects/${pid}/polygons`, { signal: controller.signal }).catch(() => null),
+        fetch(`/api/projects/${pid}/scale`, { signal: controller.signal }).catch(() => null),
       ]);
+      if (controller.signal.aborted) return;
 
       const classData = classRes?.ok ? await classRes.json() : {};
       const polyData = polyRes?.ok ? await polyRes.json() : {};
       const scaleData = scaleRes?.ok ? await scaleRes.json() : {};
+      if (controller.signal.aborted) return;
 
       const fetchedClassifications = Array.isArray(classData.classifications) ? classData.classifications : [];
       const fetchedPolygons = Array.isArray(polyData.polygons) ? polyData.polygons : [];
@@ -330,6 +343,8 @@ function PageInner() {
       setProjectName('Untitled');
       localStorage.setItem('measurex_project_id', pid);
     } catch (err) {
+      // Ignore AbortError — it means a newer hydration superseded this one
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.warn('Hydration failed:', err);
     }
   }, [setCurrentPage]);
@@ -518,6 +533,9 @@ function PageInner() {
   // Auto-create a project when a PDF is loaded and no project exists yet
   const ensureProject = useCallback(async (fileName: string) => {
     if (projectId) return;
+    // Prevent duplicate project creation from rapid uploads
+    if (isCreatingProjectRef.current) return;
+    isCreatingProjectRef.current = true;
     try {
       // Reset known IDs and hydrate empty state for a fresh project.
       // Preserve totalPages if the PDF has already reported it (PDFViewer fires
@@ -539,6 +557,8 @@ function PageInner() {
       window.history.replaceState({}, '', `/?project=${project.id}`);
     } catch (err) {
       console.error('Failed to auto-create project:', err);
+    } finally {
+      isCreatingProjectRef.current = false;
     }
   }, [projectId]);
 
