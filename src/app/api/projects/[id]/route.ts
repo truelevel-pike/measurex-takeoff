@@ -5,6 +5,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     await initDataDir();
     const { id } = await params;
+    // Validate id is a safe UUID/alphanumeric string
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
+    }
     const project = await getProject(id);
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
@@ -43,6 +47,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     await initDataDir();
     const { id } = await params;
+    // Validate id is a safe UUID/alphanumeric string
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
+    }
     const body = await req.json();
 
     // If the body contains a `state` payload (autosave from client), persist
@@ -78,6 +86,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     await initDataDir();
     const { id } = await params;
+    // Validate id is a safe UUID/alphanumeric string
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
+    }
     const ok = await deleteProject(id);
     return NextResponse.json({ ok });
   } catch (err: any) {

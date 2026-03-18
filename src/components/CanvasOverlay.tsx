@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
+import { calculatePolygonArea } from '@/lib/polygon-utils';
 
 export interface PolygonContextMenuPayload {
   polygonId: string;
@@ -95,7 +96,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       e.preventDefault();
       setDragPoints((prev) => {
         if (prev) {
-          updatePolygon(dragging.polygonId, { points: prev });
+          updatePolygon(dragging.polygonId, { points: prev, area: calculatePolygonArea(prev) });
         }
         return null;
       });

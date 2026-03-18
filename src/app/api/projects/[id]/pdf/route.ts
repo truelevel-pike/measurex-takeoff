@@ -10,6 +10,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     await initDataDir();
     const { id } = await params;
+    // Validate id is a safe UUID/alphanumeric string
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
+    }
 
     const fs = await import('fs/promises');
     const path = await import('path');
