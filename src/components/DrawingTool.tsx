@@ -34,7 +34,7 @@ export default function DrawingTool() {
     containerRef.current?.focus();
   }, []);
 
-  const CLOSE_THRESHOLD = 12;
+  const CLOSE_THRESHOLD_PX = 18;
 
   // Convert click coordinates to base (scale=1) PDF page coordinate space
   // so polygon points are zoom-independent
@@ -87,11 +87,14 @@ export default function DrawingTool() {
         }
       }
 
-      // Close polygon if clicking near the first point (immediate, no delay)
+      // Close polygon if clicking near the first point (screen-pixel space)
       if (points.length >= 3) {
-        const dx = pt.x - points[0].x;
-        const dy = pt.y - points[0].y;
-        if (Math.hypot(dx, dy) < CLOSE_THRESHOLD) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        const screenX = rect ? (points[0].x / baseDims.width) * rect.width + rect.left : 0;
+        const screenY = rect ? (points[0].y / baseDims.height) * rect.height + rect.top : 0;
+        const dx = e.clientX - screenX;
+        const dy = e.clientY - screenY;
+        if (Math.hypot(dx, dy) < CLOSE_THRESHOLD_PX) {
           if (pendingClickTimeout.current) {
             clearTimeout(pendingClickTimeout.current);
             pendingClickTimeout.current = null;
@@ -138,6 +141,7 @@ export default function DrawingTool() {
     }
   }, [setTool, commitPolygon, points.length]);
 
+  const hasScale = scale !== null && scale.pixelsPerUnit > 0;
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
   const previewArea = points.length >= 3 ? (calculatePolygonArea(points) / (ppu * ppu)) : 0;
@@ -188,7 +192,7 @@ export default function DrawingTool() {
             top: `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
             transform:'translate(-50%, -20px)',
           }}>
-          {previewArea.toFixed(1)} sq {unit}
+          {hasScale ? `${previewArea.toFixed(1)} sq ${unit}` : `-- sq ${unit}`}
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">

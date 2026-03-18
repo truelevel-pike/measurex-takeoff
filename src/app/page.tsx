@@ -41,7 +41,7 @@ import AIImageSearch from '@/components/AIImageSearch';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import { ToastProvider, useToast } from '@/components/Toast';
 
-const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure'> = {
+const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'ai'> = {
   v: 'select',
   h: 'pan',
   d: 'draw',
@@ -49,6 +49,7 @@ const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | '
   s: 'split',
   c: 'cut',
   m: 'measure',
+  a: 'ai',
 };
 
 const EMPTY_STATE: ProjectState = {
