@@ -48,7 +48,6 @@ export default function ThreeDScene({
   // selectedPolygon from store is the shared selection state.
   // QuantitiesPanel writes to it via setSelectedPolygon; we read it here to highlight in 3D.
   const selectedPolygon = useStore((s) => s.selectedPolygon);
-  const hiddenClassificationIds = useStore((s) => s.hiddenClassificationIds);
   const storeClassifications = useStore((s) => s.classifications);
 
   // If caller passed explicit walls/areas (non-empty), use them directly.
@@ -83,12 +82,10 @@ export default function ThreeDScene({
 
   // Build visibility filter: hide areas whose classification is toggled off
   const visibilityHiddenIds = React.useMemo(() => {
-    const hiddenByVisibleFlag = storeClassifications
+    return storeClassifications
       .filter((c) => c.visible === false)
       .map((c) => c.id);
-    const merged = new Set<string>([...hiddenClassificationIds, ...hiddenByVisibleFlag]);
-    return Array.from(merged);
-  }, [hiddenClassificationIds, storeClassifications]);
+  }, [storeClassifications]);
 
   // selectedId drives 3D highlight and is sourced from the store so that
   // clicking a row in QuantitiesPanel (which calls setSelectedPolygon) automatically
