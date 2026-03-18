@@ -227,16 +227,17 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
               />
               {/* Corner handles when selected */}
               {isSelected &&
-                (dragPoints || poly.points).map((pt: Point, i: number) => (
+                displayPoints.map((pt: Point, i: number) => (
                   <circle
                     key={i}
                     cx={pt.x}
                     cy={pt.y}
                     r={5}
-                    fill="#00d4ff"
+                    fill={isDraggingThis && dragging.vertexIndex === i ? '#ff6600' : '#00d4ff'}
                     stroke="#fff"
                     strokeWidth={1.5}
-                    style={{ cursor: 'crosshair' }}
+                    vectorEffect="non-scaling-stroke"
+                    style={{ cursor: 'grab' }}
                     onMouseDown={(e) => handleVertexPointerDown(e, poly.id, i)}
                   />
                 ))}
