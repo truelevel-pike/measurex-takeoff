@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
+import fs from 'fs';
 import { getProject, getPages } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { analyzePageImage } from '@/server/ai-engine';
@@ -22,7 +23,14 @@ export async function POST(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const pdfPath = path.resolve(process.cwd(), 'data', 'projects', id, 'drawing.pdf');
+    const pdfPath = path.resolve(process.cwd(), 'data', 'uploads', `${id}.pdf`);
+
+    if (!fs.existsSync(pdfPath)) {
+      return NextResponse.json(
+        { error: `PDF not found for project ${id} — please upload a drawing first` },
+        { status: 404 },
+      );
+    }
 
     const imageDataUrl = await renderPageAsImage(pdfPath, pageNum);
     if (!imageDataUrl) {
