@@ -237,6 +237,15 @@ export const useStore = create<Store>()(
       selectedClassification: s.selectedClassification === id ? null : s.selectedClassification,
       selectedPolygon: s.selectedPolygon && s.polygons.find((p) => p.id === s.selectedPolygon && p.classificationId === id) ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId && s.polygons.find((p) => p.id === s.selectedPolygonId && p.classificationId === id) ? null : s.selectedPolygonId,
+      hiddenClassificationIds: s.hiddenClassificationIds.filter((x) => x !== id),
+      groups: s.groups.map((g) => ({
+        ...g,
+        classificationIds: g.classificationIds.filter((cid) => cid !== id),
+        breakdowns: g.breakdowns.map((b) => ({
+          ...b,
+          classificationIds: b.classificationIds.filter((cid) => cid !== id),
+        })),
+      })),
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -377,6 +386,7 @@ export const useStore = create<Store>()(
     totalPages: (totalPages !== undefined && totalPages > 1)
       ? totalPages
       : (state.totalPages > 1 ? state.totalPages : (totalPages ?? state.totalPages)),
+    scale: state.scales[page] ?? state.scale,
   })),
 
   hydrateState: (state) => {
