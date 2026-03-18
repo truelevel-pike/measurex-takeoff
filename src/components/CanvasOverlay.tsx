@@ -245,28 +245,23 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
               {(() => {
                 const pts = displayPoints;
                 if (pts.length < 3) return null;
-                const lxs = pts.map((p) => p.x);
-                const lys = pts.map((p) => p.y);
-                const bboxW = Math.max(...lxs) - Math.min(...lxs);
-                const bboxH = Math.max(...lys) - Math.min(...lys);
-                if (bboxW <= 30 || bboxH <= 30) return null;
                 const centX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
                 const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
-                const clsType = cls?.type || 'area';
-                const unit = clsType === 'linear' ? 'FT' : clsType === 'count' ? 'EA' : 'SF';
-                const ppu = scale?.pixelsPerUnit || 0;
-                const valueStr = ppu
-                  ? `${(poly.area / (ppu * ppu)).toFixed(1)} ${unit}`
-                  : `? ${unit}`;
-                const clsName = cls?.name || '';
+                if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
+                const clsType = cls?.type ?? 'area';
+                const valueStr =
+                  clsType === 'linear' ? `${poly.linearFeet.toFixed(1)} FT` : clsType === 'count' ? 'EA' : `${poly.area.toFixed(1)} SF`;
+                const clsName = cls?.name ?? 'Unclassified';
                 const longestLen = Math.max(clsName.length, valueStr.length);
-                const labelW = Math.max(longestLen * 6.6 + 12, 50);
-                const labelH = 30;
+                const labelW = Math.max(80, longestLen * 6.1 + 14);
+                const labelH = 28;
+                const rectX = centX - labelW / 2;
+                const rectY = centY - labelH / 2;
                 return (
                   <g pointerEvents="none">
                     <rect
-                      x={centX - labelW / 2}
-                      y={centY - labelH / 2}
+                      x={rectX}
+                      y={rectY}
                       width={labelW}
                       height={labelH}
                       fill="rgba(0,0,0,0.65)"
@@ -274,16 +269,25 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                     />
                     <text
                       x={centX}
-                      y={centY}
-                      fontSize="11"
+                      y={rectY + 11}
+                      fontSize="10"
                       fill="#fff"
                       textAnchor="middle"
-                      dominantBaseline="middle"
                       fontFamily="sans-serif"
                       style={{ userSelect: 'none' }}
                     >
-                      <tspan x={centX} dy="-0.5em">{clsName}</tspan>
-                      <tspan x={centX} dy="1.1em">{valueStr}</tspan>
+                      {clsName}
+                    </text>
+                    <text
+                      x={centX}
+                      y={rectY + 22}
+                      fontSize="9"
+                      fill="#aaa"
+                      textAnchor="middle"
+                      fontFamily="sans-serif"
+                      style={{ userSelect: 'none' }}
+                    >
+                      {valueStr}
                     </text>
                   </g>
                 );
