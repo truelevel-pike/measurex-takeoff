@@ -55,21 +55,21 @@ function handleSSEMessage(raw: MessageEvent) {
       if (store.polygons.some((p) => p.id === poly.id)) break;
       // Directly set state to preserve the server-assigned ID
       useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
-      emitActivity('polygon:created', parsed.data as Record<string, unknown>);
+      emitActivity('polygon:created', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'polygon:updated': {
       const poly = parsed.data;
       store.updatePolygon(poly.id, poly);
-      emitActivity('polygon:updated', parsed.data as Record<string, unknown>);
+      emitActivity('polygon:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'polygon:deleted': {
       const { id } = parsed.data;
       store.deletePolygon(id);
-      emitActivity('polygon:deleted', parsed.data as Record<string, unknown>);
+      emitActivity('polygon:deleted', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
@@ -77,14 +77,14 @@ function handleSSEMessage(raw: MessageEvent) {
       const cls = parsed.data;
       if (store.classifications.some((c) => c.id === cls.id)) break;
       useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
-      emitActivity('classification:created', parsed.data as Record<string, unknown>);
+      emitActivity('classification:created', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'classification:updated': {
       const cls = parsed.data;
       store.updateClassification(cls.id, cls);
-      emitActivity('classification:updated', parsed.data as Record<string, unknown>);
+      emitActivity('classification:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
@@ -95,23 +95,23 @@ function handleSSEMessage(raw: MessageEvent) {
         // Also remove any polygons that belonged to this classification
         polygons: s.polygons.filter((p) => p.classificationId !== id),
       }));
-      emitActivity('classification:deleted', parsed.data as Record<string, unknown>);
+      emitActivity('classification:deleted', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'scale:updated': {
       store.setScale(parsed.data);
-      emitActivity('scale:updated', parsed.data as Record<string, unknown>);
+      emitActivity('scale:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'ai-takeoff:started': {
-      emitActivity('ai-takeoff:started', parsed.data as Record<string, unknown>);
+      emitActivity('ai-takeoff:started', parsed.data as unknown as Record<string, unknown>);
       break;
     }
 
     case 'ai-takeoff:complete': {
-      emitActivity('ai-takeoff:complete', parsed.data as Record<string, unknown>);
+      emitActivity('ai-takeoff:complete', parsed.data as unknown as Record<string, unknown>);
       break;
     }
   }
