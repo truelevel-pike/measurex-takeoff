@@ -37,11 +37,6 @@ export default function QuantitiesPanel() {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
 
-  // If Assemblies tab is active, render AssembliesPanel instead
-  if (activeTab === 'assemblies') {
-    return <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} />;
-  }
-
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
@@ -267,6 +262,11 @@ export default function QuantitiesPanel() {
 
   const panel = (
     <>
+      {/* Assemblies tab — conditionally renders in JSX to avoid hooks-of-rules violation */}
+      {activeTab === 'assemblies' ? (
+        <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} />
+      ) : (
+      <>
       {/* Tab bar */}
       <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
         <button
@@ -288,7 +288,7 @@ export default function QuantitiesPanel() {
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-300 font-normal">
-            {grand.count} items - {grand.areaReal.toFixed(1)} sq ft - {grand.lengthReal.toFixed(1)} ft
+            {classifications.length} {classifications.length === 1 ? 'class' : 'classes'} - {grand.count} polygons
           </span>
           <button
             type="button"
@@ -656,6 +656,8 @@ export default function QuantitiesPanel() {
           </div>
         )}
       </div>
+      </>
+      )}
     </>
   );
 
