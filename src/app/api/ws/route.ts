@@ -1,7 +1,13 @@
 import { NextRequest } from 'next/server';
 
-// Global map: projectId → Set of stream controllers
-const projectClients = new Map<string, Set<ReadableStreamDefaultController>>();
+// Singleton registry — survives Next.js module re-evaluation
+declare const globalThis: typeof global & {
+  __sseClients?: Map<string, Set<ReadableStreamDefaultController>>;
+};
+if (!globalThis.__sseClients) {
+  globalThis.__sseClients = new Map();
+}
+const projectClients = globalThis.__sseClients;
 
 /** Broadcast an SSE event to all clients subscribed to a project */
 export function broadcastToProject(projectId: string, event: string, data: unknown) {
@@ -28,8 +34,13 @@ export async function GET(request: NextRequest) {
     return new Response('Missing projectId query param', { status: 400 });
   }
 
+  let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+  let thisController: ReadableStreamDefaultController | null = null;
+
   const stream = new ReadableStream({
     start(controller) {
+      thisController = controller;
+
       // Register this client
       if (!projectClients.has(projectId)) {
         projectClients.set(projectId, new Set());
@@ -41,26 +52,37 @@ export async function GET(request: NextRequest) {
       controller.enqueue(
         encoder.encode(`data: ${JSON.stringify({ event: 'connected', data: { projectId } })}\n\n`)
       );
-    },
-    cancel() {
-      // Client disconnected — clean up
-      const clients = projectClients.get(projectId);
-      // Controller reference is captured in closure; iterate to find & remove
-      if (clients) {
-        // The controller that initiated cancel is already closed,
-        // but we can't reference it here directly. Stale controllers
-        // are pruned on next broadcast. Force a prune now:
-        for (const c of clients) {
-          try {
-            // Test if controller is still open by enqueueing empty comment
-            c.enqueue(new TextEncoder().encode(': ping\n\n'));
-          } catch {
-            clients.delete(c);
+
+      // 30-second keepalive to prevent proxy/load-balancer timeouts
+      keepaliveInterval = setInterval(() => {
+        try {
+          controller.enqueue(new TextEncoder().encode(': keepalive\n\n'));
+        } catch {
+          // Client disconnected mid-keepalive — clear interval
+          if (keepaliveInterval !== null) {
+            clearInterval(keepaliveInterval);
+            keepaliveInterval = null;
           }
         }
-        if (clients.size === 0) {
-          projectClients.delete(projectId);
+      }, 30_000);
+    },
+    cancel() {
+      // Clear keepalive interval to avoid memory leaks
+      if (keepaliveInterval !== null) {
+        clearInterval(keepaliveInterval);
+        keepaliveInterval = null;
+      }
+
+      // Client disconnected — remove this controller from the registry
+      if (thisController !== null) {
+        const clients = projectClients.get(projectId);
+        if (clients) {
+          clients.delete(thisController);
+          if (clients.size === 0) {
+            projectClients.delete(projectId);
+          }
         }
+        thisController = null;
       }
     },
   });
