@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Assembly } from '@/lib/types';
@@ -11,15 +11,30 @@ interface AssembliesPanelProps {
 }
 
 export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPanelProps) {
+  const projectId = useStore((s) => s.projectId);
   const assemblies = useStore((s) => s.assemblies);
   const classifications = useStore((s) => s.classifications);
   const addAssembly = useStore((s) => s.addAssembly);
+  const setAssemblies = useStore((s) => s.setAssemblies);
   const updateAssembly = useStore((s) => s.updateAssembly);
   const deleteAssembly = useStore((s) => s.deleteAssembly);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
   const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null);
+
+  // Fetch assemblies from API on mount / when projectId changes
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/projects/${projectId}/assemblies`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.assemblies)) {
+          setAssemblies(data.assemblies);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch assemblies:', err));
+  }, [projectId, setAssemblies]);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -46,14 +61,44 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
   function handleDelete(id: string) {
     if (window.confirm('Delete this assembly?')) {
       deleteAssembly(id);
+      if (projectId) {
+        fetch(`/api/projects/${projectId}/assemblies/${id}`, { method: 'DELETE' })
+          .catch((err) => console.error('API deleteAssembly failed:', err));
+      }
     }
   }
 
   function handleSave(assembly: Assembly) {
     if (editingAssembly) {
       updateAssembly(assembly.id, assembly);
+      if (projectId) {
+        fetch(`/api/projects/${projectId}/assemblies/${assembly.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classificationId: assembly.classificationId,
+            name: assembly.name,
+            unit: assembly.materials[0]?.unit || 'SF',
+            unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
+            quantityFormula: 'area',
+          }),
+        }).catch((err) => console.error('API updateAssembly failed:', err));
+      }
     } else {
       addAssembly(assembly);
+      if (projectId) {
+        fetch(`/api/projects/${projectId}/assemblies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classificationId: assembly.classificationId,
+            name: assembly.name,
+            unit: assembly.materials[0]?.unit || 'SF',
+            unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
+            quantityFormula: 'area',
+          }),
+        }).catch((err) => console.error('API createAssembly failed:', err));
+      }
     }
     setShowEditor(false);
     setEditingAssembly(null);

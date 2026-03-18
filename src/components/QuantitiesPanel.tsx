@@ -7,6 +7,7 @@ import type { Classification, Polygon } from '@/lib/types';
 import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 import VersionHistory from './VersionHistory';
+import AssembliesPanel from './AssembliesPanel';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -34,6 +35,12 @@ function normalizeHexInput(value: string): string {
 
 export default function QuantitiesPanel() {
   const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
+
+  // If Assemblies tab is active, render AssembliesPanel instead
+  if (activeTab === 'assemblies') {
+    return <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} />;
+  }
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
@@ -129,12 +136,16 @@ export default function QuantitiesPanel() {
   }, [classifications, polygonsByClassification, ppu]);
 
   const grand = useMemo(() => {
+    const visible = polygons.filter((polygon) => {
+      const cls = classifications.find((c) => c.id === polygon.classificationId);
+      return cls && cls.visible !== false;
+    });
     return {
-      count: polygons.length,
-      areaReal: polygons.reduce((sum, polygon) => sum + polygon.area, 0) / (ppu * ppu),
-      lengthReal: polygons.reduce((sum, polygon) => sum + (polygon.linearFeet || 0), 0),
+      count: visible.length,
+      areaReal: visible.reduce((sum, polygon) => sum + polygon.area, 0) / (ppu * ppu),
+      lengthReal: visible.reduce((sum, polygon) => sum + (polygon.linearFeet || 0), 0),
     };
-  }, [polygons, ppu]);
+  }, [polygons, ppu, classifications]);
 
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
     if (classification.type === 'area') return `${totals.areaReal.toFixed(1)} sq ft`;
@@ -253,6 +264,23 @@ export default function QuantitiesPanel() {
 
   const panel = (
     <>
+      {/* Tab bar */}
+      <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
+        <button
+          type="button"
+          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
+        >
+          Quantities
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('assemblies')}
+          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+        >
+          Assemblies
+        </button>
+      </div>
+
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <div className="flex items-center gap-2">
@@ -555,6 +583,30 @@ export default function QuantitiesPanel() {
                   >
                     <Trash2 size={13} />
                   </button>
+                </div>
+              )}
+
+              {pendingDeleteId === classification.id && (
+                <div className="mx-1 my-1 px-2 py-1.5 bg-[#0e1016] border border-red-500/30 rounded-lg flex items-center justify-between gap-2">
+                  <span className="text-[12px] text-[#e5e7eb] truncate">
+                    Delete &ldquo;{classification.name}&rdquo;?
+                  </span>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => confirmDeleteClassification(classification.id)}
+                      className="text-[11px] font-medium text-red-400 hover:text-red-300"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteId(null)}
+                      className="text-[11px] text-gray-400 hover:text-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 

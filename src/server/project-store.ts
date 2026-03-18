@@ -722,3 +722,138 @@ export async function getScale(projectId: string): Promise<ScaleCalibration | nu
 
   return readJson<ScaleCalibration | null>(path.join(projectDir(projectId), 'scale.json'), null);
 }
+
+// ── Assemblies CRUD ─────────────────────────────────────────────────
+
+export interface AssemblyRow {
+  id: string;
+  projectId: string;
+  classificationId: string;
+  name: string;
+  unit: string;
+  unitCost: number;
+  quantityFormula: string;
+  createdAt: string;
+}
+
+export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_assemblies')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`getAssemblies: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      projectId: row.project_id,
+      classificationId: row.classification_id,
+      name: row.name,
+      unit: row.unit,
+      unitCost: parseFloat(row.unit_cost),
+      quantityFormula: row.quantity_formula,
+      createdAt: row.created_at,
+    }));
+  }
+
+  return readJson<AssemblyRow[]>(path.join(projectDir(projectId), 'assemblies.json'), []);
+}
+
+export async function createAssembly(
+  projectId: string,
+  data: Omit<AssemblyRow, 'id' | 'projectId' | 'createdAt'>,
+): Promise<AssemblyRow> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const row = {
+      id,
+      project_id: projectId,
+      classification_id: data.classificationId,
+      name: data.name,
+      unit: data.unit,
+      unit_cost: data.unitCost,
+      quantity_formula: data.quantityFormula,
+      created_at: now,
+      updated_at: now,
+    };
+    const { error } = await sb.from('mx_assemblies').insert(row);
+    if (error) throw new Error(`createAssembly: ${error.message}`);
+  } else {
+    const filePath = path.join(projectDir(projectId), 'assemblies.json');
+    const list = await readJson<AssemblyRow[]>(filePath, []);
+    list.push({ id, projectId, createdAt: now, ...data });
+    await writeJson(filePath, list);
+  }
+
+  return { id, projectId, createdAt: now, ...data };
+}
+
+export async function updateAssembly(
+  projectId: string,
+  assemblyId: string,
+  patch: Partial<Omit<AssemblyRow, 'id' | 'projectId' | 'createdAt'>>,
+): Promise<AssemblyRow | null> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
+    if (patch.name !== undefined) updateData.name = patch.name;
+    if (patch.unit !== undefined) updateData.unit = patch.unit;
+    if (patch.unitCost !== undefined) updateData.unit_cost = patch.unitCost;
+    if (patch.quantityFormula !== undefined) updateData.quantity_formula = patch.quantityFormula;
+
+    const { data: row, error } = await sb
+      .from('mx_assemblies')
+      .update(updateData)
+      .eq('id', assemblyId)
+      .eq('project_id', projectId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(`updateAssembly: ${error.message}`);
+    if (!row) return null;
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      classificationId: row.classification_id,
+      name: row.name,
+      unit: row.unit,
+      unitCost: parseFloat(row.unit_cost),
+      quantityFormula: row.quantity_formula,
+      createdAt: row.created_at,
+    };
+  }
+
+  const filePath = path.join(projectDir(projectId), 'assemblies.json');
+  const list = await readJson<AssemblyRow[]>(filePath, []);
+  const idx = list.findIndex((a) => a.id === assemblyId);
+  if (idx < 0) return null;
+  list[idx] = { ...list[idx], ...patch };
+  await writeJson(filePath, list);
+  return list[idx];
+}
+
+export async function deleteAssembly(projectId: string, assemblyId: string): Promise<boolean> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_assemblies')
+      .delete()
+      .eq('id', assemblyId)
+      .eq('project_id', projectId)
+      .select('id');
+    if (error) throw new Error(`deleteAssembly: ${error.message}`);
+    return (data?.length ?? 0) > 0;
+  }
+
+  const filePath = path.join(projectDir(projectId), 'assemblies.json');
+  const list = await readJson<AssemblyRow[]>(filePath, []);
+  const before = list.length;
+  const filtered = list.filter((a) => a.id !== assemblyId);
+  if (filtered.length === before) return false;
+  await writeJson(filePath, filtered);
+  return true;
+}
