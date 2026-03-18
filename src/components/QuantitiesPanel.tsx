@@ -658,6 +658,8 @@ export default function QuantitiesPanel() {
           <div
             className="fixed inset-0 z-50 bg-[rgba(10,10,15,0.95)] backdrop-blur-md flex flex-col max-h-screen overflow-y-auto"
             aria-label="Quantities overlay"
+            onKeyDown={handleDrawerKeyDown}
+            tabIndex={-1}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#00d4ff]/20">
               <span className="font-mono tracking-wider text-sm text-[#00d4ff]">QUANTITIES</span>
@@ -693,6 +695,8 @@ export default function QuantitiesPanel() {
             showQuantitiesDrawer ? 'translate-x-0' : 'translate-x-full'
           }`}
           aria-label="Quantities panel"
+          onKeyDown={handleDrawerKeyDown}
+          tabIndex={-1}
         >
           {panel}
         </aside>
