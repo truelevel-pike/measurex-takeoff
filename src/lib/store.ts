@@ -246,6 +246,7 @@ export const useStore = create<Store>()(
           classificationIds: b.classificationIds.filter((cid) => cid !== id),
         })),
       })),
+      assemblies: s.assemblies.filter((a) => a.classificationId !== id),
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
