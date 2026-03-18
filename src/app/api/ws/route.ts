@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
         encoder.encode(`data: ${JSON.stringify({ event: 'connected', data: { projectId } })}\n\n`)
       );
 
-      // 30-second keepalive to prevent proxy/load-balancer timeouts
+      // 15-second keepalive to prevent proxy/load-balancer timeouts
       keepaliveInterval = setInterval(() => {
         try {
           controller.enqueue(new TextEncoder().encode(': keepalive\n\n'));
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
             keepaliveInterval = null;
           }
         }
-      }, 30_000);
+      }, 15_000);
     },
     cancel() {
       // Clear keepalive interval to avoid memory leaks

@@ -1,11 +1,15 @@
 import { useStore } from './store';
-import type { Polygon, Classification, ScaleCalibration } from './types';
+import type { Polygon, Classification, ScaleCalibration, Assembly } from './types';
 
 let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let currentProjectId: string | null = null;
 let reconnectAttempt = 0;
 let lastEventId = 0;
+
+// Fallback polling — used when SSE is unavailable or drops
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+const POLL_INTERVAL_MS = 3000;
 
 // ---------------------------------------------------------------------------
 // Activity event bus — lets components subscribe to SSE-derived events
@@ -33,6 +37,9 @@ type SSEEvent =
   | { event: 'classification:updated'; data: Classification }
   | { event: 'classification:deleted'; data: { id: string } }
   | { event: 'scale:updated'; data: ScaleCalibration }
+  | { event: 'assembly:created'; data: Assembly }
+  | { event: 'assembly:updated'; data: Assembly }
+  | { event: 'assembly:deleted'; data: { id: string } }
   | { event: 'ai-takeoff:started'; data: { page: number } }
   | { event: 'ai-takeoff:complete'; data: unknown };
 
@@ -103,6 +110,27 @@ function handleSSEMessage(raw: MessageEvent) {
       emitActivity('scale:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
+    case 'assembly:created': {
+      const assembly = parsed.data;
+      const { assemblies, addAssembly } = useStore.getState();
+      if (!assemblies.some((a) => a.id === assembly.id)) {
+        addAssembly(assembly);
+      }
+      emitActivity('assembly:created', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    case 'assembly:updated': {
+      const assembly = parsed.data;
+      useStore.getState().updateAssembly(assembly.id, assembly);
+      emitActivity('assembly:updated', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    case 'assembly:deleted': {
+      const { id } = parsed.data;
+      useStore.getState().deleteAssembly(id);
+      emitActivity('assembly:deleted', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
     case 'ai-takeoff:started': {
       emitActivity('ai-takeoff:started', parsed.data as unknown as Record<string, unknown>);
       break;
@@ -133,21 +161,89 @@ export function connectToProject(projectId: string): void {
   eventSource.onmessage = handleSSEMessage;
 
   eventSource.onerror = () => {
-    // Auto-reconnect with exponential backoff
+    // Auto-reconnect with exponential backoff + jitter
     if (eventSource) {
       eventSource.close();
       eventSource = null;
     }
     if (currentProjectId) {
-      const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+      const base = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+      // Add up to ±25% jitter to spread out reconnection storms
+      const jitter = base * 0.25 * (Math.random() * 2 - 1);
+      const delay = Math.max(500, base + jitter);
       reconnectAttempt++;
+
+      // Start fallback polling while waiting to reconnect
+      startFallbackPolling(currentProjectId);
+
       reconnectTimer = setTimeout(() => {
+        stopFallbackPolling();
         if (currentProjectId) {
           connectToProject(currentProjectId);
         }
       }, delay);
     }
   };
+}
+
+// ---------------------------------------------------------------------------
+// Fallback polling — fires GET /api/projects/{id} every 3 s when SSE drops
+// and merges remote state into the store for assemblies, polygons, classifications
+// ---------------------------------------------------------------------------
+function startFallbackPolling(projectId: string): void {
+  if (pollTimer !== null) return; // already running
+  pollTimer = setInterval(async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const state = data?.project?.state;
+      if (!state) return;
+
+      const store = useStore.getState();
+
+      // Merge assemblies
+      if (Array.isArray(state.assemblies)) {
+        const remoteAssemblies: Assembly[] = state.assemblies;
+        const localIds = new Set(store.assemblies.map((a) => a.id));
+        for (const a of remoteAssemblies) {
+          if (!localIds.has(a.id)) {
+            store.addAssembly(a);
+          } else {
+            store.updateAssembly(a.id, a);
+          }
+        }
+      }
+
+      // Merge polygons
+      if (Array.isArray(state.polygons)) {
+        for (const p of state.polygons as Polygon[]) {
+          if (!store.polygons.some((lp) => lp.id === p.id)) {
+            useStore.setState((s) => ({ polygons: [...s.polygons, p] }));
+          }
+        }
+      }
+
+      // Merge classifications
+      if (Array.isArray(state.classifications)) {
+        for (const c of state.classifications as Classification[]) {
+          if (!store.classifications.some((lc) => lc.id === c.id)) {
+            useStore.setState((s) => ({ classifications: [...s.classifications, c] }));
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — polling will retry on next tick
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+function stopFallbackPolling(): void {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
 }
 
 /** Disconnect from SSE stream */
@@ -160,6 +256,7 @@ export function disconnectFromProject(resetLastEventId = true): void {
     eventSource.close();
     eventSource = null;
   }
+  stopFallbackPolling();
   currentProjectId = null;
   if (resetLastEventId) {
     lastEventId = 0;
