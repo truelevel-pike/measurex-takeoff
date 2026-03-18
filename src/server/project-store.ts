@@ -213,11 +213,7 @@ export async function updateProject(
 export async function deleteProject(projectId: string): Promise<boolean> {
   if (isSupabaseMode()) {
     const sb = getClient();
-    await sb.from('mx_assemblies').delete().eq('project_id', projectId);
-    await sb.from('mx_polygons').delete().eq('project_id', projectId);
-    await sb.from('mx_classifications').delete().eq('project_id', projectId);
-    await sb.from('mx_pages').delete().eq('project_id', projectId);
-    await sb.from('mx_scales').delete().eq('project_id', projectId);
+    // Child tables use ON DELETE CASCADE — only delete the project row.
     const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
     if (error) throw new Error(`deleteProject: ${error.message}`);
     return true;
