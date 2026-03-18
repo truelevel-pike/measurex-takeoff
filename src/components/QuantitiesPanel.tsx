@@ -35,6 +35,7 @@ function normalizeHexInput(value: string): string {
 
 export default function QuantitiesPanel() {
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
 
   const classifications = useStore((s) => s.classifications);
@@ -660,8 +661,6 @@ export default function QuantitiesPanel() {
       )}
     </>
   );
-
-  const isTablet = useIsTablet();
 
   // Mobile: full-screen overlay when opened
   if (isMobile) {
