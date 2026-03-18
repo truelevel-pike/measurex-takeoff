@@ -63,9 +63,11 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
   // Fetch assemblies from API on mount / when projectId changes
   useEffect(() => {
     if (!projectId) return;
+    let cancelled = false;
     fetch(`/api/projects/${projectId}/assemblies`)
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
         if (Array.isArray(data.assemblies)) {
           // Map flat API rows (AssemblyRow) → Assembly type expected by store
           const mapped: Assembly[] = data.assemblies.map((row: any) => ({
@@ -87,7 +89,10 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
           setAssemblies(mapped);
         }
       })
-      .catch((err) => console.error('Failed to fetch assemblies:', err));
+      .catch((err) => {
+        if (!cancelled) console.error('Failed to fetch assemblies:', err);
+      });
+    return () => { cancelled = true; };
   }, [projectId, setAssemblies]);
 
   function toggleExpanded(id: string) {
