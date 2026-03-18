@@ -5,6 +5,24 @@ let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let currentProjectId: string | null = null;
 
+// ---------------------------------------------------------------------------
+// Activity event bus — lets components subscribe to SSE-derived events
+// without polling or attaching listeners directly to the EventSource.
+// ---------------------------------------------------------------------------
+type ActivityListener = (event: string, data: Record<string, unknown>) => void;
+const activityListeners = new Set<ActivityListener>();
+
+export function subscribeToActivity(fn: ActivityListener): () => void {
+  activityListeners.add(fn);
+  return () => activityListeners.delete(fn);
+}
+
+function emitActivity(event: string, data: Record<string, unknown>) {
+  for (const fn of activityListeners) {
+    try { fn(event, data); } catch { /* ignore listener errors */ }
+  }
+}
+
 type SSEEvent =
   | { event: 'connected'; data: { projectId: string } }
   | { event: 'polygon:created'; data: Polygon }
@@ -37,18 +55,21 @@ function handleSSEMessage(raw: MessageEvent) {
       if (store.polygons.some((p) => p.id === poly.id)) break;
       // Directly set state to preserve the server-assigned ID
       useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
+      emitActivity('polygon:created', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'polygon:updated': {
       const poly = parsed.data;
       store.updatePolygon(poly.id, poly);
+      emitActivity('polygon:updated', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'polygon:deleted': {
       const { id } = parsed.data;
       store.deletePolygon(id);
+      emitActivity('polygon:deleted', parsed.data as Record<string, unknown>);
       break;
     }
 
@@ -56,12 +77,14 @@ function handleSSEMessage(raw: MessageEvent) {
       const cls = parsed.data;
       if (store.classifications.some((c) => c.id === cls.id)) break;
       useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
+      emitActivity('classification:created', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'classification:updated': {
       const cls = parsed.data;
       store.updateClassification(cls.id, cls);
+      emitActivity('classification:updated', parsed.data as Record<string, unknown>);
       break;
     }
 
@@ -72,21 +95,23 @@ function handleSSEMessage(raw: MessageEvent) {
         // Also remove any polygons that belonged to this classification
         polygons: s.polygons.filter((p) => p.classificationId !== id),
       }));
+      emitActivity('classification:deleted', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'scale:updated': {
       store.setScale(parsed.data);
+      emitActivity('scale:updated', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'ai-takeoff:started': {
-      // Could be used by AIActivityLog — store emits no dedicated field yet,
-      // so we rely on the activity log subscribing to SSE directly.
+      emitActivity('ai-takeoff:started', parsed.data as Record<string, unknown>);
       break;
     }
 
     case 'ai-takeoff:complete': {
+      emitActivity('ai-takeoff:complete', parsed.data as Record<string, unknown>);
       break;
     }
   }

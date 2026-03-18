@@ -162,6 +162,11 @@ function PageInner() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
 
+  // BUG-R6-002: Track whether the PDF viewer has reported its actual page count.
+  // The store initializes totalPages to 1; we must not show "Page 1 of 1" until
+  // PDFViewer fires onPageChange. Reset to false whenever a new PDF is loaded.
+  const [pdfPageCountReady, setPdfPageCountReady] = useState(false);
+
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -284,6 +289,8 @@ function PageInner() {
             if (!pdfRes.ok) return;
             const blob = await pdfRes.blob();
             const file = new File([blob], `${data.project.name || pid}.pdf`, { type: 'application/pdf' });
+            // BUG-R6-002: Reset page count ready flag before setting new PDF file
+            setPdfPageCountReady(false);
             setPdfFile(file);
           })
           .catch(() => null); // non-fatal — user can still upload manually
@@ -538,6 +545,9 @@ function PageInner() {
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f && f.type === 'application/pdf') {
+      // BUG-R6-002: Reset page count ready flag so TopNavBar shows loading state
+      // until PDFViewer fires onPageChange with the real total.
+      setPdfPageCountReady(false);
       setPdfFile(f);
       void ensureProject(f.name);
     }
@@ -548,9 +558,12 @@ function PageInner() {
   // BUG-R5-001: PDFViewer is the authoritative source for totalPages.
   // Always push the PDF-reported total into the store so it overrides any
   // stale value left by API hydration or EMPTY_STATE initialization.
+  // BUG-R6-002: Mark the page count as ready once PDFViewer reports it so we
+  // don't show a misleading "Page 1 of 1" before the PDF has loaded.
   const handlePDFPageChange = useCallback((page: number, total: number) => {
     setCurrentPageNum(page);
     setCurrentPage(page, total);
+    setPdfPageCountReady(true);
   }, [setCurrentPage]);
 
   const handleTextExtracted = useCallback((text: string, pageNum: number) => {
@@ -706,8 +719,8 @@ function PageInner() {
         onChat={() => setShowChat((v) => !v)}
         onToggleImageSearch={() => setShowImageSearch((v) => !v)}
         sheetName={sheetNames[currentPageNum] || `Page ${currentPageNum}`}
-        pageIndex={currentPageNum - 1}
-        totalPages={totalPages}
+        pageIndex={pdfFile && pdfPageCountReady ? currentPageNum - 1 : undefined}
+        totalPages={pdfFile && pdfPageCountReady ? totalPages : undefined}
         onPrev={() => {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);

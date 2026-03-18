@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import { getEventSource } from '@/lib/ws-client';
+import { subscribeToActivity } from '@/lib/ws-client';
 
 interface LogEntry {
   id: string;
@@ -52,37 +52,15 @@ export default function AIActivityLog() {
     setEntries((prev) => [entry, ...prev].slice(0, MAX_ENTRIES));
   }, []);
 
-  // Listen to SSE events
+  // Listen to SSE-derived activity events via the ws-client pub-sub bus.
+  // subscribeToActivity returns an unsubscribe function, so cleanup is clean
+  // even when the EventSource reconnects (no stale listener references).
   useEffect(() => {
-    let mounted = true;
-
-    const poll = setInterval(() => {
-      const es = getEventSource();
-      if (!es) return;
-
-      // Attach handler if not already
-      const handler = (raw: MessageEvent) => {
-        if (!mounted) return;
-        try {
-          const parsed = JSON.parse(raw.data) as { event: string; data: Record<string, unknown> };
-          const entry = eventToLogEntry(parsed.event, parsed.data);
-          if (entry) addEntry(entry);
-        } catch {
-          // ignore
-        }
-      };
-
-      // We need to add the listener. To avoid duplicates, we use a flag.
-      if (!(es as EventSource & { _activityLogAttached?: boolean })._activityLogAttached) {
-        es.addEventListener('message', handler);
-        (es as EventSource & { _activityLogAttached?: boolean })._activityLogAttached = true;
-      }
-    }, 1000);
-
-    return () => {
-      mounted = false;
-      clearInterval(poll);
-    };
+    const unsubscribe = subscribeToActivity((event, data) => {
+      const entry = eventToLogEntry(event, data);
+      if (entry) addEntry(entry);
+    });
+    return unsubscribe;
   }, [addEntry]);
 
   // Auto-scroll to top (newest first)
