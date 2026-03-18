@@ -340,6 +340,12 @@ function PageInner() {
     return () => disconnectFromProject();
   }, [projectId]);
 
+  // Sync projectId into Zustand store so sub-components (e.g. AssembliesPanel) can access it
+  const storeSetProjectId = useStore((s) => s.setProjectId);
+  useEffect(() => {
+    storeSetProjectId(projectId);
+  }, [projectId, storeSetProjectId]);
+
   // Global close behavior for context menu
   useEffect(() => {
     if (!menuState) return;

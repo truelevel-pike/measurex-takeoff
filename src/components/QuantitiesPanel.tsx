@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
+import AssembliesPanel from './AssembliesPanel';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -33,6 +34,12 @@ function normalizeHexInput(value: string): string {
 
 export default function QuantitiesPanel() {
   const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
+
+  // If Assemblies tab is active, render AssembliesPanel instead
+  if (activeTab === 'assemblies') {
+    return <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} />;
+  }
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
@@ -243,6 +250,23 @@ export default function QuantitiesPanel() {
 
   const panel = (
     <>
+      {/* Tab bar */}
+      <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
+        <button
+          type="button"
+          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
+        >
+          Quantities
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('assemblies')}
+          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+        >
+          Assemblies
+        </button>
+      </div>
+
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <span className="text-xs text-gray-300 font-normal">

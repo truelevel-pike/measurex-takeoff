@@ -89,8 +89,13 @@ export interface Store extends ProjectState {
   undo: () => void;
   redo: () => void;
 
+  // Project ID (set by page.tsx for sub-components to access)
+  projectId: string | null;
+  setProjectId: (id: string | null) => void;
+
   // Assemblies
   assemblies: Assembly[];
+  setAssemblies: (assemblies: Assembly[]) => void;
   addAssembly: (assembly: Assembly) => void;
   updateAssembly: (id: string, updates: Partial<Assembly>) => void;
   deleteAssembly: (id: string) => void;
@@ -443,8 +448,13 @@ export const useStore = create<Store>()(
     });
   },
 
+  // ─── Project ID ───
+  projectId: null,
+  setProjectId: (id) => set({ projectId: id }),
+
   // ─── Assemblies ───
   assemblies: [],
+  setAssemblies: (assemblies) => set({ assemblies }),
   addAssembly: (assembly) => set((s) => ({ assemblies: [...s.assemblies, assembly] })),
   updateAssembly: (id, updates) =>
     set((s) => ({
