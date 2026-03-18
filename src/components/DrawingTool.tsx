@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
-import { calculatePolygonArea } from '@/lib/polygon-utils';
+import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
 
@@ -71,12 +71,14 @@ export default function DrawingTool() {
       return;
     }
     const areaPx = calculatePolygonArea(points);
+    const ppu = scale?.pixelsPerUnit || 1;
+    const linearFeet = cls.type === 'linear' ? calculateLinearFeet(points, ppu, true) : 0;
     addPolygon({
       points,
       classificationId: cls.id,
       pageNumber: currentPage || 1,
       area: areaPx,
-      linearFeet: 0,
+      linearFeet,
       isComplete: true,
       label: undefined,
     });

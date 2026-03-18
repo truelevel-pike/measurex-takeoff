@@ -547,6 +547,10 @@ export default function QuantitiesPanel() {
 
                   <span className="flex-1 font-medium truncate text-[12px] text-[#e5e7eb]">{classification.name}</span>
 
+                  <span className="text-[10px] font-mono text-[#8892a0] flex-shrink-0">
+                    {classification.type === 'area' ? 'SF' : classification.type === 'linear' ? 'FT' : 'EA'}
+                  </span>
+
                   <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
                     {formatClassificationTotal(classification, totals)}
                   </span>

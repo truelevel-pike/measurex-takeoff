@@ -393,6 +393,8 @@ function PageInner() {
         }
       } else if (e.key === '3') {
         toggleShow3D();
+      } else if (e.key.toLowerCase() === 'a') {
+        handleAITakeoff();
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
       }
