@@ -79,6 +79,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     useEffect(() => {
       if (!file) return;
       let cancelled = false;
+      let loadedDoc: PDFDocumentProxy | null = null;
       setLoadError(null);
       initialFitDone.current = false;
       const loadPdf = async () => {
@@ -90,7 +91,11 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           }
           const arrayBuffer = await file.arrayBuffer();
           const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          if (cancelled) return;
+          if (cancelled) {
+            void doc.destroy();
+            return;
+          }
+          loadedDoc = doc;
           pdfDocRef.current = doc;
           setPdfDoc(doc);
           setTotalPages(doc.numPages);
@@ -105,7 +110,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         }
       };
       loadPdf();
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+        void loadedDoc?.destroy();
+      };
     }, [file, onPageChange]);
 
     // actuallyRender uses refs so it's always current — no stale closure issues

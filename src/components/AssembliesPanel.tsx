@@ -179,7 +179,15 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
             unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
             quantityFormula: formulaType,
           }),
-        }).catch((err) => console.error('API createAssembly failed:', err));
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            const serverId = data?.assembly?.id;
+            if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
+              updateAssembly(assembly.id, { id: serverId });
+            }
+          })
+          .catch((err) => console.error('API createAssembly failed:', err));
       }
     }
     setShowEditor(false);

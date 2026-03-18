@@ -709,7 +709,9 @@ export async function getScale(projectId: string): Promise<ScaleCalibration | nu
       .from('mx_scales')
       .select('*')
       .eq('project_id', projectId)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data, error }) => ({ data: data?.[0], error }));
     if (error) throw new Error(`getScale: ${error.message}`);
     if (!data) return null;
     return {

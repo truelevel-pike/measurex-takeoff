@@ -9,6 +9,7 @@ import type { Classification, Polygon } from '@/lib/types';
 
 export interface ScaleConfig {
   pixelsPerFoot: number;
+  pixelsPerMeter?: number;
   unit: 'imperial' | 'metric';
 }
 
@@ -26,7 +27,7 @@ export interface QuantityRow {
 // ── Core Geometry ──────────────────────────────────────────────────────
 
 /**
- * Shoelace formula for polygon area in pixel², then convert to sq ft via scale.
+ * Shoelace formula for polygon area in pixel², then convert to project units via scale.
  */
 export function calculatePolygonArea(
   points: { x: number; y: number }[],
@@ -40,16 +41,20 @@ export function calculatePolygonArea(
     sum += a.x * b.y - b.x * a.y;
   }
   const pixelArea = Math.abs(sum) / 2;
-  const ppf = scale.pixelsPerFoot || 1;
-  return pixelArea / (ppf * ppf);
+  const pixelsPerUnit =
+    scale.unit === 'metric'
+      ? (scale.pixelsPerMeter || (scale.pixelsPerFoot ? scale.pixelsPerFoot * 3.28084 : 1))
+      : (scale.pixelsPerFoot || 1);
+  return pixelArea / (pixelsPerUnit * pixelsPerUnit);
 }
 
 /**
- * Sum of segment lengths in pixels, converted to linear feet via scale.
+ * Sum of segment lengths in pixels, converted to project units via scale.
  */
 export function calculateLinearLength(
   points: { x: number; y: number }[],
   scale: ScaleConfig,
+  closed = false,
 ): number {
   if (!points || points.length < 2) return 0;
   let total = 0;
@@ -58,8 +63,18 @@ export function calculateLinearLength(
     const dy = points[i + 1].y - points[i].y;
     total += Math.hypot(dx, dy);
   }
-  const ppf = scale.pixelsPerFoot || 1;
-  return total / ppf;
+  if (closed) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    const dx = first.x - last.x;
+    const dy = first.y - last.y;
+    total += Math.hypot(dx, dy);
+  }
+  const pixelsPerUnit =
+    scale.unit === 'metric'
+      ? (scale.pixelsPerMeter || (scale.pixelsPerFoot ? scale.pixelsPerFoot * 3.28084 : 1))
+      : (scale.pixelsPerFoot || 1);
+  return total / pixelsPerUnit;
 }
 
 /**
@@ -157,7 +172,7 @@ export function computeQuantities(
         row.totalArea += calculatePolygonArea(poly.points, scale);
         break;
       case 'linear':
-        row.totalLinear += calculateLinearLength(poly.points, scale);
+        row.totalLinear += calculateLinearLength(poly.points, scale, true);
         break;
       case 'count':
         row.totalCount += 1;

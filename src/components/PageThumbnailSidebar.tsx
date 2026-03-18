@@ -29,26 +29,25 @@ export default function PageThumbnailSidebar({
     const thumbScale = 0.2;
 
     (async () => {
-      const results: (string | null)[] = [];
-      for (let i = 1; i <= totalPages; i++) {
-        if (cancelled) return;
+      const renderPage = async (pageNumber: number): Promise<string | null> => {
+        if (cancelled) return null;
         try {
-          const page = await pdfDoc.getPage(i);
+          const page = await pdfDoc.getPage(pageNumber);
           const viewport = page.getViewport({ scale: thumbScale });
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            results.push(null);
-            continue;
-          }
+          if (!ctx) return null;
           await (page as any).render({ canvasContext: ctx, viewport }).promise;
-          results.push(canvas.toDataURL('image/png'));
+          return canvas.toDataURL('image/png');
         } catch {
-          results.push(null);
+          return null;
         }
-      }
+      };
+
+      const thumbPromises = Array.from({ length: totalPages }, (_, i) => renderPage(i + 1));
+      const results = await Promise.all(thumbPromises);
       if (!cancelled) setThumbnails(results);
     })();
 
