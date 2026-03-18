@@ -45,7 +45,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const scale = useStore((s) => s.scale);
-  const baseDims = useStore((s) => s.pageBaseDimensions);
+  const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
 
   // Vertex drag state
   const [dragging, setDragging] = useState<{

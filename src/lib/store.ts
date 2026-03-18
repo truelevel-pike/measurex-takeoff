@@ -45,8 +45,6 @@ export interface Store extends ProjectState {
   selectedClassification: string | null;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
-  hiddenClassificationIds: string[];
-  toggleClassificationVisibility: (id: string) => void;
   // Mobile UI state
   showQuantitiesDrawer: boolean;
   setShowQuantitiesDrawer: (show: boolean) => void;
@@ -142,8 +140,8 @@ export interface Store extends ProjectState {
   setGridSize: (size: number) => void;
 
   // Page base dimensions (PDF page at scale=1, used for zoom-independent polygon coordinates)
-  pageBaseDimensions: { width: number; height: number };
-  setPageBaseDimensions: (dims: { width: number; height: number }) => void;
+  pageBaseDimensions: Record<number, { width: number; height: number }>;
+  setPageBaseDimensions: (page: number, dims: { width: number; height: number }) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -176,13 +174,6 @@ export const useStore = create<Store>()(
   selectedClassification: null,
   selectedPolygon: null,
   selectedPolygonId: null,
-  hiddenClassificationIds: [],
-  toggleClassificationVisibility: (id) =>
-    set((state) => ({
-      hiddenClassificationIds: state.hiddenClassificationIds.includes(id)
-        ? state.hiddenClassificationIds.filter((x) => x !== id)
-        : [...state.hiddenClassificationIds, id],
-    })),
   showQuantitiesDrawer: false,
   setShowQuantitiesDrawer: (show) => set({ showQuantitiesDrawer: show }),
   showMobileMenu: false,
@@ -237,7 +228,6 @@ export const useStore = create<Store>()(
       selectedClassification: s.selectedClassification === id ? null : s.selectedClassification,
       selectedPolygon: s.selectedPolygon && s.polygons.find((p) => p.id === s.selectedPolygon && p.classificationId === id) ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId && s.polygons.find((p) => p.id === s.selectedPolygonId && p.classificationId === id) ? null : s.selectedPolygonId,
-      hiddenClassificationIds: s.hiddenClassificationIds.filter((x) => x !== id),
       groups: s.groups.map((g) => ({
         ...g,
         classificationIds: g.classificationIds.filter((cid) => cid !== id),
@@ -417,7 +407,6 @@ export const useStore = create<Store>()(
       selectedClassification: null,
       selectedPolygon: null,
       selectedPolygonId: null,
-      hiddenClassificationIds: [],
     });
   },
 
@@ -572,9 +561,9 @@ export const useStore = create<Store>()(
   setGrid: (enabled) => set({ gridEnabled: enabled }),
   setGridSize: (size) => set({ gridSize: size }),
 
-  // Page base dimensions
-  pageBaseDimensions: { width: 1, height: 1 },
-  setPageBaseDimensions: (dims) => set({ pageBaseDimensions: dims }),
+  // Page base dimensions (per-page map)
+  pageBaseDimensions: {},
+  setPageBaseDimensions: (page, dims) => set((s) => ({ pageBaseDimensions: { ...s.pageBaseDimensions, [page]: dims } })),
     }),
     {
       name: 'measurex-state',
