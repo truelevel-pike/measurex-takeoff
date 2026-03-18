@@ -18,12 +18,15 @@ export default function DrawingTool() {
   const baseDims = useStore((s) => s.pageBaseDimensions);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
-  // Track last click time to detect double-clicks in onClick (before onDoubleClick fires)
-  const lastClickTime = useRef<number>(0);
+  // Pending single-click timeout — cancelled if a double-click arrives within 250ms
+  const pendingClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus on mount so keyboard events (Esc, Enter) work immediately
   useEffect(() => {
     containerRef.current?.focus();
+    return () => {
+      if (pendingClickTimeout.current) clearTimeout(pendingClickTimeout.current);
+    };
   }, []);
 
   // Re-focus when clicking anywhere in the draw area (so Esc/Enter always work)
@@ -73,13 +76,6 @@ export default function DrawingTool() {
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      // Detect double-click: if two clicks arrive within 300ms, treat as dblclick
-      // (the browser also fires onDoubleClick, but this prevents adding an extra point)
-      const now = Date.now();
-      const isDblClick = now - lastClickTime.current < 300;
-      lastClickTime.current = now;
-      if (isDblClick) return; // onDoubleClick will handle commit
-
       const pt = getCoords(e);
 
       // Guard: require a selected classification before first point
@@ -91,16 +87,28 @@ export default function DrawingTool() {
         }
       }
 
-      // Close polygon if clicking near the first point
+      // Close polygon if clicking near the first point (immediate, no delay)
       if (points.length >= 3) {
         const dx = pt.x - points[0].x;
         const dy = pt.y - points[0].y;
         if (Math.hypot(dx, dy) < CLOSE_THRESHOLD) {
+          if (pendingClickTimeout.current) {
+            clearTimeout(pendingClickTimeout.current);
+            pendingClickTimeout.current = null;
+          }
           commitPolygon();
           return;
         }
       }
-      setPoints((prev) => [...prev, pt]);
+
+      // Defer point addition so onDoubleClick can cancel the phantom point
+      if (pendingClickTimeout.current) {
+        clearTimeout(pendingClickTimeout.current);
+      }
+      pendingClickTimeout.current = setTimeout(() => {
+        pendingClickTimeout.current = null;
+        setPoints((prev) => [...prev, pt]);
+      }, 250);
     },
     [points, getCoords, getSelectedClassification, commitPolygon, addToast]
   );
@@ -109,6 +117,11 @@ export default function DrawingTool() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // Cancel the pending single-click point so it never gets added
+      if (pendingClickTimeout.current) {
+        clearTimeout(pendingClickTimeout.current);
+        pendingClickTimeout.current = null;
+      }
       commitPolygon();
     },
     [commitPolygon]
@@ -119,7 +132,11 @@ export default function DrawingTool() {
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setPoints([]); setTool('select'); }
     if (e.key === 'Enter') { commitPolygon(); }
-  }, [setTool, commitPolygon]);
+    if (e.key === 'Backspace' && points.length > 0) {
+      e.preventDefault();
+      setPoints((prev) => prev.slice(0, -1));
+    }
+  }, [setTool, commitPolygon, points.length]);
 
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
