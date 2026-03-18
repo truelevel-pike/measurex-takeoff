@@ -21,7 +21,7 @@ export default function DrawingTool() {
   const setTool = useStore((s) => s.setTool);
   const scale = useStore((s) => s.scale);
   const currentPage = useStore((s) => s.currentPage);
-  const baseDims = useStore((s) => s.pageBaseDimensions);
+  const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
   // Pending single-click timeout — cancelled if a double-click arrives within 250ms

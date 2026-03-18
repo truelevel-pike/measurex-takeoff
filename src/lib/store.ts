@@ -142,8 +142,8 @@ export interface Store extends ProjectState {
   setGridSize: (size: number) => void;
 
   // Page base dimensions (PDF page at scale=1, used for zoom-independent polygon coordinates)
-  pageBaseDimensions: { width: number; height: number };
-  setPageBaseDimensions: (dims: { width: number; height: number }) => void;
+  pageBaseDimensions: Record<number, { width: number; height: number }>;
+  setPageBaseDimensions: (pageNumber: number, dims: { width: number; height: number }) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -573,8 +573,8 @@ export const useStore = create<Store>()(
   setGridSize: (size) => set({ gridSize: size }),
 
   // Page base dimensions
-  pageBaseDimensions: { width: 1, height: 1 },
-  setPageBaseDimensions: (dims) => set({ pageBaseDimensions: dims }),
+  pageBaseDimensions: {},
+  setPageBaseDimensions: (pageNumber, dims) => set((s) => ({ pageBaseDimensions: { ...s.pageBaseDimensions, [pageNumber]: dims } })),
     }),
     {
       name: 'measurex-state',
