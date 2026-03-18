@@ -10,6 +10,14 @@ import type { Point } from '@/lib/types';
 const SNAP_SCREEN_PX = 15;
 const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: false, gridSize: 0 } as const;
 
+function openPathDistance(pts: Point[], ppu: number): number {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.sqrt((pts[i].x - pts[i - 1].x) ** 2 + (pts[i].y - pts[i - 1].y) ** 2);
+  }
+  return total / ppu;
+}
+
 export default function DrawingTool() {
   const [points, setPoints] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<Point | null>(null);
@@ -64,15 +72,17 @@ export default function DrawingTool() {
   }, [classifications, selectedClassification]);
 
   const commitPolygon = useCallback(() => {
-    if (points.length < 3) return;
     const cls = getSelectedClassification();
+    const linear = cls?.type === 'linear';
+    const minPts = linear ? 2 : 3;
+    if (points.length < minPts) return;
     if (!cls) {
       addToast('Please create or select a classification first', 'warning');
       return;
     }
-    const areaPx = calculatePolygonArea(points);
+    const areaPx = linear ? 0 : calculatePolygonArea(points);
     const ppu = scale?.pixelsPerUnit || 1;
-    const linearFeet = cls.type === 'linear' ? calculateLinearFeet(points, ppu, true) : 0;
+    const linearFeet = linear ? calculateLinearFeet(points, ppu, false) : 0;
     addPolygon({
       points,
       classificationId: cls.id,
@@ -84,7 +94,7 @@ export default function DrawingTool() {
     });
     setPoints([]);
     setTool('select');
-  }, [points, getSelectedClassification, addPolygon, currentPage, setTool, addToast]);
+  }, [points, getSelectedClassification, addPolygon, currentPage, setTool, addToast, scale]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -99,8 +109,9 @@ export default function DrawingTool() {
         }
       }
 
-      // Close polygon if clicking near the first point (screen-pixel space)
-      if (points.length >= 3) {
+      // Close polygon if clicking near the first point (area mode only)
+      const clickCls = getSelectedClassification();
+      if (clickCls?.type !== 'linear' && points.length >= 3) {
         const rect = containerRef.current?.getBoundingClientRect();
         const screenX = rect ? (points[0].x / baseDims.width) * rect.width + rect.left : 0;
         const screenY = rect ? (points[0].y / baseDims.height) * rect.height + rect.top : 0;
@@ -173,7 +184,10 @@ export default function DrawingTool() {
   const hasScale = scale !== null && scale.pixelsPerUnit > 0;
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
+  const cls = getSelectedClassification();
+  const isLinear = cls?.type === 'linear';
   const previewArea = points.length >= 3 ? (calculatePolygonArea(points) / (ppu * ppu)) : 0;
+  const previewLength = points.length >= 2 ? openPathDistance(points, ppu) : 0;
 
   const vb = `0 0 ${baseDims.width} ${baseDims.height}`;
 
@@ -197,13 +211,13 @@ export default function DrawingTool() {
         {points.length > 0 && cursor && (
           <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
         )}
-        {/* In-progress fill preview */}
-        {points.length >= 3 && (
+        {/* In-progress fill preview (area only) */}
+        {!isLinear && points.length >= 3 && (
           <polygon points={points.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="none" />
         )}
-        {/* Vertex dots */}
+        {/* Vertex dots — no green close-indicator for linear */}
         {points.map((pt, i) => (
-          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={i === 0 && points.length >= 3 ? 8 : 5} fill={i===0?'#10b981':'#3b82f6'} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={!isLinear && i === 0 && points.length >= 3 ? 8 : 5} fill={!isLinear && i === 0 ? '#10b981' : '#3b82f6'} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         ))}
         {/* Snap indicator — yellow ring when cursor is snapped */}
         {snapIndicator && cursor && (
@@ -218,18 +232,32 @@ export default function DrawingTool() {
           </g>
         )}
       </svg>
-      {points.length >= 3 && (
+      {(isLinear ? points.length >= 2 : points.length >= 3) && (
         <div className="absolute bg-white/90 border border-blue-200 rounded px-2 py-1 text-xs font-mono text-blue-700 pointer-events-none"
           style={{
             left: `${(points.reduce((s,p)=>s+p.x,0)/points.length / baseDims.width) * 100}%`,
             top: `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
             transform:'translate(-50%, -20px)',
           }}>
-          {hasScale ? `${previewArea.toFixed(1)} sq ${unit}` : '(Scale not set)'}
+          {hasScale
+            ? isLinear
+              ? `${previewLength.toFixed(1)} ${unit}`
+              : `${previewArea.toFixed(1)} sq ${unit}`
+            : '(Scale not set)'}
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-        {points.length === 0 ? 'Click to start drawing polygon' : points.length < 3 ? `${points.length} points — need ${3 - points.length} more to close` : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
+        {isLinear
+          ? points.length === 0
+            ? 'Click to draw line — double-click or Enter to finish'
+            : points.length < 2
+              ? `${points.length} point — need 1 more`
+              : 'Click to add points · double-click or Enter to finish · Esc to cancel'
+          : points.length === 0
+            ? 'Click to start drawing polygon'
+            : points.length < 3
+              ? `${points.length} points — need ${3 - points.length} more to close`
+              : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
       </div>
     </div>
   );
