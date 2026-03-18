@@ -40,7 +40,7 @@ export default function DrawingTool() {
     containerRef.current?.focus();
   }, []);
 
-  const CLOSE_THRESHOLD_PX = 18;
+  const CLOSE_THRESHOLD_PX = 25;
 
   // Convert click coordinates to base (scale=1) PDF page coordinate space
   // so polygon points are zoom-independent, then snap to nearest vertex/midpoint
@@ -51,7 +51,10 @@ export default function DrawingTool() {
     const clickY = e.clientY - rect.top;
     const x = (clickX / rect.width) * baseDims.width;
     const y = (clickY / rect.height) * baseDims.height;
-    const snap = findNearestSnapPoint(x, y, polygons, SNAP_RADIUS, SNAP_OPTIONS);
+    // Convert 15 screen-px snap radius to base-space so snapping feels consistent at any zoom
+    const screenToBase = baseDims.width / rect.width;
+    const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
+    const snap = findNearestSnapPoint(x, y, polygons, snapRadiusBase, SNAP_OPTIONS);
     if (snap) return { x: snap.x, y: snap.y };
     return { x, y };
   }, [baseDims, polygons]);
@@ -144,7 +147,9 @@ export default function DrawingTool() {
     const clickY = e.clientY - rect.top;
     const x = (clickX / rect.width) * baseDims.width;
     const y = (clickY / rect.height) * baseDims.height;
-    const snap = findNearestSnapPoint(x, y, polygons, SNAP_RADIUS, SNAP_OPTIONS);
+    const screenToBase = baseDims.width / rect.width;
+    const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
+    const snap = findNearestSnapPoint(x, y, polygons, snapRadiusBase, SNAP_OPTIONS);
     if (snap) {
       setCursor({ x: snap.x, y: snap.y });
       setSnapIndicator(snap);
@@ -218,7 +223,7 @@ export default function DrawingTool() {
             top: `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
             transform:'translate(-50%, -20px)',
           }}>
-          {hasScale ? `${previewArea.toFixed(1)} sq ${unit}` : `-- sq ${unit}`}
+          {hasScale ? `${previewArea.toFixed(1)} sq ${unit}` : '(Scale not set)'}
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
