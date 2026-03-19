@@ -1,79 +1,39 @@
 'use client';
 
-import React from 'react';
-import { Loader2, Search, X } from 'lucide-react';
-import { useStore } from '@/lib/store';
-
-interface ImageSearchResult {
-  id: string;
-  thumbUrl: string;
-  fullUrl: string;
-  title: string;
-  source: string;
-  pageNumber?: number;
-  sheetName?: string;
-}
+import React, { useState } from 'react';
+import { Search, X } from 'lucide-react';
 
 interface AIImageSearchProps {
   onClose: () => void;
   projectId?: string | null;
 }
 
-export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
-  const storeProjectId = useStore((s) => s.projectId);
-  const effectiveProjectId = projectId ?? storeProjectId;
-  const [query, setQuery] = React.useState('');
-  const [searchedQuery, setSearchedQuery] = React.useState('');
-  const [results, setResults] = React.useState<ImageSearchResult[]>([]);
-  const [provider, setProvider] = React.useState<string>('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = React.useState<ImageSearchResult | null>(null);
+const QUICK_PICKS = ['Doors', 'Windows', 'HVAC', 'Electrical', 'Plumbing', 'Steel'];
 
-  React.useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (selectedImage) setSelectedImage(null);
-      else onClose();
-    };
-    window.addEventListener('keydown', onEsc);
-    return () => window.removeEventListener('keydown', onEsc);
-  }, [selectedImage, onClose]);
+function openGoogleImages(query: string) {
+  window.open(
+    'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(query + ' construction'),
+    '_blank',
+  );
+}
 
-  const handleSearch = React.useCallback(async (e: React.FormEvent) => {
+export function AIImageSearch({ onClose }: AIImageSearchProps) {
+  const [query, setQuery] = useState('');
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const normalized = query.trim();
-    if (!normalized) {
-      setError('Enter a search term.');
-      return;
-    }
+    const q = query.trim();
+    if (q) openGoogleImages(q);
+  }
 
-    setLoading(true);
-    setError(null);
-    setSearchedQuery(normalized);
-
-    try {
-      const res = await fetch('/api/image-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: normalized, projectId: effectiveProjectId }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
-      setResults(Array.isArray(payload?.results) ? payload.results : []);
-      setProvider(typeof payload?.provider === 'string' ? payload.provider : '');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Search failed.';
-      setResults([]);
-      setProvider('');
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [effectiveProjectId, query]);
+  function handleQuickPick(tag: string) {
+    setQuery(tag);
+    openGoogleImages(tag);
+  }
 
   return (
     <>
+      {/* Backdrop */}
       <div
         aria-hidden="true"
         onClick={onClose}
@@ -86,6 +46,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
         }}
       />
 
+      {/* Modal */}
       <div
         role="dialog"
         aria-modal="true"
@@ -95,7 +56,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 760,
+          width: 540,
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 64px)',
           display: 'flex',
@@ -110,6 +71,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
           overflow: 'hidden',
         }}
       >
+        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -155,143 +117,128 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
           </button>
         </div>
 
+        {/* Search input */}
         <form
-          onSubmit={handleSearch}
+          onSubmit={handleSubmit}
           style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(0,212,255,0.1)',
             display: 'flex',
             gap: 8,
-            padding: '14px 20px',
-            borderBottom: '1px solid rgba(0,212,255,0.1)',
-            background: 'rgba(0,212,255,0.04)',
             flexShrink: 0,
           }}
         >
           <input
             type="text"
-            placeholder="Search construction images (e.g. exterior door, roof flashing)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search construction materials, fixtures, equipment..."
+            autoFocus
             style={{
               flex: 1,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(0,212,255,0.25)',
-              borderRadius: 8,
-              color: '#e0faff',
-              padding: '9px 11px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(0,212,255,0.2)',
+              borderRadius: 10,
+              padding: '9px 14px',
               fontSize: 13,
+              color: '#e0e0e0',
               outline: 'none',
+              transition: 'border-color 150ms ease',
             }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)')}
           />
           <button
             type="submit"
-            disabled={loading}
+            disabled={!query.trim()}
             style={{
-              minWidth: 92,
-              background: loading ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.15)',
-              border: '1px solid rgba(0,212,255,0.4)',
-              borderRadius: 8,
-              padding: '7px 12px',
+              background: query.trim() ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${query.trim() ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 10,
+              padding: '9px 16px',
               fontSize: 12,
               fontWeight: 600,
-              color: '#00d4ff',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
+              color: query.trim() ? '#00d4ff' : '#4a5568',
+              cursor: query.trim() ? 'pointer' : 'default',
+              transition: 'all 150ms ease',
+              flexShrink: 0,
             }}
           >
-            {loading ? <Loader2 size={14} style={{ animation: 'mxSpin 0.9s linear infinite' }} /> : <Search size={14} />}
-            {loading ? 'Searching' : 'Search'}
+            Search
           </button>
         </form>
 
+        {/* Quick picks */}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderBottom: '1px solid rgba(0,212,255,0.1)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 11, color: '#4a5568', alignSelf: 'center', marginRight: 4 }}>
+            Quick:
+          </span>
+          {QUICK_PICKS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => handleQuickPick(tag)}
+              style={{
+                background: 'rgba(0,212,255,0.08)',
+                border: '1px solid rgba(0,212,255,0.25)',
+                borderRadius: 8,
+                padding: '5px 12px',
+                fontSize: 12,
+                color: '#00d4ff',
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0,212,255,0.18)';
+                e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0,212,255,0.08)';
+                e.currentTarget.style.borderColor = 'rgba(0,212,255,0.25)';
+              }}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        {/* Info area */}
         <div
           style={{
             flex: 1,
-            overflowY: 'auto',
-            padding: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 32,
           }}
         >
-          <p
-            style={{
-              margin: '0 0 12px',
-              fontSize: 12,
-              color: '#8892a0',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              fontWeight: 600,
-            }}
-          >
-            {loading
-              ? 'Searching...'
-              : searchedQuery
-                ? `${results.length} result${results.length === 1 ? '' : 's'} for "${searchedQuery}"`
-                : 'Search to find reference images'}
+          <p style={{ fontSize: 13, color: '#4a5568', textAlign: 'center' }}>
+            Results will open in Google Images
           </p>
-
-          {provider && !loading && (
-            <p style={{ margin: '0 0 12px', fontSize: 11, color: '#66d9ef' }}>
-              Provider: {provider}
-            </p>
-          )}
-
-          {error && (
-            <div
-              style={{
-                border: '1px solid rgba(239,68,68,0.5)',
-                background: 'rgba(239,68,68,0.08)',
-                color: '#fca5a5',
-                borderRadius: 10,
-                padding: '10px 12px',
-                fontSize: 12,
-                marginBottom: 12,
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && searchedQuery && results.length === 0 && (
-            <div
-              style={{
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#9ca3af',
-                borderRadius: 10,
-                padding: '12px 14px',
-                fontSize: 12,
-              }}
-            >
-              No images found.
-            </div>
-          )}
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: 10,
-            }}
-          >
-            {results.map((result) => (
-              <ResultCard key={result.id} result={result} onClick={() => setSelectedImage(result)} />
-            ))}
-          </div>
         </div>
 
+        {/* Footer */}
         <div
           style={{
             padding: '12px 20px',
             borderTop: '1px solid rgba(0,212,255,0.15)',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: 8,
             flexShrink: 0,
             background: 'rgba(10,10,15,0.8)',
           }}
         >
           <button
+            type="button"
             onClick={onClose}
             style={{
               background: 'transparent',
@@ -308,136 +255,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
           </button>
         </div>
       </div>
-
-      {selectedImage && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={selectedImage.title}
-          onClick={() => setSelectedImage(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 302,
-            background: 'rgba(0,0,0,0.82)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: 'min(1100px, calc(100vw - 48px))',
-              maxHeight: 'calc(100vh - 48px)',
-              borderRadius: 12,
-              overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: '#090a0f',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.65)',
-            }}
-          >
-            <img
-              src={selectedImage.fullUrl}
-              alt={selectedImage.title}
-              style={{
-                display: 'block',
-                maxWidth: '100%',
-                maxHeight: 'calc(100vh - 98px)',
-                objectFit: 'contain',
-                background: '#111827',
-              }}
-            />
-            <div style={{ padding: '10px 12px', color: '#e5e7eb', fontSize: 12 }}>
-              {selectedImage.title}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes mxSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </>
-  );
-}
-
-function ResultCard({ result, onClick }: { result: ImageSearchResult; onClick: () => void }) {
-  const [hovered, setHovered] = React.useState(false);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={result.title}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: hovered ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${hovered ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 10,
-        padding: '10px 9px',
-        cursor: 'pointer',
-        textAlign: 'center',
-        transition: 'all 150ms ease',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'stretch',
-        gap: 7,
-        boxShadow: hovered ? '0 0 16px rgba(0,212,255,0.18)' : 'none',
-      }}
-    >
-      <img
-        src={result.thumbUrl}
-        alt={result.title}
-        style={{
-          width: '100%',
-          height: 90,
-          borderRadius: 8,
-          objectFit: 'cover',
-          border: '1px solid rgba(255,255,255,0.08)',
-          background: '#111827',
-        }}
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-      />
-
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 500,
-          color: hovered ? '#e0faff' : '#d0d8e4',
-          lineHeight: 1.3,
-          textAlign: 'left',
-          wordBreak: 'break-word',
-          transition: 'color 150ms ease',
-        }}
-      >
-        {result.title}
-      </span>
-
-      <span
-        style={{
-          alignSelf: 'flex-start',
-          fontSize: 10,
-          fontWeight: 700,
-          padding: '2px 6px',
-          borderRadius: 8,
-          background: 'rgba(0,212,255,0.1)',
-          border: '1px solid rgba(0,212,255,0.35)',
-          color: '#67e8f9',
-          fontFamily: 'monospace',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {result.sheetName ? `${result.sheetName} · ${result.source}` : result.source}
-      </span>
-    </button>
   );
 }
 

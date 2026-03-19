@@ -16,7 +16,7 @@ export function loadAIResults(
     currentPage: number;
     getState?: () => { classifications: Classification[]; scale: ScaleCalibration | null; currentPage: number };
   },
-  opts?: { zoom?: number }
+  opts?: { zoom?: number; pageNumber?: number }
 ): { areas: number; lines: number; counts: number } {
   const stats = { areas: 0, lines: 0, counts: 0 };
   if (!results?.length) return stats;
@@ -59,7 +59,7 @@ export function loadAIResults(
 
   const state = readState();
   const ppu = state.scale?.pixelsPerUnit ?? 1;
-  const page = state.currentPage || 1;
+  const page = opts?.pageNumber ?? (state.currentPage || 1);
   const r = Math.max(5, Math.round((opts?.zoom ? 6 / opts.zoom : 6))); // count marker radius
 
   // Areas -> linear -> counts
