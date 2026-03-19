@@ -15,6 +15,7 @@ import {
   GitCompare,
   Download,
   Layers,
+  Layers3,
   Search,
   Save as SaveIcon,
   Loader2,
@@ -69,6 +70,8 @@ export default function TopNavBar({
   const setShowMobileMenu = useStore((s) => (s as { setShowMobileMenu?: (v: boolean) => void }).setShowMobileMenu ?? (() => {}));
   const showQuantitiesDrawer = useStore((s) => s.showQuantitiesDrawer);
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
+  const show3D = useStore((s) => s.show3D);
+  const toggleShow3D = useStore((s) => s.toggleShow3D);
 
   // Prefer the auto-detected sheet name (e.g. "A1.00 — FLOOR PLAN") over generic "Page X of Y"
   const hasRealSheetName = sheetName && !sheetName.startsWith('Page ') && sheetName !== 'Sheet 1';
@@ -258,6 +261,14 @@ export default function TopNavBar({
                 Image Search
               </button>
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
+              <NavIconButton
+                ariaLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
+                srLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
+                icon={<Layers3 size={17} aria-hidden="true" />}
+                tooltip={show3D ? '2D View (3)' : '3D View (3)'}
+                onClick={toggleShow3D}
+                ariaPressed={show3D}
+              />
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
@@ -345,6 +356,13 @@ export default function TopNavBar({
             <Download size={16} /> Export Excel
           </button>
           <button
+            onClick={() => { toggleShow3D(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Layers3 size={16} /> {show3D ? '2D View' : '3D View'}
+          </button>
+          <button
             onClick={() => { setShowQuantitiesDrawer(!showQuantitiesDrawer); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
@@ -368,6 +386,7 @@ interface NavIconButtonProps {
 }
 
 function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed }: NavIconButtonProps) {
+  const isActive = ariaPressed === true;
   return (
     <button
       aria-label={ariaLabel}
@@ -376,9 +395,9 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpande
       aria-expanded={ariaExpanded}
       aria-pressed={ariaPressed}
       style={{
-        background: '#12121a',
-        border: '1px solid rgba(0,212,255,0.15)',
-        color: '#b0dff0',
+        background: isActive ? 'rgba(0,212,255,0.15)' : '#12121a',
+        border: isActive ? '1px solid rgba(0,212,255,0.5)' : '1px solid rgba(0,212,255,0.15)',
+        color: isActive ? '#00d4ff' : '#b0dff0',
         cursor: 'pointer',
         padding: 6,
         borderRadius: 8,
