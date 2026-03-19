@@ -76,9 +76,41 @@ function toCountMarker(point: { x: number; y: number }, radius = 8): Array<{ x: 
 }
 
 /**
+ * Synonym groups: any two names that share a group are considered equivalent.
+ * Each inner array is a cluster of interchangeable terms (lower-case).
+ */
+const SYNONYM_GROUPS: string[][] = [
+  ['room', 'space', 'area'],
+  ['wall', 'partition'],
+  ['door', 'entry', 'entrance'],
+  ['window', 'glazing', 'opening'],
+  ['floor', 'slab', 'deck'],
+  ['ceiling', 'soffit'],
+  ['stair', 'stairs', 'stairway', 'staircase', 'steps'],
+  ['column', 'pillar', 'post', 'col'],
+  ['beam', 'girder', 'joist'],
+  ['bathroom', 'restroom', 'wc', 'toilet room', 'lavatory'],
+  ['kitchen', 'kitchenette'],
+  ['corridor', 'hallway', 'hall', 'passage', 'passageway'],
+  ['parking', 'parking space', 'parking stall'],
+];
+
+/** Return the synonym-group index for a word, or -1 if not in any group. */
+function synonymGroupOf(word: string): number {
+  for (let i = 0; i < SYNONYM_GROUPS.length; i++) {
+    if (SYNONYM_GROUPS[i].includes(word)) return i;
+  }
+  return -1;
+}
+
+/**
  * Fuzzy-match an AI-detected classification name against existing ones.
  * Returns the existing classification ID if a reasonable match is found, else null.
- * Rules: same type required, then checks exact match, substring, or common word overlap.
+ * Rules (same type required):
+ *   1. Exact match (case-insensitive)
+ *   2. Substring match — either direction
+ *   3. Significant word overlap
+ *   4. Synonym match — any key word in the needle maps to the same synonym group as a key word in the existing name
  */
 function fuzzyMatchClassification(
   name: string,
@@ -104,10 +136,11 @@ function fuzzyMatchClassification(
     if (existing.includes(needle) || needle.includes(existing)) return c.id;
   }
 
-  // 3. Significant word overlap (split on spaces, slashes, hyphens)
   const splitWords = (s: string) =>
     s.split(/[\s\/\-]+/).filter((w) => w.length > 2);
   const needleWords = splitWords(needle);
+
+  // 3. Significant word overlap
   if (needleWords.length > 0) {
     for (const c of candidates) {
       const existingWords = splitWords(c.name.trim().toLowerCase());
@@ -115,6 +148,19 @@ function fuzzyMatchClassification(
       if (overlap.length > 0 && overlap.length >= Math.min(needleWords.length, existingWords.length)) {
         return c.id;
       }
+    }
+  }
+
+  // 4. Synonym match — any key word in needle shares a synonym group with any key word in existing name
+  if (needleWords.length > 0) {
+    for (const c of candidates) {
+      const existingWords = splitWords(c.name.trim().toLowerCase());
+      const hasSynonymOverlap = needleWords.some((nw) => {
+        const ng = synonymGroupOf(nw);
+        if (ng === -1) return false;
+        return existingWords.some((ew) => synonymGroupOf(ew) === ng);
+      });
+      if (hasSynonymOverlap) return c.id;
     }
   }
 
