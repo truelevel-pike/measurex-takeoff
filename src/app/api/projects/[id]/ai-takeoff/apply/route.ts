@@ -7,7 +7,9 @@ import {
   createPolygon,
 } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
+import { fireWebhook } from '@/lib/webhooks';
 import type { AIDetectedElement } from '@/server/ai-engine';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 /**
  * Shoelace formula for polygon area in pixels.
@@ -57,7 +59,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const body = await req.json();
     const elements: AIDetectedElement[] = body?.elements;
     const page: number = body?.page ?? 1;
@@ -133,6 +137,12 @@ export async function POST(
       existingPolygons.push(newPolygon); // track for dedup within batch
       createdPolygons++;
     }
+
+    fireWebhook(id, 'takeoff.completed', {
+      polygonCount: createdPolygons,
+      classificationCount: createdClassifications,
+      skipped,
+    });
 
     return NextResponse.json({
       created: { classifications: createdClassifications, polygons: createdPolygons },

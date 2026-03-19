@@ -39,6 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       formulaSavedToLibrary: body.formulaSavedToLibrary,
     });
     broadcastToProject(id, 'classification:created', classification);
+    fireWebhook(id, 'classification.created', classification);
     return NextResponse.json({ classification });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

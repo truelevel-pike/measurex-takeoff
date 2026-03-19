@@ -307,6 +307,70 @@ curl -o takeoff.json http://localhost:3000/api/projects/$PROJECT_ID/export/json
 
 ---
 
+## Webhooks (Outbound)
+
+Register URLs to receive HTTP POST notifications when events occur in a project.
+
+### Register a webhook
+
+```bash
+curl -X POST http://localhost:3000/api/projects/$PROJECT_ID/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/hook",
+    "events": ["polygon.created", "classification.created", "takeoff.completed"]
+  }'
+```
+
+Response:
+```json
+{
+  "webhook": {
+    "id": "a1b2c3d4-...",
+    "projectId": "fe7314a6-...",
+    "url": "https://example.com/hook",
+    "events": ["polygon.created", "classification.created", "takeoff.completed"],
+    "createdAt": "2026-03-18T..."
+  }
+}
+```
+
+### List webhooks
+
+```bash
+curl http://localhost:3000/api/projects/$PROJECT_ID/webhooks
+```
+
+### Unregister a webhook
+
+```bash
+curl -X DELETE "http://localhost:3000/api/projects/$PROJECT_ID/webhooks?id=WEBHOOK_ID"
+```
+
+### Webhook payload
+
+When a matching event fires, a POST is sent to your URL:
+```json
+{
+  "event": "polygon.created",
+  "projectId": "fe7314a6-...",
+  "timestamp": "2026-03-18T...",
+  "data": { ... }
+}
+```
+
+### Available events
+
+| Event | Fired when |
+|-------|-----------|
+| `polygon.created` | A polygon is added (manual or AI) |
+| `classification.created` | A classification is added (manual or AI) |
+| `takeoff.completed` | AI takeoff apply finishes — `data` includes `polygonCount`, `classificationCount`, `skipped` |
+
+Webhooks are stored in memory and do not persist across server restarts.
+
+---
+
 ## Key Concepts
 
 - **Points are in pixel coordinates** — they match the PDF page dimensions returned by the upload endpoint
