@@ -100,6 +100,14 @@ const ChatMessageSchema = z.object({
   content: z.string().min(1),
 });
 
+const QuantityEntrySchema = z.object({
+  name: z.string(),
+  type: z.enum(['area', 'linear', 'count']),
+  value: z.number(),
+  unit: z.string(),
+  count: z.number().optional(),
+});
+
 export const ChatBodySchema = z.object({
   message: z.string().min(1).optional(),
   messages: z.array(ChatMessageSchema).min(1).optional(),
@@ -108,6 +116,8 @@ export const ChatBodySchema = z.object({
     totalArea: z.number().optional(),
     unit: z.string().optional(),
     classifications: z.array(z.string()).optional(),
+    quantities: z.array(QuantityEntrySchema).optional(),
+    polygonCount: z.number().optional(),
   }).optional(),
 }).refine(
   (d) => d.message !== undefined || d.messages !== undefined,

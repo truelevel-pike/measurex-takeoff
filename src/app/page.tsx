@@ -3,7 +3,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
+import { File as FileIcon, Layers3 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
@@ -40,7 +40,7 @@ import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
 import ScaleCalibration from '@/components/ScaleCalibration';
 const ThreeDScene = dynamic(() => import('@/components/ThreeDScene'), { ssr: false });
-import TogalChat from '@/components/TogalChat';
+import MXChat from '@/components/MXChat';
 import AIImageSearch from '@/components/AIImageSearch';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
@@ -472,7 +472,7 @@ function PageInner() {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Hydration failed:', err);
     }
-  }, [setCurrentPage]);
+  }, [setCurrentPage, setSheetName]);
 
   // Load project by URL param or localStorage on mount
   useEffect(() => {
@@ -584,7 +584,7 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId]);
 
   useEffect(() => {
     if (!pdfFile) return;
@@ -1055,20 +1055,28 @@ function PageInner() {
   }, [addToast]);
 
   const handleAITakeoffAllPages = useCallback(async () => {
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+
     const total = useStore.getState().totalPages;
+    const originalPage = useStore.getState().currentPage || 1;
     setAiLoading(true);
     setAiAllPagesProgress({ current: 1, total });
+
     for (let page = 1; page <= total; page++) {
       setAiAllPagesProgress({ current: page, total });
-      setAiStatus(`Page ${page}/${total}: Navigating...`);
-      pdfViewerRef.current?.goToPage(page);
-      await new Promise<void>((resolve) => setTimeout(resolve, 1400));
-      const pageCanvas = pdfViewerRef.current?.getPageCanvas?.();
-      if (!pageCanvas) continue;
+      setAiStatus(`Page ${page}/${total}: Capturing...`);
+
+      const canvas = await viewer.renderPageForCapture(page);
+      if (!canvas) {
+        setAiStatus(`Page ${page}/${total}: Could not capture, skipping`);
+        continue;
+      }
+
       setAiStatus(`Page ${page}/${total}: AI analyzing...`);
       try {
-        const imageBase64 = capturePageScreenshot(pageCanvas);
-        const dims = pdfViewerRef.current?.pageDimensions || { width: pageCanvas.width, height: pageCanvas.height };
+        const imageBase64 = capturePageScreenshot(canvas);
+        const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
         const pageScale = useStore.getState().scales?.[page] ?? useStore.getState().scale;
         const elements: DetectedElement[] = await triggerAITakeoff(imageBase64, pageScale, dims.width, dims.height);
         loadAIResults(elements, {
@@ -1086,8 +1094,9 @@ function PageInner() {
       } catch (err) {
         setAiStatus(`Page ${page}/${total}: Error — ${err instanceof Error ? err.message : 'failed'}`);
       }
-      await new Promise<void>((resolve) => setTimeout(resolve, 400));
     }
+
+    viewer.goToPage(originalPage);
     setAiAllPagesProgress(null);
     setAiStatus('All pages complete!');
     setTimeout(() => setAiStatus(null), 5000);
@@ -1454,7 +1463,7 @@ function PageInner() {
         </div>
       )}
 
-      {showChat && <TogalChat onClose={() => setShowChat(false)} />}
+      {showChat && <MXChat onClose={() => setShowChat(false)} />}
       {showImageSearch && (
         <AIImageSearch
           onClose={() => setShowImageSearch(false)}
