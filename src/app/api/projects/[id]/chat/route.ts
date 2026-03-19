@@ -89,7 +89,7 @@ export async function POST(
 
     // Build assembly context
     const assemblyContext = assemblies.map((a) => {
-      const q = quantityMap[a.classificationId];
+      const q = a.classificationId ? quantityMap[a.classificationId] : undefined;
       const quantity = q?.quantity ?? 0;
       const projectedTotal = quantity * a.unitCost;
       return { assemblyName: a.name, unitCost: a.unitCost, quantity: parseFloat(quantity.toFixed(1)), projectedTotal: parseFloat(projectedTotal.toFixed(2)) };
