@@ -103,6 +103,7 @@ export default function ProjectsPage() {
   // New dashboard state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
   const [activeSection, setActiveSection] = useState<SidebarSection>('all');
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -267,8 +268,26 @@ export default function ProjectsPage() {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q));
     }
-    return list;
-  }, [projects, activeSection, starredIds, searchQuery, folders]);
+
+    const sorted = [...list];
+    const getTimestamp = (p: ProjectRow) => {
+      const raw = p.updatedAt || p.createdAt || p.updated_at || p.created_at;
+      const time = raw ? new Date(raw).getTime() : 0;
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    if (sortBy === 'newest') {
+      sorted.sort((a, b) => getTimestamp(b) - getTimestamp(a));
+    } else if (sortBy === 'oldest') {
+      sorted.sort((a, b) => getTimestamp(a) - getTimestamp(b));
+    } else if (sortBy === 'az') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'za') {
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+    }
+
+    return sorted;
+  }, [projects, activeSection, starredIds, searchQuery, folders, sortBy]);
 
   // Onboarding steps
   const onboardingSteps = useMemo(() => [
@@ -320,6 +339,17 @@ export default function ProjectsPage() {
               className="bg-zinc-700 border border-zinc-600 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-zinc-400 outline-none focus:border-blue-500 w-32 sm:w-56"
             />
           </div>
+          <select
+            aria-label="Sort projects"
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'az' | 'za')}
+            className="bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="az">A-Z</option>
+            <option value="za">Z-A</option>
+          </select>
           <button aria-label="Compare Drawings" onClick={() => setShowCompare(true)}
             className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
             <GitCompare size={14} aria-hidden /> Compare

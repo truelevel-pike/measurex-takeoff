@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { File as FileIcon, GitCompare } from 'lucide-react';
+import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
@@ -38,6 +38,7 @@ import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
+import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import { ToastProvider, useToast } from '@/components/Toast';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'ai'> = {
@@ -122,6 +123,7 @@ function PageInner() {
 
 
   const show3D = useStore((s) => s.show3D);
+  const setShow3D = useStore((s) => s.setShow3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
   const threeData = React.useMemo(() => convertTakeoffTo3D(polygons, classifications), [polygons, classifications]);
 
@@ -156,6 +158,7 @@ function PageInner() {
   const [showChat, setShowChat] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -411,7 +414,11 @@ function PageInner() {
         setSelectedPolygon(null);
         setSelectedClassification(null);
         setShowCalModal(false);
+        setShowKeyboardHelp(false);
         closeContextMenu();
+      } else if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        e.preventDefault();
+        setShowKeyboardHelp((prev) => !prev);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedPolygon) {
           deletePolygon(selectedPolygon);
@@ -793,7 +800,7 @@ function PageInner() {
   useIsMobile();
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#0a0a0f] text-white" onClick={closeContextMenu}>
+    <div className="relative flex flex-col h-screen w-screen bg-[#0a0a0f] text-white" onClick={closeContextMenu}>
       <TopNavBar
         onAITakeoff={handleAITakeoff}
         aiLoading={aiLoading}
@@ -821,6 +828,31 @@ function PageInner() {
           pdfViewerRef.current?.goToPage(next);
         }}
       />
+
+      {/* Floating 2D/3D toggle — always visible */}
+      <div className="absolute top-14 left-3 z-50 flex items-center gap-1 bg-[rgba(18,18,26,0.92)] backdrop-blur-sm border border-[#00d4ff]/20 rounded-lg p-1 shadow-[0_0_20px_rgba(0,212,255,0.15)]">
+        <button
+          onClick={() => setShow3D(false)}
+          className={`h-8 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition ${
+            !show3D
+              ? 'bg-[#00d4ff]/20 border-[#00d4ff]/50 text-[#00d4ff]'
+              : 'bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35'
+          }`}
+        >
+          2D
+        </button>
+        <button
+          onClick={() => setShow3D(true)}
+          className={`h-8 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition inline-flex items-center gap-1.5 ${
+            show3D
+              ? 'bg-[#00ff88]/15 border-[#00ff88]/50 text-[#00ff88]'
+              : 'bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35'
+          }`}
+        >
+          <Layers3 size={13} />
+          3D
+        </button>
+      </div>
 
       <div className={show3D ? 'flex-1 min-h-0' : 'hidden'}>
         <ThreeDScene className="h-full w-full" walls={threeData.walls} areas={threeData.areas} labels={threeData.labels} pdfTextureUrl={pdfTextureUrl} />
@@ -985,6 +1017,7 @@ function PageInner() {
       )}
 
       {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
+      <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
       {aiLoading && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

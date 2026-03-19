@@ -23,6 +23,7 @@ import {
   Menu,
   PanelRightOpen,
 } from 'lucide-react';
+import ReTogal from './ReTogal';
 
 interface TopNavBarProps {
   sheetName?: string;
@@ -32,8 +33,10 @@ interface TopNavBarProps {
   onNext?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
-  onAITakeoff?: () => void;
+  onAITakeoff?: () => void | Promise<void>;
   aiLoading?: boolean;
+  hasScale?: boolean;
+  hasRunTakeoff?: boolean;
   onExportExcel?: () => void;
   onExportJson?: () => void;
   onSave?: () => void;
@@ -57,6 +60,8 @@ export default function TopNavBar({
   onToggleImageSearch,
   onCompare,
   aiLoading,
+  hasScale,
+  hasRunTakeoff,
   onExportExcel,
   onExportJson,
   onSave,
@@ -72,6 +77,7 @@ export default function TopNavBar({
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
+  const currentPage = useStore((s) => s.currentPage);
 
   // Prefer the auto-detected sheet name (e.g. "A1.00 — FLOOR PLAN") over generic "Page X of Y"
   const hasRealSheetName = sheetName && !sheetName.startsWith('Page ') && sheetName !== 'Sheet 1';
@@ -216,6 +222,14 @@ export default function TopNavBar({
                 {aiLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
                 {aiLoading ? 'Analyzing…' : 'AI Takeoff'}
               </button>
+              {hasRunTakeoff && onAITakeoff && (
+                <ReTogal
+                  currentPage={currentPage}
+                  hasScale={hasScale ?? false}
+                  hasRunTakeoff={hasRunTakeoff}
+                  onRunTakeoff={onAITakeoff}
+                />
+              )}
               <button
                 aria-label="Open MX Chat"
                 onClick={onChat}

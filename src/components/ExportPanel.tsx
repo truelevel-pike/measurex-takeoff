@@ -171,6 +171,7 @@ interface ExportPanelProps {
 }
 
 export default function ExportPanel({ onClose }: ExportPanelProps) {
+  const projectId = useStore((s) => s.projectId);
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
@@ -425,6 +426,44 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   const handlePdfExport = useCallback(() => {
     showToast('PDF export coming soon!');
   }, [showToast]);
+
+  // ── Export: JSON ──
+  const handleJsonExport = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const derivedProjectName = params.get('name');
+    const projectName = derivedProjectName && derivedProjectName.trim().length > 0
+      ? derivedProjectName
+      : null;
+
+    const data = {
+      projectId,
+      projectName,
+      exportedAt: new Date().toISOString(),
+      scale: {
+        pixelsPerUnit: scale?.pixelsPerUnit ?? null,
+        unit: scale?.unit ?? null,
+      },
+      classifications,
+      polygons: polygons.map((poly) => ({
+        id: poly.id,
+        classificationId: poly.classificationId,
+        pageNumber: poly.pageNumber,
+        points: poly.points,
+        area: poly.area,
+        linearFeet: poly.linearFeet,
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName || 'project'}-export.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showToast('JSON export completed!');
+  }, [projectId, scale, classifications, polygons, showToast]);
 
   // ── Visible columns for preview ──
   const visibleColumns = useMemo(() => {
@@ -750,6 +789,14 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
             Export PDF
+          </button>
+          <button
+            onClick={handleJsonExport}
+            aria-label="Export to JSON"
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export JSON
           </button>
         </div>
 

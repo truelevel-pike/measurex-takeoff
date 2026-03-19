@@ -1,39 +1,76 @@
 'use client';
 
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface SearchResult {
+interface ImageSearchResult {
   id: string;
-  name: string;
-  count: number;
-  emoji: string;
-  color: string;
+  thumbUrl: string;
+  fullUrl: string;
+  title: string;
+  source: string;
+  pageNumber?: number;
+  sheetName?: string;
 }
 
 interface AIImageSearchProps {
   onClose: () => void;
+  projectId?: string | null;
 }
 
-// ─── Stub data ────────────────────────────────────────────────────────────────
+export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
+  const [query, setQuery] = React.useState('');
+  const [searchedQuery, setSearchedQuery] = React.useState('');
+  const [results, setResults] = React.useState<ImageSearchResult[]>([]);
+  const [provider, setProvider] = React.useState<string>('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = React.useState<ImageSearchResult | null>(null);
 
-const SAMPLE_RESULTS: SearchResult[] = [
-  { id: '1', name: 'Exterior Door',    count: 14, emoji: '🚪', color: '#3b82f6' },
-  { id: '2', name: 'Window (2×4)',     count: 28, emoji: '🪟', color: '#10b981' },
-  { id: '3', name: 'Duplex Outlet',    count: 62, emoji: '🔌', color: '#f59e0b' },
-  { id: '4', name: 'Light Fixture',    count: 41, emoji: '💡', color: '#8b5cf6' },
-  { id: '5', name: 'HVAC Diffuser',    count: 19, emoji: '🌀', color: '#06b6d4' },
-  { id: '6', name: 'Fire Sprinkler',   count: 33, emoji: '🔴', color: '#ef4444' },
-];
+  React.useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (selectedImage) setSelectedImage(null);
+      else onClose();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [selectedImage, onClose]);
 
-// ─── Component ───────────────────────────────────────────────────────────────
+  const handleSearch = React.useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalized = query.trim();
+    if (!normalized) {
+      setError('Enter a search term.');
+      return;
+    }
 
-export function AIImageSearch({ onClose }: AIImageSearchProps) {
+    setLoading(true);
+    setError(null);
+    setSearchedQuery(normalized);
+
+    try {
+      const res = await fetch('/api/image-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: normalized, projectId }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
+      setResults(Array.isArray(payload?.results) ? payload.results : []);
+      setProvider(typeof payload?.provider === 'string' ? payload.provider : '');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Search failed.';
+      setResults([]);
+      setProvider('');
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, query]);
+
   return (
     <>
-      {/* Backdrop */}
       <div
         aria-hidden="true"
         onClick={onClose}
@@ -71,7 +108,6 @@ export function AIImageSearch({ onClose }: AIImageSearchProps) {
           overflow: 'hidden',
         }}
       >
-        {/* ── Header ── */}
         <div
           style={{
             display: 'flex',
@@ -125,108 +161,57 @@ export function AIImageSearch({ onClose }: AIImageSearchProps) {
           </button>
         </div>
 
-        {/* ── Instruction banner ── */}
-        <div
+        <form
+          onSubmit={handleSearch}
           style={{
+            display: 'flex',
+            gap: 8,
             padding: '14px 20px',
             borderBottom: '1px solid rgba(0,212,255,0.1)',
             background: 'rgba(0,212,255,0.04)',
             flexShrink: 0,
           }}
         >
-          {/* Selection box animation */}
-          <div
+          <input
+            type="text"
+            placeholder="Search construction images (e.g. exterior door, roof flashing)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(0,212,255,0.25)',
+              borderRadius: 8,
+              color: '#e0faff',
+              padding: '9px 11px',
+              fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              minWidth: 92,
+              background: loading ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.15)',
+              border: '1px solid rgba(0,212,255,0.4)',
+              borderRadius: 8,
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#00d4ff',
+              cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 12,
-              marginBottom: 10,
+              justifyContent: 'center',
+              gap: 6,
             }}
           >
-            <div
-              aria-hidden="true"
-              style={{
-                width: 56,
-                height: 56,
-                border: '2px dashed rgba(0,212,255,0.5)',
-                borderRadius: 8,
-                background: 'rgba(0,212,255,0.06)',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                boxShadow: '0 0 16px rgba(0,212,255,0.1) inset',
-              }}
-            >
-              {/* Corner handles */}
-              {[
-                { top: -3, left: -3 },
-                { top: -3, right: -3 },
-                { bottom: -3, left: -3 },
-                { bottom: -3, right: -3 },
-              ].map((pos, i) => (
-                <div
-                  key={i}
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    width: 6,
-                    height: 6,
-                    background: '#00d4ff',
-                    borderRadius: 1,
-                    ...pos,
-                  }}
-                />
-              ))}
-              <Search size={18} style={{ color: 'rgba(0,212,255,0.6)' }} />
-            </div>
+            {loading ? <Loader2 size={14} style={{ animation: 'mxSpin 0.9s linear infinite' }} /> : <Search size={14} />}
+            {loading ? 'Searching' : 'Search'}
+          </button>
+        </form>
 
-            <div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#e0faff',
-                  marginBottom: 4,
-                }}
-              >
-                Draw a box around an object to search for similar items
-              </p>
-              <p style={{ margin: 0, fontSize: 11, color: '#8892a0' }}>
-                Click and drag on the canvas, then release to find matching components in the takeoff.
-              </p>
-            </div>
-          </div>
-
-          {/* Fake in-progress indicator */}
-          <div
-            style={{
-              height: 2,
-              background: 'rgba(0,212,255,0.15)',
-              borderRadius: 2,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                height: '100%',
-                width: '60%',
-                background: 'linear-gradient(90deg, rgba(0,212,255,0) 0%, rgba(0,212,255,0.7) 50%, rgba(0,212,255,0) 100%)',
-                animation: 'mxScanline 2s ease-in-out infinite',
-              }}
-            />
-          </div>
-          <p style={{ margin: '6px 0 0', fontSize: 10, color: '#4a5568', textAlign: 'right' }}>
-            Sample results shown · V1 stub
-          </p>
-        </div>
-
-        {/* ── Results grid ── */}
         <div
           style={{
             flex: 1,
@@ -244,23 +229,63 @@ export function AIImageSearch({ onClose }: AIImageSearchProps) {
               fontWeight: 600,
             }}
           >
-            {SAMPLE_RESULTS.length} matches found
+            {loading
+              ? 'Searching...'
+              : searchedQuery
+                ? `${results.length} result${results.length === 1 ? '' : 's'} for "${searchedQuery}"`
+                : 'Search to find reference images'}
           </p>
+
+          {provider && !loading && (
+            <p style={{ margin: '0 0 12px', fontSize: 11, color: '#66d9ef' }}>
+              Provider: {provider}
+            </p>
+          )}
+
+          {error && (
+            <div
+              style={{
+                border: '1px solid rgba(239,68,68,0.5)',
+                background: 'rgba(239,68,68,0.08)',
+                color: '#fca5a5',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 12,
+                marginBottom: 12,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && searchedQuery && results.length === 0 && (
+            <div
+              style={{
+                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.03)',
+                color: '#9ca3af',
+                borderRadius: 10,
+                padding: '12px 14px',
+                fontSize: 12,
+              }}
+            >
+              No images found.
+            </div>
+          )}
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gap: 10,
             }}
           >
-            {SAMPLE_RESULTS.map((result) => (
-              <ResultCard key={result.id} result={result} />
+            {results.map((result) => (
+              <ResultCard key={result.id} result={result} onClick={() => setSelectedImage(result)} />
             ))}
           </div>
         </div>
 
-        {/* ── Footer ── */}
         <div
           style={{
             padding: '12px 20px',
@@ -295,51 +320,74 @@ export function AIImageSearch({ onClose }: AIImageSearchProps) {
           >
             Cancel
           </button>
-          <button
-            style={{
-              background: 'rgba(0,212,255,0.15)',
-              border: '1px solid rgba(0,212,255,0.4)',
-              borderRadius: 8,
-              padding: '7px 16px',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#00d4ff',
-              cursor: 'pointer',
-              transition: 'all 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(0,212,255,0.25)';
-              e.currentTarget.style.borderColor = 'rgba(0,212,255,0.6)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0,212,255,0.15)';
-              e.currentTarget.style.borderColor = 'rgba(0,212,255,0.4)';
-            }}
-          >
-            Add to Takeoff
-          </button>
         </div>
       </div>
 
-      {/* Scan animation */}
+      {selectedImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={selectedImage.title}
+          onClick={() => setSelectedImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 302,
+            background: 'rgba(0,0,0,0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 'min(1100px, calc(100vw - 48px))',
+              maxHeight: 'calc(100vh - 48px)',
+              borderRadius: 12,
+              overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: '#090a0f',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.65)',
+            }}
+          >
+            <img
+              src={selectedImage.fullUrl}
+              alt={selectedImage.title}
+              style={{
+                display: 'block',
+                maxWidth: '100%',
+                maxHeight: 'calc(100vh - 98px)',
+                objectFit: 'contain',
+                background: '#111827',
+              }}
+            />
+            <div style={{ padding: '10px 12px', color: '#e5e7eb', fontSize: 12 }}>
+              {selectedImage.title}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        @keyframes mxScanline {
-          0%   { left: -60%; }
-          100% { left: 120%; }
+        @keyframes mxSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </>
   );
 }
 
-// ─── Result card ─────────────────────────────────────────────────────────────
-
-function ResultCard({ result }: { result: SearchResult }) {
+function ResultCard({ result, onClick }: { result: ImageSearchResult; onClick: () => void }) {
   const [hovered, setHovered] = React.useState(false);
 
   return (
     <button
-      aria-label={`${result.name}, count ${result.count}`}
+      type="button"
+      onClick={onClick}
+      aria-label={result.title}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -352,59 +400,56 @@ function ResultCard({ result }: { result: SearchResult }) {
         transition: 'all 150ms ease',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
-        boxShadow: hovered ? `0 0 16px ${result.color}22` : 'none',
+        alignItems: 'stretch',
+        gap: 7,
+        boxShadow: hovered ? '0 0 16px rgba(0,212,255,0.18)' : 'none',
       }}
     >
-      {/* Thumbnail */}
-      <div
-        aria-hidden="true"
+      <img
+        src={result.thumbUrl}
+        alt={result.title}
         style={{
-          width: 64,
-          height: 64,
+          width: '100%',
+          height: 90,
           borderRadius: 8,
-          background: `${result.color}18`,
-          border: `1px solid ${result.color}40`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 28,
-          boxShadow: `0 0 12px ${result.color}25 inset`,
+          objectFit: 'cover',
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#111827',
         }}
-      >
-        {result.emoji}
-      </div>
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+      />
 
-      {/* Name */}
       <span
         style={{
           fontSize: 11,
           fontWeight: 500,
           color: hovered ? '#e0faff' : '#d0d8e4',
           lineHeight: 1.3,
+          textAlign: 'left',
           wordBreak: 'break-word',
           transition: 'color 150ms ease',
         }}
       >
-        {result.name}
+        {result.title}
       </span>
 
-      {/* Count badge */}
       <span
         style={{
-          fontSize: 11,
+          alignSelf: 'flex-start',
+          fontSize: 10,
           fontWeight: 700,
-          padding: '2px 8px',
+          padding: '2px 6px',
           borderRadius: 8,
-          background: `${result.color}22`,
-          border: `1px solid ${result.color}50`,
-          color: result.color,
+          background: 'rgba(0,212,255,0.1)',
+          border: '1px solid rgba(0,212,255,0.35)',
+          color: '#67e8f9',
           fontFamily: 'monospace',
           letterSpacing: '0.04em',
         }}
       >
-        {result.count} EA
+        {result.sheetName ? `${result.sheetName} · ${result.source}` : result.source}
       </span>
     </button>
   );

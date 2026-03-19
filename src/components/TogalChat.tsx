@@ -4,11 +4,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Send, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface Message {
   id: string;
-  role: 'user' | 'ai';
+  role: 'user' | 'assistant';
   text: string;
   timestamp: Date;
 }
@@ -17,7 +15,10 @@ interface TogalChatProps {
   onClose: () => void;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+interface ChatApiMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -27,12 +28,11 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export function TogalChat({ onClose }: TogalChatProps) {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const projectId = useStore((s) => s.projectId);
 
   const ppu = scale?.pixelsPerUnit ?? 1;
   const unit = scale?.unit ?? 'ft';
@@ -43,36 +43,28 @@ export function TogalChat({ onClose }: TogalChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
-      role: 'ai',
-      text: 'Hi! I\'m MeasureX AI. Ask me anything about your takeoff — classifications, areas, or measurements.',
+      role: 'assistant',
+      text: "Hi! I'm MX. Ask me anything about your takeoff data, measurements, or quantities.",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  function buildAIResponse(): string {
-    const count = classificationCount;
-    const area = totalAreaSqFt.toFixed(1);
-    if (count === 0) {
-      return `I found 0 classifications on this page with a total of 0.0 sq ${unit}. Try running AI Takeoff or drawing some areas first!`;
-    }
-    return `I found ${count} classification${count !== 1 ? 's' : ''} on this page with a total of ${area} sq ${unit}.`;
-  }
-
-  function sendMessage() {
+  async function sendMessage() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || isLoading) return;
 
     const userMsg: Message = {
       id: generateId(),
@@ -81,27 +73,55 @@ export function TogalChat({ onClose }: TogalChatProps) {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setIsTyping(true);
+    const nextMessages = [...messages, userMsg];
+    const payloadMessages: ChatApiMessage[] = nextMessages
+      .filter((m) => m.id !== 'welcome')
+      .map((m) => ({ role: m.role, content: m.text }));
 
-    // Simulate AI thinking delay
-    setTimeout(() => {
+    setMessages(nextMessages);
+    setInput('');
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: payloadMessages,
+          projectId: projectId ?? undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Chat request failed');
+      }
+
+      const reply = typeof data?.reply === 'string' ? data.reply.trim() : '';
+      if (!reply) {
+        throw new Error('No assistant reply returned');
+      }
+
       const aiMsg: Message = {
         id: generateId(),
-        role: 'ai',
-        text: buildAIResponse(),
+        role: 'assistant',
+        text: reply,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 800);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      void sendMessage();
     }
   }
 
@@ -125,7 +145,6 @@ export function TogalChat({ onClose }: TogalChatProps) {
         backdropFilter: 'blur(12px)',
       }}
     >
-      {/* ── Header ── */}
       <div
         style={{
           display: 'flex',
@@ -179,7 +198,6 @@ export function TogalChat({ onClose }: TogalChatProps) {
         </button>
       </div>
 
-      {/* ── Stats bar ── */}
       {classificationCount > 0 && (
         <div
           style={{
@@ -197,7 +215,6 @@ export function TogalChat({ onClose }: TogalChatProps) {
         </div>
       )}
 
-      {/* ── Message list ── */}
       <div
         role="log"
         aria-live="polite"
@@ -252,13 +269,12 @@ export function TogalChat({ onClose }: TogalChatProps) {
                 paddingRight: 4,
               }}
             >
-              {msg.role === 'ai' ? 'MX AI · ' : ''}{formatTime(msg.timestamp)}
+              {msg.role === 'assistant' ? 'MX · ' : ''}{formatTime(msg.timestamp)}
             </span>
           </div>
         ))}
 
-        {/* Typing indicator */}
-        {isTyping && (
+        {isLoading && (
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <div
               style={{
@@ -289,30 +305,46 @@ export function TogalChat({ onClose }: TogalChatProps) {
           </div>
         )}
 
+        {error && (
+          <div
+            style={{
+              fontSize: 12,
+              color: '#ff9b9b',
+              background: 'rgba(255, 59, 59, 0.08)',
+              border: '1px solid rgba(255, 59, 59, 0.25)',
+              borderRadius: 8,
+              padding: '8px 10px',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Input bar ── */}
       <div
         style={{
           padding: '12px 12px 16px',
           borderTop: '1px solid rgba(0,212,255,0.2)',
           display: 'flex',
           gap: 8,
-          alignItems: 'center',
+          alignItems: 'flex-end',
           background: 'rgba(10,10,15,0.9)',
           flexShrink: 0,
         }}
       >
-        <input
+        <textarea
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask about your takeoff…"
           aria-label="Chat message input"
+          rows={2}
           style={{
             flex: 1,
+            resize: 'none',
             background: 'rgba(255,255,255,0.05)',
             border: '1px solid rgba(0,212,255,0.2)',
             borderRadius: 10,
@@ -326,16 +358,18 @@ export function TogalChat({ onClose }: TogalChatProps) {
           onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)')}
         />
         <button
-          onClick={sendMessage}
-          disabled={!input.trim() || isTyping}
+          onClick={() => {
+            void sendMessage();
+          }}
+          disabled={!input.trim() || isLoading}
           aria-label="Send message"
           style={{
-            background: input.trim() && !isTyping ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
-            border: `1px solid ${input.trim() && !isTyping ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
+            background: input.trim() && !isLoading ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${input.trim() && !isLoading ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
             borderRadius: 10,
             padding: '9px 12px',
-            cursor: input.trim() && !isTyping ? 'pointer' : 'default',
-            color: input.trim() && !isTyping ? '#00d4ff' : '#4a5568',
+            cursor: input.trim() && !isLoading ? 'pointer' : 'default',
+            color: input.trim() && !isLoading ? '#00d4ff' : '#4a5568',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -347,7 +381,6 @@ export function TogalChat({ onClose }: TogalChatProps) {
         </button>
       </div>
 
-      {/* Bounce animation for typing dots */}
       <style>{`
         @keyframes mxChatBounce {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }

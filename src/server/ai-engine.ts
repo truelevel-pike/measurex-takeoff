@@ -29,14 +29,17 @@ function nameToColor(name: string): string {
   return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
 }
 
-const SYSTEM_PROMPT = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements.
+const SYSTEM_PROMPT = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
 COUNT items (type: "count") — return a single center point for each instance detected:
-- Doors: classify as "Single Door" (single-leaf swing) or "Double Door" (double-leaf / bi-parting swing)
-- Windows: classify as "Window" (all types: casement, sliding, awning, fixed)
-- Plumbing fixtures: "Toilet", "Sink", "Kitchen Sink", "Bathtub"
-- Furniture: "Chair", "Office Chair", "Table", "Dining Table", "Desk"
-- Parking: "Parking Space" (each individual stall)
+- "Single Swing Door": a door with one leaf that swings on hinges (shown as an arc on blueprints)
+- "Double Swing Door": a door with two leaves that swing open from the center
+- "Window": all window types (casement, sliding, awning, fixed, double-hung) — shown as parallel lines in walls
+- "Electrical Outlet": wall-mounted power outlets, switches, and junction boxes (shown as circles or symbols on walls)
+- "Plumbing Fixture": toilets, sinks, kitchen sinks, bathtubs, showers, urinals, floor drains
+- "Column": structural columns, pillars, posts (shown as filled rectangles or circles in the plan)
+- "Parking Space": each individual parking stall (shown as lined rectangles in parking areas)
+- Other furniture: "Chair", "Table", "Desk" if visible
 
 AREA items (type: "area") — return polygon points tracing the boundary:
 - Rooms, spaces (living room, bedroom, bathroom, kitchen, etc.)
@@ -45,7 +48,9 @@ AREA items (type: "area") — return polygon points tracing the boundary:
 LINEAR items (type: "linear") — return two endpoints:
 - Walls, beams, fences, roads
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex), confidence: number (0-1) }. No prose, no markdown fences.`;
+For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
+
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex), confidence: number (0-1) }. No prose, no markdown fences.`;
 
 /**
  * Analyze a blueprint page image using OpenAI vision and return detected elements.
@@ -55,8 +60,8 @@ export async function analyzePageImage(
   pageWidth: number,
   pageHeight: number,
 ): Promise<AIDetectedElement[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured — set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in .env.local');
 
   const content = [
     {
