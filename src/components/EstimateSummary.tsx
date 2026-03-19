@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
@@ -24,9 +24,42 @@ function formatCurrency(value: number): string {
 export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemblies }: EstimateSummaryProps) {
   const projectId = useStore((s) => s.projectId);
   const assemblies = useStore((s) => s.assemblies);
+  const setAssemblies = useStore((s) => s.setAssemblies);
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+
+  // Fetch assemblies from API when this tab mounts (in case AssembliesPanel hasn't loaded them yet)
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    fetch(`/api/projects/${projectId}/assemblies`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !Array.isArray(data.assemblies)) return;
+        const mapped: Assembly[] = data.assemblies.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          classificationId: row.classificationId ?? '',
+          isLibrary: false,
+          materials: row.materials ?? [
+            {
+              id: row.id,
+              name: row.name,
+              unitCost: row.unitCost ?? 0,
+              wasteFactor: 0,
+              coverageRate: 0,
+              unit: row.unit ?? 'SF',
+            },
+          ],
+        }));
+        setAssemblies(mapped);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('EstimateSummary: failed to fetch assemblies:', err);
+      });
+    return () => { cancelled = true; };
+  }, [projectId, setAssemblies]);
 
   const ppu = scale?.pixelsPerUnit || 1;
 
