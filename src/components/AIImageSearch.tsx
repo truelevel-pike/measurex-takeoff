@@ -84,8 +84,8 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: A
       }
 
       setResult(data as VisionResult);
-    } catch (err: any) {
-      setError(err?.message || 'Vision search failed.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Vision search failed.');
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     // Placeholder persists; real impl would update project state in DB
     return NextResponse.json({ ok: true, polygon: body });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Persist failed' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : 'Persist failed') }, { status: 500 });
   }
 }

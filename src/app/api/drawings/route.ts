@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     // Placeholder for drawing uploads (would use storage service)
     const body = await req.json();
     return NextResponse.json({ ok: true, body });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : 'Upload failed') }, { status: 500 });
   }
 }

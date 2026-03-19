@@ -21,8 +21,7 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
   const setTool = useStore((s) => s.setTool);
 
   const startCalibrationDraw = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setTool('calibrate' as any);
+    setTool('calibrate');
     setStep('drawing');
   }, [setTool]);
 
@@ -31,8 +30,7 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
       const ce = e as CustomEvent<{ lengthPx: number }>;
       setLineLengthPx(ce.detail.lengthPx);
       setStep('dimension');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setTool('select' as any);
+      setTool('select');
     };
     window.addEventListener('calibration-line-complete', handler);
     return () => window.removeEventListener('calibration-line-complete', handler);
@@ -79,8 +77,7 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
           <div className="flex flex-col gap-3 items-center text-center">
             <p className="text-sm text-cyan-300 font-medium animate-pulse">Calibration mode active — click two points on the canvas spanning a known distance</p>
             <p className="text-xs text-gray-400">A line will be drawn between your two clicks.</p>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            <button onClick={() => { setTool('select' as any); setStep('intro'); }} className="px-3 py-1.5 rounded text-xs text-gray-300 border border-gray-600 hover:border-gray-400">Cancel</button>
+            <button onClick={() => { setTool('select'); setStep('intro'); }} className="px-3 py-1.5 rounded text-xs text-gray-300 border border-gray-600 hover:border-gray-400">Cancel</button>
           </div>
         )}
 

@@ -1362,7 +1362,7 @@ function PageInner() {
       />
 
       {/* Calibration draw overlay — captures two clicks when tool is 'calibrate' */}
-      {currentTool === ('calibrate' as string) && (
+      {currentTool === 'calibrate' && (
         <div
           className="fixed inset-0 z-40"
           style={{ cursor: 'crosshair', background: 'transparent' }}

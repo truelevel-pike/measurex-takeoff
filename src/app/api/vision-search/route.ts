@@ -109,10 +109,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(parsed);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[vision-search] Error:', err);
     return NextResponse.json(
-      { error: err?.message || 'Vision search failed.' },
+      { error: (err instanceof Error ? err.message : 'Vision search failed.') },
       { status: 500 },
     );
   }

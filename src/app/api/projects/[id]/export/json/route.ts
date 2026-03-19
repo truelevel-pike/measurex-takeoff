@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         'Content-Length': String(new TextEncoder().encode(json).byteLength),
       },
     });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  } catch (err: unknown) {
+    return new Response(JSON.stringify({ error: (err instanceof Error ? err.message : String(err)) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

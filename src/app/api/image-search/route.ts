@@ -213,7 +213,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ provider: 'None', results: [] });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Image search failed.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : 'Image search failed.') }, { status: 500 });
   }
 }

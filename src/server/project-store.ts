@@ -266,8 +266,8 @@ export async function deleteProject(projectId: string): Promise<boolean> {
       try {
         const { error } = await sb.from(table).delete().eq('project_id', projectId);
         if (error) throw error;
-      } catch (err: any) {
-        const msg = err?.message ?? String(err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         console.error(`[deleteProject] failed deleting ${table} for project ${projectId}:`, msg);
         throw new Error(`deleteProject: failed to delete from ${table}: ${msg}`);
       }

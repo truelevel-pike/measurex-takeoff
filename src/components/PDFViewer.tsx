@@ -221,9 +221,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           renderTaskRef.current = renderTask;
           try {
             await renderTask.promise;
-          } catch (err: any) {
+          } catch (err: unknown) {
             // RenderingCancelledException is expected when we cancel; swallow it
-            if (err?.name === 'RenderingCancelledException') return;
+            if (err instanceof Error && err.name === 'RenderingCancelledException') return;
             throw err;
           } finally {
             if (renderTaskRef.current === renderTask) renderTaskRef.current = null;

@@ -46,8 +46,8 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
         );
         setProjects(list);
         if (list.length > 0) setSelectedProjectId(list[0].id);
-      } catch (err: any) {
-        setError(err.message ?? 'Failed to load projects');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load projects');
       } finally {
         setFetching(false);
       }
@@ -72,8 +72,8 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
       const data: CompareResult = await res.json();
       setResult(data);
       onOverlay({ added: data.added, removed: data.removed, unchanged: data.unchanged });
-    } catch (err: any) {
-      setError(err.message ?? 'Compare failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Compare failed');
     } finally {
       setLoading(false);
     }

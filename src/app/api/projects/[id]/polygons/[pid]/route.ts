@@ -10,8 +10,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updated = await updatePolygon(id, pid, body);
     if (updated) broadcastToProject(id, 'polygon:updated', updated);
     return NextResponse.json({ polygon: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -22,7 +22,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const ok = await deletePolygon(id, pid);
     if (ok) broadcastToProject(id, 'polygon:deleted', { id: pid });
     return NextResponse.json({ ok });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

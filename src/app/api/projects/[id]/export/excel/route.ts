@@ -196,7 +196,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         'Content-Length': String(nodeBuf.byteLength),
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

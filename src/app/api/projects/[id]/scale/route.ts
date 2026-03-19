@@ -8,8 +8,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const scale = await getScale(id);
     return NextResponse.json({ scale });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual', pageNumber: pageNumber || 1 });
     broadcastToProject(id, 'scale:updated', scale);
     return NextResponse.json({ scale });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

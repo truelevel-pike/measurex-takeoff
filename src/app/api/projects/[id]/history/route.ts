@@ -13,8 +13,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const history = await getHistory(id, limit);
 
     return NextResponse.json({ history });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[GET /history]', err);
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : 'Internal error') }, { status: 500 });
   }
 }

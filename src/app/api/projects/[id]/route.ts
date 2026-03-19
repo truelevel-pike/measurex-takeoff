@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
+import type { Classification, Polygon } from '@/lib/types';
+import type { PageInfo } from '@/server/project-store';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,10 +16,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     // Bundle full state so the client can hydrate in a single round-trip
     const [classifications, polygons, scale, pages, thumbnail] = await Promise.all([
-      getClassifications(id).catch(() => [] as any[]),
-      getPolygons(id).catch(() => [] as any[]),
+      getClassifications(id).catch(() => [] as Classification[]),
+      getPolygons(id).catch(() => [] as Polygon[]),
       getScale(id).catch(() => null),
-      getPages(id).catch((e) => { console.error('getPages error:', e); return [] as any[]; }),
+      getPages(id).catch((e) => { console.error('getPages error:', e); return [] as PageInfo[]; }),
       getThumbnail(id).catch(() => null),
     ]);
 
@@ -50,9 +52,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         },
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -90,9 +92,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     const updated = await updateProject(id, metaPatch);
     return NextResponse.json({ project: updated });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -110,8 +112,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.metadata && typeof body.metadata === 'object') patch.metadata = body.metadata;
     const updated = await updateProject(id, patch as any);
     return NextResponse.json({ project: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -125,8 +127,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     }
     const ok = await deleteProject(id);
     return NextResponse.json({ ok });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

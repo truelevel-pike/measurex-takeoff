@@ -9,8 +9,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const ok = await deleteClassification(id, cid);
     if (ok) broadcastToProject(id, 'classification:deleted', { id: cid });
     return NextResponse.json({ ok });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -30,7 +30,7 @@ async function patchClassification(req: Request, params: Promise<{ id: string; c
     const updated = await updateClassification(id, cid, body);
     if (updated) broadcastToProject(id, 'classification:updated', updated);
     return NextResponse.json({ classification: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

@@ -39,7 +39,8 @@ export type Tool =
   | 'cut'
   | 'ai'
   | 'measure'
-  | 'annotate';
+  | 'annotate'
+  | 'calibrate';
 
 export interface Store extends ProjectState {
   // UI state

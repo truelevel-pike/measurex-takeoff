@@ -13,8 +13,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     broadcastToProject(id, 'assembly:updated', updated);
     return NextResponse.json({ assembly: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -28,7 +28,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     }
     broadcastToProject(id, 'assembly:deleted', { id: aid });
     return new Response(null, { status: 204 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

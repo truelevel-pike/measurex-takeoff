@@ -12,8 +12,8 @@ export async function GET() {
       })
     );
     return NextResponse.json({ projects: withThumbnails });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 });
     const project = await createProject(name);
     return NextResponse.json({ project });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Create failed' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : 'Create failed') }, { status: 500 });
   }
 }

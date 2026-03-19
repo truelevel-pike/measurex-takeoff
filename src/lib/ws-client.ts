@@ -190,10 +190,8 @@ function handleSSEMessage(raw: MessageEvent) {
       emitActivity('page:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
-    default: {
-      console.warn('[ws-client] Unknown SSE event type:', parsed.event);
+    default:
       break;
-    }
   }
 }
 
