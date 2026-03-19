@@ -468,7 +468,7 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
               .map((run, idx) => (
                 <div
                   key={run.id}
-                  className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
+                  className="group relative flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
                 >
                   <div className="mt-0.5">
                     <Zap size={14} className={idx === 0 ? 'text-emerald-400' : 'text-gray-500'} />
@@ -489,15 +489,51 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
                     </p>
                     <span className="text-[10px] text-gray-500">{timeAgo(run.timestamp)}</span>
                   </div>
-                  {idx !== 0 && onRestoreRun && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {idx !== 0 && onRestoreRun && (
+                      <button
+                        type="button"
+                        onClick={() => onRestoreRun(run)}
+                        className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
+                      >
+                        <RotateCcw size={10} />
+                        Restore
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => onRestoreRun(run)}
-                      className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors flex-shrink-0"
+                      onClick={() => setRerunPickerRunId(rerunPickerRunId === run.id ? null : run.id)}
+                      className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
                     >
                       <RotateCcw size={10} />
-                      Restore
+                      Re-run ↻
                     </button>
+                  </div>
+                  {rerunPickerRunId === run.id && (
+                    <div className="absolute right-2 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 min-w-[180px]">
+                      <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
+                        Re-run with model
+                      </div>
+                      {AVAILABLE_MODELS.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            if (onRerunWithModel) {
+                              onRerunWithModel(run, m.id);
+                            }
+                            addToast(`Re-running page ${run.pageRange} with ${m.label}…`, 'info');
+                            setRerunPickerRunId(null);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-gray-700/60 transition-colors flex items-center gap-2 ${
+                            run.model === m.id ? 'text-emerald-400' : 'text-gray-300'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${run.model === m.id ? 'bg-emerald-400' : 'bg-transparent'}`} />
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))
