@@ -142,11 +142,23 @@ export default function ProjectsPage() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
+      const trimmed = newName.trim();
+      // BUG-R5-005: check for duplicate project name — open existing instead of creating
+      const existing = projects.find(
+        (p) => p.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (existing) {
+        handleOpen(existing.id);
+        setShowCreate(false);
+        setNewName('');
+        return;
+      }
+
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newName.trim(),
+          name: trimmed,
           state: {
             classifications: [],
             polygons: [],
