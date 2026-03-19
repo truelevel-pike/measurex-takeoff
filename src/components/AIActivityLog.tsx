@@ -73,9 +73,12 @@ export default function AIActivityLog() {
   return (
     <div className="bg-[#0d0d1a] border border-[rgba(0,212,255,0.15)] rounded-lg overflow-hidden w-72">
       {/* Header */}
-      <button
-        className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-cyan-300 hover:bg-[rgba(0,212,255,0.05)] transition-colors"
+      <div
+        className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-cyan-300 hover:bg-[rgba(0,212,255,0.05)] transition-colors cursor-pointer"
+        role="button"
+        tabIndex={0}
         onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed((v) => !v); } }}
       >
         <span>AI Activity Log</span>
         <div className="flex items-center gap-1">
@@ -93,7 +96,7 @@ export default function AIActivityLog() {
           )}
           {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
         </div>
-      </button>
+      </div>
 
       {/* Body */}
       {!collapsed && (
