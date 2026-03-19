@@ -121,6 +121,13 @@ export const ChatBodySchema = z.object({
     classifications: z.array(z.string()).optional(),
     quantities: z.array(QuantityEntrySchema).optional(),
     polygonCount: z.number().optional(),
+    currentPage: z.number().optional(),
+    totalPages: z.number().optional(),
+    pageBreakdown: z.record(z.string(), z.array(z.object({
+      classificationId: z.string(),
+      name: z.string(),
+      count: z.number(),
+    }))).optional(),
   }).optional(),
 }).refine(
   (d) => d.message !== undefined || d.messages !== undefined,

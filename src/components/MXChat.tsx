@@ -42,6 +42,8 @@ export default function MXChat({ onClose }: MXChatProps) {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const currentPage = useStore((s) => s.currentPage);
+  const totalPages = useStore((s) => s.totalPages);
   const ppu = scale?.pixelsPerUnit ?? 1;
   const unit = scale?.unit ?? 'ft';
 
@@ -69,7 +71,7 @@ export default function MXChat({ onClose }: MXChatProps) {
     inputRef.current?.focus();
   }, []);
 
-  // Build per-classification quantities
+  // Build per-classification quantities (all pages + current page breakdown)
   const buildContext = useCallback(() => {
     const quantities: QuantityEntry[] = classifications.map((c) => {
       const classPolygons = polygons.filter((p) => p.classificationId === c.id);
@@ -85,15 +87,32 @@ export default function MXChat({ onClose }: MXChatProps) {
 
     const totalArea = polygons.reduce((sum, p) => sum + p.area, 0) / (ppu * ppu);
 
+    // Per-page breakdown so the AI can answer page-specific questions
+    const pageBreakdown: Record<number, { classificationId: string; name: string; count: number }[]> = {};
+    for (let pg = 1; pg <= totalPages; pg++) {
+      const pagePolygons = polygons.filter((p) => p.pageNumber === pg);
+      const perClass: Record<string, { classificationId: string; name: string; count: number }> = {};
+      for (const poly of pagePolygons) {
+        const cls = classifications.find((c) => c.id === poly.classificationId);
+        if (!cls) continue;
+        if (!perClass[cls.id]) perClass[cls.id] = { classificationId: cls.id, name: cls.name, count: 0 };
+        perClass[cls.id].count += 1;
+      }
+      pageBreakdown[pg] = Object.values(perClass);
+    }
+
     return {
       classificationCount: classifications.length,
       polygonCount: polygons.length,
       totalArea,
       unit,
+      currentPage,
+      totalPages,
       classifications: classifications.map((c) => c.name).slice(0, 20),
       quantities,
+      pageBreakdown,
     };
-  }, [classifications, polygons, ppu, unit]);
+  }, [classifications, polygons, ppu, unit, currentPage, totalPages]);
 
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();

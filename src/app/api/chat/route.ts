@@ -34,18 +34,32 @@ export async function POST(req: Request) {
     let contextBlock = '';
     if (context) {
       const parts: string[] = [];
+      if (context.currentPage != null) parts.push(`Viewer is on page: ${context.currentPage} of ${context.totalPages ?? 1}`);
       parts.push(`Classifications: ${context.classificationCount ?? 0}`);
       parts.push(`Polygons: ${context.polygonCount ?? 0}`);
       parts.push(`Total measured area: ${(context.totalArea ?? 0).toFixed(1)} sq ${context.unit ?? 'ft'}`);
 
       if (context.quantities && context.quantities.length > 0) {
-        const qLines = context.quantities.map((q) => {
+        const qLines = context.quantities.map((q: { type: string; name: string; count?: number; value: number; unit: string }) => {
           if (q.type === 'count') return `  - ${q.name}: ${q.count ?? 0} count`;
           return `  - ${q.name}: ${q.value.toFixed(1)} ${q.unit}${q.count ? ` (${q.count} polygons)` : ''}`;
         });
-        parts.push(`\nQuantities by classification:\n${qLines.join('\n')}`);
+        parts.push(`\nQuantities by classification (all pages):\n${qLines.join('\n')}`);
       } else if (context.classifications && context.classifications.length > 0) {
         parts.push(`Classification names: ${context.classifications.join(', ')}`);
+      }
+
+      // Per-page breakdown for page-specific queries
+      if (context.pageBreakdown && typeof context.pageBreakdown === 'object') {
+        const pageLines: string[] = [];
+        for (const [pg, entries] of Object.entries(context.pageBreakdown as Record<string, Array<{ name: string; count: number }>>)) {
+          if (entries.length === 0) continue;
+          const entryStr = entries.map((e) => `${e.name}: ${e.count}`).join(', ');
+          pageLines.push(`  Page ${pg}: ${entryStr}`);
+        }
+        if (pageLines.length > 0) {
+          parts.push(`\nPolygon counts by page:\n${pageLines.join('\n')}`);
+        }
       }
 
       contextBlock = `\n\nCurrent project takeoff data:\n${parts.join('\n')}`;
