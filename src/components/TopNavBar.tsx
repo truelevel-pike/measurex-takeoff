@@ -94,6 +94,8 @@ export default function TopNavBar({
   onSettings,
   onToggleTakeoffSearch,
   isTakeoffSearchOpen,
+  onToggleTextSearch,
+  isTextSearchOpen,
   projectId,
   onProjectNameSaved,
   onGoToPage,
@@ -236,6 +238,13 @@ export default function TopNavBar({
             srLabel="Open projects"
             tooltip="Projects"
             onClick={() => router.push('/projects')}
+          />
+          <NavIconButton
+            ariaLabel="Classification Library"
+            icon={<BookOpen size={18} aria-hidden="true" />}
+            srLabel="Classification Library"
+            tooltip="Library"
+            onClick={() => router.push('/library')}
           />
 
           {/* Brand */}
@@ -593,6 +602,14 @@ export default function TopNavBar({
                 ariaPressed={isTakeoffSearchOpen}
               />
               <NavIconButton
+                ariaLabel={isTextSearchOpen ? 'Hide text search' : 'Search pages & labels'}
+                srLabel={isTextSearchOpen ? 'Hide text search' : 'Search pages & labels'}
+                icon={<Search size={17} aria-hidden="true" />}
+                tooltip="Text Search (Ctrl+F)"
+                onClick={onToggleTextSearch}
+                ariaPressed={isTextSearchOpen}
+              />
+              <NavIconButton
                 ariaLabel="Project settings"
                 srLabel="Project settings"
                 icon={<Settings size={17} aria-hidden="true" />}
@@ -696,6 +713,13 @@ export default function TopNavBar({
             style={{ touchAction: 'manipulation' }}
           >
             <Search size={16} /> {isTakeoffSearchOpen ? 'Hide Search' : 'Search Takeoff'}
+          </button>
+          <button
+            onClick={() => { onToggleTextSearch?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Search size={16} /> {isTextSearchOpen ? 'Hide Text Search' : 'Text Search'}
           </button>
           <button
             onClick={() => { onSettings?.(); setShowMobileMenu(false); }}

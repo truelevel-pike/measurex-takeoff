@@ -29,6 +29,7 @@ import {
   XCircle,
   Upload,
   Loader2,
+  BookOpen,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { ProjectState } from '@/lib/types';
@@ -587,6 +588,10 @@ export default function ProjectsPage() {
             <option value="az">A-Z</option>
             <option value="za">Z-A</option>
           </select>
+          <button aria-label="Classification Library" onClick={() => router.push('/library')}
+            className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            <BookOpen size={14} aria-hidden /> Library
+          </button>
           <button aria-label="Compare Drawings" onClick={() => setShowCompare(true)}
             className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
             <GitCompare size={14} aria-hidden /> Compare
