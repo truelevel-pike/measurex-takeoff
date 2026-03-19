@@ -56,6 +56,7 @@ interface TopNavBarProps {
   onSettings?: () => void;
   onToggleTakeoffSearch?: () => void;
   isTakeoffSearchOpen?: boolean;
+  onGoToPage?: (page: number) => void;
 }
 
 export default function TopNavBar({
@@ -84,6 +85,7 @@ export default function TopNavBar({
   onSettings,
   onToggleTakeoffSearch,
   isTakeoffSearchOpen,
+  onGoToPage,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -99,6 +101,9 @@ export default function TopNavBar({
   const { addToast } = useToast();
 
   const [shareLoading, setShareLoading] = React.useState(false);
+  const [isEditingPage, setIsEditingPage] = React.useState(false);
+  const [pageInputValue, setPageInputValue] = React.useState('');
+  const pageInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleCopyLink = React.useCallback(async () => {
     try {
@@ -235,6 +240,13 @@ export default function TopNavBar({
             aria-label={`Current sheet: ${badge}`}
             role="status"
             aria-live="polite"
+            onClick={() => {
+              if (onGoToPage && typeof pageIndex === 'number' && typeof totalPages === 'number') {
+                setIsEditingPage(true);
+                setPageInputValue(String(pageIndex + 1));
+                setTimeout(() => pageInputRef.current?.select(), 0);
+              }
+            }}
             style={{
               background: 'rgba(0,212,255,0.1)',
               border: '1px solid rgba(0,212,255,0.35)',
@@ -248,10 +260,50 @@ export default function TopNavBar({
               alignItems: 'center',
               gap: 6,
               boxShadow: '0 0 12px rgba(0,212,255,0.15) inset',
+              cursor: onGoToPage ? 'pointer' : 'default',
             }}
           >
             <Layers size={13} aria-hidden="true" />
-            {badge}
+            {isEditingPage && typeof totalPages === 'number' ? (
+              <input
+                ref={pageInputRef}
+                type="number"
+                min={1}
+                max={totalPages}
+                value={pageInputValue}
+                onChange={(e) => setPageInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = Math.max(1, Math.min(totalPages, parseInt(pageInputValue, 10) || 1));
+                    onGoToPage?.(val - 1);
+                    setIsEditingPage(false);
+                  } else if (e.key === 'Escape') {
+                    setIsEditingPage(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (isEditingPage) {
+                    const val = Math.max(1, Math.min(totalPages, parseInt(pageInputValue, 10) || 1));
+                    onGoToPage?.(val - 1);
+                    setIsEditingPage(false);
+                  }
+                }}
+                style={{
+                  background: 'rgba(0,0,0,0.4)',
+                  color: '#00d4ff',
+                  border: '1px solid rgba(0,212,255,0.5)',
+                  borderRadius: 4,
+                  width: 42,
+                  padding: '1px 4px',
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  textAlign: 'center',
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <span style={{ textDecoration: onGoToPage ? 'underline dotted rgba(0,212,255,0.4)' : 'none', textUnderlineOffset: 3 }}>{badge}</span>
+            )}
           </div>
         </div>
 

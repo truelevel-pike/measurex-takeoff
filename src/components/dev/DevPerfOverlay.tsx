@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function DevPerfOverlay() {
   const isDev = process.env.NODE_ENV === 'development';
-  const show = isDev;
+  const [visible, setVisible] = useState(false);
 
   const rafRef = useRef(0);
   const framesRef = useRef(0);
@@ -16,8 +16,21 @@ export default function DevPerfOverlay() {
     polygonDraw: null,
   });
 
+  // Toggle overlay with Ctrl+Shift+F
   useEffect(() => {
-    if (!show) return;
+    if (!isDev) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setVisible((v) => !v);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDev]);
+
+  useEffect(() => {
+    if (!visible) return;
 
     // Initialise global perf marks store
     if (!window.__perfMarks) {
@@ -42,9 +55,9 @@ export default function DevPerfOverlay() {
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [show]);
+  }, [visible]);
 
-  if (!show) return null;
+  if (!isDev || !visible) return null;
 
   return (
     <div

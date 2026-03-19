@@ -237,6 +237,7 @@ export default function ProjectsPage() {
       setShowCreate(false);
       setNewName('');
       setNewProjectTags([]);
+      loadProjects();
       handleOpen(data.project.id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Create failed';

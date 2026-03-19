@@ -1267,6 +1267,13 @@ function PageInner() {
         onSettings={() => setShowProjectSettings(true)}
         onToggleTakeoffSearch={() => setShowTakeoffSearch((prev) => !prev)}
         isTakeoffSearchOpen={showTakeoffSearch}
+        onGoToPage={(zeroBasedPage) => {
+          const page = zeroBasedPage + 1;
+          const clamped = Math.max(1, Math.min(totalPages, page));
+          setCurrentPageNum(clamped);
+          setCurrentPage(clamped, totalPages);
+          safeGoToPage(clamped, 'top-nav:go-to-page');
+        }}
         onPrev={() => {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);
