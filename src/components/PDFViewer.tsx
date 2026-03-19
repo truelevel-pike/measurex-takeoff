@@ -62,7 +62,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const renderVersionRef = useRef(0);
     // Current in-flight renderTask for cancellation
     const renderTaskRef = useRef<any>(null);
-    // Keep onPageChange in a ref so goToPage always calls the latest version without needing it in deps
+    const retryCancelRef = useRef<(() => void) | null>(null);
+    // Keep onPageChange in a ref so load/goToPage always call the latest version without needing it in deps
     const onPageChangeRef = useRef(onPageChange);
     useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
 
@@ -82,6 +83,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // ISSUE #1: When file becomes null/undefined, clear prior viewer state
     useEffect(() => {
       if (file) return;
+      retryCancelRef.current?.();
+      retryCancelRef.current = null;
       // Destroy any loaded doc
       if (pdfDocRef.current) {
         void pdfDocRef.current.destroy();
@@ -139,7 +142,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           setTotalPages(doc.numPages);
           totalPagesRef.current = doc.numPages;
           setCurrentPage(1);
-          onPageChange?.(1, doc.numPages);
+          onPageChangeRef.current?.(1, doc.numPages);
         } catch (err) {
           if (cancelled) return;
           const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -150,6 +153,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       loadPdf();
       return () => {
         cancelled = true;
+        retryCancelRef.current?.();
+        retryCancelRef.current = null;
         // ISSUE #2: Destroy on unmount or file change
         if (loadedDoc) {
           void loadedDoc.destroy();
@@ -160,7 +165,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           pdfDocRef.current = null;
         }
       };
-    }, [file, onPageChange]);
+    }, [file]);
 
     // actuallyRender uses refs so it's always current — no stale closure issues
     // ISSUE #4: render-version guard aborts stale renders after each await
@@ -248,10 +253,16 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       [onDimensionsChange, onTextExtracted]
     );
 
-    // Render current page — stable deps: only re-runs when page or zoom actually changes
+    // ISSUE #6 FIX: pendingRender uses a "latest-wins / dirty-flag" pattern.
+    // Rapid page changes collapse to a single queued render: each new call overwrites
+    // pendingRender with the LATEST requested page number. When the current render
+    // finishes, actuallyRender drains the pending slot once — always rendering the
+    // most-recently requested page. This avoids unbounded queuing while guaranteeing
+    // the final visible page is always the most recently requested one.
     const renderPage = useCallback(
       (pageNum: number) => {
         if (isRenderingRef.current) {
+          // Latest wins: overwrite any earlier pending page with the newest request
           pendingRender.current = pageNum;
           return;
         }
@@ -331,6 +342,19 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     }, [setZoom]);
 
     // Zoom to cursor
+    // ISSUE #7 FIX: correct cursor-anchored zoom math.
+    // Previous code subtracted pan before computing the canvas-space pivot, but that
+    // produced wrong offsets because the pan translation lives outside the canvas
+    // coordinate space. The correct approach:
+    //   1. Convert mouse position to canvas-space coords by accounting for container
+    //      origin AND the current pan offset: canvasX = (mouseX - containerLeft - panX) / currentScale
+    //      (divided by scale because the canvas itself is rendered at zoom * 1.5)
+    //   2. After applying the new zoom, recompute panX so the same canvas point
+    //      remains under the cursor: panX' = mouseX - containerLeft - canvasX * nextZoom
+    // We skip the /currentScale division here because pan is in CSS pixels (not canvas
+    // render pixels), so the simpler formulation is: keep the screen-space vector from
+    // origin to cursor invariant — i.e. panX' = panX - pivotX*(newZoom/oldZoom - 1)
+    // where pivotX = mouseX - containerLeft - panX (screen offset from pan-origin to cursor).
     const handleWheel = useCallback(
       (e: React.WheelEvent) => {
         if (!(e.ctrlKey || e.metaKey)) return;
@@ -338,17 +362,29 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         const container = containerRef.current;
         if (!container) return;
         const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left - pan.x;
-        const mouseY = e.clientY - rect.top - pan.y;
         const prevZoom = zoom;
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         const nextZoom = Math.max(0.25, Math.min(5, prevZoom + delta));
-        // adjust pan so the content under cursor stays fixed
-        const scale = nextZoom / prevZoom;
-        setPan({ x: pan.x - mouseX * (scale - 1), y: pan.y - mouseY * (scale - 1) });
+
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        const pageWidthAtZoom1 = pageDimensions.width > 0 ? pageDimensions.width / prevZoom : 0;
+        const pageHeightAtZoom1 = pageDimensions.height > 0 ? pageDimensions.height / prevZoom : 0;
+        const prevOffsetX = pageWidthAtZoom1 > 0 ? (container.clientWidth - pageWidthAtZoom1 * prevZoom) / 2 : 0;
+        const prevOffsetY = pageHeightAtZoom1 > 0 ? (container.clientHeight - pageHeightAtZoom1 * prevZoom) / 2 : 0;
+        const nextOffsetX = pageWidthAtZoom1 > 0 ? (container.clientWidth - pageWidthAtZoom1 * nextZoom) / 2 : 0;
+        const nextOffsetY = pageHeightAtZoom1 > 0 ? (container.clientHeight - pageHeightAtZoom1 * nextZoom) / 2 : 0;
+        // Pivot point in centered-page space (page origin inside flex container + pan).
+        const pivotX = pointerX - pan.x - prevOffsetX;
+        const pivotY = pointerY - pan.y - prevOffsetY;
+        const ratio = nextZoom / prevZoom;
+        setPan({
+          x: pan.x - pivotX * (ratio - 1) + (prevOffsetX - nextOffsetX),
+          y: pan.y - pivotY * (ratio - 1) + (prevOffsetY - nextOffsetY),
+        });
         setZoom(nextZoom);
       },
-      [zoom, pan, setZoom]
+      [zoom, pan, pageDimensions, setZoom]
     );
 
     // Pan handlers with pointer cancel/out
@@ -437,6 +473,12 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
     const onTouchStart = useCallback((e: React.TouchEvent) => {
       if (e.touches.length === 1) {
+        // ISSUE #9 FIX: only activate one-finger pan when a navigation tool is active.
+        // Draw/measure tools need single-finger touch for their own gesture handling;
+        // allowing pan here would intercept pointer events before the tool can act.
+        const tool = useStore.getState().currentTool;
+        const panTools: string[] = ['pan', 'select'];
+        if (!panTools.includes(tool)) return;
         // begin pan
         setIsPanning(true);
         const t = e.touches[0];
@@ -465,14 +507,25 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         // adjust pan so the content under pinch center stays fixed
         const rect = containerRef.current?.getBoundingClientRect();
         if (rect) {
-          const cx = center.x - rect.left - pan.x;
-          const cy = center.y - rect.top - pan.y;
+          const pointerX = center.x - rect.left;
+          const pointerY = center.y - rect.top;
+          const pageWidthAtZoom1 = pageDimensions.width > 0 ? pageDimensions.width / zoom : 0;
+          const pageHeightAtZoom1 = pageDimensions.height > 0 ? pageDimensions.height / zoom : 0;
+          const prevOffsetX = pageWidthAtZoom1 > 0 ? (rect.width - pageWidthAtZoom1 * zoom) / 2 : 0;
+          const prevOffsetY = pageHeightAtZoom1 > 0 ? (rect.height - pageHeightAtZoom1 * zoom) / 2 : 0;
+          const nextOffsetX = pageWidthAtZoom1 > 0 ? (rect.width - pageWidthAtZoom1 * nextZoom) / 2 : 0;
+          const nextOffsetY = pageHeightAtZoom1 > 0 ? (rect.height - pageHeightAtZoom1 * nextZoom) / 2 : 0;
+          const cx = pointerX - pan.x - prevOffsetX;
+          const cy = pointerY - pan.y - prevOffsetY;
           const factor = nextZoom / zoom;
-          setPan({ x: pan.x - cx * (factor - 1), y: pan.y - cy * (factor - 1) });
+          setPan({
+            x: pan.x - cx * (factor - 1) + (prevOffsetX - nextOffsetX),
+            y: pan.y - cy * (factor - 1) + (prevOffsetY - nextOffsetY),
+          });
         }
         setZoom(nextZoom);
       }
-    }, [isPanning, pan, panStart, zoom, setZoom]);
+    }, [isPanning, pan, panStart, zoom, pageDimensions, setZoom]);
 
     const onTouchEnd = useCallback(() => {
       setIsPanning(false);
@@ -485,15 +538,26 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       setCurrentPage(1);
       // Re-trigger load by forcing effect — toggle a render cycle
       if (file) {
+        retryCancelRef.current?.();
+        let cancelled = false;
+        retryCancelRef.current = () => { cancelled = true; };
+        const isCancelled = () => cancelled;
+
         const loadPdf = async () => {
           try {
             const pdfjsLib: any = await import('pdfjs-dist');
+            if (isCancelled()) return;
             if (pdfjsLib.GlobalWorkerOptions) {
               pdfjsLib.GlobalWorkerOptions.workerSrc =
                 `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
             }
             const arrayBuffer = await file.arrayBuffer();
+            if (isCancelled()) return;
             const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            if (isCancelled()) {
+              void doc.destroy();
+              return;
+            }
             pdfDocRef.current = doc;
             setPdfDoc(doc);
             setTotalPages(doc.numPages);
@@ -501,11 +565,12 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             setCurrentPage(1);
             onPageChange?.(1, doc.numPages);
           } catch (err) {
+            if (isCancelled()) return;
             const msg = err instanceof Error ? err.message : 'Unknown error';
             setLoadError(msg);
           }
         };
-        loadPdf();
+        void loadPdf();
       }
     }, [file, onPageChange]);
 
