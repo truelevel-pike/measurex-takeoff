@@ -87,7 +87,7 @@ export default function DrawingTool() {
       area: 0,
       linearFeet: 0,
       isComplete: true,
-      label: undefined,
+      label: cls.name,
     });
   }, [getSelectedClassification, addPolygon, drawingPage, addToast]);
 
@@ -101,7 +101,11 @@ export default function DrawingTool() {
       addToast('Please create or select a classification first', 'warning');
       return;
     }
-    performance.mark('polygon-draw-start');
+    const canMeasurePerf =
+      typeof performance !== 'undefined' &&
+      typeof performance.mark === 'function' &&
+      typeof performance.measure === 'function';
+    if (canMeasurePerf) performance.mark('polygon-draw-start');
     const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
     const ppu = scale?.pixelsPerUnit || 1;
     const linearFeet = linear ? calculateLinearFeet(currentPoints, ppu, false) : 0;
@@ -112,13 +116,18 @@ export default function DrawingTool() {
       area: areaPx,
       linearFeet,
       isComplete: true,
-      label: undefined,
+      label: cls.name,
     });
-    performance.mark('polygon-draw-end');
-    const polyMeasure = performance.measure('polygon-draw', 'polygon-draw-start', 'polygon-draw-end');
-    if (typeof window !== 'undefined') {
+    if (canMeasurePerf) {
+      performance.mark('polygon-draw-end');
+      const polyMeasure = performance.measure('polygon-draw', 'polygon-draw-start', 'polygon-draw-end');
+      if (typeof window !== 'undefined') {
+        if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
+        window.__perfMarks.polygonDraw = polyMeasure.duration;
+      }
+    } else if (typeof window !== 'undefined') {
       if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
-      window.__perfMarks.polygonDraw = polyMeasure.duration;
+      window.__perfMarks.polygonDraw = null;
     }
     setPointsAndRef([]);
     setTool('select');
@@ -207,7 +216,11 @@ export default function DrawingTool() {
   const cls = getSelectedClassification();
   const isLinear = cls?.type === 'linear';
   const previewArea = points.length >= 3 ? (calculatePolygonArea(points) / (ppu * ppu)) : 0;
-  const previewLength = points.length >= 2 ? openPathDistance(points, ppu) : 0;
+  const previewLength = points.length >= 1 && cursor
+    ? openPathDistance([...points, cursor], ppu)
+    : points.length >= 2
+      ? openPathDistance(points, ppu)
+      : 0;
 
   const vb = `0 0 ${baseDims.width} ${baseDims.height}`;
 
@@ -252,16 +265,20 @@ export default function DrawingTool() {
           </g>
         )}
       </svg>
-      {(isLinear ? points.length >= 2 : points.length >= 3) && (
+      {(isLinear ? (points.length >= 1 && cursor) : points.length >= 3) && (
         <div className="absolute bg-white/90 border border-blue-200 rounded px-2 py-1 text-xs font-mono text-blue-700 pointer-events-none"
           style={{
-            left: `${(points.reduce((s,p)=>s+p.x,0)/points.length / baseDims.width) * 100}%`,
-            top: `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
-            transform:'translate(-50%, -20px)',
+            left: isLinear && cursor
+              ? `${(cursor.x / baseDims.width) * 100}%`
+              : `${(points.reduce((s,p)=>s+p.x,0)/points.length / baseDims.width) * 100}%`,
+            top: isLinear && cursor
+              ? `${(cursor.y / baseDims.height) * 100}%`
+              : `${(points.reduce((s,p)=>s+p.y,0)/points.length / baseDims.height) * 100}%`,
+            transform:'translate(-50%, -28px)',
           }}>
           {hasScale
             ? isLinear
-              ? `${previewLength.toFixed(1)} ${unit}`
+              ? `${previewLength.toFixed(1)} LF`
               : `${previewArea.toFixed(1)} sq ${unit}`
             : '(Scale not set)'}
         </div>

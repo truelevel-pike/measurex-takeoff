@@ -75,6 +75,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
   const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
 
@@ -420,43 +421,94 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const polyWithDisplay = poly as typeof poly & { color?: string; fillOpacity?: number };
           const color = getPolygonColor(polyWithDisplay, cls?.color);
           const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted);
+          const isLinearPoly = cls?.type === 'linear';
+          const sharedStyle: React.CSSProperties = {
+            cursor: currentTool === 'select' ? 'pointer' : 'default',
+            animation: isHighlighted ? 'mx-polygon-flash 0.33s ease-in-out 6' : undefined,
+            filter: isHighlighted
+              ? 'drop-shadow(0 0 10px rgba(253,224,71,0.95))'
+              : isSelected
+              ? 'drop-shadow(0 0 6px rgba(0,255,136,0.6))'
+              : 'drop-shadow(0 0 4px rgba(0,212,255,0.25))',
+          };
 
           return (
             <g key={poly.id}>
-              <polygon
-                points={pointsStr}
-                fill={hexToRgba(color, fillOpacity)}
-                stroke={color}
-                strokeWidth={1.5}
-                vectorEffect="non-scaling-stroke"
-                style={{
-                  cursor: currentTool === 'select' ? 'pointer' : 'default',
-                  animation: isHighlighted ? 'mx-polygon-flash 0.33s ease-in-out 6' : undefined,
-                  filter: isHighlighted
-                    ? 'drop-shadow(0 0 10px rgba(253,224,71,0.95))'
-                    : isSelected
-                    ? 'drop-shadow(0 0 6px rgba(0,255,136,0.6))'
-                    : 'drop-shadow(0 0 4px rgba(0,212,255,0.25))',
-                }}
-                data-polygon-id={poly.id}
-                onClick={handlePolygonClick}
-                onContextMenu={handlePolygonContextMenu}
-                aria-label={cls?.name ?? 'Unknown classification'}
-              >
-                <title>{cls?.name ?? 'Polygon'}</title>
-              </polygon>
-              {isSelected && (
+              {isLinearPoly ? (
+                <>
+                  <polyline
+                    points={pointsStr}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                    style={sharedStyle}
+                    data-polygon-id={poly.id}
+                    onClick={handlePolygonClick as unknown as React.MouseEventHandler<SVGPolylineElement>}
+                    onContextMenu={handlePolygonContextMenu as unknown as React.MouseEventHandler<SVGPolylineElement>}
+                    aria-label={cls?.name ?? 'Unknown classification'}
+                  >
+                    <title>{cls?.name ?? 'Polyline'}</title>
+                  </polyline>
+                  {/* Endpoint dots for linear */}
+                  {displayPoints.length >= 2 && [0, displayPoints.length - 1].map((idx) => (
+                    <circle
+                      key={`ep-${idx}`}
+                      cx={displayPoints[idx].x}
+                      cy={displayPoints[idx].y}
+                      r={4}
+                      fill={color}
+                      stroke="#fff"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ))}
+                </>
+              ) : (
                 <polygon
                   points={pointsStr}
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth={2}
-                  strokeDasharray="8 6"
-                  opacity={0.75}
+                  fill={hexToRgba(color, fillOpacity)}
+                  stroke={color}
+                  strokeWidth={1.5}
                   vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
+                  style={sharedStyle}
                   data-polygon-id={poly.id}
-                />
+                  onClick={handlePolygonClick}
+                  onContextMenu={handlePolygonContextMenu}
+                  aria-label={cls?.name ?? 'Unknown classification'}
+                >
+                  <title>{cls?.name ?? 'Polygon'}</title>
+                </polygon>
+              )}
+              {isSelected && (
+                isLinearPoly ? (
+                  <polyline
+                    points={pointsStr}
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    strokeDasharray="8 6"
+                    opacity={0.75}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
+                    data-polygon-id={poly.id}
+                  />
+                ) : (
+                  <polygon
+                    points={pointsStr}
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    strokeDasharray="8 6"
+                    opacity={0.75}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
+                    data-polygon-id={poly.id}
+                  />
+                )
               )}
               {/* Corner handles when selected */}
               {isSelected &&
@@ -486,20 +538,24 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 const centX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
                 const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
                 if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
-                const ppu = scale?.pixelsPerUnit || 1;
+                const pageScale = scales[poly.pageNumber] ?? scale;
+                const ppu = pageScale?.pixelsPerUnit || 1;
                 // For count: show number of polygons in this classification on this page
                 const countForClass = clsType === 'count'
                   ? (polygonCountByClassification.get(poly.classificationId) ?? 0)
                   : 0;
                 const areaReal = poly.area / (ppu * ppu);
+                const linearReal = calculateLinearFeet(poly.points, ppu, false);
+                const rawLabel = (poly.label ?? cls?.name ?? '').trim();
                 const measureStr =
                   clsType === 'linear'
-                    ? `${poly.linearFeet.toFixed(1)} LF`
+                    ? `${linearReal.toFixed(1)} LF`
                     : clsType === 'count'
                     ? `${countForClass} EA`
                     : `${areaReal.toFixed(1)} SF`;
+                const displayStr = rawLabel ? `${rawLabel}: ${measureStr}` : measureStr;
                 const labelColor = cls?.color ?? '#00d4ff';
-                const longestLen = measureStr.length;
+                const longestLen = displayStr.length;
                 const labelW = Math.max(60, longestLen * 7 + 14);
                 const labelH = 20;
                 const rectX = centX - labelW / 2;
@@ -524,7 +580,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                       fontWeight="600"
                       style={{ userSelect: 'none' }}
                     >
-                      {measureStr}
+                      {displayStr}
                     </text>
                   </g>
                 );
