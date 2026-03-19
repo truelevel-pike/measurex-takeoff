@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check, Brain, Eye, EyeOff } from 'lucide-react';
+import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check, Brain, Eye, EyeOff, Key, Plus, Trash2, Copy } from 'lucide-react';
 import Link from 'next/link';
 import {
   type MeasurementSettings,
@@ -16,7 +16,15 @@ import {
 } from '@/lib/measurement-settings';
 import { type AiSettings, loadAiSettings, saveAiSettings } from '@/lib/ai-settings';
 
-type SettingsTab = 'profile' | 'measurements' | 'ai' | 'organization' | 'account';
+type SettingsTab = 'profile' | 'measurements' | 'ai' | 'organization' | 'account' | 'api-keys';
+
+interface ApiKey {
+  id: string;
+  label: string;
+  key: string;
+  createdAt: string;
+  lastUsed: string | null;
+}
 
 const AI_MODEL_OPTIONS = [
   { value: 'gpt-5.4', label: 'GPT-5.4' },
@@ -77,10 +85,44 @@ export default function SettingsPage() {
   // Organization state
   const [teamName, setTeamName] = useState('MeasureX Team');
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [showNewKey, setShowNewKey] = useState(false);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
+  const addApiKey = () => {
+    if (!newKeyLabel.trim() || !newKeyValue.trim()) return;
+    const key: ApiKey = {
+      id: Math.random().toString(36).slice(2),
+      label: newKeyLabel.trim(),
+      key: newKeyValue.trim(),
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+    };
+    setApiKeys(prev => [...prev, key]);
+    setNewKeyLabel('');
+    setNewKeyValue('');
+    setShowNewKey(false);
+  };
+
+  const removeApiKey = (id: string) => {
+    setApiKeys(prev => prev.filter(k => k.id !== id));
+  };
+
+  const copyKey = (id: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedKeyId(id);
+      setTimeout(() => setCopiedKeyId(null), 2000);
+    });
+  };
+
   const tabs: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { key: 'profile', label: 'Profile', icon: <User size={16} /> },
     { key: 'measurements', label: 'Measurements', icon: <Settings size={16} /> },
     { key: 'ai', label: 'AI', icon: <Brain size={16} /> },
+    { key: 'api-keys', label: 'API Keys', icon: <Key size={16} /> },
     { key: 'organization', label: 'Organization', icon: <Building2 size={16} /> },
     { key: 'account', label: 'Account', icon: <Shield size={16} /> },
   ];
@@ -502,6 +544,120 @@ export default function SettingsPage() {
                     This will permanently delete your account and all associated data.
                   </p>
                 </div>
+              </div>
+            </section>
+          )}
+          {activeTab === 'api-keys' && (
+            <section className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">API Keys</h2>
+                  <p className="text-xs text-gray-500 mt-1">Use your own OpenAI API key to avoid platform quotas.</p>
+                </div>
+                <button
+                  onClick={() => setShowNewKey(v => !v)}
+                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <Plus size={14} /> Add Key
+                </button>
+              </div>
+
+              {/* Add new key form */}
+              {showNewKey && (
+                <div className="bg-gray-900 border border-green-600/30 rounded-xl p-5 space-y-4">
+                  <h3 className="text-sm font-semibold text-white">New API Key</h3>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1.5">Label</label>
+                    <input
+                      value={newKeyLabel}
+                      onChange={e => setNewKeyLabel(e.target.value)}
+                      placeholder="e.g. My OpenAI Key"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1.5">OpenAI API Key</label>
+                    <input
+                      type="password"
+                      value={newKeyValue}
+                      onChange={e => setNewKeyValue(e.target.value)}
+                      placeholder="sk-..."
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 transition-colors font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Your key is stored locally and sent only to OpenAI.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={addApiKey}
+                      disabled={!newKeyLabel.trim() || !newKeyValue.trim()}
+                      className="bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Check size={14} /> Save Key
+                    </button>
+                    <button
+                      onClick={() => { setShowNewKey(false); setNewKeyLabel(''); setNewKeyValue(''); }}
+                      className="border border-gray-600 text-gray-400 hover:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Key list */}
+              {apiKeys.length === 0 && !showNewKey ? (
+                <div className="bg-gray-900 border border-gray-800 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+                  <Key size={32} className="text-gray-700" />
+                  <p className="text-sm text-gray-500">No API keys yet.</p>
+                  <p className="text-xs text-gray-600 max-w-xs">Add your OpenAI API key to use your own quota for AI Takeoff instead of the platform key.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {apiKeys.map(k => (
+                    <div key={k.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
+                      <Key size={16} className="text-green-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white">{k.label}</div>
+                        <div className="text-xs text-gray-500 font-mono mt-0.5">
+                          {k.key.slice(0, 7)}••••••••{k.key.slice(-4)}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          Added {new Date(k.createdAt).toLocaleDateString()}
+                          {k.lastUsed && ` · Last used ${new Date(k.lastUsed).toLocaleDateString()}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => copyKey(k.id, k.key)}
+                          className="text-gray-500 hover:text-white p-2 transition-colors"
+                          title="Copy key"
+                        >
+                          {copiedKeyId === k.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                        </button>
+                        <button
+                          onClick={() => removeApiKey(k.id)}
+                          className="text-gray-500 hover:text-red-400 p-2 transition-colors"
+                          title="Remove key"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Info box */}
+              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-2">
+                <h3 className="text-sm font-semibold text-gray-200">How it works</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  When you add an OpenAI API key here, AI Takeoff will use it instead of the platform's shared key.
+                  This means usage is billed directly to your OpenAI account and you won't hit platform rate limits.
+                </p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Keys are stored in your browser's local storage and sent to the server only when running a takeoff.
+                  They are never logged or stored server-side.
+                </p>
               </div>
             </section>
           )}

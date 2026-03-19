@@ -387,18 +387,28 @@ export async function getProjectByShareToken(token: string): Promise<ProjectMeta
 export async function createPage(projectId: string, page: PageInfo): Promise<PageInfo> {
   if (isSupabaseMode()) {
     const sb = getClient();
-    const { error } = await sb.from('mx_pages').upsert(
-      {
-        project_id: projectId,
-        page_number: page.pageNum,
-        width: page.width,
-        height: page.height,
-        text: page.text ?? '',
-        name: page.name ?? null,
-        drawing_set: page.drawingSet ?? null,
-      },
-      { onConflict: 'project_id,page_number' },
-    );
+    // Start with core columns that are guaranteed to exist in the base schema
+    const corePayload: Record<string, unknown> = {
+      project_id: projectId,
+      page_number: page.pageNum,
+      width: page.width,
+      height: page.height,
+      text: page.text ?? '',
+    };
+    // Optional columns added by later migrations — include and strip on error
+    const optionalFields: Array<[string, unknown]> = [
+      ['name', page.name ?? null],
+      ['drawing_set', page.drawingSet ?? null],
+    ];
+    let payload: Record<string, unknown> = { ...corePayload };
+    for (const [k, v] of optionalFields) payload[k] = v;
+
+    let { error } = await sb.from('mx_pages').upsert(payload, { onConflict: 'project_id,page_number' });
+    if (error && (error.message.includes("column") || error.message.includes("schema cache"))) {
+      // One or more optional columns are missing — fall back to core-only insert
+      const result = await sb.from('mx_pages').upsert(corePayload, { onConflict: 'project_id,page_number' });
+      error = result.error;
+    }
     if (error) throw new Error(`createPage: ${error.message}`);
     return page;
   }

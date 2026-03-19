@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import { ToastProvider } from '@/components/Toast';
-import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2, FileText } from 'lucide-react';
+import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2, FileText, Printer, Download } from 'lucide-react';
 
 interface SharedProject {
   id: string;
@@ -54,6 +54,8 @@ export default function SharedViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const hydrateState = useStore((s) => s.hydrateState);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
@@ -117,6 +119,37 @@ export default function SharedViewPage() {
     });
   }, [totalPages, setCurrentPage]);
 
+  const handlePrint = useCallback(() => window.print(), []);
+
+  const handleExport = useCallback(async (format: 'excel' | 'json' | 'pdf') => {
+    setShowExportMenu(false);
+    if (format === 'json' || format === 'pdf') {
+      window.open(`/api/share/${token}/export?format=${format}`, '_blank');
+    } else {
+      const res = await fetch(`/api/share/${token}/export?format=excel`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `measurex-${project?.name?.replace(/[^a-zA-Z0-9-_]/g, '-') || 'export'}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, [token, project?.name]);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
+
   // Compute per-page quantities summary
   const pageQuantities = useMemo(() => {
     if (!project) return [];
@@ -176,10 +209,16 @@ export default function SharedViewPage() {
 
   return (
     <ToastProvider>
+    <style>{`@media print { .no-print { display: none !important; } .print-only { display: block !important; } }`}</style>
     <div className="h-screen w-screen flex flex-col" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
+      {/* Print-only header */}
+      <div className="print-only" style={{ display: 'none', padding: '24px 16px', borderBottom: '2px solid #333' }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111' }}>{project.name}</h1>
+        <p style={{ fontSize: 12, color: '#666', marginTop: 4 }}>MeasureX Takeoff Report &mdash; {new Date().toLocaleDateString()}</p>
+      </div>
       {/* Header */}
       <header
-        className="w-full backdrop-blur-sm border-b flex-shrink-0"
+        className="no-print w-full backdrop-blur-sm border-b flex-shrink-0"
         style={{
           height: 52,
           background: 'rgba(10,10,15,0.95)',
@@ -249,11 +288,70 @@ export default function SharedViewPage() {
           </button>
         </div>
 
-        {/* Right: read-only badge + open in MeasureX */}
+        {/* Right: read-only badge + export + print + open in MeasureX */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '2px 8px', fontWeight: 500 }}>
             Read-only preview
           </span>
+          {/* Export dropdown */}
+          <div ref={exportRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+              style={{
+                background: '#12121a',
+                border: '1px solid rgba(0,212,255,0.3)',
+                color: '#00d4ff',
+              }}
+            >
+              <Download size={14} />
+              Export
+            </button>
+            {showExportMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 4,
+                  background: '#12121a',
+                  border: '1px solid rgba(0,212,255,0.3)',
+                  borderRadius: 8,
+                  padding: 4,
+                  minWidth: 180,
+                  zIndex: 50,
+                }}
+              >
+                {[
+                  { label: 'Excel (.xlsx)', format: 'excel' as const },
+                  { label: 'JSON', format: 'json' as const },
+                  { label: 'Contractor Report', format: 'pdf' as const },
+                ].map((opt) => (
+                  <button
+                    key={opt.format}
+                    onClick={() => handleExport(opt.format)}
+                    className="w-full text-left px-3 py-2 rounded text-sm hover:bg-[rgba(0,212,255,0.1)]"
+                    style={{ color: '#e0e0e0', display: 'block' }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Print button */}
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+            style={{
+              background: '#12121a',
+              border: '1px solid rgba(0,212,255,0.3)',
+              color: '#00d4ff',
+            }}
+          >
+            <Printer size={14} />
+            Print Report
+          </button>
           <a
             href={`/?project=${project.id}`}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
@@ -354,7 +452,7 @@ export default function SharedViewPage() {
 
         {/* Quantities panel (read-only) */}
         <div
-          className="hidden md:flex flex-col border-l overflow-y-auto"
+          className="no-print hidden md:flex flex-col border-l overflow-y-auto"
           style={{
             width: 360,
             background: 'rgba(10,10,15,0.95)',
@@ -367,6 +465,7 @@ export default function SharedViewPage() {
 
       {/* Footer */}
       <footer
+        className="no-print"
         style={{
           height: 36,
           background: 'rgba(10,10,15,0.95)',

@@ -5,6 +5,7 @@ import { validateBody } from '@/lib/api/validate';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { deletePolygonsByPage } from '@/server/project-store';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
+import { fireWebhook } from '@/lib/webhooks';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -185,9 +186,14 @@ export async function POST(req: Request) {
     if ('error' in validated) return validated.error;
     const { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
 
-    const guard = checkOpenAIKey();
-    if (guard) return guard;
-    const apiKey = getOpenAIKey()!;
+    // Support user-supplied API key via X-OpenAI-Api-Key header (from Settings UI)
+    const userSuppliedKey = req.headers.get('x-openai-api-key');
+    const effectiveOpenAIKey = userSuppliedKey || getOpenAIKey();
+    if (!effectiveOpenAIKey) {
+      const guard = checkOpenAIKey();
+      if (guard) return guard;
+    }
+    const apiKey = effectiveOpenAIKey!;
 
     const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -353,6 +359,15 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
         detected: results.length,
         persistedPolygons,
       });
+
+      // Fire takeoff.complete webhook event
+      if (projectId) {
+        void fireWebhook(projectId, 'takeoff.complete', {
+          page,
+          detected: results.length,
+          persistedPolygons,
+        });
+      }
     }
 
     return NextResponse.json({ results, persistedPolygons });

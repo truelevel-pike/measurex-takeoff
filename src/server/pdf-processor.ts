@@ -129,7 +129,9 @@ const pageImageCache = new Map<string, Buffer>();
 
 /**
  * Render a single PDF page to a PNG base64 data URL.
- * Returns null if the canvas package is not available.
+ * First attempts pdfjs+canvas rendering; falls back to pdftoppm (poppler) if pdfjs fails
+ * (e.g. PDFs with embedded JPEG images that pdfjs-dist 5.x can't decode in Node).
+ * Returns null if neither method is available.
  */
 export async function renderPageAsImage(
   filePath: string,
@@ -140,48 +142,83 @@ export async function renderPageAsImage(
   const cached = pageImageCache.get(cacheKey);
   if (cached) return `data:image/png;base64,${cached.toString('base64')}`;
 
+  // --- Attempt 1: pdfjs + node-canvas ---
   let createCanvas: (w: number, h: number) => ReturnType<typeof import('canvas')['createCanvas']>;
+  let pdfJsResult: Buffer | null = null;
+
   try {
     const canvasModule = await import('canvas');
     createCanvas = canvasModule.createCanvas;
+
+    const canvasFactory = {
+      create(width: number, height: number) {
+        const canvas = createCanvas(width, height);
+        return { canvas, context: canvas.getContext('2d') };
+      },
+      reset(canvasData: { canvas: { width: number; height: number }; context: unknown }, width: number, height: number) {
+        canvasData.canvas.width = width;
+        canvasData.canvas.height = height;
+      },
+      destroy() { /* no-op */ },
+    };
+
+    const pdfjsLib = await getPdfjs();
+    const fileData = new Uint8Array(await fs.readFile(filePath));
+    const doc = await pdfjsLib.getDocument({ data: fileData, useSystemFonts: true, disableWorker: true } as unknown as Parameters<typeof pdfjsLib.getDocument>[0]).promise;
+
+    if (pageNum >= 1 && pageNum <= doc.numPages) {
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
+
+      await page.render({
+        canvasContext: canvasAndContext.context,
+        viewport,
+        canvasFactory,
+      } as unknown as Parameters<ReturnType<typeof page.render>['promise'] extends Promise<unknown> ? typeof page.render : never>[0]).promise;
+
+      pdfJsResult = (canvasAndContext.canvas as unknown as { toBuffer(format: string): Buffer }).toBuffer('image/png');
+    }
   } catch {
-    // canvas package not available — graceful degradation
-    return null;
+    // pdfjs failed (e.g. embedded images) — will fall through to pdftoppm
+    pdfJsResult = null;
   }
 
-  const canvasFactory = {
-    create(width: number, height: number) {
-      const canvas = createCanvas(width, height);
-      return { canvas, context: canvas.getContext('2d') };
-    },
-    reset(canvasData: { canvas: { width: number; height: number }; context: unknown }, width: number, height: number) {
-      canvasData.canvas.width = width;
-      canvasData.canvas.height = height;
-    },
-    destroy() { /* no-op */ },
-  };
+  if (pdfJsResult) {
+    pageImageCache.set(cacheKey, pdfJsResult);
+    return `data:image/png;base64,${pdfJsResult.toString('base64')}`;
+  }
 
-  const pdfjsLib = await getPdfjs();
-  const fileData = new Uint8Array(await fs.readFile(filePath));
-  const doc = await pdfjsLib.getDocument({ data: fileData, useSystemFonts: true, disableWorker: true } as unknown as Parameters<typeof pdfjsLib.getDocument>[0]).promise;
+  // --- Attempt 2: pdftoppm fallback (poppler) ---
+  try {
+    const { execFile } = await import('child_process');
+    const os = await import('os');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mx-pdf-'));
+    const outputPrefix = path.join(tmpDir, 'page');
+    // dpi 150 ≈ scale 2x (72dpi * 2)
+    const dpi = Math.round(72 * scale);
+    await execFileAsync('pdftoppm', [
+      '-png',
+      '-r', String(dpi),
+      '-f', String(pageNum),
+      '-l', String(pageNum),
+      '-singlefile',
+      filePath,
+      outputPrefix,
+    ]);
+    // pdftoppm writes <prefix>.png when -singlefile
+    const outFile = `${outputPrefix}.png`;
+    const pngBuffer = await fs.readFile(outFile);
+    await fs.rm(tmpDir, { recursive: true }).catch(() => {});
+    pageImageCache.set(cacheKey, pngBuffer);
+    return `data:image/png;base64,${pngBuffer.toString('base64')}`;
+  } catch {
+    // pdftoppm not available or failed
+  }
 
-  if (pageNum < 1 || pageNum > doc.numPages) return null;
-
-  const page = await doc.getPage(pageNum);
-  const viewport = page.getViewport({ scale });
-  const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
-
-  await page.render({
-    canvasContext: canvasAndContext.context,
-    viewport,
-    canvasFactory,
-  } as unknown as Parameters<ReturnType<typeof page.render>['promise'] extends Promise<unknown> ? typeof page.render : never>[0]).promise;
-
-  // The canvas from the `canvas` package has a toBuffer method not in the standard type
-  const pngBuffer = (canvasAndContext.canvas as unknown as { toBuffer(format: string): Buffer }).toBuffer('image/png');
-  pageImageCache.set(cacheKey, pngBuffer);
-
-  return `data:image/png;base64,${pngBuffer.toString('base64')}`;
+  return null;
 }
 
 /**

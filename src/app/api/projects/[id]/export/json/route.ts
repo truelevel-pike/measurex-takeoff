@@ -1,5 +1,6 @@
 import { getProject, getPolygons, getClassifications, getScale, getPages, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { fireWebhook } from '@/lib/webhooks';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,6 +21,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const payload = { project, pages, classifications, polygons, scale };
     const json = JSON.stringify(payload, null, 2);
     const safeName = (project.name || 'project').replace(/[^a-zA-Z0-9-_]/g, '-');
+
+    // Fire export.requested webhook (fire-and-forget)
+    void fireWebhook(id, 'export.requested', { format: 'json', projectName: project.name || id, polygons: polygons.length });
 
     return new Response(json, {
       status: 200,

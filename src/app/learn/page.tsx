@@ -20,10 +20,27 @@ import {
 import Link from 'next/link';
 
 const GETTING_STARTED = [
-  { step: 1, icon: <Upload size={24} />, title: 'Upload Your Plans', desc: 'Drag and drop PDF drawings or blueprints to get started.' },
-  { step: 2, icon: <Cpu size={24} />, title: 'Run AI Takeoff', desc: 'Our AI automatically detects and measures elements in your plans.' },
-  { step: 3, icon: <Layers size={24} />, title: 'Classify & Measure', desc: 'Organize elements into classifications and verify measurements.' },
-  { step: 4, icon: <Download size={24} />, title: 'Export Results', desc: 'Export quantities to Excel or integrate with your estimating workflow.' },
+  {
+    step: 1,
+    icon: <Upload size={24} />,
+    title: 'Upload PDF',
+    desc: 'Click "New Project" and drag-and-drop your PDF plans. Multi-page PDFs are fully supported — each page becomes a separate takeoff sheet.',
+    detail: 'Supported formats: PDF, TIFF, PNG, JPEG. Max 200 MB per file.',
+  },
+  {
+    step: 2,
+    icon: <Ruler size={24} />,
+    title: 'Set Scale',
+    desc: 'Use the Scale tool to draw a line between two known points on your drawing and enter the real-world distance. MeasureX calculates the exact pixels-per-foot ratio.',
+    detail: 'Tip: Use a dimension line or a door width (standard 3 ft) as your reference.',
+  },
+  {
+    step: 3,
+    icon: <Cpu size={24} />,
+    title: 'Run AI Takeoff',
+    desc: 'Click "AI Takeoff" in the toolbar. The AI scans your drawing, identifies elements (walls, slabs, openings, etc.), and places polygons with measurements automatically.',
+    detail: 'Review and edit any polygon before exporting. Export to Excel when ready.',
+  },
 ];
 
 const TUTORIALS = [
@@ -71,28 +88,36 @@ export default function LearnPage() {
         {/* Getting Started */}
         <section>
           <h2 className="text-lg font-semibold mb-6">Getting Started</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {GETTING_STARTED.map(item => (
               <div
                 key={item.step}
-                className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-3"
+                className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col gap-4 relative"
               >
+                {/* Step badge */}
                 <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-green-600/20 text-green-400 flex items-center justify-center text-sm font-bold">
+                  <span className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
                     {item.step}
                   </span>
                   <span className="text-green-400">{item.icon}</span>
                 </div>
-                <h3 className="text-sm font-semibold text-white">{item.title}</h3>
-                <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
-                {/* Progress indicator */}
-                <div className="mt-auto pt-2">
-                  <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500/40 rounded-full" style={{ width: '0%' }} />
-                  </div>
+                <h3 className="text-base font-semibold text-white">{item.title}</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{item.desc}</p>
+                {/* Detail hint */}
+                <div className="mt-auto pt-3 border-t border-gray-800">
+                  <p className="text-xs text-gray-500 leading-relaxed">{item.detail}</p>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Connector arrows between steps */}
+          <div className="hidden md:flex items-center justify-center gap-2 mt-2 text-gray-700 text-xs select-none">
+            <span>Step 1</span>
+            <ArrowRight size={14} />
+            <span>Step 2</span>
+            <ArrowRight size={14} />
+            <span>Step 3</span>
           </div>
         </section>
 

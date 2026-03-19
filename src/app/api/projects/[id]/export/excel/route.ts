@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { getPolygons, getClassifications, getScale, getProject, getAssemblies, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { fireWebhook } from '@/lib/webhooks';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
@@ -227,6 +228,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
     const bytes = new Uint8Array(buf);
     const safeName = projectName.replace(/[^a-zA-Z0-9-_]/g, '-');
+
+    // Fire export.requested webhook (fire-and-forget)
+    void fireWebhook(id, 'export.requested', { format: 'excel', projectName, polygons: polygons.length });
 
     return new Response(bytes, {
       headers: {
