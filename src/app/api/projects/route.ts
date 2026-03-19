@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listProjects, createProject, initDataDir, getThumbnail } from '@/server/project-store';
+import { ProjectCreateSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET() {
   try {
@@ -20,10 +21,11 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     await initDataDir();
-    const body = await req.json();
-    const name = (body?.name || '').toString().trim();
-    if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 });
-    const project = await createProject(name);
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const bodyResult = ProjectCreateSchema.safeParse(body);
+    if (!bodyResult.success) return validationError(bodyResult.error);
+    const project = await createProject(bodyResult.data.name);
     return NextResponse.json({ project });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : 'Create failed') }, { status: 500 });

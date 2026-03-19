@@ -1,0 +1,2411 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MeasureX API",
+    "description": "Construction takeoff and measurement platform API",
+    "version": "1.0.0",
+    "contact": {
+      "name": "MeasureX Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Relative API base"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Projects",
+      "description": "Project CRUD and metadata"
+    },
+    {
+      "name": "Upload",
+      "description": "PDF upload and page management"
+    },
+    {
+      "name": "Classifications",
+      "description": "Measurement classifications (area, linear, count)"
+    },
+    {
+      "name": "Polygons",
+      "description": "Polygon/measurement geometry"
+    },
+    {
+      "name": "Scale",
+      "description": "Drawing scale configuration"
+    },
+    {
+      "name": "Assemblies",
+      "description": "Cost assemblies linked to classifications"
+    },
+    {
+      "name": "Quantities",
+      "description": "Computed quantities from geometry"
+    },
+    {
+      "name": "Export",
+      "description": "Excel and JSON export"
+    },
+    {
+      "name": "AI Takeoff",
+      "description": "AI-powered blueprint analysis"
+    },
+    {
+      "name": "Chat",
+      "description": "AI chat assistant"
+    },
+    {
+      "name": "Search",
+      "description": "Image and vision search"
+    },
+    {
+      "name": "Real-time",
+      "description": "Server-Sent Events for live updates"
+    },
+    {
+      "name": "Compare",
+      "description": "Project comparison"
+    }
+  ],
+  "paths": {
+    "/api/projects": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "List all projects",
+        "operationId": "listProjects",
+        "responses": {
+          "200": {
+            "description": "List of projects with thumbnails",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Project"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "thumbnail": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Create a new project",
+        "operationId": "createProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Building A — Floor Plan"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Get project with full hydrated state",
+        "operationId": "getProject",
+        "description": "Returns the project with all classifications, polygons, scale, pages,\nand thumbnail bundled in a single round-trip for client hydration.\n",
+        "responses": {
+          "200": {
+            "description": "Full project state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Project"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "thumbnail": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "state": {
+                              "type": "object",
+                              "properties": {
+                                "classifications": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/Classification"
+                                  }
+                                },
+                                "polygons": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/Polygon"
+                                  }
+                                },
+                                "scale": {
+                                  "$ref": "#/components/schemas/ScaleConfig"
+                                },
+                                "scales": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "$ref": "#/components/schemas/ScaleConfig"
+                                  }
+                                },
+                                "currentPage": {
+                                  "type": "integer",
+                                  "example": 1
+                                },
+                                "totalPages": {
+                                  "type": "integer"
+                                },
+                                "sheetNames": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                },
+                                "drawingSets": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid project ID"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Update project (autosave)",
+        "operationId": "updateProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "object",
+                    "properties": {
+                      "scale": {
+                        "$ref": "#/components/schemas/ScaleConfig"
+                      },
+                      "totalPages": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Partial update (thumbnail, name, metadata)",
+        "operationId": "patchProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "thumbnail": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patched project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Delete a project",
+        "operationId": "deleteProject",
+        "responses": {
+          "200": {
+            "description": "Deletion confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/upload": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Upload a PDF file",
+        "operationId": "uploadPdf",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF file to upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "type": "integer",
+                      "description": "Total number of pages"
+                    },
+                    "dimensions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "sheetNames": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Map of page number to extracted sheet name"
+                    },
+                    "detectedScale": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "pixelsPerUnit": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file provided or invalid format"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/pdf": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Serve the uploaded PDF binary",
+        "operationId": "getPdf",
+        "responses": {
+          "200": {
+            "description": "PDF file",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "private, max-age=3600"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No PDF uploaded for this project"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/pages": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Upload"
+        ],
+        "summary": "List all pages for a project",
+        "operationId": "listPages",
+        "responses": {
+          "200": {
+            "description": "Page list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Page"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/classifications": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Classifications"
+        ],
+        "summary": "List classifications",
+        "operationId": "listClassifications",
+        "responses": {
+          "200": {
+            "description": "Classification list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "classifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Classification"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Classifications"
+        ],
+        "summary": "Create a classification",
+        "operationId": "createClassification",
+        "description": "Creates a new measurement classification. Broadcasts `classification:created` via SSE.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "type"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Interior Walls"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "area",
+                      "linear",
+                      "count"
+                    ],
+                    "example": "area"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Optional client-generated ID"
+                  },
+                  "color": {
+                    "type": "string",
+                    "default": "#3b82f6",
+                    "example": "#ef4444"
+                  },
+                  "visible": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "formula": {
+                    "type": "string"
+                  },
+                  "formulaUnit": {
+                    "type": "string"
+                  },
+                  "formulaSavedToLibrary": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created classification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "classification": {
+                      "$ref": "#/components/schemas/Classification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/classifications/{cid}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "name": "cid",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Classification ID"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Classifications"
+        ],
+        "summary": "Update a classification",
+        "operationId": "updateClassification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated classification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "classification": {
+                      "$ref": "#/components/schemas/Classification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Classifications"
+        ],
+        "summary": "Partial update a classification",
+        "operationId": "patchClassification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated classification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "classification": {
+                      "$ref": "#/components/schemas/Classification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Classifications"
+        ],
+        "summary": "Delete a classification",
+        "operationId": "deleteClassification",
+        "responses": {
+          "200": {
+            "description": "Deletion confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/polygons": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Polygons"
+        ],
+        "summary": "List polygons",
+        "operationId": "listPolygons",
+        "responses": {
+          "200": {
+            "description": "Polygon list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "polygons": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Polygon"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Polygons"
+        ],
+        "summary": "Create a polygon",
+        "operationId": "createPolygon",
+        "description": "Creates a measurement polygon. Area and linearFeet are auto-computed from points\nif not provided. Broadcasts `polygon:created` via SSE.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "points",
+                  "classificationId"
+                ],
+                "properties": {
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "description": "Polygon vertices in pixel coordinates"
+                  },
+                  "classificationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Optional client-generated ID"
+                  },
+                  "pageNumber": {
+                    "type": "integer",
+                    "default": 1
+                  },
+                  "area": {
+                    "type": "number",
+                    "description": "Override computed area (pixels squared)"
+                  },
+                  "linearFeet": {
+                    "type": "number",
+                    "description": "Override computed perimeter (pixels)"
+                  },
+                  "isComplete": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created polygon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "polygon": {
+                      "$ref": "#/components/schemas/Polygon"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/polygons/{pid}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "name": "pid",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Polygon ID"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Polygons"
+        ],
+        "summary": "Update a polygon",
+        "operationId": "updatePolygon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "classificationId": {
+                    "type": "string"
+                  },
+                  "pageNumber": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated polygon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "polygon": {
+                      "$ref": "#/components/schemas/Polygon"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Polygons"
+        ],
+        "summary": "Delete a polygon",
+        "operationId": "deletePolygon",
+        "responses": {
+          "200": {
+            "description": "Deletion confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/scale": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Scale"
+        ],
+        "summary": "Get project scale",
+        "operationId": "getScale",
+        "responses": {
+          "200": {
+            "description": "Current scale configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scale": {
+                      "$ref": "#/components/schemas/ScaleConfig",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Scale"
+        ],
+        "summary": "Set project scale",
+        "operationId": "setScale",
+        "description": "Sets the drawing scale. This is critical for converting pixel measurements\nto real-world units. Broadcasts `scale:updated` via SSE.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "pixelsPerUnit",
+                  "unit"
+                ],
+                "properties": {
+                  "pixelsPerUnit": {
+                    "type": "number",
+                    "description": "How many pixels equal one real-world unit",
+                    "example": 96
+                  },
+                  "unit": {
+                    "type": "string",
+                    "description": "Real-world unit (ft, in, m, etc.)",
+                    "example": "ft"
+                  },
+                  "label": {
+                    "type": "string",
+                    "default": "Custom",
+                    "example": "1/4\" = 1'-0\""
+                  },
+                  "source": {
+                    "type": "string",
+                    "default": "manual",
+                    "enum": [
+                      "manual",
+                      "auto",
+                      "ai"
+                    ]
+                  },
+                  "pageNumber": {
+                    "type": "integer",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scale saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scale": {
+                      "$ref": "#/components/schemas/ScaleConfig"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/assemblies": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Assemblies"
+        ],
+        "summary": "List assemblies",
+        "operationId": "listAssemblies",
+        "responses": {
+          "200": {
+            "description": "Assembly list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assemblies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Assembly"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Assemblies"
+        ],
+        "summary": "Create an assembly",
+        "operationId": "createAssembly",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "classificationId",
+                  "name"
+                ],
+                "properties": {
+                  "classificationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "Drywall Installation"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "default": "SF",
+                    "example": "SF"
+                  },
+                  "unitCost": {
+                    "type": "number",
+                    "default": 0,
+                    "example": 2.5
+                  },
+                  "quantityFormula": {
+                    "type": "string",
+                    "default": "area",
+                    "example": "area"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created assembly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assembly": {
+                      "$ref": "#/components/schemas/Assembly"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/assemblies/{aid}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "name": "aid",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Assembly ID"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Assemblies"
+        ],
+        "summary": "Update an assembly",
+        "operationId": "updateAssembly",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "unitCost": {
+                    "type": "number"
+                  },
+                  "quantityFormula": {
+                    "type": "string"
+                  },
+                  "classificationId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated assembly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assembly": {
+                      "$ref": "#/components/schemas/Assembly"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Assembly not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Assemblies"
+        ],
+        "summary": "Delete an assembly",
+        "operationId": "deleteAssembly",
+        "responses": {
+          "204": {
+            "description": "Deleted (no content)"
+          },
+          "404": {
+            "description": "Assembly not found"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/quantities": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Quantities"
+        ],
+        "summary": "Get computed quantities per classification",
+        "operationId": "getQuantities",
+        "description": "Returns quantities recalculated from polygon geometry and current scale.\nUnits: SF for area, FT for linear, EA for count.\n",
+        "responses": {
+          "200": {
+            "description": "Computed quantities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "quantities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "classificationId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "area",
+                              "linear",
+                              "count"
+                            ]
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "area": {
+                            "type": "number",
+                            "description": "Area in square feet (SF)"
+                          },
+                          "linearFeet": {
+                            "type": "number",
+                            "description": "Length in feet (FT)"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "SF",
+                              "FT",
+                              "EA"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "scale": {
+                      "$ref": "#/components/schemas/ScaleConfig",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/history": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Get project history",
+        "operationId": "getHistory",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "History entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HistoryEntry"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/export/excel": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export project as Excel (.xlsx)",
+        "operationId": "exportExcel",
+        "description": "Generates a 3-sheet workbook: Summary, Quantities, and Assemblies.\nQuantities are recalculated from geometry.\n",
+        "responses": {
+          "200": {
+            "description": "Excel file download",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string",
+                  "example": "attachment; filename=\"project-name.xlsx\""
+                }
+              }
+            },
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/export/json": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export project as JSON",
+        "operationId": "exportJson",
+        "responses": {
+          "200": {
+            "description": "JSON file download",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    },
+                    "pages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Page"
+                      }
+                    },
+                    "classifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Classification"
+                      }
+                    },
+                    "polygons": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Polygon"
+                      }
+                    },
+                    "scale": {
+                      "$ref": "#/components/schemas/ScaleConfig"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/ai-takeoff": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "AI Takeoff"
+        ],
+        "summary": "Run AI takeoff on a PDF page",
+        "operationId": "runAiTakeoff",
+        "description": "Renders the specified PDF page to an image and sends it to the AI engine\nfor blueprint element detection. Requires a PDF to already be uploaded.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "page"
+                ],
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "description": "Page number to analyze (1-based)",
+                    "example": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detected elements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "elements": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AIDetectedElement"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/ai-takeoff/apply": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "AI Takeoff"
+        ],
+        "summary": "Apply AI-detected elements to the project",
+        "operationId": "applyAiTakeoff",
+        "description": "Creates classifications and polygons from AI detection results.\nDeduplicates classifications by name (case-insensitive) and polygons\nusing 80% point overlap threshold.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "elements"
+                ],
+                "properties": {
+                  "elements": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "area",
+                            "linear",
+                            "count"
+                          ]
+                        },
+                        "points": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        },
+                        "color": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "page": {
+                    "type": "integer",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "object",
+                      "properties": {
+                        "classifications": {
+                          "type": "integer"
+                        },
+                        "polygons": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "skipped": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai-takeoff": {
+      "post": {
+        "tags": [
+          "AI Takeoff"
+        ],
+        "summary": "Standalone AI takeoff (no project context)",
+        "operationId": "standaloneAiTakeoff",
+        "description": "Analyzes a base64-encoded blueprint image for construction elements\nwithout requiring a project. Uses GPT-4o-mini.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "imageBase64",
+                  "pageWidth",
+                  "pageHeight"
+                ],
+                "properties": {
+                  "imageBase64": {
+                    "type": "string",
+                    "description": "Base64-encoded image"
+                  },
+                  "pageWidth": {
+                    "type": "number"
+                  },
+                  "pageHeight": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detected elements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "classification": {
+                            "type": "string"
+                          },
+                          "points": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          },
+                          "color": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/compare": {
+      "post": {
+        "tags": [
+          "Compare"
+        ],
+        "summary": "Compare polygons between two projects",
+        "operationId": "compareProjects",
+        "description": "Matches polygons by classificationId and area (within 20% tolerance).\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "projectIdA",
+                  "projectIdB"
+                ],
+                "properties": {
+                  "projectIdA": {
+                    "type": "string"
+                  },
+                  "projectIdB": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comparison results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "added": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Polygon"
+                      }
+                    },
+                    "removed": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Polygon"
+                      }
+                    },
+                    "unchanged": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Polygon"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "addedCount": {
+                          "type": "integer"
+                        },
+                        "removedCount": {
+                          "type": "integer"
+                        },
+                        "unchangedCount": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "summary": "Chat with MeasureX AI assistant",
+        "operationId": "chat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "message"
+                    ],
+                    "properties": {
+                      "message": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "$ref": "#/components/schemas/ChatContext"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "messages"
+                    ],
+                    "properties": {
+                      "messages": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "assistant"
+                              ]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "context": {
+                        "$ref": "#/components/schemas/ChatContext"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI reply",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reply": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/image-search": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search for construction images",
+        "operationId": "imageSearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "example": "concrete foundation"
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "description": "Optional project ID to include project sheet results"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "thumbUrl": {
+                            "type": "string"
+                          },
+                          "fullUrl": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "pageNumber": {
+                            "type": "integer"
+                          },
+                          "sheetName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vision-search": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search for elements in a blueprint image using vision AI",
+        "operationId": "visionSearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image",
+                  "query"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Base64-encoded image or data URL"
+                  },
+                  "query": {
+                    "type": "string",
+                    "example": "find all doors"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vision search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "boundingBoxes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                  "description": "Percentage (0-100)"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number"
+                                },
+                                "height": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ws": {
+      "get": {
+        "tags": [
+          "Real-time"
+        ],
+        "summary": "Server-Sent Events stream",
+        "operationId": "sseStream",
+        "description": "Opens an SSE connection for real-time project updates. Despite the route\nname, this is SSE (not WebSocket). Sends keepalive comments every 15s.\nBuffers last 50 events per project for replay.\n\n**Event types:** `connected`, `polygon:created`, `polygon:updated`,\n`polygon:deleted`, `classification:created`, `classification:updated`,\n`classification:deleted`, `scale:updated`, `assembly:created`,\n`assembly:updated`, `assembly:deleted`\n",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project to subscribe to"
+          },
+          {
+            "name": "lastEventId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Resume from this event ID (also accepts Last-Event-Id header)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ProjectId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "description": "Project UUID"
+      }
+    },
+    "schemas": {
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Classification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "area",
+              "linear",
+              "count"
+            ]
+          },
+          "color": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "formula": {
+            "type": "string",
+            "nullable": true
+          },
+          "formulaUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "formulaSavedToLibrary": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ClassificationUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "area",
+              "linear",
+              "count"
+            ]
+          },
+          "color": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "formula": {
+            "type": "string"
+          },
+          "formulaUnit": {
+            "type": "string"
+          }
+        }
+      },
+      "Polygon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "classificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "pageNumber": {
+            "type": "integer"
+          },
+          "area": {
+            "type": "number"
+          },
+          "linearFeet": {
+            "type": "number"
+          },
+          "isComplete": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ScaleConfig": {
+        "type": "object",
+        "properties": {
+          "pixelsPerUnit": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        }
+      },
+      "Assembly": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "classificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "number"
+          },
+          "quantityFormula": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        }
+      },
+      "HistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AIDetectedElement": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "area",
+              "linear",
+              "count"
+            ]
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "color": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        }
+      },
+      "ChatContext": {
+        "type": "object",
+        "properties": {
+          "classificationCount": {
+            "type": "integer"
+          },
+          "totalArea": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "classifications": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

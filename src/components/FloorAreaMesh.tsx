@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import * as THREE from 'three';
+import { Shape, ShapeGeometry, Vector3, Color, DoubleSide } from 'three';
+import type { Event as ThreeEvent } from 'three';
 import { Line } from '@react-three/drei';
 
 /** 2D point used by takeoff data and the conversion layer. */
@@ -39,7 +40,7 @@ export interface FloorAreaMeshProps {
   /** Classification display name (used only for aria / future tooltip). */
   classificationName?: string;
   /** Click handler */
-  onClick?: (e: THREE.Event) => void;
+  onClick?: (e: ThreeEvent) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,9 +57,9 @@ function normalizePoints(pts: FloorPoint[] | [number, number, number][]): FloorP
   return pts as FloorPoint[];
 }
 
-function buildShape(points: FloorPoint[]): THREE.Shape | null {
+function buildShape(points: FloorPoint[]): Shape | null {
   if (!points || points.length < 3) return null;
-  const shape = new THREE.Shape();
+  const shape = new Shape();
   shape.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) {
     shape.lineTo(points[i].x, points[i].y);
@@ -67,8 +68,8 @@ function buildShape(points: FloorPoint[]): THREE.Shape | null {
   return shape;
 }
 
-function pointsToVec3(points: FloorPoint[], y: number): THREE.Vector3[] {
-  return points.map((p) => new THREE.Vector3(p.x, y, p.y));
+function pointsToVec3(points: FloorPoint[], y: number): Vector3[] {
+  return points.map((p) => new Vector3(p.x, y, p.y));
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +89,7 @@ export default function FloorAreaMesh({
   const geometry = useMemo(() => {
     const shape = buildShape(points);
     if (!shape) return null;
-    const geo = new THREE.ShapeGeometry(shape);
+    const geo = new ShapeGeometry(shape);
     // Rotate from XY plane onto XZ ground plane
     geo.rotateX(-Math.PI / 2);
     // Slight lift to avoid z-fighting with ground
@@ -98,7 +99,7 @@ export default function FloorAreaMesh({
 
   if (!geometry) return null;
 
-  const fillColor = new THREE.Color(selected ? brighten(color) : color);
+  const fillColor = new Color(selected ? brighten(color) : color);
   const opacity = selected ? 0.8 : 0.5;
   const outlineY = 0.02; // slightly above fill
 
@@ -116,17 +117,17 @@ export default function FloorAreaMesh({
         geometry={geometry}
         onPointerDown={(e) => {
           e.stopPropagation();
-          onClick?.(e as unknown as THREE.Event);
+          onClick?.(e as unknown as ThreeEvent);
         }}
       >
         <meshStandardMaterial
           color={fillColor}
           transparent
           opacity={opacity}
-          emissive={selected ? new THREE.Color(color) : new THREE.Color('#000000')}
+          emissive={selected ? new Color(color) : new Color('#000000')}
           emissiveIntensity={selected ? 0.35 : 0}
           depthWrite={false}
-          side={THREE.DoubleSide}
+          side={DoubleSide}
         />
       </mesh>
 
@@ -148,7 +149,7 @@ export default function FloorAreaMesh({
 
 /** Simple brightening by blending toward white. */
 function brighten(hex: string, factor = 0.35): string {
-  const c = new THREE.Color(hex);
-  c.lerp(new THREE.Color('#ffffff'), factor);
+  const c = new Color(hex);
+  c.lerp(new Color('#ffffff'), factor);
   return '#' + c.getHexString();
 }

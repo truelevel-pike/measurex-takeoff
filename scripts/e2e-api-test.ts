@@ -22,10 +22,10 @@ async function test(name: string, fn: () => Promise<void>) {
     const ms = (performance.now() - t0).toFixed(0);
     console.log(`  ✅ PASS  ${name}  (${ms}ms)`);
     passed++;
-  } catch (err: any) {
+  } catch (err: unknown) {
     const ms = (performance.now() - t0).toFixed(0);
     console.log(`  ❌ FAIL  ${name}  (${ms}ms)`);
-    console.log(`          ${err.message}`);
+    console.log(`          ${err instanceof Error ? err.message : String(err)}`);
     failed++;
   }
 }
@@ -147,7 +147,7 @@ await test("Read quantities", async () => {
   const data = await json(res);
   assert(Array.isArray(data.quantities), "quantities should be an array");
   const match = data.quantities.find(
-    (q: any) => q.classificationId === classificationId
+    (q: Record<string, unknown>) => q.classificationId === classificationId
   );
   assert(match, "Classification not found in quantities");
   assert(match.area > 0 || match.count > 0, "Expected area or count > 0");

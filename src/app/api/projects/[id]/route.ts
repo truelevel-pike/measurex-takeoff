@@ -2,15 +2,14 @@ import { NextResponse } from 'next/server';
 import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
 import type { Classification, Polygon } from '@/lib/types';
 import type { PageInfo } from '@/server/project-store';
+import { ProjectIdSchema, ProjectUpdateSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    // Validate id is a safe UUID/alphanumeric string
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const project = await getProject(id);
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
@@ -61,11 +60,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    // Validate id is a safe UUID/alphanumeric string
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const body = await req.json();
 
     // If the body contains a `state` payload (autosave from client), persist
@@ -101,10 +98,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const body = await req.json();
     const patch: Record<string, unknown> = {};
     if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
@@ -120,11 +116,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    // Validate id is a safe UUID/alphanumeric string
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const ok = await deleteProject(id);
     return NextResponse.json({ ok });
   } catch (err: unknown) {

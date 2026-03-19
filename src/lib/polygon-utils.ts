@@ -1,3 +1,20 @@
+/**
+ * @turf/turf usage in this file:
+ *
+ * Functions actually used from the @turf/turf bundle:
+ *   - turf.polygon()          — Create GeoJSON Polygon features from coordinate rings
+ *   - turf.featureCollection() — Wrap features into a GeoJSON FeatureCollection
+ *   - turf.union()            — Merge/union two polygons (used in mergePolygons)
+ *   - turf.lineString()       — Create GeoJSON LineString feature (used in splitPolygonByLine)
+ *   - turf.buffer()           — Buffer a geometry by distance (used in splitPolygonByLine)
+ *   - turf.difference()       — Compute polygon difference (used in splitPolygonByLine)
+ *
+ * If bundle size becomes a concern, replace `@turf/turf` with individual packages:
+ *   @turf/helpers (polygon, featureCollection, lineString)
+ *   @turf/union
+ *   @turf/buffer
+ *   @turf/difference
+ */
 import * as turf from '@turf/turf';
 import type { Point } from './types';
 
@@ -54,18 +71,18 @@ export function mergePolygons(poly1: Point[], poly2: Point[]): Point[] {
     const f1 = turf.polygon([ring1]);
     const f2 = turf.polygon([ring2]);
     const fc = turf.featureCollection([f1, f2]);
-    const united = turf.union(fc) as any;
+    const united = turf.union(fc);
     if (!united) return [...poly1, ...poly2];
     if (united.geometry.type === 'Polygon') {
       const coords = united.geometry.coordinates[0];
-      return coords.slice(0, -1).map(([x, y]: [number, number]) => ({ x, y }));
+      return coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
     }
     // MultiPolygon: choose largest area
     let best: Point[] = [];
     let bestArea = -1;
-    for (const rings of united.geometry.coordinates) {
+    for (const rings of (united.geometry as GeoJSON.MultiPolygon).coordinates) {
       const ring = rings[0];
-      const pts = ring.slice(0, -1).map(([x, y]: [number, number]) => ({ x, y }));
+      const pts = ring.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
       const a = calculatePolygonArea(pts);
       if (a > bestArea) { bestArea = a; best = pts; }
     }
@@ -82,20 +99,21 @@ export function splitPolygonByLine(polygon: Point[], lineStart: Point, lineEnd: 
     ring.push([polygon[0].x, polygon[0].y]);
     const poly = turf.polygon([ring]);
     const line = turf.lineString([[lineStart.x, lineStart.y], [lineEnd.x, lineEnd.y]]);
-    const buffered = turf.buffer(line, 0.001, { units: 'meters' }) as any;
+    const buffered = turf.buffer(line, 0.001, { units: 'meters' });
     if (!buffered) return [polygon, []];
-    const fc = turf.featureCollection([poly, buffered]) as any;
-    const diff = turf.difference(fc) as any;
+    const fc = turf.featureCollection([poly, buffered]);
+    const diff = turf.difference(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
     if (!diff) return [polygon, []];
     if (diff.geometry.type === 'Polygon') {
-      const a = diff.geometry.coordinates[0].slice(0, -1).map(([x, y]: [number, number]) => ({ x, y }));
+      const coords = diff.geometry.coordinates[0];
+      const a = coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
       return [a, []];
     }
     // MultiPolygon → return two largest pieces
-    const coords = diff.geometry.coordinates as any[];
-    const parts: Point[][] = coords.map((rings: any) => {
-      const ring = rings[0] as any[];
-      return ring.slice(0, -1).map((c: any) => ({ x: c[0] as number, y: c[1] as number }));
+    const multiCoords = (diff.geometry as GeoJSON.MultiPolygon).coordinates;
+    const parts: Point[][] = multiCoords.map((rings) => {
+      const ring = rings[0];
+      return ring.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
     });
     parts.sort((a, b) => calculatePolygonArea(b) - calculatePolygonArea(a));
     return [parts[0] || [], parts[1] || []];

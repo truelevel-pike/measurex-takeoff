@@ -10,7 +10,7 @@ import {
   PerspectiveCamera,
   OrthographicCamera,
 } from '@react-three/drei';
-import * as THREE from 'three';
+import { CanvasTexture, RepeatWrapping, TextureLoader, ClampToEdgeWrapping } from 'three';
 import { Box, Layers3 } from 'lucide-react';
 
 type CameraMode = 'perspective' | 'orthographic';
@@ -26,7 +26,7 @@ interface ThreeDViewerProps {
 }
 
 /** Build a procedural grid canvas texture as a fallback when no PDF is available */
-function makeGridFallbackTexture(): THREE.CanvasTexture {
+function makeGridFallbackTexture(): CanvasTexture {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -66,8 +66,8 @@ function makeGridFallbackTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const tex = new CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = RepeatWrapping;
   tex.repeat.set(4, 4);
   return tex;
 }
@@ -103,7 +103,7 @@ function GroundPlane({ textureUrl, pageDimensions }: GroundPlaneProps) {
 
   const pdfTexture = useMemo(() => {
     if (!textureUrl) return null;
-    const loader = new THREE.TextureLoader();
+    const loader = new TextureLoader();
     const t = loader.load(textureUrl, (loadedTexture) => {
       const image = loadedTexture.image as { width?: number; height?: number } | undefined;
       const width = image?.width ?? 0;
@@ -112,7 +112,7 @@ function GroundPlane({ textureUrl, pageDimensions }: GroundPlaneProps) {
         setAspectRatio(width / height);
       }
     });
-    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.wrapS = t.wrapT = ClampToEdgeWrapping;
     t.anisotropy = 4;
     return t;
   }, [textureUrl]);

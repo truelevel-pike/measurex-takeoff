@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import * as THREE from 'three';
+import { Vector2, Shape, ExtrudeGeometry, Vector3 } from 'three';
+import type { BufferGeometry } from 'three';
 import { Html } from "@react-three/drei";
 export type XY = { x: number; y: number };
 
@@ -43,12 +44,12 @@ export default function WallMesh({
   // Build instanced-like data: geometry per unique (length, thickness, height). For simplicity, generate per wall.
   const meshes = useMemo(() => {
     return segments.map((seg, idx) => {
-      const a = new THREE.Vector2(seg.start.x, seg.start.y);
-      const b = new THREE.Vector2(seg.end.x, seg.end.y);
+      const a = new Vector2(seg.start.x, seg.start.y);
+      const b = new Vector2(seg.end.x, seg.end.y);
       const dir = b.clone().sub(a);
       const len = dir.length();
       if (len === 0) {
-        return { key: idx, geometry: null as THREE.BufferGeometry | null, position: new THREE.Vector3(), color: defaultColor, opacity: seg.opacity ?? 0.85 };
+        return { key: idx, geometry: null as BufferGeometry | null, position: new Vector3(), color: defaultColor, opacity: seg.opacity ?? 0.85 };
       }
 
       const h = seg.height ?? defaultHeight;
@@ -56,7 +57,7 @@ export default function WallMesh({
       const color = seg.color ?? defaultColor;
 
       // Compute perpendicular unit normal (left of AB)
-      const n = new THREE.Vector2(-dir.y, dir.x).normalize();
+      const n = new Vector2(-dir.y, dir.x).normalize();
       const half = n.multiplyScalar(t / 2);
 
       // Quad corners around centerline (A->B), in XY plane
@@ -65,14 +66,14 @@ export default function WallMesh({
       const p3 = b.clone().sub(half); // right of B
       const p4 = a.clone().sub(half); // right of A
 
-      const shape = new THREE.Shape([
-        new THREE.Vector2(p1.x, p1.y),
-        new THREE.Vector2(p2.x, p2.y),
-        new THREE.Vector2(p3.x, p3.y),
-        new THREE.Vector2(p4.x, p4.y),
+      const shape = new Shape([
+        new Vector2(p1.x, p1.y),
+        new Vector2(p2.x, p2.y),
+        new Vector2(p3.x, p3.y),
+        new Vector2(p4.x, p4.y),
       ]);
 
-      const extrude = new THREE.ExtrudeGeometry(shape, {
+      const extrude = new ExtrudeGeometry(shape, {
         depth: h, // extrudes along +Z
         bevelEnabled: false,
         steps: 1,
@@ -83,12 +84,12 @@ export default function WallMesh({
       extrude.translate(0, h / 2, 0);
 
       // Compute a nominal position (not strictly necessary since geometry already positioned)
-      const center = new THREE.Vector3((a.x + b.x) / 2, h / 2, (a.y + b.y) / 2);
+      const center = new Vector3((a.x + b.x) / 2, h / 2, (a.y + b.y) / 2);
 
       // Optimize: compute vertex normals for proper lighting
       extrude.computeVertexNormals();
 
-      return { key: idx, geometry: extrude as THREE.BufferGeometry, position: center, color, opacity: seg.opacity ?? 0.85 };
+      return { key: idx, geometry: extrude as BufferGeometry, position: center, color, opacity: seg.opacity ?? 0.85 };
     });
   }, [segments, defaultHeight, defaultThickness, defaultColor]);
 

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getPages, initDataDir } from '@/server/project-store';
+
+const ImageSearchBodySchema = z.object({
+  query: z.string().min(1),
+  projectId: z.string().optional(),
+});
 
 interface ImageResult {
   id: string;
@@ -9,11 +15,6 @@ interface ImageResult {
   source: string;
   pageNumber?: number;
   sheetName?: string;
-}
-
-interface ImageSearchBody {
-  query?: unknown;
-  projectId?: unknown;
 }
 
 function asString(input: unknown): string {
@@ -194,11 +195,16 @@ async function searchProjectSheets(query: string, projectId: string): Promise<Im
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as ImageSearchBody;
-    const query = asString(body?.query);
-    const projectId = asString(body?.projectId);
-
-    if (!query) return NextResponse.json({ error: 'Query is required.' }, { status: 400 });
+    const body = await req.json();
+    const parsed = ImageSearchBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return Response.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 422 },
+      );
+    }
+    const query = asString(parsed.data.query);
+    const projectId = asString(parsed.data.projectId);
 
     const bingResults = await searchBing(query);
     if (bingResults.length > 0) return NextResponse.json({ provider: 'Bing', results: bingResults });

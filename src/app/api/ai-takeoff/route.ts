@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+
+const AiTakeoffBodySchema = z.object({
+  imageBase64: z.string().min(1),
+  pageWidth: z.number().positive(),
+  pageHeight: z.number().positive(),
+});
 
 /**
  * Generate a deterministic hex color from a string.
@@ -20,13 +27,14 @@ function nameToColor(name: string): string {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { imageBase64, pageWidth, pageHeight } = body || {};
-    if (!imageBase64 || !pageWidth || !pageHeight) {
-      return NextResponse.json(
-        { error: 'imageBase64, pageWidth, pageHeight required' },
-        { status: 400 },
+    const parsed = AiTakeoffBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return Response.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 422 },
       );
     }
+    const { imageBase64, pageWidth, pageHeight } = parsed.data;
 
     const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
     if (!apiKey) {
