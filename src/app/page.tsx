@@ -33,7 +33,6 @@ import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
-import ScalePopup from '@/components/ScalePopup';
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
@@ -696,9 +695,62 @@ function PageInner() {
     }
   }, [projectId, currentPageNum, buildStatePayload, setCurrentPage, persistSaveStatus, flushSave, addToast]);
 
-  const handleExport = useCallback(() => {
-    downloadExcel(classifications, polygons, scale, scales);
-  }, [classifications, polygons, scale, scales]);
+  const handleExportExcel = useCallback(async () => {
+    if (!projectId) {
+      downloadExcel(classifications, polygons, scale, scales);
+      return;
+    }
+
+    try {
+      const blob = await api.exportExcel(projectId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `measurex-${projectId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      addToast('Excel export downloaded', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to export Excel', 'error');
+    }
+  }, [projectId, classifications, polygons, scale, scales, addToast]);
+
+  const handleExportJson = useCallback(async () => {
+    if (!projectId) {
+      const payload = { classifications, polygons, scale, scales };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'measurex-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      addToast('JSON export downloaded', 'success');
+      return;
+    }
+
+    try {
+      const payload = await api.exportJSON(projectId);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `measurex-${projectId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      addToast('JSON export downloaded', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to export JSON', 'error');
+    }
+  }, [projectId, classifications, polygons, scale, scales, addToast]);
 
   // AI Takeoff flow
   const handleAITakeoff = useCallback(async () => {
@@ -745,7 +797,8 @@ function PageInner() {
       <TopNavBar
         onAITakeoff={handleAITakeoff}
         aiLoading={aiLoading}
-        onExport={handleExport}
+        onExportExcel={handleExportExcel}
+        onExportJson={handleExportJson}
         onSave={handleSave}
         saving={saving}
         projectName={projectName || undefined}
@@ -979,6 +1032,47 @@ function PageInner() {
               Close
             </button>
           </div>
+        </div>
+      )}
+
+      {/* GAP-006: Server-detected scale banner from upload response */}
+      {uploadDetectedScale && (
+        <div
+          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 rounded-lg shadow-2xl px-5 py-3 flex items-center gap-4"
+          style={{ background: '#1a1a2e', border: '1px solid rgba(0,212,255,0.4)' }}
+        >
+          <span className="text-sm text-white">
+            Scale detected: <strong>{uploadDetectedScale.description}</strong> — Apply?
+          </span>
+          <button
+            onClick={() => {
+              setScale({
+                pixelsPerUnit: uploadDetectedScale.pixelsPerUnit,
+                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'mm',
+                label: uploadDetectedScale.description,
+                source: 'auto',
+              });
+              setScaleForPage(1, {
+                pixelsPerUnit: uploadDetectedScale.pixelsPerUnit,
+                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'mm',
+                label: uploadDetectedScale.description,
+                source: 'auto',
+              });
+              addToast('Scale applied: ' + uploadDetectedScale.description, 'success');
+              setUploadDetectedScale(null);
+            }}
+            className="rounded px-3 py-1 text-xs font-semibold"
+            style={{ background: '#059669', color: '#fff', cursor: 'pointer' }}
+          >
+            Accept
+          </button>
+          <button
+            onClick={() => setUploadDetectedScale(null)}
+            className="rounded px-3 py-1 text-xs font-medium"
+            style={{ background: 'transparent', color: '#a0aec0', border: '1px solid rgba(160,174,192,0.3)', cursor: 'pointer' }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
     </div>

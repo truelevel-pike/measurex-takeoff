@@ -33,7 +33,8 @@ interface TopNavBarProps {
   onZoomOut?: () => void;
   onAITakeoff?: () => void;
   aiLoading?: boolean;
-  onExport?: () => void;
+  onExportExcel?: () => void;
+  onExportJson?: () => void;
   onSave?: () => void;
   saving?: boolean;
   projectName?: string;
@@ -55,7 +56,8 @@ export default function TopNavBar({
   onToggleImageSearch,
   onCompare,
   aiLoading,
-  onExport,
+  onExportExcel,
+  onExportJson,
   onSave,
   saving,
   projectName,
@@ -259,7 +261,8 @@ export default function TopNavBar({
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
-              <NavIconButton ariaLabel="Export to Excel" srLabel="Export to Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Export to Excel" onClick={onExport} />
+              <NavIconButton ariaLabel="Export JSON" srLabel="Export JSON" icon={<Download size={17} aria-hidden="true" />} tooltip="Export JSON" onClick={onExportJson} />
+              <NavIconButton ariaLabel="Export to Excel" srLabel="Export to Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Export to Excel" onClick={onExportExcel} />
             </>
           )}
           {isTablet && (
@@ -328,11 +331,18 @@ export default function TopNavBar({
             <Search size={16} /> Image Search
           </button>
           <button
-            onClick={() => { onExport?.(); setShowMobileMenu(false); }}
+            onClick={() => { onExportJson?.(); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
           >
-            <Download size={16} /> Export
+            <Download size={16} /> Export JSON
+          </button>
+          <button
+            onClick={() => { onExportExcel?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Download size={16} /> Export Excel
           </button>
           <button
             onClick={() => { setShowQuantitiesDrawer(!showQuantitiesDrawer); setShowMobileMenu(false); }}

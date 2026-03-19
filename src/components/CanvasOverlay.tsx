@@ -94,7 +94,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       const rect = wrapperRef.current?.getBoundingClientRect();
       const screenToBase = rect ? baseDims.width / rect.width : 1;
       const snapThreshold = 10 * screenToBase;
-      const otherPolygons = polygons.filter((p) => p.id !== dragging.polygonId);
+      const otherPolygons = allPolygons.filter((p) => p.pageNumber === currentPage && p.id !== dragging.polygonId);
       const snap = snapToNearestVertex(pt, otherPolygons, snapThreshold);
       const snappedPt = snap ? { x: snap.x, y: snap.y } : pt;
       setSnapIndicator(snap);
@@ -130,7 +130,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, toSvgCoords, updatePolygon, allPolygons, classifications, scale]);
+  }, [dragging, toSvgCoords, updatePolygon, allPolygons, classifications, scale, currentPage, baseDims]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
