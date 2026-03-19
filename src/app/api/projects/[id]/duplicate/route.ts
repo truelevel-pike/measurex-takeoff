@@ -1,0 +1,100 @@
+import { NextResponse } from 'next/server';
+import {
+  createClassification,
+  createPage,
+  createPolygon,
+  createProject,
+  getClassifications,
+  getPages,
+  getPolygons,
+  getProject,
+  getScale,
+  initDataDir,
+  setScale,
+  updateProject,
+} from '@/server/project-store';
+
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await initDataDir();
+    const { id } = await params;
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    }
+
+    const sourceProject = await getProject(id);
+    if (!sourceProject) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    const [classifications, polygons, scale, pages] = await Promise.all([
+      getClassifications(id),
+      getPolygons(id),
+      getScale(id),
+      getPages(id),
+    ]);
+
+    const duplicated = await createProject(`Copy of ${sourceProject.name}`);
+    const classificationIdMap = new Map<string, string>();
+
+    for (const classification of classifications) {
+      const created = await createClassification(duplicated.id, {
+        name: classification.name,
+        color: classification.color,
+        type: classification.type,
+        visible: classification.visible,
+        formula: classification.formula,
+        formulaUnit: classification.formulaUnit,
+        formulaSavedToLibrary: classification.formulaSavedToLibrary,
+      });
+      classificationIdMap.set(classification.id, created.id);
+    }
+
+    for (const polygon of polygons) {
+      await createPolygon(duplicated.id, {
+        points: polygon.points,
+        classificationId: classificationIdMap.get(polygon.classificationId) || polygon.classificationId,
+        pageNumber: polygon.pageNumber,
+        area: polygon.area,
+        linearFeet: polygon.linearFeet,
+        isComplete: polygon.isComplete,
+        label: polygon.label,
+      });
+    }
+
+    for (const page of pages) {
+      await createPage(duplicated.id, {
+        pageNum: page.pageNum,
+        width: page.width,
+        height: page.height,
+        text: page.text,
+        name: page.name,
+        drawingSet: page.drawingSet,
+      });
+    }
+
+    if (scale) {
+      await setScale(duplicated.id, {
+        pixelsPerUnit: scale.pixelsPerUnit,
+        unit: scale.unit,
+        label: scale.label,
+        source: scale.source,
+        confidence: scale.confidence,
+        pageNumber: scale.pageNumber,
+      });
+    }
+
+    if (pages.length > 0) {
+      await updateProject(duplicated.id, { totalPages: pages.length });
+    }
+
+    const newProject = await getProject(duplicated.id);
+    return NextResponse.json({ project: newProject ?? duplicated });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+}
