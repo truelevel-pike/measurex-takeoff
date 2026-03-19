@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { trackError } from "@/lib/error-tracker";
 
 interface Props {
   children: React.ReactNode;
@@ -22,6 +23,25 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    const context = {
+      componentStack: info.componentStack,
+      boundaryName: this.props.name ?? "unknown",
+    };
+
+    trackError(error, context);
+
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      const payload = JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        context,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      });
+      const blob = new Blob([payload], { type: "application/json" });
+      navigator.sendBeacon("/api/errors", blob);
+    }
+
     console.error(`[ErrorBoundary:${this.props.name ?? "unknown"}]`, error, info);
   }
 

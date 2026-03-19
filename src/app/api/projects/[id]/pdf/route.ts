@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { initDataDir } from '@/server/project-store';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 /**
  * GET /api/projects/:id/pdf
@@ -9,11 +10,9 @@ import { initDataDir } from '@/server/project-store';
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    // Validate id is a safe UUID/alphanumeric string
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: "Invalid project id" }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
 
     const fs = await import('fs/promises');
     const path = await import('path');

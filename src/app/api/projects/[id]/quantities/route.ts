@@ -49,7 +49,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       };
     });
 
-    return NextResponse.json({ quantities, scale: scale || null });
+    return NextResponse.json({ quantities, scale: scale || null }, {
+      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=30' },
+    });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

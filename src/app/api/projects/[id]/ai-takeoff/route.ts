@@ -5,11 +5,16 @@ import { getProject, getPages } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { analyzePageImage } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Rate limit: 10 req/min per IP
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);

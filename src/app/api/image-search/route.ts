@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getPages, initDataDir } from '@/server/project-store';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const ImageSearchBodySchema = z.object({
   query: z.string().min(1),
@@ -194,6 +195,10 @@ async function searchProjectSheets(query: string, projectId: string): Promise<Im
 }
 
 export async function POST(req: Request) {
+  // Rate limit: 10 req/min per IP
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const parsed = ImageSearchBodySchema.safeParse(body);

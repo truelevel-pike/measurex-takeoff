@@ -17,7 +17,8 @@
     "analyze": "ANALYZE=true next build",
     "migrate": "npx tsx scripts/migrate.ts",
     "migrate:dry": "npx tsx scripts/migrate.ts --dry-run",
-    "mx": "node --experimental-strip-types scripts/mx-cli.ts"
+    "mx": "node --experimental-strip-types scripts/mx-cli.ts",
+    "load-test": "npx ts-node scripts/load-test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

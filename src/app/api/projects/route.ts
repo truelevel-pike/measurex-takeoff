@@ -12,7 +12,9 @@ export async function GET() {
         return { ...p, thumbnail };
       })
     );
-    return NextResponse.json({ projects: withThumbnails });
+    return NextResponse.json({ projects: withThumbnails }, {
+      headers: { 'Cache-Control': 'public, max-age=10, s-maxage=10' },
+    });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

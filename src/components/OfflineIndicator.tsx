@@ -1,36 +1,27 @@
 'use client';
+import { useEffect, useState } from 'react';
 
-import { useState, useEffect } from 'react';
-import { WifiOff } from 'lucide-react';
-
-export default function OfflineIndicator() {
+export function OfflineIndicator() {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    // Check initial state
-    setIsOffline(!navigator.onLine);
-
-    const handleOffline = () => setIsOffline(true);
     const handleOnline = () => setIsOffline(false);
-
-    window.addEventListener('offline', handleOffline);
+    const handleOffline = () => setIsOffline(true);
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOffline(!navigator.onLine);
     return () => {
-      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
   if (!isOffline) return null;
 
   return (
-    <div
-      role="alert"
-      aria-live="polite"
-      className="fixed top-0 inset-x-0 z-[9999] flex items-center justify-center gap-2 bg-yellow-500 text-yellow-950 text-sm font-medium py-1.5 px-4"
-    >
-      <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />
-      <span>You are offline — some features may be unavailable</span>
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-500 text-black px-4 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
+      <span>⚠️</span>
+      <span>You&apos;re offline — changes will sync when reconnected</span>
     </div>
   );
 }

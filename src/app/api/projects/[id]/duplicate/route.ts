@@ -13,15 +13,14 @@ import {
   setScale,
   updateProject,
 } from '@/server/project-store';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
-    }
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
 
     const sourceProject = await getProject(id);
     if (!sourceProject) {

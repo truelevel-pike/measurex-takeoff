@@ -1,9 +1,12 @@
 import { getProject, getPolygons, getClassifications, getScale, getPages, initDataDir } from '@/server/project-store';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const [project, polygons, classifications, scale, pages] = await Promise.all([
       getProject(id),
       getPolygons(id),

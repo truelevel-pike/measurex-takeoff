@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { getPolygons, getClassifications, getScale, getProject, getAssemblies, initDataDir } from '@/server/project-store';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
@@ -155,7 +156,9 @@ function buildEstimatesSheet(
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
 
     const [project, polygons, classifications, assemblies, scale] = await Promise.all([
       getProject(id),

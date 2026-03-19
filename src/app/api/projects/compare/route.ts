@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getPolygons } from '@/server/project-store';
 import type { Polygon } from '@/lib/types';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
+  // Rate limit: 10 req/min per IP
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const { projectIdA, projectIdB } = await req.json();
     if (!projectIdA || !projectIdB) {

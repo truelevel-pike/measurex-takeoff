@@ -6,6 +6,7 @@ import {
   getScale,
   initDataDir,
 } from '@/server/project-store';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { calculateLinearLength, calculatePolygonArea } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
@@ -223,7 +224,9 @@ function buildReportHtml(
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const [project, classifications, polygons, scale] = await Promise.all([
       getProject(id),
       getClassifications(id),
