@@ -1389,9 +1389,18 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                           {Array.from(countsByPage.get(classification.id) ?? [])
                             .sort(([a], [b]) => a - b)
                             .map(([page, count]) => (
-                              <div key={page} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
-                                <span>Page {page}</span>
-                                <span className="font-mono text-[#e5e7eb]">{count}</span>
+                              <div key={page} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-1">
+                                <span className="flex-1">Page {page}</span>
+                                <span className="font-mono text-[#e5e7eb]">{count} EA</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setCurrentPage(page); }}
+                                  className="text-[9px] px-1.5 py-0.5 rounded border border-[#00d4ff]/25 text-[#00d4ff] hover:bg-[#00d4ff]/10 hover:border-[#00d4ff]/50 transition-colors whitespace-nowrap flex-shrink-0"
+                                  aria-label={`Go to page ${page}`}
+                                  title={`Jump to page ${page}`}
+                                >
+                                  Go to Page
+                                </button>
                               </div>
                             ))}
                         </>
@@ -1410,13 +1419,25 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                         const lengthReal = calculateLinearFeet(polygon.points, polygonPpu, false);
 
                         return (
-                          <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
-                            <span className="truncate">
+                          <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-1">
+                            <span className="truncate flex-1">
                               {classification.name} #{index + 1}
+                              <span className="text-[10px] text-gray-500 ml-1">p.{polygon.pageNumber}</span>
                             </span>
-                            <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
-                              A {formatArea(areaReal, measurementSettings)} | L {formatLinear(lengthReal, measurementSettings)}
+                            <span className="font-mono text-[#e5e7eb] whitespace-nowrap text-[10px]">
+                              {classification.type === 'linear'
+                                ? formatLinear(lengthReal, measurementSettings)
+                                : formatArea(areaReal, measurementSettings)}
                             </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleFocusPolygon(polygon); }}
+                              className="text-[9px] px-1.5 py-0.5 rounded border border-[#00d4ff]/25 text-[#00d4ff] hover:bg-[#00d4ff]/10 hover:border-[#00d4ff]/50 transition-colors whitespace-nowrap flex-shrink-0"
+                              aria-label={`Go to page ${polygon.pageNumber}`}
+                              title={`Jump to page ${polygon.pageNumber}`}
+                            >
+                              Go to Page
+                            </button>
                           </div>
                         );
                       })}

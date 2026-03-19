@@ -130,7 +130,18 @@ export default function TopNavBar({
       setShareLoading(true);
       // Generate (or retrieve) a share token via the API
       const res = await fetch(`/api/projects/${pid}/share`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to generate share link');
+      if (!res.ok) {
+        // Gracefully handle missing share_token column (migration 012 not applied)
+        if (res.status === 500) {
+          const body = await res.json().catch(() => ({}));
+          const msg = body?.error ?? '';
+          if (msg.includes('share_token') || msg.includes('column') || msg.includes('relation')) {
+            addToast('Schema not ready, try again shortly.', 'error');
+            return;
+          }
+        }
+        throw new Error('Failed to generate share link');
+      }
       const { token } = await res.json();
 
       const shareUrl = `${window.location.origin}/share/${token}`;

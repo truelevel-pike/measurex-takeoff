@@ -24,13 +24,19 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
       const lower = key.toLowerCase();
       const store = useStore.getState() as ReturnType<typeof useStore.getState> & OptionalActions;
 
-      if (event.metaKey && event.shiftKey && lower === 'z') {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && lower === 'z') {
         event.preventDefault();
         store.redo?.();
         return;
       }
 
-      if (event.metaKey && lower === 'z') {
+      if ((event.metaKey || event.ctrlKey) && lower === 'y') {
+        event.preventDefault();
+        store.redo?.();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && lower === 'z') {
         event.preventDefault();
         store.undo?.();
         return;
@@ -102,19 +108,31 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
         return;
       }
 
-      if (lower === 'r' || lower === 'c' || lower === 'a') {
+      if (lower === 'v') {
         event.preventDefault();
-        store.setTool('draw');
+        store.setTool('select');
         return;
       }
 
-      if (lower === 'v') {
+      if (lower === 'h') {
         event.preventDefault();
         store.setTool('pan');
         return;
       }
 
-      if (lower === 'm') {
+      if (lower === 'd') {
+        event.preventDefault();
+        store.setTool('draw');
+        return;
+      }
+
+      if (lower === 'a') {
+        event.preventDefault();
+        store.setTool('ai');
+        return;
+      }
+
+      if (lower === 'g') {
         event.preventDefault();
         store.setTool('merge');
         return;
@@ -123,6 +141,18 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
       if (lower === 's') {
         event.preventDefault();
         store.setTool('split');
+        return;
+      }
+
+      if (lower === 'c') {
+        event.preventDefault();
+        store.setTool('cut');
+        return;
+      }
+
+      if (lower === 'm') {
+        event.preventDefault();
+        store.setTool('measure');
       }
     };
 

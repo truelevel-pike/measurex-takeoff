@@ -1245,12 +1245,24 @@ function PageInner() {
 
   }, [pageBaseDimensions, setCurrentPage, setSelectedPolygon, setZoomLevel, safeGoToPage]);
 
-  useIsMobile();
+  const isMobileViewport = useIsMobile();
 
   return (
     <div className="relative flex flex-col h-screen w-screen bg-[#0a0a0f] text-white" onClick={closeContextMenu}>
       {/* Hidden print header — populated by ExportPanel before window.print() */}
       <div id="print-header" className="print-header" />
+      {isMobileViewport && (
+        <div
+          className="w-full px-4 py-2 text-center text-xs font-medium flex-shrink-0"
+          style={{
+            background: 'linear-gradient(90deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.08) 100%)',
+            borderBottom: '1px solid rgba(0,212,255,0.2)',
+            color: '#8892a0',
+          }}
+        >
+          MeasureX works best on desktop. Use a tablet or computer for full functionality.
+        </div>
+      )}
       <TopNavBar
         onAITakeoff={handleAITakeoff}
         aiLoading={aiLoading}
