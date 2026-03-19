@@ -205,6 +205,8 @@ export async function POST(req: Request) {
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
+COORDINATE FORMAT: All x,y values must be 0-1 (normalized to page width/height). x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom.
+
 COUNT items (type: "count") — return a single center point for each instance detected (a small position marker is correct for count elements):
 - "Single Swing Door": a door with one leaf that swings on hinges (shown as an arc on blueprints)
 - "Double Swing Door": a door with two leaves that swing open from the center
@@ -226,14 +228,22 @@ CRITICAL: Do NOT place a tiny marker box. You MUST trace the actual walls/outlin
 - Rooms, spaces (living room, bedroom, bathroom, kitchen, office, corridor, etc.)
 - Slabs, foundations, floor areas, roof areas, concrete pads, site areas
 
+For AREA elements, the polygon must cover the full interior space. If a room occupies roughly 20% of the visible floor area, its polygon should span roughly 20% of the page coordinates. Never use a polygon smaller than 0.05 x 0.05 page units for a room.
+
+AREA POLYGON EXAMPLES:
+- BAD: A room polygon covering only 2% of the page — points like (0.40,0.50), (0.42,0.50), (0.42,0.52), (0.40,0.52). This is far too small.
+- GOOD: A room polygon spanning the actual room area — points like (0.15,0.30), (0.45,0.30), (0.45,0.70), (0.15,0.70). This covers the real room boundary.
+- BAD: An L-shaped room traced as a simple rectangle missing the alcove.
+- GOOD: An L-shaped room with 6+ vertices following each wall turn.
+
 LINEAR items (type: "linear") — return two endpoints:
 - Walls, beams, fences, roads
 
 For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex), confidence: number (0.0-1.0, your confidence in the detection accuracy) }. No prose, no markdown fences.
+Please include a confidence field (0.0-1.0) for each element you detect. This represents your confidence in the detection accuracy — use lower values for ambiguous or partially occluded elements.
 
-COORDINATE FORMAT: All x and y values MUST be NORMALIZED — floating-point numbers between 0.0 and 1.0, relative to the full image dimensions (0,0 = top-left corner, 1,1 = bottom-right corner). Do NOT return pixel values.
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex), confidence: number (0.0-1.0) }. No prose, no markdown fences.
 
 AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.`;
 
