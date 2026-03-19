@@ -163,6 +163,8 @@ function PageInner() {
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
+  const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
 
   // BUG-R6-002: Track whether the PDF viewer has reported its actual page count.
   // The store initializes totalPages to 1; we must not show "Page 1 of 1" until
@@ -830,6 +832,46 @@ function PageInner() {
     }
   }, []);
 
+  const handleAITakeoffAllPages = useCallback(async () => {
+    const total = useStore.getState().totalPages;
+    setAiLoading(true);
+    setAiAllPagesProgress({ current: 1, total });
+    for (let page = 1; page <= total; page++) {
+      setAiAllPagesProgress({ current: page, total });
+      setAiStatus(`Page ${page}/${total}: Navigating...`);
+      pdfViewerRef.current?.goToPage(page);
+      await new Promise<void>((resolve) => setTimeout(resolve, 1400));
+      const pageCanvas = pdfViewerRef.current?.getPageCanvas?.();
+      if (!pageCanvas) continue;
+      setAiStatus(`Page ${page}/${total}: AI analyzing...`);
+      try {
+        const imageBase64 = capturePageScreenshot(pageCanvas);
+        const dims = pdfViewerRef.current?.pageDimensions || { width: pageCanvas.width, height: pageCanvas.height };
+        const pageScale = useStore.getState().scales?.[page] ?? useStore.getState().scale;
+        const elements: DetectedElement[] = await triggerAITakeoff(imageBase64, pageScale, dims.width, dims.height);
+        loadAIResults(elements, {
+          addClassification: useStore.getState().addClassification,
+          addPolygon: useStore.getState().addPolygon,
+          classifications: useStore.getState().classifications,
+          scale: pageScale,
+          currentPage: page,
+          getState: () => {
+            const s = useStore.getState();
+            return { classifications: s.classifications, scale: s.scale, currentPage: page };
+          },
+        }, { pageNumber: page });
+        setAiStatus(`Page ${page}/${total}: Done — ${elements.length} elements`);
+      } catch (err) {
+        setAiStatus(`Page ${page}/${total}: Error — ${err instanceof Error ? err.message : 'failed'}`);
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 400));
+    }
+    setAiAllPagesProgress(null);
+    setAiStatus('All pages complete!');
+    setTimeout(() => setAiStatus(null), 5000);
+    setAiLoading(false);
+  }, []);
+
   useIsMobile();
 
   return (
@@ -850,6 +892,10 @@ function PageInner() {
         sheetName={sheetNames[currentPageNum] || `Page ${currentPageNum}`}
         pageIndex={pdfFile && pdfPageCountReady ? currentPageNum - 1 : undefined}
         totalPages={pdfFile && pdfPageCountReady ? totalPages : undefined}
+        aiAllPagesMode={aiAllPagesMode}
+        onAiAllPagesModeChange={setAiAllPagesMode}
+        aiAllPagesProgress={aiAllPagesProgress}
+        onAITakeoffAllPages={handleAITakeoffAllPages}
         onPrev={() => {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);
