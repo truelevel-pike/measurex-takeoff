@@ -101,6 +101,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   const setScale = useStore((s) => s.setScale);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const currentPage = useStore((s) => s.currentPage);
+  const projectId = useStore((s) => s.projectId);
   const setTool = useStore((s) => s.setTool);
   const { addToast } = useToast();
 
@@ -117,6 +118,27 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     setTool('select');
     onClose?.();
   }, [setTool, onClose]);
+
+  const persistScale = useCallback(
+    (cal: { pixelsPerUnit: number; unit: 'ft' | 'in' | 'm' | 'mm'; label: string; source: 'manual' }) => {
+      if (!projectId) return;
+      const pageNumber = currentPage >= 1 ? currentPage : 1;
+      void fetch(`/api/projects/${projectId}/scale`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixelsPerUnit: cal.pixelsPerUnit,
+          unit: cal.unit,
+          label: cal.label,
+          source: cal.source,
+          pageNumber,
+        }),
+      }).catch((err) => {
+        console.error('Failed to persist scale:', err);
+      });
+    },
+    [projectId, currentPage],
+  );
 
   const handleSelectScale = useCallback(
     async (label: string) => {
@@ -139,13 +161,14 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       if (currentPage >= 1) {
         setScaleForPage(currentPage, cal);
       }
+      persistScale(cal);
       const { getNotificationPrefs } = await import('@/components/NotificationSettings');
       if (getNotificationPrefs().scaleChanged) {
         addToast(`Scale set to ${label}`, 'success', 3000);
       }
       handleClose();
     },
-    [currentPage, setScale, setScaleForPage, handleClose, addToast],
+    [currentPage, setScale, setScaleForPage, persistScale, handleClose, addToast],
   );
 
   const handleOpenManual = useCallback(() => {
@@ -170,9 +193,10 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       if (currentPage >= 1) {
         setScaleForPage(currentPage, cal);
       }
+      persistScale(cal);
       handleClose();
     },
-    [currentPage, setScale, setScaleForPage, handleClose],
+    [currentPage, setScale, setScaleForPage, persistScale, handleClose],
   );
 
   const handleManualCancel = useCallback(() => {

@@ -563,6 +563,14 @@ function PageInner() {
     };
   }, [menuState, closeContextMenu]);
 
+  const safeGoToPage = useCallback((page: number, source: string) => {
+    try {
+      pdfViewerRef.current?.goToPage(page);
+    } catch (error) {
+      console.error(`[page navigation] Failed to go to page ${page} from ${source}:`, error);
+    }
+  }, []);
+
   // AI Takeoff flow — processes ALL pages in the PDF
   const handleAITakeoff = useCallback(async () => {
     const viewer = pdfViewerRef.current;
@@ -608,7 +616,7 @@ function PageInner() {
       }
 
       // Return to the original page
-      viewer.goToPage(originalPage);
+      safeGoToPage(originalPage, 'ai-takeoff:return');
       await reloadProjectPolygonsAndClassifications(projectId);
 
       const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
@@ -626,7 +634,7 @@ function PageInner() {
     } finally {
       setAiLoading(false);
     }
-  }, [addToast, projectId, reloadProjectPolygonsAndClassifications]);
+  }, [addToast, projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
 
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
@@ -1026,6 +1034,7 @@ function PageInner() {
         addToast('Project saved', 'success');
       }
     } catch (error) {
+      console.error('Failed to save project:', error);
       const message = error instanceof Error ? error.message : 'Save failed';
       persistSaveStatus(`Error: ${message}`, 3500);
       addToast('Failed to save project', 'error');
@@ -1140,13 +1149,13 @@ function PageInner() {
       }
     }
 
-    viewer.goToPage(originalPage);
+    safeGoToPage(originalPage, 'ai-takeoff-all-pages:return');
     await reloadProjectPolygonsAndClassifications(projectId);
     setAiAllPagesProgress(null);
     setAiStatus('All pages complete!');
     setTimeout(() => setAiStatus(null), 5000);
     setAiLoading(false);
-  }, [projectId, reloadProjectPolygonsAndClassifications]);
+  }, [projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
 
   // Crop & Search: when user completes a bounding box, crop the canvas region and send for AI analysis
   const handleCropComplete = useCallback((cropRect: { x: number; y: number; width: number; height: number }) => {
@@ -1214,13 +1223,17 @@ function PageInner() {
 
     const viewer = pdfViewerRef.current;
     if (viewer) {
-      viewer.goToPage(page);
-      void viewer.renderPageForCapture(page).then(() => {
-        viewer.focusOnNormalizedPoint(normalizedPoint, 2);
-      });
+      safeGoToPage(page, 'takeoff-search');
+      void viewer.renderPageForCapture(page)
+        .then(() => {
+          viewer.focusOnNormalizedPoint(normalizedPoint, 2);
+        })
+        .catch((error) => {
+          console.error(`[page navigation] Failed to render page ${page} from takeoff-search:`, error);
+        });
     }
 
-  }, [pageBaseDimensions, setCurrentPage, setSelectedPolygon, setZoomLevel]);
+  }, [pageBaseDimensions, setCurrentPage, setSelectedPolygon, setZoomLevel, safeGoToPage]);
 
   useIsMobile();
 
@@ -1255,13 +1268,13 @@ function PageInner() {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);
           setCurrentPage(prev, totalPages);
-          pdfViewerRef.current?.goToPage(prev);
+          safeGoToPage(prev, 'top-nav:prev');
         }}
         onNext={() => {
           const next = Math.min(totalPages, currentPageNum + 1);
           setCurrentPageNum(next);
           setCurrentPage(next, totalPages);
-          pdfViewerRef.current?.goToPage(next);
+          safeGoToPage(next, 'top-nav:next');
         }}
       />
       {/* Floating 2D/3D toggle — always visible */}
@@ -1307,7 +1320,7 @@ function PageInner() {
             onPageSelect={(page) => {
               setCurrentPageNum(page);
               setCurrentPage(page, totalPages);
-              pdfViewerRef.current?.goToPage(page);
+              safeGoToPage(page, 'thumbnail-sidebar');
             }}
           />
         )}

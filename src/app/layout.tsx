@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
@@ -7,11 +6,9 @@ import OfflineBanner from "@/components/OfflineBanner";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { PerfMonitor } from "@/components/PerfMonitor";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-
-const DevPerfOverlay =
-  process.env.NODE_ENV === "development"
-    ? dynamic(() => import("@/components/dev/DevPerfOverlay"), { ssr: false })
-    : (() => null);
+// Dev-only: loaded via a client wrapper that uses next/dynamic with ssr:false
+// so the FPS overlay never appears in SSR output or production bundles
+import DevPerfOverlayLoader from "@/components/dev/DevPerfOverlayLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,7 +52,7 @@ export default function RootLayout({
         <OfflineBanner />
         {children}
         <KeyboardShortcutsPortal />
-        <DevPerfOverlay />
+        {process.env.NODE_ENV === 'development' && <DevPerfOverlayLoader />}
         <PerfMonitor />
         <OfflineIndicator />
         <ServiceWorkerRegister />
