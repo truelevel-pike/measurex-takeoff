@@ -58,3 +58,52 @@ export function getMetrics(): RouteMetrics[] {
   }
   return result.sort((a, b) => b.count - a.count);
 }
+
+// ---------------------------------------------------------------------------
+// Client-side Web Vitals monitoring types & initializer
+// web-vitals is imported dynamically in initPerfMonitor to avoid server-side issues
+// ---------------------------------------------------------------------------
+
+export type VitalsMetric = {
+  name: string;
+  value: number;
+  rating: 'good' | 'needs-improvement' | 'poor';
+  delta: number;
+  id: string;
+};
+
+export type PerfMonitorOptions = {
+  /** Send to endpoint (e.g. /api/perf) — POST JSON. Optional. */
+  reportUrl?: string;
+  /** Log to console (default: process.env.NODE_ENV !== 'production') */
+  logToConsole?: boolean;
+  /** Additional tags to attach to every metric */
+  tags?: Record<string, string>;
+};
+
+export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
+  const { reportUrl, logToConsole = process.env.NODE_ENV !== 'production', tags = {} } = options;
+
+  function handleMetric(metric: VitalsMetric) {
+    if (logToConsole) {
+      const emoji = metric.rating === 'good' ? '✅' : metric.rating === 'needs-improvement' ? '⚠️' : '❌';
+      console.log(`[Perf] ${emoji} ${metric.name}: ${metric.value.toFixed(1)} (${metric.rating})`);
+    }
+
+    if (reportUrl) {
+      const body = JSON.stringify({ ...metric, ...tags, timestamp: Date.now() });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(reportUrl, body);
+      } else {
+        fetch(reportUrl, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+      }
+    }
+  }
+
+  const { onCLS, onFCP, onINP, onLCP, onTTFB } = await import('web-vitals');
+  onCLS(handleMetric as any);
+  onFCP(handleMetric as any);
+  onINP(handleMetric as any);
+  onLCP(handleMetric as any);
+  onTTFB(handleMetric as any);
+}
