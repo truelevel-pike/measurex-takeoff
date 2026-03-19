@@ -26,8 +26,8 @@ export default function DuplicateProjectModal({ projectId, projectName, onClose,
       if (!srcRes.ok) throw new Error('Failed to load source project');
       const srcData = await srcRes.json();
       const state = srcData.project?.state || {};
-      const sourceClassifications: any[] = state.classifications || [];
-      const sourcePolygons: any[] = state.polygons || [];
+      const sourceClassifications: Record<string, unknown>[] = state.classifications || [];
+      const sourcePolygons: Record<string, unknown>[] = state.polygons || [];
       const sourceScale = state.scale || null;
 
       // 2. Create new project
@@ -46,7 +46,7 @@ export default function DuplicateProjectModal({ projectId, projectName, onClose,
       const classIdMap = new Map<string, string>();
       for (const cls of sourceClassifications) {
         const newId = crypto.randomUUID();
-        classIdMap.set(cls.id, newId);
+        classIdMap.set(String(cls['id'] ?? ''), newId);
         await fetch(`/api/projects/${newProjectId}/classifications`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -57,7 +57,8 @@ export default function DuplicateProjectModal({ projectId, projectName, onClose,
       // 4. Copy polygons (remapping classificationId)
       setProgress('Copying polygons...');
       for (const poly of sourcePolygons) {
-        const newClassId = classIdMap.get(poly.classificationId) || poly.classificationId;
+        const origClassId = String(poly['classificationId'] ?? '');
+        const newClassId = classIdMap.get(origClassId) ?? origClassId;
         await fetch(`/api/projects/${newProjectId}/polygons`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
 import type { Classification, Polygon } from '@/lib/types';
-import type { PageInfo } from '@/server/project-store';
+import type { PageInfo, ProjectMeta } from '@/server/project-store';
 import { ProjectIdSchema, ProjectPutSchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 import { withCache } from '@/lib/with-cache';
@@ -107,11 +107,10 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
     const body = await req.json();
-    const patch: Record<string, unknown> = {};
+    const patch: Partial<Pick<ProjectMeta, 'name' | 'thumbnail'>> = {};
     if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
     if (typeof body.name === 'string') patch.name = body.name;
-    if (body.metadata && typeof body.metadata === 'object') patch.metadata = body.metadata;
-    const updated = await updateProject(id, patch as any);
+    const updated = await updateProject(id, patch);
     return NextResponse.json({ project: updated });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 
 // ---------------------------------------------------------------------------
 // Shared Zod schemas for MeasureX API validation
@@ -68,10 +69,9 @@ export const createAssemblySchema = z.object({
 // ---------------------------------------------------------------------------
 // Helper: parse or throw 400-ready error
 // ---------------------------------------------------------------------------
-export function parseBody<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: Response } {
+export function parseBody<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: ReturnType<typeof NextResponse.json> } {
   const result = schema.safeParse(data);
   if (!result.success) {
-    const { NextResponse } = require('next/server');
     return {
       success: false,
       error: NextResponse.json(

@@ -52,14 +52,13 @@ function isSupabaseMode(): boolean {
 
 // ── Supabase Client (lazy, only created in Supabase mode) ─────────────
 
+import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 let _client: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
   if (!_client) {
-    // Dynamic import would be cleaner but createClient is sync; require at call time
-    const { createClient } = require('@supabase/supabase-js');
     _client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -158,11 +157,11 @@ export async function listProjects(): Promise<ProjectMeta[]> {
       .select('*')
       .order('updated_at', { ascending: false });
     if (error) throw new Error(`listProjects: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+    return (data || []).map((row: Record<string, unknown>): ProjectMeta => ({
+      id: row.id as string,
+      name: row.name as string,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
     }));
   }
 
@@ -242,7 +241,7 @@ export async function updateProject(
   const filePath = path.join(projectDir(projectId), 'project.json');
   const existing = await readJson<ProjectMeta | null>(filePath, null);
   if (!existing) return null;
-  const { thumbnail: _thumb, ...safePatch } = patch;
+  const { thumbnail: _, ...safePatch } = patch;
   const updated = { ...existing, ...safePatch, updatedAt: now };
   await writeJson(filePath, updated);
   return updated;
@@ -325,13 +324,13 @@ export async function getPages(projectId: string): Promise<PageInfo[]> {
       .eq('project_id', projectId)
       .order('page_number', { ascending: true });
     if (error) throw new Error(`getPages: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      pageNum: row.page_number,
-      width: row.width,
-      height: row.height,
-      text: row.pdf_url ?? '',
-      name: row.name ?? undefined,
-      drawingSet: row.drawing_set ?? undefined,
+    return (data || []).map((row: Record<string, unknown>): PageInfo => ({
+      pageNum: row.page_number as number,
+      width: row.width as number,
+      height: row.height as number,
+      text: (row.pdf_url as string | null) ?? '',
+      name: (row.name as string | null) ?? undefined,
+      drawingSet: (row.drawing_set as string | null) ?? undefined,
     }));
   }
 
@@ -474,15 +473,15 @@ export async function getClassifications(projectId: string): Promise<Classificat
       .select('*')
       .eq('project_id', projectId);
     if (error) throw new Error(`getClassifications: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      color: row.color,
-      type: row.type,
-      visible: row.visible,
-      formula: row.formula ?? undefined,
-      formulaUnit: row.formula_unit ?? undefined,
-      formulaSavedToLibrary: row.formula_saved_to_library ?? undefined,
+    return (data || []).map((row: Record<string, unknown>): Classification => ({
+      id: row.id as string,
+      name: row.name as string,
+      color: row.color as string,
+      type: row.type as Classification['type'],
+      visible: row.visible as boolean,
+      formula: (row.formula as string | null) ?? undefined,
+      formulaUnit: (row.formula_unit as string | null) ?? undefined,
+      formulaSavedToLibrary: (row.formula_saved_to_library as boolean | null) ?? undefined,
     }));
   }
 
@@ -614,17 +613,17 @@ export async function getPolygons(projectId: string): Promise<Polygon[]> {
       .select('*')
       .eq('project_id', projectId);
     if (error) throw new Error(`getPolygons: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      points: row.points,
-      classificationId: row.classification_id,
-      pageNumber: row.page_number,
-      area: row.area_pixels,
-      linearFeet: row.linear_pixels,
-      isComplete: row.is_complete,
-      label: row.label ?? undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+    return (data || []).map((row: Record<string, unknown>): Polygon => ({
+      id: row.id as string,
+      points: row.points as Polygon['points'],
+      classificationId: row.classification_id as string,
+      pageNumber: row.page_number as number,
+      area: row.area_pixels as number,
+      linearFeet: row.linear_pixels as number,
+      isComplete: row.is_complete as boolean,
+      label: (row.label as string | null) ?? undefined,
+      createdAt: (row.created_at as string | null) ?? undefined,
+      updatedAt: (row.updated_at as string | null) ?? undefined,
     }));
   }
 
@@ -770,15 +769,15 @@ export async function getHistory(
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw new Error(`getHistory: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      projectId: row.project_id,
-      actionType: row.action_type,
-      entityType: row.entity_type,
-      entityId: row.entity_id ?? null,
+    return (data || []).map((row: Record<string, unknown>): HistoryEntry => ({
+      id: row.id as string,
+      projectId: row.project_id as string,
+      actionType: row.action_type as HistoryEntry['actionType'],
+      entityType: row.entity_type as HistoryEntry['entityType'],
+      entityId: (row.entity_id as string | null) ?? null,
       beforeData: row.before_data ?? null,
       afterData: row.after_data ?? null,
-      createdAt: row.created_at,
+      createdAt: row.created_at as string,
     }));
   }
 
@@ -851,13 +850,13 @@ export async function listScales(projectId: string): Promise<ScaleCalibration[]>
       .eq('project_id', projectId)
       .order('page_number', { ascending: true });
     if (error) throw new Error(`listScales: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      pixelsPerUnit: row.pixels_per_unit,
-      unit: row.unit,
-      label: row.label,
-      source: row.source,
-      confidence: row.confidence ?? undefined,
-      pageNumber: row.page_number,
+    return (data || []).map((row: Record<string, unknown>): ScaleCalibration => ({
+      pixelsPerUnit: row.pixels_per_unit as number,
+      unit: row.unit as 'ft' | 'in' | 'm' | 'mm',
+      label: row.label as string,
+      source: row.source as ScaleCalibration['source'],
+      confidence: (row.confidence as number | null) ?? undefined,
+      pageNumber: row.page_number as number,
     }));
   }
 
@@ -892,15 +891,15 @@ export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {
       .eq('project_id', projectId)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`getAssemblies: ${error.message}`);
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      projectId: row.project_id,
-      classificationId: row.classification_id,
-      name: row.name,
-      unit: row.unit,
-      unitCost: parseFloat(row.unit_cost),
-      quantityFormula: row.quantity_formula,
-      createdAt: row.created_at,
+    return (data || []).map((row: Record<string, unknown>): AssemblyRow => ({
+      id: row.id as string,
+      projectId: row.project_id as string,
+      classificationId: row.classification_id as string,
+      name: row.name as string,
+      unit: row.unit as 'ft' | 'in' | 'm' | 'mm',
+      unitCost: parseFloat(String(row.unit_cost)),
+      quantityFormula: row.quantity_formula as string,
+      createdAt: row.created_at as string,
     }));
   }
 
@@ -1067,7 +1066,16 @@ export async function createSnapshot(
   await fs.mkdir(dir, { recursive: true });
   await writeJson(path.join(dir, `${id}.json`), snapshot);
 
-  const { classifications: _c, polygons: _p, scales: _s, assemblies: _a, pages: _pg, ...meta } = snapshot;
+  const meta: SnapshotMeta = {
+    id: snapshot.id,
+    projectId: snapshot.projectId,
+    description: snapshot.description,
+    createdAt: snapshot.createdAt,
+    polygonCount: snapshot.polygonCount,
+    classificationCount: snapshot.classificationCount,
+    assemblyCount: snapshot.assemblyCount,
+    pageCount: snapshot.pageCount,
+  };
   return meta;
 }
 
@@ -1085,8 +1093,17 @@ export async function listSnapshots(projectId: string): Promise<SnapshotMeta[]> 
     if (!entry.endsWith('.json')) continue;
     const data = await readJson<SnapshotData | null>(path.join(dir, entry), null);
     if (!data) continue;
-    const { classifications: _c, polygons: _p, scales: _s, assemblies: _a, pages: _pg, ...meta } = data;
-    snapshots.push(meta);
+    const snapMeta: SnapshotMeta = {
+      id: data.id,
+      projectId: data.projectId,
+      description: data.description,
+      createdAt: data.createdAt,
+      polygonCount: data.polygonCount,
+      classificationCount: data.classificationCount,
+      assemblyCount: data.assemblyCount,
+      pageCount: data.pageCount,
+    };
+    snapshots.push(snapMeta);
   }
 
   snapshots.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -1138,8 +1155,13 @@ export async function restoreSnapshot(projectId: string, snapshotId: string): Pr
     }
     // Recreate assemblies
     for (const asm of snapshot.assemblies) {
-      const { id: _id, projectId: _pid, createdAt: _ca, ...data } = asm;
-      await createAssembly(projectId, data);
+      await createAssembly(projectId, {
+        classificationId: asm.classificationId,
+        name: asm.name,
+        unit: asm.unit,
+        unitCost: asm.unitCost,
+        quantityFormula: asm.quantityFormula,
+      });
     }
   } else {
     // File mode: overwrite JSON files directly

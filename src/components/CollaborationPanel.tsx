@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, Mail, Link2, Check, X, ChevronDown, Shield, Eye, Pencil } from 'lucide-react';
+import { Users, Mail, Link2, Check, X, ChevronDown } from 'lucide-react';
 
 // --- Types ---
 type Permission = 'view' | 'edit' | 'admin';
@@ -34,43 +34,7 @@ const SAMPLE_COLLABORATORS: Collaborator[] = [
 const FAKE_SHARE_URL = 'https://measurex.app/share/proj_8fq2k7?token=abc123';
 
 // --- Helpers ---
-const ROLE_LABELS: Record<Permission, string> = { view: 'View Only', edit: 'Can Edit', admin: 'Admin' };
-const ROLE_COLORS: Record<Permission, string> = {
-  view: 'rgba(0,212,255,0.3)',
-  edit: 'rgba(34,197,94,0.35)',
-  admin: 'rgba(239,68,68,0.35)',
-};
 const ROLE_TEXT: Record<Permission, string> = { view: '#00d4ff', edit: '#4ade80', admin: '#f87171' };
-
-function RoleIcon({ role }: { role: Permission }) {
-  if (role === 'admin') return <Shield size={11} />;
-  if (role === 'edit') return <Pencil size={11} />;
-  return <Eye size={11} />;
-}
-
-function RoleBadge({ role }: { role: Permission }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '2px 8px',
-        borderRadius: 999,
-        fontSize: 10,
-        fontWeight: 700,
-        fontFamily: 'monospace',
-        background: ROLE_COLORS[role],
-        color: ROLE_TEXT[role],
-        letterSpacing: 0.5,
-        border: `1px solid ${ROLE_TEXT[role]}55`,
-      }}
-    >
-      <RoleIcon role={role} />
-      {ROLE_LABELS[role]}
-    </span>
-  );
-}
 
 function Avatar({ initials, color }: { initials: string; color: string }) {
   return (
@@ -468,10 +432,10 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,212,255,0.15)', flexShrink: 0 }}>
-          <button style={tabStyle(activeTab === 'internal')} onClick={() => setActiveTab('internal')} aria-selected={activeTab === 'internal'}>
+          <button style={tabStyle(activeTab === 'internal')} onClick={() => setActiveTab('internal')} aria-pressed={activeTab === 'internal'}>
             Internal ({collaborators.filter((c) => c.type === 'internal').length})
           </button>
-          <button style={tabStyle(activeTab === 'external')} onClick={() => setActiveTab('external')} aria-selected={activeTab === 'external'}>
+          <button style={tabStyle(activeTab === 'external')} onClick={() => setActiveTab('external')} aria-pressed={activeTab === 'external'}>
             External ({collaborators.filter((c) => c.type === 'external').length})
           </button>
         </div>

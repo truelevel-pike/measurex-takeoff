@@ -98,7 +98,7 @@ describe('Activity pub-sub', () => {
   let subscribeToActivity: typeof import('@/lib/ws-client').subscribeToActivity;
   let emitActivity: typeof import('@/lib/ws-client').emitActivity;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
     // ws-client imports useStore which needs zustand — mock it
     jest.doMock('@/lib/store', () => ({
@@ -121,8 +121,8 @@ describe('Activity pub-sub', () => {
       },
     }));
 
-    // Re-require to get fresh module with isolated activityListeners
-    const wsClient = require('@/lib/ws-client');
+    // Re-import to get fresh module with isolated activityListeners
+    const wsClient = await import('@/lib/ws-client');
     subscribeToActivity = wsClient.subscribeToActivity;
     emitActivity = wsClient.emitActivity;
   });
@@ -187,7 +187,7 @@ describe('Activity pub-sub', () => {
 describe('broadcastToProject', () => {
   let broadcastToProject: typeof import('@/app/api/ws/route').broadcastToProject;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset globals
     (globalThis as Record<string, unknown>).__sseClients = new Map();
     (globalThis as Record<string, unknown>).__projectEventCounters = new Map();
@@ -202,7 +202,7 @@ describe('broadcastToProject', () => {
       NextResponse: class {},
     }));
 
-    const route = require('@/app/api/ws/route');
+    const route = await import('@/app/api/ws/route');
     broadcastToProject = route.broadcastToProject;
   });
 

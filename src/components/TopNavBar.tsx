@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Link,
   MessageSquare,
   List,
   Grid3X3,
@@ -21,7 +20,6 @@ import {
   Search,
   Save as SaveIcon,
   Loader2,
-  Ellipsis,
   Menu,
   PanelRightOpen,
   Settings,
@@ -37,8 +35,6 @@ interface TopNavBarProps {
   totalPages?: number;
   onPrev?: () => void;
   onNext?: () => void;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
   onAITakeoff?: () => void | Promise<void>;
   aiLoading?: boolean;
   hasScale?: boolean;
@@ -66,8 +62,6 @@ export default function TopNavBar({
   totalPages,
   onPrev,
   onNext,
-  onZoomIn,
-  onZoomOut,
   onAITakeoff,
   onChat,
   onToggleImageSearch,

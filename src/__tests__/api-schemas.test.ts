@@ -255,7 +255,7 @@ describe('validationError', () => {
     // Response.json is available in Node 18+ and in Next.js runtime
     if (typeof Response === 'undefined' || typeof Response.json !== 'function') {
       // Polyfill for Jest environment
-      (globalThis as any).Response = {
+      (globalThis as Record<string, unknown>).Response = {
         json: (body: unknown, init?: { status?: number }) => ({ body, status: init?.status ?? 200 }),
       };
     }

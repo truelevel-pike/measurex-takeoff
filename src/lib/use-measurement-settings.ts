@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   type MeasurementSettings,
-  DEFAULT_MEASUREMENT_SETTINGS,
   loadMeasurementSettings,
   saveMeasurementSettings,
 } from './measurement-settings';
@@ -15,11 +14,7 @@ const STORAGE_KEY = 'mx-measurement-settings';
  * Triggers re-render on change and syncs across tabs via storage event.
  */
 export function useMeasurementSettings() {
-  const [settings, setSettingsState] = useState<MeasurementSettings>(DEFAULT_MEASUREMENT_SETTINGS);
-
-  useEffect(() => {
-    setSettingsState(loadMeasurementSettings());
-  }, []);
+  const [settings, setSettingsState] = useState<MeasurementSettings>(() => loadMeasurementSettings());
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {

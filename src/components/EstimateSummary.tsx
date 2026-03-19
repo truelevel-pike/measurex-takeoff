@@ -6,6 +6,15 @@ import { useStore } from '@/lib/store';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
 import type { Assembly, Classification } from '@/lib/types';
 
+interface AssemblyRow {
+  id: string;
+  name: string;
+  classificationId?: string;
+  materials?: Array<{ id: string; name: string; unitCost: number; wasteFactor: number; coverageRate: number; unit: string }>;
+  unitCost?: number;
+  unit?: string;
+}
+
 interface EstimateSummaryProps {
   onSwitchToQuantities: () => void;
   onSwitchToAssemblies: () => void;
@@ -37,7 +46,7 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
       .then((res) => res.json())
       .then((data) => {
         if (cancelled || !Array.isArray(data.assemblies)) return;
-        const mapped: Assembly[] = data.assemblies.map((row: any) => ({
+        const mapped: Assembly[] = data.assemblies.map((row: AssemblyRow) => ({
           id: row.id,
           name: row.name,
           classificationId: row.classificationId ?? '',
@@ -89,14 +98,6 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
     return map;
   }, [classifications, polygons, ppu]);
 
-  function getQuantity(cls: Classification): number {
-    const q = quantitiesByClass[cls.id];
-    if (!q) return 0;
-    if (cls.type === 'area') return q.areaReal;
-    if (cls.type === 'linear') return q.lengthReal;
-    return q.count;
-  }
-
   function unitLabel(cls: Classification): string {
     if (cls.type === 'area') return 'SF';
     if (cls.type === 'linear') return 'FT';
@@ -109,6 +110,13 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
 
   // Group assemblies by classification, only classifications that have assemblies
   const classificationSections = useMemo(() => {
+    function getQuantity(cls: Classification): number {
+      const q = quantitiesByClass[cls.id];
+      if (!q) return 0;
+      if (cls.type === 'area') return q.areaReal;
+      if (cls.type === 'linear') return q.lengthReal;
+      return q.count;
+    }
     const classIds = new Set(assemblies.map((a) => a.classificationId));
     return classifications
       .filter((cls) => classIds.has(cls.id))

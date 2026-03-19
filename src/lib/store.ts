@@ -40,7 +40,8 @@ export type Tool =
   | 'ai'
   | 'measure'
   | 'annotate'
-  | 'calibrate';
+  | 'calibrate'
+  | 'crop';
 
 export interface Store extends ProjectState {
   // UI state
@@ -478,7 +479,7 @@ export const useStore = create<Store>()(
     });
   },
 
-  cutPolygon: (id, _cutShape) => {
+  cutPolygon: (id, _) => {
     const s = get();
     const before = snapshot(s);
     set({

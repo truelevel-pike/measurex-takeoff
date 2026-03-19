@@ -169,10 +169,8 @@ export const Loading: Story = {
     polygons: [],
   },
   render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [ready, setReady] = useState(false);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => {
       const t = setTimeout(() => setReady(true), 2000);
       return () => clearTimeout(t);

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import {
   UploadCloud,
   Plus,
@@ -416,9 +417,9 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
                 onClick={() => onDrawingSelect?.(d)}
               >
                 {/* Thumbnail placeholder */}
-                <div className="w-10 h-12 rounded bg-[#1e1e2e] border border-[#2a2a3e] flex flex-col items-center justify-center flex-shrink-0">
+                <div className="relative w-10 h-12 rounded bg-[#1e1e2e] border border-[#2a2a3e] flex flex-col items-center justify-center flex-shrink-0">
                   {d.thumbnailUrl ? (
-                    <img src={d.thumbnailUrl} alt={d.name} className="w-full h-full object-cover rounded" />
+                    <Image src={d.thumbnailUrl} alt={d.name} fill className="object-cover rounded" />
                   ) : (
                     <>
                       <FileText size={14} className="text-neutral-500" />

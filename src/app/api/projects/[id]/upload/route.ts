@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createPage, updateProject, initDataDir } from '@/server/project-store';
-import { processPDF } from '@/server/pdf-processor';
+import { processPDF, renderPageAsImage } from '@/server/pdf-processor';
 import { extractSheetName } from '@/lib/sheet-namer';
+import { aiSheetNamer } from '@/lib/ai-sheet-namer';
 import { detectScaleFromText } from '@/lib/auto-scale';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
@@ -29,9 +30,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const result = await processPDF(filePath, id);
 
     // GAP-001: Extract sheet names and store pages
+    // For image-only PDFs (no text layer), fall back to AI vision to read the title block.
+    const resolvedNames: Record<number, string> = {};
+    const aiNamingPromises: Promise<void>[] = [];
+
     for (const page of result.pages) {
       const sheetName = extractSheetName(page.text ?? '');
-      await createPage(id, { ...page, name: sheetName ?? undefined });
+      if (sheetName) {
+        resolvedNames[page.pageNum] = sheetName;
+      } else {
+        // Queue AI fallback — non-blocking per page, we'll await all at end
+        aiNamingPromises.push(
+          renderPageAsImage(filePath, page.pageNum, 1.0)
+            .then((imageBase64) => imageBase64 ? aiSheetNamer(imageBase64) : null)
+            .then((aiName) => {
+              if (aiName) resolvedNames[page.pageNum] = aiName;
+            })
+            .catch(() => { /* graceful — falls back to "Sheet N" on client */ }),
+        );
+      }
+    }
+
+    // Wait for all AI naming attempts (non-blocking: failures are swallowed above)
+    await Promise.all(aiNamingPromises);
+
+    for (const page of result.pages) {
+      await createPage(id, { ...page, name: resolvedNames[page.pageNum] ?? undefined });
     }
 
     // Persist totalPages on the project so GET /api/projects/:id returns it correctly
@@ -43,9 +67,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Collect sheet names so the client has them immediately
     const sheetNames: Record<number, string> = {};
-    for (const page of result.pages) {
-      const name = extractSheetName(page.text ?? '');
-      if (name) sheetNames[page.pageNum] = name;
+    for (const [pageNum, name] of Object.entries(resolvedNames)) {
+      sheetNames[Number(pageNum)] = name;
     }
 
     const response: Record<string, unknown> = {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export const USER_PREFS_STORAGE_KEY = 'mx-preferences';
 
@@ -118,11 +118,7 @@ export function saveUserPrefs(prefs: UserPrefs): void {
 }
 
 export function useUserPrefs() {
-  const [prefs, setPrefsState] = useState<UserPrefs>(DEFAULT_PREFS);
-
-  useEffect(() => {
-    setPrefsState(loadUserPrefs());
-  }, []);
+  const [prefs, setPrefsState] = useState<UserPrefs>(() => loadUserPrefs());
 
   const setPrefs = useCallback((updater: UserPrefs | ((prev: UserPrefs) => UserPrefs)) => {
     setPrefsState((prev) => {

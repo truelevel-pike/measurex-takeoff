@@ -1,6 +1,6 @@
 const isDev = process.env.NODE_ENV === "development";
 
-function noop(..._args: unknown[]): void {}
+function noop(...args: unknown[]): void { void args; }
 
 export const logger = {
   debug: isDev ? (...args: unknown[]) => console.debug("[MX:DEBUG]", ...args) : noop,

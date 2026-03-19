@@ -29,6 +29,8 @@ interface AIImageSearchProps {
   getPageCanvas?: () => HTMLCanvasElement | null;
   hasPdf?: boolean;
   onHighlight?: (regions: BoundingBox[]) => void;
+  onStartCrop?: () => void;
+  croppedImageBase64?: string | null;
 }
 
 const QUICK_PICKS = ['Doors', 'Windows', 'HVAC', 'Electrical', 'Plumbing', 'Steel'];
@@ -40,11 +42,12 @@ function openGoogleImages(query: string) {
   );
 }
 
-export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: AIImageSearchProps) {
+export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onStartCrop, croppedImageBase64 }: AIImageSearchProps) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VisionResult | null>(null);
+  const [cropDescription, setCropDescription] = useState<string | null>(null);
   const focusTrapRef = useFocusTrap(true);
 
   useEffect(() => {
@@ -54,6 +57,46 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: A
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  // When a cropped image arrives from CropOverlay, run visual search automatically
+  useEffect(() => {
+    if (croppedImageBase64) {
+      handleCroppedSearch(croppedImageBase64);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [croppedImageBase64]);
+
+  async function handleCroppedSearch(croppedImage: string) {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setCropDescription(null);
+
+    try {
+      const res = await fetch('/api/vision-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: croppedImage,
+          query: 'This is a cropped element from a construction blueprint. Identify this element, describe what it is, and find similar or matching elements. What construction element is this?',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || `Request failed (${res.status})`);
+        return;
+      }
+
+      const visionResult = data as VisionResult;
+      setResult(visionResult);
+      setCropDescription(visionResult.summary || 'Visual element search complete');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Cropped image search failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleVisionSearch(q: string) {
     if (!q.trim()) return;
@@ -323,7 +366,45 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: A
               {tag}
             </button>
           ))}
+          {hasPdf && onStartCrop && (
+            <button
+              type="button"
+              onClick={onStartCrop}
+              disabled={loading}
+              style={{
+                background: 'rgba(0,255,136,0.08)',
+                border: '1px solid rgba(0,255,136,0.3)',
+                borderRadius: 8,
+                padding: '5px 12px',
+                fontSize: 12,
+                color: '#00ff88',
+                cursor: loading ? 'default' : 'pointer',
+                transition: 'all 150ms ease',
+                opacity: loading ? 0.5 : 1,
+                fontWeight: 600,
+                marginLeft: 4,
+              }}
+            >
+              Crop &amp; Search
+            </button>
+          )}
         </div>
+
+        {/* Crop description banner */}
+        {cropDescription && !loading && (
+          <div
+            style={{
+              padding: '8px 20px',
+              background: 'rgba(0,255,136,0.06)',
+              borderBottom: '1px solid rgba(0,255,136,0.15)',
+              fontSize: 12,
+              color: '#00ff88',
+              flexShrink: 0,
+            }}
+          >
+            Visual crop search: {cropDescription}
+          </div>
+        )}
 
         {/* Content area */}
         <div

@@ -8,7 +8,7 @@ function normalizeClassificationType(type: string): 'area' | 'linear' | 'count' 
 export function installMeasurexAPI() {
   if (typeof window === 'undefined') return;
 
-  (window as any).measurex = {
+  (window as Window & { measurex?: unknown }).measurex = {
     selectPolygon(id: string) {
       useStore.getState().setSelectedPolygon(id);
     },

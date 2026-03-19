@@ -31,7 +31,7 @@ const ScalePopup: React.FC<Props> = ({ detectedScaleText, onAccept, onManual }) 
         className="bg-white rounded-lg shadow-xl p-8 min-w-[320px] flex flex-col gap-4 border border-zinc-200"
       >
         <h2 id="scale-popup-heading" className="text-lg font-bold text-zinc-800 mb-1">Scale Detected</h2>
-        <p className="mb-2 text-zinc-600">We've auto-detected the scale for this sheet:</p>
+        <p className="mb-2 text-zinc-600">We&apos;ve auto-detected the scale for this sheet:</p>
         <div className="text-green-700 font-mono text-xl px-2 py-1 bg-green-50 rounded-md inline-block mb-4 text-center">
           {detectedScaleText}
         </div>

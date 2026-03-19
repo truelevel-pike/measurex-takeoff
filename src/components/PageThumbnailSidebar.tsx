@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '@/lib/store';
@@ -43,7 +44,6 @@ function PageThumbnailSidebar({
 
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
-  const sheetNames = useStore((s) => s.sheetNames);
 
   const processThumbnailQueue = useCallback(() => {
     const activeSession = renderSessionRef.current;
@@ -66,7 +66,7 @@ function PageThumbnailSidebar({
           canvas.height = viewport.height;
           const ctx = canvas.getContext('2d');
           if (!ctx) return;
-          await (page as any).render({ canvasContext: ctx, viewport }).promise;
+          await page.render({ canvas, canvasContext: ctx, viewport }).promise;
           if (renderSessionRef.current !== activeSession) return;
           setThumbnails((prev) => {
             if (prev[pageNumber - 1]) return prev;
@@ -195,9 +195,12 @@ function PageThumbnailSidebar({
           aria-current={isActive ? 'page' : undefined}
         >
           {thumb ? (
-            <img
+            <Image
               src={thumb}
               alt={`Page ${page}`}
+              width={56}
+              height={52}
+              unoptimized
               className={`w-14 h-auto rounded-sm ${
                 isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
               }`}

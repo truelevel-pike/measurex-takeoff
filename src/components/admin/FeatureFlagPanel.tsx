@@ -1,14 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getAllFlags, setFlag, FLAG_NAMES, type FlagName } from '@/lib/feature-flags';
 
 export default function FeatureFlagPanel() {
   const [flags, setFlags] = useState<Record<FlagName, boolean>>(() => getAllFlags());
-
-  useEffect(() => {
-    setFlags(getAllFlags());
-  }, []);
 
   function handleToggle(name: FlagName) {
     const next = !flags[name];

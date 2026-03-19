@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 function usePerfQuery(): boolean {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
+  const [enabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('perf') === '1') setEnabled(true);
-  }, []);
+    return params.get('perf') === '1';
+  });
   return enabled;
 }
 
@@ -18,7 +18,7 @@ export default function DevPerfOverlay() {
 
   const rafRef = useRef(0);
   const framesRef = useRef(0);
-  const lastTimeRef = useRef(performance.now());
+  const lastTimeRef = useRef<number>(0);
   const [fps, setFps] = useState(0);
   const [marks, setMarks] = useState<{ pdfRender: number | null; aiTakeoff: number | null; polygonDraw: number | null }>({
     pdfRender: null,
@@ -33,6 +33,8 @@ export default function DevPerfOverlay() {
     if (!window.__perfMarks) {
       window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
     }
+
+    lastTimeRef.current = performance.now();
 
     function tick() {
       framesRef.current++;

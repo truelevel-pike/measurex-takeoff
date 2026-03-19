@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -64,7 +64,6 @@ function SmartToolBtn({ icon: Icon, label, tooltip, disabled, onClick, shortcut 
 export default function SmartTools() {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
-  const scale = useStore((s) => s.scale);
   const addClassification = useStore((s) => s.addClassification);
   const addPolygon = useStore((s) => s.addPolygon);
   const updatePolygon = useStore((s) => s.updatePolygon);
@@ -72,14 +71,18 @@ export default function SmartTools() {
 
   const [doorWidth, setDoorWidth] = useState(DEFAULT_DOOR_WIDTH);
   const [windowWidth, setWindowWidth] = useState(DEFAULT_WINDOW_WIDTH);
-  const [lastAction, setLastAction] = useState<(() => void) | null>(null);
-  const [lastActionLabel, setLastActionLabel] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<string>('');
 
-  // Track last action for Repeat
+  // Track last action for Repeat via refs (no setState needed)
+  const lastActionRef = useRef<(() => void) | null>(null);
+  const lastActionLabelRef = useRef<string>('');
+  // Force re-render when last action changes (so the Repeat button enables/disables)
+  const [hasLastAction, setHasLastAction] = useState(false);
+
   const recordAction = useCallback((label: string, fn: () => void) => {
-    setLastAction(() => fn);
-    setLastActionLabel(label);
+    lastActionRef.current = fn;
+    lastActionLabelRef.current = label;
+    setHasLastAction(true);
   }, []);
 
   const showStatus = useCallback((msg: string) => {
@@ -102,8 +105,6 @@ export default function SmartTools() {
 
   // --- Tool: Backout Doors/Windows ---
   const handleBackout = useCallback(() => {
-    const ppu = scale?.pixelsPerUnit ?? 1;
-
     // Count doors and windows from count-type polygons on current page
     let doorCount = 0;
     let windowCount = 0;
@@ -135,7 +136,7 @@ export default function SmartTools() {
 
     showStatus(`Backed out ${doorCount} doors, ${windowCount} windows (−${totalDeduction.toFixed(1)} ft) from ${updated} wall segments`);
     recordAction('Backout Doors/Windows', handleBackout);
-  }, [polygons, wallClassifications, doorClassifications, windowClassifications, doorWidth, windowWidth, currentPage, scale, updatePolygon, showStatus, recordAction]);
+  }, [polygons, wallClassifications, doorClassifications, windowClassifications, doorWidth, windowWidth, currentPage, updatePolygon, showStatus, recordAction]);
 
   // --- Tool: Auto-classify Wall Centerline ---
   const handleWallCenterline = useCallback(() => {
@@ -205,11 +206,11 @@ export default function SmartTools() {
 
   // --- Tool: Repeat Last Action ---
   const handleRepeat = useCallback(() => {
-    if (lastAction) {
-      lastAction();
-      showStatus(`Repeated: ${lastActionLabel}`);
+    if (lastActionRef.current) {
+      lastActionRef.current();
+      showStatus(`Repeated: ${lastActionLabelRef.current}`);
     }
-  }, [lastAction, lastActionLabel, showStatus]);
+  }, [showStatus]);
 
   // Keyboard shortcut: Shift+R for repeat
   useEffect(() => {
@@ -276,7 +277,7 @@ export default function SmartTools() {
         icon={Repeat}
         label="Repeat Last"
         tooltip="Repeat the last smart tool action"
-        disabled={!lastAction}
+        disabled={!hasLastAction}
         onClick={handleRepeat}
         shortcut="Shift+R"
       />

@@ -27,7 +27,7 @@ export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_re
       const classPolygons = polygons.filter((p) => p.classificationId === c.id);
       let totalArea = 0;
       let totalLinear = 0;
-      let count = classPolygons.length;
+      const count = classPolygons.length;
 
       for (const p of classPolygons) {
         if (c.type === 'area') {

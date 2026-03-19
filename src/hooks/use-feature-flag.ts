@@ -25,10 +25,7 @@ export function useFeatureFlag(flag: string): boolean {
   const [enabled, setEnabled] = useState(() => cachedFlags?.[flag] ?? false);
 
   useEffect(() => {
-    if (cachedFlags) {
-      setEnabled(cachedFlags[flag] ?? false);
-      return;
-    }
+    if (cachedFlags) return;
     fetchFlags().then((flags) => {
       setEnabled(flags[flag] ?? false);
     });

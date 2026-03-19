@@ -42,6 +42,7 @@ import ScaleCalibration from '@/components/ScaleCalibration';
 const ThreeDScene = dynamic(() => import('@/components/ThreeDScene'), { ssr: false });
 import MXChat from '@/components/MXChat';
 import AIImageSearch from '@/components/AIImageSearch';
+import CropOverlay from '@/components/CropOverlay';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
@@ -245,6 +246,8 @@ function PageInner() {
   // Chat & Image Search panel state
   const [showChat, setShowChat] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
+  const [cropMode, setCropMode] = useState(false);
+  const [croppedImageBase64, setCroppedImageBase64] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -508,6 +511,81 @@ function PageInner() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [menuState, closeContextMenu]);
+
+  // AI Takeoff flow — processes ALL pages in the PDF
+  const handleAITakeoff = useCallback(async () => {
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+
+    const pages = useStore.getState().totalPages || 1;
+    const originalPage = useStore.getState().currentPage || 1;
+
+    setAiLoading(true);
+    const totalStats = { areas: 0, lines: 0, counts: 0 };
+
+    try {
+      for (let pageNum = 1; pageNum <= pages; pageNum++) {
+        setAiStatus(`Processing page ${pageNum} of ${pages}...`);
+
+        // Navigate to the page and wait for the canvas to render
+        const canvas = await viewer.renderPageForCapture(pageNum);
+        if (!canvas) {
+          console.error(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
+          continue;
+        }
+
+        const imageBase64 = capturePageScreenshot(canvas);
+        const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
+
+        setAiStatus(`AI analyzing page ${pageNum} of ${pages}... (10-30s per page)`);
+        const elements: DetectedElement[] = await triggerAITakeoff(
+          imageBase64,
+          useStore.getState().scale,
+          dims.width,
+          dims.height,
+        );
+
+        setAiStatus(`Page ${pageNum}: found ${elements.length} elements. Loading...`);
+        const stats = loadAIResults(elements, {
+          addClassification: useStore.getState().addClassification,
+          addPolygon: useStore.getState().addPolygon,
+          classifications: useStore.getState().classifications,
+          scale: useStore.getState().scale,
+          currentPage: pageNum,
+          getState: () => {
+            const s = useStore.getState();
+            return {
+              classifications: s.classifications,
+              scale: s.scale,
+              currentPage: pageNum,
+            };
+          },
+        }, { pageNumber: pageNum });
+
+        totalStats.areas += stats.areas;
+        totalStats.lines += stats.lines;
+        totalStats.counts += stats.counts;
+      }
+
+      // Return to the original page
+      viewer.goToPage(originalPage);
+
+      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`;
+      setAiStatus(doneMsg);
+      setTimeout(() => setAiStatus(null), 5000);
+
+      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+      if (getNotificationPrefs().aiTakeoffComplete) {
+        addToast(doneMsg, 'success');
+      }
+    } catch (error) {
+      console.error(error);
+      setAiStatus(`Error: ${error instanceof Error ? error.message : 'AI failed'}`);
+      setTimeout(() => setAiStatus(null), 7000);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [addToast]);
 
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
@@ -979,81 +1057,6 @@ function PageInner() {
     }
   }, [projectId, classifications, polygons, scale, scales, addToast]);
 
-  // AI Takeoff flow — processes ALL pages in the PDF
-  const handleAITakeoff = useCallback(async () => {
-    const viewer = pdfViewerRef.current;
-    if (!viewer) return;
-
-    const pages = useStore.getState().totalPages || 1;
-    const originalPage = useStore.getState().currentPage || 1;
-
-    setAiLoading(true);
-    const totalStats = { areas: 0, lines: 0, counts: 0 };
-
-    try {
-      for (let pageNum = 1; pageNum <= pages; pageNum++) {
-        setAiStatus(`Processing page ${pageNum} of ${pages}...`);
-
-        // Navigate to the page and wait for the canvas to render
-        const canvas = await viewer.renderPageForCapture(pageNum);
-        if (!canvas) {
-          console.error(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
-          continue;
-        }
-
-        const imageBase64 = capturePageScreenshot(canvas);
-        const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
-
-        setAiStatus(`AI analyzing page ${pageNum} of ${pages}... (10-30s per page)`);
-        const elements: DetectedElement[] = await triggerAITakeoff(
-          imageBase64,
-          useStore.getState().scale,
-          dims.width,
-          dims.height,
-        );
-
-        setAiStatus(`Page ${pageNum}: found ${elements.length} elements. Loading...`);
-        const stats = loadAIResults(elements, {
-          addClassification: useStore.getState().addClassification,
-          addPolygon: useStore.getState().addPolygon,
-          classifications: useStore.getState().classifications,
-          scale: useStore.getState().scale,
-          currentPage: pageNum,
-          getState: () => {
-            const s = useStore.getState();
-            return {
-              classifications: s.classifications,
-              scale: s.scale,
-              currentPage: pageNum,
-            };
-          },
-        }, { pageNumber: pageNum });
-
-        totalStats.areas += stats.areas;
-        totalStats.lines += stats.lines;
-        totalStats.counts += stats.counts;
-      }
-
-      // Return to the original page
-      viewer.goToPage(originalPage);
-
-      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`;
-      setAiStatus(doneMsg);
-      setTimeout(() => setAiStatus(null), 5000);
-
-      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
-      if (getNotificationPrefs().aiTakeoffComplete) {
-        addToast(doneMsg, 'success');
-      }
-    } catch (error) {
-      console.error(error);
-      setAiStatus(`Error: ${error instanceof Error ? error.message : 'AI failed'}`);
-      setTimeout(() => setAiStatus(null), 7000);
-    } finally {
-      setAiLoading(false);
-    }
-  }, [addToast]);
-
   const handleAITakeoffAllPages = useCallback(async () => {
     const viewer = pdfViewerRef.current;
     if (!viewer) return;
@@ -1102,6 +1105,37 @@ function PageInner() {
     setTimeout(() => setAiStatus(null), 5000);
     setAiLoading(false);
   }, []);
+
+  // Crop & Search: when user completes a bounding box, crop the canvas region and send for AI analysis
+  const handleCropComplete = useCallback((cropRect: { x: number; y: number; width: number; height: number }) => {
+    const canvas = pdfViewerRef.current?.getPageCanvas?.();
+    if (!canvas) return;
+
+    const baseDims = pdfViewerRef.current?.pageDimensions || { width: canvas.width, height: canvas.height };
+    // Convert base coords to actual canvas pixel coords
+    const scaleX = canvas.width / baseDims.width;
+    const scaleY = canvas.height / baseDims.height;
+
+    const sx = cropRect.x * scaleX;
+    const sy = cropRect.y * scaleY;
+    const sw = cropRect.width * scaleX;
+    const sh = cropRect.height * scaleY;
+
+    // Crop to offscreen canvas
+    const off = document.createElement('canvas');
+    off.width = Math.round(sw);
+    off.height = Math.round(sh);
+    const ctx = off.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, off.width, off.height);
+
+    const dataUrl = off.toDataURL('image/png');
+    setCroppedImageBase64(dataUrl);
+    setCropMode(false);
+    setTool('select');
+    // Reopen image search modal with the cropped image
+    setShowImageSearch(true);
+  }, [setTool]);
 
   const handleTakeoffSearchSelect = useCallback((result: TakeoffSearchResult) => {
     const polygon = useStore.getState().polygons.find((p) => p.id === result.polygonId);
@@ -1270,6 +1304,16 @@ function PageInner() {
                   {currentTool === 'cut' && <CutTool />}
                   {currentTool === 'measure' && <MeasurementTool />}
                   {currentTool === 'annotate' && <AnnotationTool />}
+                  {cropMode && currentTool === 'crop' && (
+                    <CropOverlay
+                      onCropComplete={handleCropComplete}
+                      onCancel={() => {
+                        setCropMode(false);
+                        setTool('select');
+                        setShowImageSearch(true);
+                      }}
+                    />
+                  )}
                 </PDFViewer>
                 </ErrorBoundary>
                 <ZoomControls />
@@ -1466,9 +1510,18 @@ function PageInner() {
       {showChat && <MXChat onClose={() => setShowChat(false)} />}
       {showImageSearch && (
         <AIImageSearch
-          onClose={() => setShowImageSearch(false)}
+          onClose={() => {
+            setShowImageSearch(false);
+            setCroppedImageBase64(null);
+          }}
           hasPdf={!!pdfFile}
           getPageCanvas={() => pdfViewerRef.current?.getPageCanvas?.() ?? null}
+          onStartCrop={() => {
+            setShowImageSearch(false);
+            setCropMode(true);
+            setTool('crop');
+          }}
+          croppedImageBase64={croppedImageBase64}
         />
       )}
 

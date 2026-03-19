@@ -9,8 +9,14 @@ import React, {
   useImperativeHandle,
 } from 'react';
 import { FileX, WifiOff } from 'lucide-react';
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import { useStore } from '@/lib/store';
+
+interface PdfJsLib {
+  GlobalWorkerOptions: { workerSrc: string };
+  version: string;
+  getDocument: (params: { data: ArrayBuffer }) => { promise: Promise<PDFDocumentProxy> };
+}
 
 interface PDFViewerProps {
   file?: File | null;
@@ -48,7 +54,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const [isPanning, setIsPanning] = useState(false);
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const [pageDimensions, setPageDimensions] = useState({ width: 0, height: 0 });
-    const [isRendering, setIsRendering] = useState(false);
+    const [, setIsRendering] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [isOffline, setIsOffline] = useState(false);
     const pendingRender = useRef<number | null>(null);
@@ -63,7 +69,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // Render-version counter: incremented before each render; checked at each await to abort stale renders
     const renderVersionRef = useRef(0);
     // Current in-flight renderTask for cancellation
-    const renderTaskRef = useRef<any>(null);
+    const renderTaskRef = useRef<RenderTask | null>(null);
     const retryCancelRef = useRef<(() => void) | null>(null);
     // Resolve callback for renderPageForCapture — called when a render completes
     const renderCompleteResolveRef = useRef<((canvas: HTMLCanvasElement | null) => void) | null>(null);
@@ -150,7 +156,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       initialFitDone.current = false;
       const loadPdf = async () => {
         try {
-          const pdfjsLib: any = await import('pdfjs-dist');
+          const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
           if (pdfjsLib.GlobalWorkerOptions) {
             pdfjsLib.GlobalWorkerOptions.workerSrc =
               `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -239,7 +245,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
           // ISSUE #5: Store the render task so it can be cancelled if superseded
           performance.mark('pdf-render-start');
-          const renderTask = (page as any).render({ canvasContext: ctx, viewport, canvas });
+          const renderTask = page.render({ canvas, canvasContext: ctx, viewport });
           renderTaskRef.current = renderTask;
           try {
             await renderTask.promise;
@@ -264,8 +270,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             const textContent = await page.getTextContent();
             // Stale check #3: abort if superseded during text extraction
             if (renderVersionRef.current !== myVersion) return;
-            const fullText = (textContent.items as any[])
-              .map((item) => (item.str || '').trim())
+            const fullText = textContent.items
+              .map((item: any) => ('str' in item ? item.str : '').trim())
               .join('\n');
             onTextExtracted?.(fullText, pageNum);
           } catch {}
@@ -410,7 +416,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         x: Number.isFinite(panX) ? panX : 0,
         y: Number.isFinite(panY) ? panY : 0,
       });
-    }, [pageDimensions]);
+    }, [pageDimensions, setZoom]);
 
     // Zoom to cursor
     // ISSUE #7 FIX: correct cursor-anchored zoom math.
@@ -553,11 +559,6 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
     // Touch handlers for mobile: pan (one finger) and pinch-to-zoom (two fingers)
     const pinchInfo = useRef<{ dist: number; center: { x: number; y: number }; startZoom: number } | null>(null);
-    const getTouchPoint = (t: Touch) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return { x: 0, y: 0 };
-      return { x: t.clientX - rect.left - pan.x, y: t.clientY - rect.top - pan.y };
-    };
     const touchDistance = (a: { clientX: number; clientY: number }, b: { clientX: number; clientY: number }) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
     const touchCenter = (a: { clientX: number; clientY: number }, b: { clientX: number; clientY: number }) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
 
@@ -640,7 +641,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
         const loadPdf = async () => {
           try {
-            const pdfjsLib: any = await import('pdfjs-dist');
+            const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
             if (isCancelled()) return;
             if (pdfjsLib.GlobalWorkerOptions) {
               pdfjsLib.GlobalWorkerOptions.workerSrc =

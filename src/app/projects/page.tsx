@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Folder,
@@ -777,12 +778,15 @@ export default function ProjectsPage() {
                   >
                     {/* Project thumbnail */}
                     {p.thumbnail ? (
-                      <img
-                        src={p.thumbnail}
-                        alt="Project preview"
-                        className="w-full h-28 object-cover"
-                        style={{ background: '#0a0a0f' }}
-                      />
+                      <div className="relative w-full h-28" style={{ background: '#0a0a0f' }}>
+                        <Image
+                          src={p.thumbnail}
+                          alt="Project preview"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
                     ) : (
                       <div
                         className="h-28 flex items-center justify-center"

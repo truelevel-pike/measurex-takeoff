@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import type { UnitCostMap } from "@/types/estimates";
 import { loadUnitCosts, updateUnitCost } from "@/lib/estimate-storage";
 
@@ -32,12 +32,14 @@ export default function EstimatesTab({
   classifications,
   quantities,
 }: EstimatesTabProps) {
-  const [unitCosts, setUnitCosts] = useState<UnitCostMap>({});
+  const [loadedProjectId, setLoadedProjectId] = useState(projectId);
+  const [unitCosts, setUnitCosts] = useState<UnitCostMap>(() => loadUnitCosts(projectId));
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  useEffect(() => {
+  if (loadedProjectId !== projectId) {
+    setLoadedProjectId(projectId);
     setUnitCosts(loadUnitCosts(projectId));
-  }, [projectId]);
+  }
 
   const handleCostChange = useCallback(
     (classificationId: string, classificationName: string, unit: string, value: number) => {
@@ -77,15 +79,14 @@ export default function EstimatesTab({
     );
   }
 
-  let grandTotal = 0;
   const rows = classifications.map((c) => {
     const qty = quantities[c.id] ?? 0;
     const unit = c.unit || defaultUnit[c.type] || "EA";
     const costPerUnit = unitCosts[c.id]?.costPerUnit ?? 0;
     const subtotal = qty * costPerUnit;
-    grandTotal += subtotal;
     return { ...c, qty, unit, costPerUnit, subtotal };
   });
+  const grandTotal = rows.reduce((sum, r) => sum + r.subtotal, 0);
 
   return (
     <div className="overflow-x-auto">

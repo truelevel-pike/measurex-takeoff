@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, GitCompare, Layers, Eye, SlidersHorizontal } from 'lucide-react';
 
 // --- Types ---

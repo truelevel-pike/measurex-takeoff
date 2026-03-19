@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -47,11 +47,7 @@ export default function SettingsPage() {
   const [applyToAll, setApplyToAll] = useState(false);
 
   // Measurement precision settings (persisted in localStorage)
-  const [ms, setMs] = useState<MeasurementSettings | null>(null);
-
-  useEffect(() => {
-    setMs(loadMeasurementSettings());
-  }, []);
+  const [ms, setMs] = useState<MeasurementSettings | null>(() => loadMeasurementSettings());
 
   const updateSetting = (patch: Partial<MeasurementSettings>) => {
     if (!ms) return;

@@ -71,7 +71,15 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
         if (cancelled) return;
         if (Array.isArray(data.assemblies)) {
           // Map flat API rows (AssemblyRow) → Assembly type expected by store
-          const mapped: Assembly[] = data.assemblies.map((row: any) => ({
+          interface AssemblyRow {
+            id: string;
+            name: string;
+            classificationId?: string;
+            unitCost?: number;
+            unit?: string;
+            materials?: Assembly['materials'];
+          }
+          const mapped: Assembly[] = data.assemblies.map((row: AssemblyRow) => ({
             id: row.id,
             name: row.name,
             classificationId: row.classificationId ?? '',

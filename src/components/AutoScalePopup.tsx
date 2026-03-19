@@ -23,7 +23,10 @@ export default function AutoScalePopup({
 }: AutoScalePopupProps) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [remaining, setRemaining] = useState(AUTO_DISMISS_MS);
-  const startRef = useRef(Date.now());
+  const startRef = useRef(0);
+  useEffect(() => {
+    startRef.current = Date.now();
+  }, []);
   const focusTrapRef = useFocusTrap(true);
 
   const handleIgnore = useCallback(() => {

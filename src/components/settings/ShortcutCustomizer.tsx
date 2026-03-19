@@ -25,16 +25,12 @@ function formatKey(e: KeyboardEvent): string {
 }
 
 export default function ShortcutCustomizer() {
-  const [shortcuts, setShortcuts] = useState<Record<string, string>>({});
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>(() => getAllShortcuts());
   const [listening, setListening] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setShortcuts(getAllShortcuts());
   }, []);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
 
   useEffect(() => {
     if (!listening) return;

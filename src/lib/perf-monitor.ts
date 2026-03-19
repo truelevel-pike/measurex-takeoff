@@ -1,3 +1,5 @@
+import type { CLSMetric, FCPMetric, INPMetric, LCPMetric, TTFBMetric } from 'web-vitals';
+
 // ---------------------------------------------------------------------------
 // Lightweight server-side performance monitor — stores last N API calls
 // Uses globalThis to survive Next.js hot reload in dev
@@ -84,7 +86,9 @@ export type PerfMonitorOptions = {
 export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
   const { reportUrl, logToConsole = process.env.NODE_ENV !== 'production', tags = {} } = options;
 
-  function handleMetric(metric: VitalsMetric) {
+  type WebVitalMetric = CLSMetric | FCPMetric | INPMetric | LCPMetric | TTFBMetric;
+
+  function handleMetric(metric: WebVitalMetric) {
     if (logToConsole) {
       const emoji = metric.rating === 'good' ? '✅' : metric.rating === 'needs-improvement' ? '⚠️' : '❌';
       console.log(`[Perf] ${emoji} ${metric.name}: ${metric.value.toFixed(1)} (${metric.rating})`);
@@ -101,9 +105,9 @@ export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
   }
 
   const { onCLS, onFCP, onINP, onLCP, onTTFB } = await import('web-vitals');
-  onCLS(handleMetric as any);
-  onFCP(handleMetric as any);
-  onINP(handleMetric as any);
-  onLCP(handleMetric as any);
-  onTTFB(handleMetric as any);
+  onCLS((metric) => handleMetric(metric));
+  onFCP((metric) => handleMetric(metric));
+  onINP((metric) => handleMetric(metric));
+  onLCP((metric) => handleMetric(metric));
+  onTTFB((metric) => handleMetric(metric));
 }

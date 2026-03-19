@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo, useCallback, Suspense } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
@@ -10,8 +10,6 @@ import {
   formatArea,
   formatLinear,
   formatCount,
-  AREA_UNIT_LABELS,
-  LINEAR_UNIT_LABELS,
 } from '@/lib/measurement-settings';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -122,7 +120,8 @@ function PrintViewInner() {
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         const ctx = canvas.getContext('2d')!;
-        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx as unknown as any, viewport } as any).promise;
 
         if (!cancelled) setPdfLoaded(true);
       } catch (err) {
@@ -195,7 +194,7 @@ function PrintViewInner() {
   const svgScale = useMemo(() => {
     if (!state || !canvasRef.current) return 1;
     return (canvasRef.current?.width ?? state.pageDims.width) / state.pageDims.width;
-  }, [state, pdfLoaded]);
+  }, [state]);
 
   if (error) {
     return (

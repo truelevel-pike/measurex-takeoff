@@ -379,7 +379,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     currentTool === 'measure' ||
     currentTool === 'cut' ||
     currentTool === 'merge' ||
-    currentTool === 'split';
+    currentTool === 'split' ||
+    currentTool === 'crop';
 
   return (
     <div

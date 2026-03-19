@@ -159,7 +159,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('project') || localStorage.getItem('measurex_project_id');
+  });
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -191,14 +195,6 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
   const ppu = scale?.pixelsPerUnit || 1;
 
-  // Get projectId from URL or localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const pid = params.get('project') || localStorage.getItem('measurex_project_id');
-      setProjectId(pid);
-    }
-  }, []);
 
   // Focus first element in drawer when opened on mobile
   useEffect(() => {
@@ -342,22 +338,6 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return totals;
   }, [classifications, polygonsByClassification, ppu]);
 
-  useEffect(() => {
-    setDeductionsByClassification((prev) => {
-      const validIds = new Set(classifications.map((classification) => classification.id));
-      let changed = false;
-      const next: Record<string, ClassificationDeduction[]> = {};
-      for (const [classificationId, deductions] of Object.entries(prev)) {
-        if (validIds.has(classificationId)) {
-          next[classificationId] = deductions;
-        } else {
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [classifications]);
-
   function getDeductions(classification: Classification): ClassificationDeduction[] {
     return deductionsByClassification[classification.id] ?? classification.deductions ?? [];
   }
@@ -391,8 +371,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
   function handleClassificationRowKeyDown(
     event: React.KeyboardEvent<HTMLDivElement>,
-    classificationId: string,
-    isSelected: boolean
+    classificationId: string
   ) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -656,7 +635,6 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     } else {
       addGroup(trimmedName, groupColor);
       // find the newly added group and assign classifications
-      const newGroups = groups;
       // moveClassificationToGroup handles one at a time
       // We'll assign after creation via a microtask
       setTimeout(() => {
@@ -670,7 +648,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       }, 0);
     }
     setShowGroupModal(false);
-  }, [groupName, groupColor, groupSelectedClassificationIds, editingGroupId, addGroup, updateGroup, groups]);
+  }, [groupName, groupColor, groupSelectedClassificationIds, editingGroupId, addGroup, updateGroup, groups, moveClassificationToGroup]);
 
   const handleDeleteGroup = useCallback((groupId: string) => {
     deleteGroup(groupId);
@@ -1040,7 +1018,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     : 'hover:bg-[#0e1016]'
                   }`}
                   onClick={() => { setSelectedClassificationId(classification.id); activateClassification(classification.id, isSelected); }}
-                  onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id, isSelected)}
+                  onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id)}
                   onFocus={() => setSelectedClassificationId(classification.id)}
                   tabIndex={0}
                   data-classification-row

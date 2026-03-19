@@ -15,11 +15,13 @@ export function formatLength(value: number, unit: 'ft'|'in'|'m'|'mm'|'px' = 'px'
 }
 
 export function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
+    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
+  });
   useEffect(() => {
     if (typeof window === 'undefined' || !('matchMedia' in window)) return;
     const mql = window.matchMedia(`(max-width: ${breakpoint}px)`);
-    setIsMobile(mql.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
@@ -28,11 +30,13 @@ export function useIsMobile(breakpoint = 768) {
 }
 
 export function useIsTablet() {
-  const [isTablet, setIsTablet] = useState(false);
+  const [isTablet, setIsTablet] = useState(() => {
+    if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
+    return window.matchMedia('(min-width: 769px) and (max-width: 1024px)').matches;
+  });
   useEffect(() => {
     if (typeof window === 'undefined' || !('matchMedia' in window)) return;
     const mql = window.matchMedia('(min-width: 769px) and (max-width: 1024px)');
-    setIsTablet(mql.matches);
     const handler = (e: MediaQueryListEvent) => setIsTablet(e.matches);
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);

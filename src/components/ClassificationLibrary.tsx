@@ -23,18 +23,20 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
 
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setActiveTab('RESIDENTIAL');
+      setSelectedKeys(new Set());
+    }
+  }
 
   const byId = useMemo(
     () => new Map(CLASSIFICATION_PRESET_COLLECTIONS.map((collection) => [collection.id, collection])),
     []
   );
   const currentCollection = byId.get(activeTab) ?? CLASSIFICATION_PRESET_COLLECTIONS[0];
-
-  useEffect(() => {
-    if (!open) return;
-    setActiveTab('RESIDENTIAL');
-    setSelectedKeys(new Set());
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,9 +75,10 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
   function addPresets(presets: ClassificationPreset[]) {
     let added = 0;
     let skipped = 0;
+    const seenNames = new Set(existingNames);
 
     for (const preset of presets) {
-      if (existingNames.has(preset.name.toLowerCase())) {
+      if (seenNames.has(preset.name.toLowerCase())) {
         skipped++;
         continue;
       }
@@ -85,7 +88,7 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
         color: preset.color,
         visible: true,
       });
-      existingNames.add(preset.name.toLowerCase());
+      seenNames.add(preset.name.toLowerCase());
       added++;
     }
 

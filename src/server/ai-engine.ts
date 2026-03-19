@@ -108,12 +108,10 @@ export async function analyzePageImage(
   const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
   if (!Array.isArray(parsed)) throw new Error('Parsed AI response is not an array');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results: AIDetectedElement[] = parsed
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((el: any) => Array.isArray(el?.points) && el?.type)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((el: any) => ({
+  type ParsedElement = { name?: string; classification?: string; type?: string; points?: unknown; confidence?: unknown; color?: string };
+  const results: AIDetectedElement[] = (parsed as ParsedElement[])
+    .filter((el) => Array.isArray(el?.points) && el?.type)
+    .map((el) => ({
       name: String(el.name || el.classification || 'Unknown'),
       type: el.type as AIDetectedElement['type'],
       points: el.points as Array<{ x: number; y: number }>,

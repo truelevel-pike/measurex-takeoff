@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { userEvent, within } from 'storybook/test';
 
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';

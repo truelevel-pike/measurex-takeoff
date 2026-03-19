@@ -1,26 +1,20 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Briefcase, Plus } from 'lucide-react';
+import { Briefcase } from 'lucide-react';
 import {
   getWorkspaces,
   saveWorkspaces,
   getActiveWorkspace,
   setActiveWorkspace,
-  DEFAULT_WORKSPACE,
   type Workspace,
 } from '@/lib/workspace';
 
 export default function WorkspaceSwitcher() {
   const router = useRouter();
-  const [workspaces, setWorkspacesState] = useState<Workspace[]>([DEFAULT_WORKSPACE]);
-  const [activeId, setActiveId] = useState(DEFAULT_WORKSPACE.id);
-
-  useEffect(() => {
-    setWorkspacesState(getWorkspaces());
-    setActiveId(getActiveWorkspace().id);
-  }, []);
+  const [workspaces, setWorkspacesState] = useState<Workspace[]>(() => getWorkspaces());
+  const [activeId, setActiveId] = useState(() => getActiveWorkspace().id);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

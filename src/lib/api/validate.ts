@@ -1,4 +1,4 @@
-import { ZodSchema, ZodError } from 'zod';
+import { ZodSchema } from 'zod';
 import { NextResponse } from 'next/server';
 
 export function validateBody<T>(
