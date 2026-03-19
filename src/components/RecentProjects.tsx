@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Copy } from 'lucide-react';
 
 interface ProjectSummary {
   id: string;
@@ -53,7 +54,8 @@ export default function RecentProjects() {
     };
   }, []);
 
-  const handleDuplicate = async (projectId: string) => {
+  const handleDuplicate = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
     try {
       setDuplicatingId(projectId);
       const res = await fetch(`/api/projects/${projectId}/duplicate`, { method: 'POST' });
@@ -85,7 +87,8 @@ export default function RecentProjects() {
         {projects.map((project) => (
           <article
             key={project.id}
-            className="border border-zinc-700 bg-zinc-900/40 rounded-lg p-3 flex flex-col gap-2"
+            onClick={() => router.push(`/?project=${project.id}`)}
+            className="border border-zinc-700 bg-zinc-900/40 rounded-lg p-3 flex flex-col gap-2 cursor-pointer hover:border-zinc-500 hover:bg-zinc-900/60 transition-colors"
           >
             <div>
               <p className="font-medium text-sm text-zinc-100 truncate">{project.name}</p>
@@ -95,10 +98,11 @@ export default function RecentProjects() {
             </div>
             <button
               type="button"
-              onClick={() => void handleDuplicate(project.id)}
+              onClick={(e) => void handleDuplicate(e, project.id)}
               disabled={duplicatingId === project.id}
-              className="mt-auto text-xs px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-600 disabled:text-zinc-300 text-white"
+              className="mt-auto self-end inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-zinc-600 text-zinc-400 hover:text-zinc-200 hover:border-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
+              <Copy size={12} />
               {duplicatingId === project.id ? 'Duplicating...' : 'Duplicate'}
             </button>
           </article>

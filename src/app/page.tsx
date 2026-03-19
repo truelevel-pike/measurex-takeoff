@@ -1482,19 +1482,21 @@ function PageInner() {
 
       {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
       {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}
-      <ProjectSettingsPanel
-        open={showProjectSettings}
-        onClose={() => setShowProjectSettings(false)}
-        projectName={projectName}
-        onProjectNameSaved={(newName) => {
-          setProjectName(newName);
-          persistSaveStatus('Project renamed');
-        }}
-        onProjectDeleted={() => {
-          setProjectId(null);
-          setProjectName(null);
-        }}
-      />
+      {showProjectSettings && (
+        <ProjectSettingsPanel
+          open={showProjectSettings}
+          onClose={() => setShowProjectSettings(false)}
+          projectName={projectName}
+          onProjectNameSaved={(newName) => {
+            setProjectName(newName);
+            persistSaveStatus('Project renamed');
+          }}
+          onProjectDeleted={() => {
+            setProjectId(null);
+            setProjectName(null);
+          }}
+        />
+      )}
 
       {/* Calibration draw overlay — captures two clicks when tool is 'calibrate' */}
       {currentTool === 'calibrate' && (
