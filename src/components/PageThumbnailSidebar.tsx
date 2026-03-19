@@ -141,7 +141,25 @@ function PageThumbnailSidebar({
     );
 
     root.querySelectorAll<HTMLElement>('[data-page-number]').forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+
+    // Watch for new [data-page-number] nodes added after the initial query
+    const mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          if (node.dataset.pageNumber) {
+            observer.observe(node);
+          }
+          node.querySelectorAll<HTMLElement>('[data-page-number]').forEach((child) => observer.observe(child));
+        }
+      }
+    });
+    mutationObserver.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      mutationObserver.disconnect();
+    };
   }, [collapsed, drawingSets, totalPages]);
 
   // Queue only near-viewport pages and render thumbnails with max concurrency 2.
