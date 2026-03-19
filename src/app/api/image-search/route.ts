@@ -82,7 +82,7 @@ async function searchBing(query: string): Promise<ImageResult[]> {
   const values = Array.isArray(data?.value) ? data.value : [];
 
   return values
-    .map((item: any): ImageResult | null => {
+    .map((item: Record<string, unknown>): ImageResult | null => {
       const thumb = asString(item?.thumbnailUrl);
       const full = asString(item?.contentUrl);
       if (!thumb || !full) return null;
@@ -115,8 +115,9 @@ async function searchGoogleCse(query: string): Promise<ImageResult[]> {
   const items = Array.isArray(data?.items) ? data.items : [];
 
   return items
-    .map((item: any): ImageResult | null => {
-      const thumb = asString(item?.image?.thumbnailLink) || asString(item?.link);
+    .map((item: Record<string, unknown>): ImageResult | null => {
+      const image = item?.image as Record<string, unknown> | undefined;
+      const thumb = asString(image?.thumbnailLink) || asString(item?.link);
       const full = asString(item?.link);
       if (!thumb || !full) return null;
       return {
@@ -148,9 +149,10 @@ async function searchUnsplash(query: string): Promise<ImageResult[]> {
   const items = Array.isArray(data?.results) ? data.results : [];
 
   return items
-    .map((item: any): ImageResult | null => {
-      const thumb = asString(item?.urls?.small);
-      const full = asString(item?.urls?.regular) || asString(item?.urls?.full);
+    .map((item: Record<string, unknown>): ImageResult | null => {
+      const urls = item?.urls as Record<string, unknown> | undefined;
+      const thumb = asString(urls?.small);
+      const full = asString(urls?.regular) || asString(urls?.full);
       if (!thumb || !full) return null;
       return {
         id: `unsplash-${asString(item?.id) || crypto.randomUUID()}`,

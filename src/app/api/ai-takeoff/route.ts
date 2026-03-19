@@ -97,12 +97,17 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
     if (!Array.isArray(parsed)) throw new Error('Parsed response is not an array');
 
     // Map and validate each element to match client DetectedElement schema
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const results = parsed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((el: any) => Array.isArray(el?.points) && el?.type)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((el: any) => {
+    interface RawElement {
+      name?: string;
+      type?: 'area' | 'linear' | 'count';
+      classification?: string;
+      points?: Array<{ x: number; y: number }>;
+      color?: string;
+    }
+
+    const results = (parsed as RawElement[])
+      .filter((el) => Array.isArray(el?.points) && el?.type)
+      .map((el) => {
         const name = String(el.name || el.classification || 'Unknown');
         return {
           name,
