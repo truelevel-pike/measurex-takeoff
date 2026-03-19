@@ -771,6 +771,7 @@ export const useStore = create<Store>()(
         snappingEnabled: state.snappingEnabled,
         gridEnabled: state.gridEnabled,
         gridSize: state.gridSize,
+        pageBaseDimensions: state.pageBaseDimensions,
       }),
     }
   )

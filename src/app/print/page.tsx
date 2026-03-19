@@ -246,13 +246,47 @@ function PrintViewInner() {
             {state.polygons.map(poly => {
               const cls = state.classifications.find(c => c.id === poly.classificationId);
               if (!cls || !cls.visible) return null;
-              const points = poly.points
-                .map(p => `${p.x * svgScale},${p.y * svgScale}`)
-                .join(' ');
+              const scaledPts = poly.points.map(p => ({
+                x: p.x * svgScale,
+                y: p.y * svgScale,
+              }));
+
+              if (cls.type === 'linear') {
+                const pts = scaledPts.map(p => `${p.x},${p.y}`).join(' ');
+                return (
+                  <g key={poly.id}>
+                    <polyline
+                      points={pts}
+                      fill="none"
+                      stroke={cls.color}
+                      strokeWidth={3}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {scaledPts.map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r={3} fill={cls.color} />
+                    ))}
+                  </g>
+                );
+              }
+
+              if (cls.type === 'count') {
+                const cx = scaledPts.reduce((s, p) => s + p.x, 0) / (scaledPts.length || 1);
+                const cy = scaledPts.reduce((s, p) => s + p.y, 0) / (scaledPts.length || 1);
+                return (
+                  <g key={poly.id}>
+                    <circle cx={cx} cy={cy} r={8} fill={hexToRgba(cls.color, 0.5)} stroke={cls.color} strokeWidth={2} />
+                    <circle cx={cx} cy={cy} r={3} fill={cls.color} />
+                  </g>
+                );
+              }
+
+              // area polygon
+              const pts = scaledPts.map(p => `${p.x},${p.y}`).join(' ');
               return (
                 <polygon
                   key={poly.id}
-                  points={points}
+                  points={pts}
                   fill={hexToRgba(cls.color, 0.3)}
                   stroke={cls.color}
                   strokeWidth={2}
@@ -316,17 +350,31 @@ function PrintViewInner() {
       <style jsx global>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; padding: 0; }
+          body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print-view { padding: 0; }
-          .print-header { padding: 12pt 24pt; }
-          .print-drawing { page-break-inside: avoid; }
-          .print-quantities { page-break-inside: avoid; }
+          .print-header { padding: 8pt 16pt; margin-bottom: 4pt !important; }
+          .print-drawing {
+            page-break-inside: avoid;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .print-drawing canvas {
+            width: 100% !important;
+            height: auto !important;
+          }
+          .print-quantities { page-break-inside: avoid; margin-top: 8pt !important; }
           .print-color-swatch { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          svg polygon { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          svg polygon, svg polyline, svg circle {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           @page {
-            margin: 0.5in;
+            margin: 0.35in;
             size: landscape;
           }
+        }
+        @media screen {
+          .print-drawing { max-width: 1200px; }
         }
       `}</style>
     </div>

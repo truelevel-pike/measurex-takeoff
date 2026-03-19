@@ -1353,6 +1353,11 @@ function PageInner() {
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
         onExportPanel={() => setShowExport(true)}
+        onPrintBlueprint={() => {
+          const name = projectName || 'Untitled Project';
+          const printUrl = `/print?projectId=${projectId}&name=${encodeURIComponent(name)}&page=${currentPageNum}`;
+          window.open(printUrl, '_blank');
+        }}
         onSave={handleSave}
         saving={saving}
         projectName={projectName || undefined}

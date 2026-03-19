@@ -25,6 +25,7 @@ import {
   PanelRightOpen,
   Settings,
   Share2,
+  Printer,
 } from 'lucide-react';
 import ReTogal from './ReTogal';
 import { useToast } from './Toast';
@@ -61,6 +62,7 @@ interface TopNavBarProps {
   onGoToPage?: (page: number) => void;
   aiModel?: string;
   onAiModelChange?: (model: string) => void;
+  onPrintBlueprint?: () => void;
 }
 
 export default function TopNavBar({
@@ -94,6 +96,7 @@ export default function TopNavBar({
   onGoToPage,
   aiModel,
   onAiModelChange,
+  onPrintBlueprint,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -588,6 +591,7 @@ export default function TopNavBar({
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
+              <NavIconButton ariaLabel="Print Blueprint" srLabel="Print Blueprint" icon={<Printer size={17} aria-hidden="true" />} tooltip="Print Blueprint" onClick={onPrintBlueprint} />
               <NavIconButton ariaLabel="Export" srLabel="Export" icon={<FileSpreadsheet size={17} aria-hidden="true" />} tooltip="Export" onClick={onExportPanel} />
               <NavIconButton ariaLabel="Quick Export Excel" srLabel="Quick Export Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Quick Export Excel" onClick={onExportExcel} />
             </>
@@ -677,6 +681,13 @@ export default function TopNavBar({
             style={{ touchAction: 'manipulation' }}
           >
             <Settings size={16} /> Settings
+          </button>
+          <button
+            onClick={() => { onPrintBlueprint?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Printer size={16} /> Print Blueprint
           </button>
           <button
             onClick={() => { onExportPanel?.(); setShowMobileMenu(false); }}

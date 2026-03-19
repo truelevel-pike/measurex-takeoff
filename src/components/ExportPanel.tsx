@@ -1004,11 +1004,11 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           </button>
           <button
             onClick={handlePrintExport}
-            aria-label="Print page with overlays"
+            aria-label="Print blueprint with polygon overlays"
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
-            Print
+            Print Blueprint
           </button>
           <button
             onClick={handleContractorReport}
