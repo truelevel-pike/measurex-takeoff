@@ -32,6 +32,9 @@ import type { ProjectState } from '@/lib/types';
 const DrawingComparison = dynamic(() => import('@/components/DrawingComparison'), { ssr: false });
 import CollaborationPanel from '@/components/CollaborationPanel';
 import AutoNameTool from '@/components/AutoNameTool';
+import RecentProjectsSection, { saveRecentProject } from '@/components/RecentProjectsSection';
+import DuplicateProjectModal from '@/components/DuplicateProjectModal';
+import RecentProjects from '@/components/RecentProjects';
 
 /* ── Project thumbnail helpers ─────────────────────────────────── */
 const THUMB_PALETTE = [
@@ -141,6 +144,7 @@ export default function ProjectsPage() {
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+  const [duplicateTarget, setDuplicateTarget] = useState<{ id: string; name: string } | null>(null);
 
   // Load persisted local state
   useEffect(() => {
@@ -223,7 +227,11 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleOpen = (id: string) => router.push(`/?project=${id}`);
+  const handleOpen = (id: string, name?: string) => {
+    const project = projects.find(p => p.id === id);
+    saveRecentProject(id, project?.name || name || id);
+    router.push(`/?project=${id}`);
+  };
 
   // Star toggle
   const toggleStar = (id: string) => {
@@ -538,6 +546,8 @@ export default function ProjectsPage() {
             </div>
           )}
 
+          <RecentProjectsSection />
+
           {/* Onboarding checklist */}
           {showOnboarding && (
             <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-5 mb-5">
@@ -576,6 +586,8 @@ export default function ProjectsPage() {
               </button>
             </div>
           )}
+
+          <RecentProjects />
 
           {/* Section header + view toggle */}
           <div className="flex items-center justify-between mb-4">
@@ -828,6 +840,15 @@ export default function ProjectsPage() {
           )}
           <div className="border-t border-zinc-700 my-1" />
           <button
+            className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
+            onClick={() => {
+              const p = projects.find(pr => pr.id === contextMenu.projectId);
+              setDuplicateTarget({ id: contextMenu.projectId, name: p?.name || 'Project' });
+              setContextMenu(null);
+            }}
+          >Duplicate</button>
+          <div className="border-t border-zinc-700 my-1" />
+          <button
             className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-zinc-700 transition-colors"
             onClick={() => { handleDelete(contextMenu.projectId); setContextMenu(null); }}
           >Delete</button>
@@ -841,6 +862,15 @@ export default function ProjectsPage() {
 
       {showCollab && (
         <CollaborationPanel onClose={() => setShowCollab(false)} />
+      )}
+
+      {duplicateTarget && (
+        <DuplicateProjectModal
+          projectId={duplicateTarget.id}
+          projectName={duplicateTarget.name}
+          onClose={() => setDuplicateTarget(null)}
+          onDuplicated={(newId) => { loadProjects(); handleOpen(newId); }}
+        />
       )}
 
       {showAutoName && (
