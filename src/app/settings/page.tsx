@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check } from 'lucide-react';
+import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check, Brain, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import {
   type MeasurementSettings,
@@ -14,8 +14,16 @@ import {
   loadMeasurementSettings,
   saveMeasurementSettings,
 } from '@/lib/measurement-settings';
+import { type AiSettings, loadAiSettings, saveAiSettings } from '@/lib/ai-settings';
 
-type SettingsTab = 'profile' | 'measurements' | 'organization' | 'account';
+type SettingsTab = 'profile' | 'measurements' | 'ai' | 'organization' | 'account';
+
+const AI_MODEL_OPTIONS = [
+  { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gemini-3.1', label: 'Gemini 3.1' },
+  { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+];
 
 const SCALE_OPTIONS = [
   '1/8" = 1\'',
@@ -56,12 +64,23 @@ export default function SettingsPage() {
     saveMeasurementSettings(next);
   };
 
+  // AI settings state
+  const [ai, setAi] = useState<AiSettings>(() => loadAiSettings());
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  const updateAi = (patch: Partial<AiSettings>) => {
+    const next: AiSettings = { ...ai, ...patch };
+    setAi(next);
+    saveAiSettings(next);
+  };
+
   // Organization state
   const [teamName, setTeamName] = useState('MeasureX Team');
 
   const tabs: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { key: 'profile', label: 'Profile', icon: <User size={16} /> },
     { key: 'measurements', label: 'Measurements', icon: <Settings size={16} /> },
+    { key: 'ai', label: 'AI', icon: <Brain size={16} /> },
     { key: 'organization', label: 'Organization', icon: <Building2 size={16} /> },
     { key: 'account', label: 'Account', icon: <Shield size={16} /> },
   ];
@@ -308,6 +327,99 @@ export default function SettingsPage() {
                     {ms.scaleDisplayFormat === 'architectural' && 'e.g. 1/4" = 1\''}
                     {ms.scaleDisplayFormat === 'engineering' && 'e.g. 1" = 20\''}
                     {ms.scaleDisplayFormat === 'ratio' && 'e.g. 1:48'}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'ai' && (
+            <section className="space-y-6">
+              <h2 className="text-lg font-semibold mb-4">AI</h2>
+
+              <div className="bg-gray-900 rounded-xl p-6 space-y-6 border border-gray-800">
+                {/* Default AI Model */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1.5">Default AI Model</label>
+                  <select
+                    value={ai.defaultModel}
+                    onChange={e => updateAi({ defaultModel: e.target.value })}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 w-64 transition-colors"
+                  >
+                    {AI_MODEL_OPTIONS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Default Scale Unit */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Default Scale Unit</label>
+                  <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
+                    {(['ft', 'm'] as const).map(u => (
+                      <button
+                        key={u}
+                        onClick={() => updateAi({ defaultScaleUnit: u })}
+                        className={`px-6 py-2.5 text-sm font-medium transition-colors ${
+                          ai.defaultScaleUnit === u
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Auto-run Scale Detection */}
+                <div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div
+                      onClick={() => updateAi({ autoRunScaleDetection: !ai.autoRunScaleDetection })}
+                      className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                        ai.autoRunScaleDetection ? 'bg-green-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          ai.autoRunScaleDetection ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-300">Auto-run Scale Detection</span>
+                  </label>
+                </div>
+
+                {/* Theme */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1.5">Theme</label>
+                  <span className="inline-block bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-400">
+                    Dark
+                  </span>
+                </div>
+
+                {/* OpenAI API Key */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1.5">OpenAI API Key</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={ai.openaiApiKey}
+                      onChange={e => updateAi({ openaiApiKey: e.target.value })}
+                      placeholder="sk-..."
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="text-gray-400 hover:text-white p-2 transition-colors"
+                    >
+                      {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Used for direct GPT-5.4 calls (optional override)
                   </p>
                 </div>
               </div>

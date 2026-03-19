@@ -1,13 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Camera, Clock, CheckCircle, ChevronDown, ChevronRight, RotateCcw, X, Loader2, Plus, Pencil, Trash2, User } from 'lucide-react';
+import { History, Camera, Clock, CheckCircle, ChevronDown, ChevronRight, RotateCcw, X, Loader2, Plus, Pencil, Trash2, User, Zap } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import SnapshotPanel from '@/components/SnapshotPanel';
 
+export interface TakeoffRun {
+  id: string;
+  timestamp: string;
+  model: string;
+  pageRange: string;
+  polygonCount: number;
+  projectId: string;
+  isCurrent?: boolean;
+}
+
 interface VersionHistoryProps {
   onClose: () => void;
+  onRestoreRun?: (run: TakeoffRun) => void;
 }
 
 interface ApiHistoryEntry {
@@ -214,12 +225,78 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-export default function VersionHistory({ onClose }: VersionHistoryProps) {
+const RUNS_STORAGE_KEY = 'mx-takeoff-runs';
+
+function getModelBadgeColor(model: string): string {
+  if (model.includes('sonnet') || model.includes('claude') || model.includes('opus'))
+    return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
+  if (model.includes('gpt'))
+    return 'text-blue-400 bg-blue-400/10 border-blue-400/30';
+  if (model.includes('gemini'))
+    return 'text-purple-400 bg-purple-400/10 border-purple-400/30';
+  return 'text-gray-400 bg-gray-400/10 border-gray-400/30';
+}
+
+function getModelLabel(model: string): string {
+  const map: Record<string, string> = {
+    'claude-sonnet-4-6': 'Sonnet 4.6',
+    'claude-opus-4-6': 'Opus 4.6',
+    'gpt-5.4': 'GPT-5.4',
+    'gemini-3.1': 'Gemini 3.1',
+  };
+  return map[model] || model;
+}
+
+function loadTakeoffRuns(): TakeoffRun[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(RUNS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* ignore */ }
+
+  // Pre-populate mock entries for demo
+  const now = Date.now();
+  const mocks: TakeoffRun[] = [
+    {
+      id: 'run-001',
+      timestamp: new Date(now - 15 * 60 * 1000).toISOString(),
+      model: 'claude-sonnet-4-6',
+      pageRange: '1-3',
+      polygonCount: 24,
+      projectId: 'demo',
+      isCurrent: true,
+    },
+    {
+      id: 'run-002',
+      timestamp: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      model: 'gpt-5.4',
+      pageRange: 'all',
+      polygonCount: 18,
+      projectId: 'demo',
+    },
+    {
+      id: 'run-003',
+      timestamp: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
+      model: 'gemini-3.1',
+      pageRange: '1-2',
+      polygonCount: 12,
+      projectId: 'demo',
+    },
+  ];
+  localStorage.setItem(RUNS_STORAGE_KEY, JSON.stringify(mocks));
+  return mocks;
+}
+
+export default function VersionHistory({ onClose, onRestoreRun }: VersionHistoryProps) {
   const undoStack = useStore((s) => s.undoStack);
   const undo = useStore((s) => s.undo);
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'history' | 'snapshots'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'snapshots' | 'runs'>('history');
+  const [runs] = useState<TakeoffRun[]>(() => loadTakeoffRuns());
   const [loading, setLoading] = useState(true);
   const [apiEntries, setApiEntries] = useState<ApiHistoryEntry[] | null>(null);
   const [restoringEntryId, setRestoringEntryId] = useState<string | null>(null);
@@ -347,11 +424,75 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
           <Camera size={12} />
           Snapshots
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('runs')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'runs'
+              ? 'text-emerald-400 border-b-2 border-emerald-400'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Zap size={12} />
+          Runs
+        </button>
       </div>
 
       {/* Content */}
-      {activeTab === 'snapshots' && projectId ? (
+      {activeTab === 'runs' ? (
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+          {runs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <Zap size={18} className="text-gray-600 mb-2" />
+              <p className="text-sm font-medium text-gray-300">No AI runs yet</p>
+              <p className="text-xs text-gray-500 mt-1">Start a takeoff to record history</p>
+            </div>
+          ) : (
+            runs
+              .slice()
+              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+              .map((run, idx) => (
+                <div
+                  key={run.id}
+                  className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
+                >
+                  <div className="mt-0.5">
+                    <Zap size={14} className={idx === 0 ? 'text-emerald-400' : 'text-gray-500'} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[10px] font-medium border rounded px-1.5 py-0.5 ${getModelBadgeColor(run.model)}`}>
+                        {getModelLabel(run.model)}
+                      </span>
+                      {idx === 0 && (
+                        <span className="text-[9px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 rounded px-1 py-0">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-300 mt-0.5">
+                      Pages {run.pageRange} · {run.polygonCount} polygons
+                    </p>
+                    <span className="text-[10px] text-gray-500">{timeAgo(run.timestamp)}</span>
+                  </div>
+                  {idx !== 0 && onRestoreRun && (
+                    <button
+                      type="button"
+                      onClick={() => onRestoreRun(run)}
+                      className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors flex-shrink-0"
+                    >
+                      <RotateCcw size={10} />
+                      Restore
+                    </button>
+                  )}
+                </div>
+              ))
+          )}
+        </div>
+      ) : activeTab === 'snapshots' && projectId ? (
         <SnapshotPanel projectId={projectId} />
+      ) : activeTab === 'snapshots' ? (
+        <div className="flex-1" />
       ) : (
 
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">

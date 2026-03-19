@@ -124,18 +124,24 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <GitCompare size={16} style={{ color: '#00d4ff' }} />
-          <span
-            style={{
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              letterSpacing: 1,
-              color: '#e0faff',
-              fontSize: 13,
-              textTransform: 'uppercase',
-            }}
-          >
-            COMPARE PROJECTS
-          </span>
+          <div>
+            <span
+              style={{
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                letterSpacing: 1,
+                color: '#e0faff',
+                fontSize: 13,
+                textTransform: 'uppercase',
+                display: 'block',
+              }}
+            >
+              COMPARE PROJECTS
+            </span>
+            <span style={{ fontSize: 11, color: '#8892a0', fontFamily: 'monospace' }}>
+              Compare two takeoff versions side-by-side
+            </span>
+          </div>
         </div>
         <button
           aria-label="Close compare panel"
@@ -176,7 +182,9 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
               Loading projects...
             </div>
           ) : projects.length === 0 ? (
-            <div style={{ color: '#8892a0', fontSize: 12 }}>No other projects available</div>
+            <div style={{ color: '#8892a0', fontSize: 12, lineHeight: 1.5 }}>
+              You need at least 2 projects to use Compare. Create another project to get started.
+            </div>
           ) : (
             <select
               value={selectedProjectId}
@@ -383,6 +391,26 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
             </div>
           </div>
         )}
+      </div>
+
+      {/* Diff legend */}
+      <div
+        style={{
+          padding: '10px 16px',
+          borderTop: '1px solid rgba(0,212,255,0.15)',
+          display: 'flex',
+          gap: 16,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#22c55e' }} />
+          <span style={{ fontSize: 10, color: '#8892a0', fontFamily: 'monospace' }}>New polygons</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ef4444' }} />
+          <span style={{ fontSize: 10, color: '#8892a0', fontFamily: 'monospace' }}>Removed polygons</span>
+        </div>
       </div>
 
       {/* Inline keyframe for spinner */}
