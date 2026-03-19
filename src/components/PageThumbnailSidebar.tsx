@@ -46,6 +46,27 @@ function PageThumbnailSidebar({
   const renderSessionRef = useRef(0);
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
+  const polygons = useStore((s) => s.polygons);
+  const classifications = useStore((s) => s.classifications);
+  const pageBaseDimensions = useStore((s) => s.pageBaseDimensions);
+
+  // Pre-compute a classificationId → color map for thumbnail overlays
+  const classColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of classifications) m.set(c.id, c.color);
+    return m;
+  }, [classifications]);
+
+  // Group polygons by page number
+  const polygonsByPage = useMemo(() => {
+    const m = new Map<number, typeof polygons>();
+    for (const p of polygons) {
+      const list = m.get(p.pageNumber);
+      if (list) list.push(p);
+      else m.set(p.pageNumber, [p]);
+    }
+    return m;
+  }, [polygons]);
 
   const processThumbnailQueue = useCallback(() => {
     const activeSession = renderSessionRef.current;
@@ -173,17 +194,44 @@ function PageThumbnailSidebar({
           aria-current={isActive ? 'page' : undefined}
         >
           {thumb ? (
-            <Image
-              src={thumb}
-              alt={`Page ${page}`}
-              width={56}
-              height={52}
-              unoptimized
-              className={`w-14 h-auto rounded-sm ${
-                isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
-              }`}
-              draggable={false}
-            />
+            <div className="relative w-14">
+              <Image
+                src={thumb}
+                alt={`Page ${page}`}
+                width={56}
+                height={52}
+                unoptimized
+                className={`w-14 h-auto rounded-sm ${
+                  isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
+                }`}
+                draggable={false}
+              />
+              {/* Polygon overlay preview */}
+              {(() => {
+                const pagePolygons = polygonsByPage.get(page);
+                const dims = pageBaseDimensions[page];
+                if (!pagePolygons?.length || !dims) return null;
+                return (
+                  <svg
+                    className="absolute inset-0 w-full h-full pointer-events-none"
+                    viewBox={`0 0 ${dims.width} ${dims.height}`}
+                    preserveAspectRatio="none"
+                  >
+                    {pagePolygons.map((poly) => (
+                      <polygon
+                        key={poly.id}
+                        points={poly.points.map((pt) => `${pt.x},${pt.y}`).join(' ')}
+                        fill={classColorMap.get(poly.classificationId) ?? '#00d4ff'}
+                        fillOpacity={0.3}
+                        stroke={classColorMap.get(poly.classificationId) ?? '#00d4ff'}
+                        strokeWidth={dims.width * 0.005}
+                        strokeOpacity={0.6}
+                      />
+                    ))}
+                  </svg>
+                );
+              })()}
+            </div>
           ) : failedPages.has(page) ? (
             <span
               className="w-14 h-[52px] rounded-sm flex items-center justify-center text-red-400 text-sm font-bold ring-1 ring-gray-700 bg-[#1a1a2e]"
