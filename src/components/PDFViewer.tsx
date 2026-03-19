@@ -423,6 +423,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       const fitZoom = Math.min(scaleX, scaleY, 3);
       setZoom(fitZoom);
       setPan({ x: 0, y: 0 });
+      // Sync to store so external ZoomControls displays the correct percentage
+      useStore.getState().setZoomLevel(fitZoom);
     }, [setZoom]);
 
     const focusOnNormalizedPoint = useCallback((point: { x: number; y: number }, targetZoom = 2) => {
@@ -506,6 +508,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           y: pan.y - pivotY * (ratio - 1) + (prevOffsetY - nextOffsetY),
         });
         setZoom(nextZoom);
+        // Sync to store so external ZoomControls displays the correct percentage
+        useStore.getState().setZoomLevel(nextZoom);
       },
       [zoom, pan, pageDimensions, setZoom]
     );
@@ -562,20 +566,17 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       return () => { cancelAnimationFrame(rafId); clearTimeout(timeoutId); };
     }, [pageDimensions, fitToPage]);
 
-    // Keyboard navigation
+    // Keyboard navigation (page only — zoom keys handled by page.tsx to avoid conflicts)
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
         const active = document.activeElement as HTMLElement | null;
         if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
         if (e.key === 'ArrowRight' || e.key === 'PageDown') nextPage();
         if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevPage();
-        if (e.key === '+' || e.key === '=') setZoom(zoom + 0.1);
-        if (e.key === '-') setZoom(zoom - 0.1);
-        if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitToPage(); }
       };
       window.addEventListener('keydown', handler);
       return () => window.removeEventListener('keydown', handler);
-    }, [nextPage, prevPage, zoom, setZoom, fitToPage]);
+    }, [nextPage, prevPage]);
 
     // renderPageForCapture: navigate to a page, wait for render, return canvas
     const renderPageForCapture = useCallback(
@@ -670,6 +671,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           });
         }
         setZoom(nextZoom);
+        // Sync to store so external ZoomControls displays the correct percentage
+        useStore.getState().setZoomLevel(nextZoom);
       }
     }, [isPanning, pan, panStart, zoom, pageDimensions, setZoom]);
 
@@ -760,36 +763,6 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           </div>
         ) : (
           <>
-            {/* Zoom controls widget — bottom-right corner */}
-            <div
-              style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 20 }}
-              className="flex flex-col gap-1 items-center"
-            >
-              <button
-                title="Zoom in"
-                onClick={() => setZoom(zoom + 0.15)}
-                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-base font-bold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
-                aria-label="Zoom in"
-              >
-                +
-              </button>
-              <button
-                title="Fit page"
-                onClick={fitToPage}
-                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-[10px] font-semibold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
-                aria-label="Fit to page"
-              >
-                Fit
-              </button>
-              <button
-                title="Zoom out"
-                onClick={() => setZoom(zoom - 0.15)}
-                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-base font-bold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
-                aria-label="Zoom out"
-              >
-                −
-              </button>
-            </div>
             {pdfDoc && (
               <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>

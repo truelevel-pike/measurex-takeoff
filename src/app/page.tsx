@@ -860,7 +860,10 @@ function PageInner() {
       } else if (e.key === '-') {
         e.preventDefault();
         setZoomLevel(Math.max(MIN_ZOOM, zoomLevel - ZOOM_STEP));
-      } else if (e.key === '0') {
+      } else if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        pdfViewerRef.current?.fitToPage();
+      } else if (e.key === '0' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         setZoomLevel(1);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
