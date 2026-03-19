@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getPages, updatePage, initDataDir } from '@/server/project-store';
+import { getPages, updatePage, createPage, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 const PagePatchSchema = z.object({
@@ -38,9 +38,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (text !== undefined) patch.text = text;
     if (sheet_name !== undefined) patch.name = sheet_name;
 
-    const updated = await updatePage(id, pageNum, patch);
+    let updated = await updatePage(id, pageNum, patch);
     if (!updated) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      // Page doesn't exist yet — create it (upsert). This handles the race where
+      // the client extracts text before the upload route has finished creating pages.
+      const page = await createPage(id, {
+        pageNum,
+        width: 0,
+        height: 0,
+        text: (text as string | undefined) ?? '',
+        name: (sheet_name as string | undefined) ?? undefined,
+      });
+      updated = page;
     }
     return NextResponse.json({ page: updated });
   } catch (err: unknown) {

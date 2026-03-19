@@ -94,6 +94,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // Keep onPageChange in a ref so load/goToPage always call the latest version without needing it in deps
     const onPageChangeRef = useRef(onPageChange);
     useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
+    // Keep projectId in a ref so the PATCH inside actuallyRender always reads the latest value,
+    // even if the render started before projectId was set (race condition on new uploads).
+    const projectIdRef = useRef(projectId);
+    useEffect(() => { projectIdRef.current = projectId; }, [projectId]);
 
     // Final cleanup guard for worker/doc resources on component unmount.
     useEffect(() => {
@@ -297,12 +301,15 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
               .join('\n');
             onTextExtracted?.(fullText, pageNum);
 
-            // Send extracted text + auto-detected sheet name to server
-            if (projectId && fullText.trim()) {
+            // Send extracted text + auto-detected sheet name to server.
+            // Use projectIdRef (not the closure value) so we pick up the latest
+            // projectId even when the render started before it was set.
+            const pid = projectIdRef.current;
+            if (pid && fullText.trim()) {
               const sheetName = detectSheetName(fullText);
               const patchBody: Record<string, unknown> = { pageNum, text: fullText };
               if (sheetName) patchBody.sheet_name = sheetName;
-              fetch(`/api/projects/${projectId}/pages`, {
+              fetch(`/api/projects/${pid}/pages`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(patchBody),
@@ -327,7 +334,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           }
         }
       },
-      [onDimensionsChange, onTextExtracted, projectId]
+      [onDimensionsChange, onTextExtracted]
     );
 
     // ISSUE #6 FIX: pendingRender uses a "latest-wins / dirty-flag" pattern.
