@@ -220,6 +220,13 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     },
     [classifications, searchLower]
   );
+  const classificationById = useMemo(() => {
+    const byId = new Map<string, Classification>();
+    for (const classification of classifications) {
+      byId.set(classification.id, classification);
+    }
+    return byId;
+  }, [classifications]);
 
   // Polygons matching search by label (shown as extra search results)
   const matchingPolygons = useMemo(() => {
@@ -260,7 +267,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
     const byClassPage = new Map<string, TakeoffSearchResult>();
     for (const polygon of polygons) {
-      const classification = classifications.find((c) => c.id === polygon.classificationId);
+      const classification = classificationById.get(polygon.classificationId);
       if (!classification) continue;
 
       const classMatch = classification.name.toLowerCase().includes(query);
@@ -283,7 +290,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return Array.from(byClassPage.values())
       .sort((a, b) => (a.pageNumber - b.pageNumber) || a.classificationName.localeCompare(b.classificationName))
       .slice(0, 30);
-  }, [takeoffSearchQuery, polygons, classifications, polygonCountsByClassificationPage]);
+  }, [takeoffSearchQuery, polygons, classificationById, polygonCountsByClassificationPage]);
 
   // Count of classifications that have at least one polygon
   const activeClassificationCount = useMemo(
@@ -502,13 +509,34 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setEditError(null);
   }
 
+  const handleSwitchToQuantities = useCallback(() => setActiveTab('quantities'), []);
+  const handleSwitchToAssemblies = useCallback(() => setActiveTab('assemblies'), []);
+  const handleSwitchToEstimate = useCallback(() => setActiveTab('estimate'), []);
+  const handleToggleHistory = useCallback(() => setShowHistory((v) => !v), []);
+  const handleToggleMeasurementSettings = useCallback(() => setShowMeasurementSettings((v) => !v), []);
+  const handleCloseMeasurementSettings = useCallback(() => setShowMeasurementSettings(false), []);
+  const handleOpenTemplateLibrary = useCallback(() => setShowTemplateLibrary(true), []);
+  const handleCloseTemplateLibrary = useCallback(() => setShowTemplateLibrary(false), []);
+  const handleToggleNewClassification = useCallback(() => {
+    setShowNewClassification((prev) => !prev);
+    setNewClassificationError(null);
+  }, []);
+  const handleCancelNewClassification = useCallback(() => {
+    setShowNewClassification(false);
+    setNewClassificationError(null);
+  }, []);
+  const handleExportJson = useCallback(() => {
+    if (!projectId) return;
+    window.open(`/api/projects/${projectId}/export/json`, '_blank');
+  }, [projectId]);
+
   const panel = (
     <>
       {/* Assemblies / Estimate tabs — conditionally renders to avoid hooks-of-rules violation */}
       {activeTab === 'assemblies' ? (
-        <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} onSwitchToEstimate={() => setActiveTab('estimate')} />
+        <AssembliesPanel onSwitchToQuantities={handleSwitchToQuantities} onSwitchToEstimate={handleSwitchToEstimate} />
       ) : activeTab === 'estimate' ? (
-        <EstimateSummary onSwitchToQuantities={() => setActiveTab('quantities')} onSwitchToAssemblies={() => setActiveTab('assemblies')} />
+        <EstimateSummary onSwitchToQuantities={handleSwitchToQuantities} onSwitchToAssemblies={handleSwitchToAssemblies} />
       ) : (
       <>
       {/* Tab bar */}
@@ -521,14 +549,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('assemblies')}
+          onClick={handleSwitchToAssemblies}
           className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >
           Assemblies
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('estimate')}
+          onClick={handleSwitchToEstimate}
           className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >
           Estimate
@@ -544,38 +572,38 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           {projectId && (
             <button
               type="button"
-              onClick={() => window.open(`/api/projects/${projectId}/export/json`, '_blank')}
+              onClick={handleExportJson}
               className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
               aria-label="Export JSON"
               title="Export JSON"
             >
-              <Download size={14} />
+              <Download size={14} aria-hidden="true" />
             </button>
           )}
           <button
             type="button"
-            onClick={() => setShowHistory((v) => !v)}
+            onClick={handleToggleHistory}
             className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
             aria-label="Toggle version history"
             title="Version History"
           >
-            <History size={14} />
+            <History size={14} aria-hidden="true" />
           </button>
           <button
             type="button"
-            onClick={() => setShowMeasurementSettings((v) => !v)}
+            onClick={handleToggleMeasurementSettings}
             className={`p-1 rounded hover:bg-gray-700/60 transition-colors ${showMeasurementSettings ? 'text-[#00d4ff]' : 'text-gray-400 hover:text-gray-200'}`}
             aria-label="Measurement settings"
             title="Measurement Settings"
           >
-            <Settings size={14} />
+            <Settings size={14} aria-hidden="true" />
           </button>
         </div>
         {showMeasurementSettings && (
           <MeasurementSettingsPanel
             settings={measurementSettings}
             onChange={setMeasurementSettings}
-            onClose={() => setShowMeasurementSettings(false)}
+            onClose={handleCloseMeasurementSettings}
           />
         )}
       </div>
@@ -630,14 +658,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       <div className="px-2 pb-2">
         <button
           type="button"
-          onClick={() => {
-            setShowNewClassification((prev) => !prev);
-            setNewClassificationError(null);
-          }}
+          onClick={handleToggleNewClassification}
           className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           aria-label="New Classification"
         >
-          <Plus size={13} />
+          <Plus size={13} aria-hidden="true" />
           New Classification
         </button>
       </div>
@@ -656,6 +681,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               onChange={(event) => setNewName(event.target.value)}
               className="w-full px-2 py-1 border rounded text-[13px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
               autoFocus
+              aria-label="Classification name"
             />
           </div>
 
@@ -686,10 +712,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              onClick={() => {
-                setShowNewClassification(false);
-                setNewClassificationError(null);
-              }}
+              onClick={handleCancelNewClassification}
               className="text-gray-300 text-xs"
             >
               Cancel
@@ -704,11 +727,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       <div className="px-2 pb-2">
         <button
           type="button"
-          onClick={() => setShowTemplateLibrary(true)}
+          onClick={handleOpenTemplateLibrary}
           className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           aria-label="Classification Templates"
         >
-          <Layers size={13} />
+          <Layers size={13} aria-hidden="true" />
           Templates
         </button>
       </div>
@@ -717,7 +740,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         <div className="mx-2 mb-2 p-2 bg-[#0e1016] border border-[#00d4ff]/20 rounded-lg">
           <div className="text-[11px] text-gray-400 mb-1 font-mono">Matching polygons:</div>
           {matchingPolygons.map((polygon) => {
-            const cls = classifications.find((c) => c.id === polygon.classificationId);
+            const cls = classificationById.get(polygon.classificationId);
             return (
               <div
                 key={polygon.id}
@@ -740,7 +763,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   aria-label="Find on canvas"
                   title="Find on canvas"
                 >
-                  <Crosshair size={11} />
+                  <Crosshair size={11} aria-hidden="true" />
                   <span className="text-[9px]">Find</span>
                 </button>
               </div>
@@ -777,6 +800,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                       }}
                       className="w-full px-2 py-1 border rounded text-[13px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
                       autoFocus
+                      aria-label="Classification name"
                     />
                   </div>
 
@@ -806,7 +830,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
                   <div className="flex gap-2 justify-end">
                     <button type="button" onClick={cancelEditing} className="text-gray-300 text-xs inline-flex items-center gap-1">
-                      <X size={12} />
+                      <X size={12} aria-hidden="true" />
                       Cancel
                     </button>
                     <button
@@ -834,9 +858,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                 >
                   {totals.count > 0 || classification.type === 'count' ? (
                     isExpanded ? (
-                      <ChevronDown size={12} className="text-gray-300" />
+                      <ChevronDown size={12} className="text-gray-300" aria-hidden="true" />
                     ) : (
-                      <ChevronRight size={12} className="text-gray-300" />
+                      <ChevronRight size={12} className="text-gray-300" aria-hidden="true" />
                     )
                   ) : (
                     <div className="w-3" />
@@ -874,7 +898,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     className="focus:outline-none"
                     aria-label={isHidden ? 'Show classification' : 'Hide classification'}
                   >
-                    {isHidden ? <EyeOff size={13} className="text-gray-300" /> : <Eye size={13} className="text-[#00d4ff]" />}
+                    {isHidden ? <EyeOff size={13} className="text-gray-300" aria-hidden="true" /> : <Eye size={13} className="text-[#00d4ff]" aria-hidden="true" />}
                   </button>
 
                   <button
@@ -886,7 +910,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     className="hidden group-hover:inline-flex text-gray-300 hover:text-[#00d4ff]"
                     aria-label="Edit classification"
                   >
-                    <Pencil size={13} />
+                    <Pencil size={13} aria-hidden="true" />
                   </button>
 
                   <button
@@ -898,7 +922,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     className="hidden group-hover:inline-flex text-red-400 hover:text-red-500"
                     aria-label="Delete classification"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -987,7 +1011,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           </div>
         )}
       </div>
-      <ClassificationLibrary open={showTemplateLibrary} onClose={() => setShowTemplateLibrary(false)} />
+      <ClassificationLibrary open={showTemplateLibrary} onClose={handleCloseTemplateLibrary} />
       </>
       )}
     </>
@@ -1029,7 +1053,19 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return (
       <>
         {showQuantitiesDrawer && (
-          <div className="fixed inset-0 z-40" onClick={() => setShowQuantitiesDrawer(false)}>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowQuantitiesDrawer(false)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setShowQuantitiesDrawer(false);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Close quantities drawer backdrop"
+          >
             <div className="absolute inset-0 bg-black/30" />
           </div>
         )}

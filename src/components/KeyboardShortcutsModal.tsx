@@ -52,7 +52,7 @@ export default function KeyboardShortcutsModal({ open, onClose }: KeyboardShortc
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Keyboard Shortcuts"
+      aria-labelledby="keyboard-shortcuts-title"
     >
       <div
         ref={focusTrapRef}
@@ -61,8 +61,8 @@ export default function KeyboardShortcutsModal({ open, onClose }: KeyboardShortc
       >
         <div className="flex items-center justify-between border-b border-[rgba(0,212,255,0.2)] px-5 py-4">
           <div className="flex items-center gap-2">
-            <Keyboard size={18} className="text-[#00d4ff]" />
-            <h2 className="text-base font-semibold text-white">Keyboard Shortcuts</h2>
+            <Keyboard size={18} className="text-[#00d4ff]" aria-hidden="true" />
+            <h2 id="keyboard-shortcuts-title" className="text-base font-semibold text-white">Keyboard Shortcuts</h2>
           </div>
           <button
             type="button"
@@ -70,7 +70,7 @@ export default function KeyboardShortcutsModal({ open, onClose }: KeyboardShortc
             className="rounded-md border border-transparent p-1 text-gray-300 transition hover:border-[rgba(0,212,255,0.35)] hover:bg-[rgba(0,212,255,0.12)] hover:text-white"
             aria-label="Close keyboard shortcuts"
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 

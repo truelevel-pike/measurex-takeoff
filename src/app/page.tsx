@@ -92,20 +92,20 @@ function normalizeProjectState(raw: unknown): ProjectState {
 
   // Dedup by ID to guard against any merge/hydration artifacts
   const seenClassIds = new Set<string>();
-  const classifications = rawClassifications.filter((c: any) => {
+  const classifications = rawClassifications.filter((c: { id?: string }) => {
     if (!c?.id || seenClassIds.has(c.id)) return false;
     seenClassIds.add(c.id);
     return true;
   });
 
   const seenPolyIds = new Set<string>();
-  const polygons = rawPolygons.filter((p: any) => {
+  const polygons = rawPolygons.filter((p: { id?: string }) => {
     if (!p?.id || seenPolyIds.has(p.id)) return false;
     seenPolyIds.add(p.id);
     return true;
   });
   const seenAnnotationIds = new Set<string>();
-  const annotations = rawAnnotations.filter((a: any) => {
+  const annotations = rawAnnotations.filter((a: { id?: string }) => {
     if (!a?.id || seenAnnotationIds.has(a.id)) return false;
     seenAnnotationIds.add(a.id);
     return true;
@@ -468,7 +468,7 @@ function PageInner() {
     } catch (err) {
       // Ignore AbortError — it means a newer hydration superseded this one
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      console.warn('Hydration failed:', err);
+      console.error('Hydration failed:', err);
     }
   }, [setCurrentPage]);
 
@@ -584,7 +584,7 @@ function PageInner() {
         pdfDocRef.current = doc;
         setPdfDocState(doc);
       } catch (e) {
-        console.warn('Could not load PDF document for 3D texture capture:', e);
+        console.error('Could not load PDF document for 3D texture capture:', e);
       }
     })();
     return () => {
@@ -613,7 +613,7 @@ function PageInner() {
           await page.render({ canvas: offCanvas as HTMLCanvasElement, canvasContext, viewport } as Parameters<typeof page.render>[0]).promise;
           setPdfTextureUrl(offCanvas.toDataURL('image/png'));
         } catch (e) {
-          console.warn('Could not capture PDF texture:', e);
+          console.error('Could not capture PDF texture:', e);
         }
       })();
     }, 500);
@@ -790,7 +790,7 @@ function PageInner() {
         body: JSON.stringify({ thumbnail: dataUrl }),
       });
     } catch (e) {
-      console.warn('Thumbnail upload failed', e);
+      console.error('Thumbnail upload failed:', e);
     }
   }, [projectId]);
 
@@ -968,7 +968,7 @@ function PageInner() {
         // Navigate to the page and wait for the canvas to render
         const canvas = await viewer.renderPageForCapture(pageNum);
         if (!canvas) {
-          console.warn(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
+          console.error(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
           continue;
         }
 
