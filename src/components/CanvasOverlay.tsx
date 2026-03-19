@@ -301,7 +301,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                     onMouseDown={(e) => handleVertexPointerDown(e, poly.id, i)}
                   />
                 ))}
-              {/* Polygon label: classification name + measurement */}
+              {/* Polygon label: measurement annotation (area/length/count) */}
               {(() => {
                 const pts = displayPoints;
                 if (pts.length < 3) return null;
@@ -309,12 +309,22 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                 const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
                 if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
                 const clsType = cls?.type ?? 'area';
-                const valueStr =
-                  clsType === 'linear' ? `${poly.linearFeet.toFixed(1)} FT` : clsType === 'count' ? 'EA' : `${poly.area.toFixed(1)} SF`;
-                const clsName = cls?.name ?? 'Unclassified';
-                const longestLen = Math.max(clsName.length, valueStr.length);
-                const labelW = Math.max(80, longestLen * 6.1 + 14);
-                const labelH = 28;
+                const ppu = scale?.pixelsPerUnit || 1;
+                // For count: show number of polygons in this classification on this page
+                const countForClass = clsType === 'count'
+                  ? polygons.filter((p) => p.classificationId === poly.classificationId).length
+                  : 0;
+                const areaReal = poly.area / (ppu * ppu);
+                const measureStr =
+                  clsType === 'linear'
+                    ? `${poly.linearFeet.toFixed(1)} LF`
+                    : clsType === 'count'
+                    ? `${countForClass} EA`
+                    : `${areaReal.toFixed(1)} SF`;
+                const labelColor = cls?.color ?? '#00d4ff';
+                const longestLen = measureStr.length;
+                const labelW = Math.max(60, longestLen * 7 + 14);
+                const labelH = 20;
                 const rectX = centX - labelW / 2;
                 const rectY = centY - labelH / 2;
                 return (
@@ -324,30 +334,20 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                       y={rectY}
                       width={labelW}
                       height={labelH}
-                      fill="rgba(0,0,0,0.65)"
+                      fill="rgba(0,0,0,0.72)"
                       rx={3}
                     />
                     <text
                       x={centX}
-                      y={rectY + 11}
-                      fontSize="10"
-                      fill="#fff"
+                      y={centY + 5}
+                      fontSize="11"
+                      fill={labelColor}
                       textAnchor="middle"
                       fontFamily="sans-serif"
+                      fontWeight="600"
                       style={{ userSelect: 'none' }}
                     >
-                      {clsName}
-                    </text>
-                    <text
-                      x={centX}
-                      y={rectY + 22}
-                      fontSize="9"
-                      fill="#aaa"
-                      textAnchor="middle"
-                      fontFamily="sans-serif"
-                      style={{ userSelect: 'none' }}
-                    >
-                      {valueStr}
+                      {measureStr}
                     </text>
                   </g>
                 );

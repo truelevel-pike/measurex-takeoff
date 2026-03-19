@@ -56,17 +56,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
       {children}
-      {/* Toast container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
+      {/* Toast container — each toast offset vertically by index to prevent overlap */}
+      <div className="fixed right-4 z-50 pointer-events-none" style={{ bottom: 0 }}>
+        {toasts.map((toast, index) => (
+          <ToastItem key={toast.id} toast={toast} index={index} onRemove={removeToast} />
         ))}
       </div>
     </ToastContext.Provider>
   );
 }
 
-function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+function ToastItem({ toast, index, onRemove }: { toast: Toast; index: number; onRemove: (id: string) => void }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -85,7 +85,8 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-3 bg-zinc-800 border border-zinc-700 border-l-4 ${borderColorMap[toast.type]} rounded-lg px-4 py-3 shadow-lg min-w-[280px] max-w-[400px] transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      style={{ position: 'absolute', right: 0, bottom: 16 + index * 72, transition: 'bottom 0.3s ease, opacity 0.3s ease' }}
+      className={`pointer-events-auto flex items-center gap-3 bg-zinc-800 border border-zinc-700 border-l-4 ${borderColorMap[toast.type]} rounded-lg px-4 py-3 shadow-lg min-w-[280px] max-w-[400px] ${visible ? 'opacity-100' : 'opacity-0'}`}
     >
       <Icon size={18} className={`shrink-0 ${iconColorMap[toast.type]}`} />
       <span className="text-sm text-zinc-100 flex-1">{toast.message}</span>

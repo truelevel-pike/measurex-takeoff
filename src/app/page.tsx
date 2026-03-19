@@ -22,6 +22,7 @@ import AIActivityLog from '@/components/AIActivityLog';
 import AutoScalePopup from '@/components/AutoScalePopup';
 import TopNavBar from '@/components/TopNavBar';
 import LeftToolbar from '@/components/LeftToolbar';
+import MobileToolbar from '@/components/MobileToolbar';
 import PDFViewer from '@/components/PDFViewer';
 import CanvasOverlay from '@/components/CanvasOverlay';
 import type { PolygonContextMenuPayload } from '@/components/CanvasOverlay';
@@ -1162,9 +1163,7 @@ function PageInner() {
       </div>
 
       {/* Mobile/Tablet bottom toolbar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0f]/95 backdrop-blur-sm border-t border-[rgba(0,212,255,0.2)]">
-        <LeftToolbar />
-      </div>
+      <MobileToolbar />
 
       {/* GAP-006: Single confirmation dialog before applying detected scale */}
       {showAutoScalePopup && detectedScaleInfo && (

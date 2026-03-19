@@ -649,6 +649,37 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                 {Math.round(zoom * 100)}% · x{Math.round(pan.x)} y{Math.round(pan.y)}
               </div>
             </div>
+
+            {/* Zoom controls widget — bottom-right corner */}
+            <div
+              style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 20 }}
+              className="flex flex-col gap-1 items-center"
+            >
+              <button
+                title="Zoom in"
+                onClick={() => setZoom(zoom + 0.15)}
+                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-base font-bold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+              <button
+                title="Fit page"
+                onClick={fitToPage}
+                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-[10px] font-semibold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
+                aria-label="Fit to page"
+              >
+                Fit
+              </button>
+              <button
+                title="Zoom out"
+                onClick={() => setZoom(zoom - 0.15)}
+                className="w-8 h-8 flex items-center justify-center rounded border border-[#00d4ff]/30 bg-[rgba(10,10,15,0.82)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.15)] hover:border-[#00d4ff]/60 backdrop-blur-sm text-base font-bold leading-none transition-colors shadow-[0_0_8px_rgba(0,212,255,0.1)] select-none"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+            </div>
             {pdfDoc && (
               <div style={{ position: 'absolute', transform: `translate(${pan.x}px, ${pan.y}px)`, transformOrigin: 'center center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
