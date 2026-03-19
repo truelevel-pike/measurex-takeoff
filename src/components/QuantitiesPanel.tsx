@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
@@ -902,6 +902,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               title="Export JSON"
             >
               <Download size={14} aria-hidden="true" />
+            </button>
+          )}
+          {projectId && (
+            <button
+              type="button"
+              onClick={() => window.open(`/api/projects/${projectId}/export/contractor`, '_blank')}
+              className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
+              aria-label="Print Contractor Report"
+              title="Print Contractor Report"
+            >
+              <Printer size={14} aria-hidden="true" />
             </button>
           )}
           <button

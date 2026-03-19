@@ -27,6 +27,8 @@ import {
   Circle,
   Pencil,
   XCircle,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { ProjectState } from '@/lib/types';
@@ -164,6 +166,9 @@ export default function ProjectsPage() {
   const [duplicateTarget, setDuplicateTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newProjectTags, setNewProjectTags] = useState<string[]>([]);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   // Load persisted local state
   useEffect(() => {
@@ -196,6 +201,16 @@ export default function ProjectsPage() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    // If a PDF is selected, use the full upload flow
+    if (pdfFile) {
+      setShowCreate(false);
+      const name = newName.trim();
+      setNewName('');
+      setPdfFile(null);
+      setNewProjectTags([]);
+      await handlePdfUpload(pdfFile, name);
+      return;
+    }
     setCreating(true);
     try {
       const trimmed = newName.trim();
@@ -396,6 +411,66 @@ export default function ProjectsPage() {
     saveOnboardingDismissed(true);
   };
 
+  /** Auto-generate project name from PDF filename */
+  const nameFromFile = (file: File) =>
+    file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
+
+  /** Full PDF upload flow: create project → upload file → redirect */
+  const handlePdfUpload = async (file: File, projectName?: string) => {
+    const name = (projectName || nameFromFile(file)).trim();
+    if (!name) return;
+    setUploading(true);
+    try {
+      // 1. Create the project
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          state: { classifications: [], polygons: [], annotations: [], scale: null, scales: {}, currentPage: 1, totalPages: 1 } as ProjectState,
+        }),
+      });
+      if (!res.ok) throw new Error(`Create failed (${res.status})`);
+      const data = await res.json();
+      const projectId = data.project.id;
+
+      // 2. Upload the PDF
+      const fd = new FormData();
+      fd.append('file', file);
+      const uploadRes = await fetch(`/api/projects/${projectId}/upload`, {
+        method: 'POST',
+        body: fd,
+      });
+      if (!uploadRes.ok) throw new Error(`Upload failed (${uploadRes.status})`);
+
+      // 3. Redirect
+      saveRecentProject(projectId, name);
+      router.push(`/?project=${projectId}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setError(message);
+      setUploading(false);
+    }
+  };
+
+  /** Handle file selection in the create modal */
+  const handleFileSelect = (file: File | null) => {
+    setPdfFile(file);
+    if (file && !newName.trim()) {
+      setNewName(nameFromFile(file));
+    }
+  };
+
+  /** Handle drop on the empty-state drop zone */
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      handlePdfUpload(file);
+    }
+  };
+
   // Section label
   const sectionLabel = activeSection === 'all' ? 'All Projects'
     : activeSection === 'starred' ? 'Starred'
@@ -414,18 +489,43 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white flex flex-col" onClick={() => contextMenu && setContextMenu(null)}>
-      {/* Top header bar */}
-      <header className="bg-zinc-800 border-b border-zinc-700 px-3 sm:px-6 py-3 flex items-center justify-between shrink-0 gap-2">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <FileSpreadsheet size={22} className="text-blue-400 shrink-0" aria-hidden />
-          <span className="text-lg font-bold">MeasureX</span>
-          <span className="text-zinc-400 text-sm ml-1 hidden sm:inline">Projects</span>
-          <div className="hidden sm:block ml-2">
-            <WorkspaceSwitcher />
+      {/* Hero section */}
+      <header className="bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 shrink-0">
+        <div className="px-4 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600/20 p-2.5 rounded-xl">
+              <FileSpreadsheet size={32} className="text-blue-400" aria-hidden />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">MeasureX</h1>
+              <p className="text-sm text-zinc-400">AI-Powered Construction Takeoff</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block">
+              <WorkspaceSwitcher />
+            </div>
+            <button
+              aria-label="Upload PDF"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.pdf';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) handlePdfUpload(file);
+                };
+                input.click();
+              }}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-5 sm:px-6 py-2.5 rounded-lg font-semibold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20 min-h-[44px]"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <Upload size={16} aria-hidden /> Upload PDF
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
-          {/* Search in header */}
+        {/* Secondary toolbar */}
+        <div className="px-4 sm:px-8 pb-3 flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden />
             <input
@@ -461,9 +561,9 @@ export default function ProjectsPage() {
           </button>
           <button aria-label="New Project"
             onClick={() => setShowCreate(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-3 sm:px-4 py-1.5 rounded-lg font-medium text-sm flex items-center gap-1.5 transition-colors min-h-[44px]"
+            className="text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors hover:bg-zinc-700"
             style={{ touchAction: 'manipulation' }}>
-            <Plus size={14} aria-hidden /> <span className="hidden sm:inline">New Project</span>
+            <Plus size={14} aria-hidden /> New Project
           </button>
         </div>
       </header>

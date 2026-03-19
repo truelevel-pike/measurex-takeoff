@@ -74,149 +74,110 @@ function buildReportHtml(
   totals: { totalArea: number; totalLinear: number; totalCount: number },
 ): string {
   const safeName = escapeHtml(projectName);
-  const dateLabel = escapeHtml(generatedAt.toLocaleDateString('en-US'));
+  const dateLabel = escapeHtml(generatedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
   const rowsHtml = rows
     .map((row, index) => {
       const bg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
       return `
-        <tr style="background:${bg}">
-          <td>${escapeHtml(row.name)}</td>
-          <td>${escapeHtml(row.type.toUpperCase())}</td>
-          <td style="text-align:right">${row.quantity.toFixed(2)}</td>
-          <td>${row.unit}</td>
-        </tr>
-      `;
+            <tr style="background:${bg}">
+              <td style="padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px">${escapeHtml(row.name)}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px">${escapeHtml(row.type.toUpperCase())}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;text-align:right;font-variant-numeric:tabular-nums">${row.quantity.toFixed(2)}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px">${row.unit}</td>
+            </tr>`;
     })
     .join('');
+
+  const totalsRow = `
+            <tr style="background:#f1f5f9;font-weight:700;border-top:2px solid #cbd5e1">
+              <td style="padding:12px 14px;font-size:14px;color:#1e293b">TOTALS</td>
+              <td style="padding:12px 14px;font-size:14px"></td>
+              <td style="padding:12px 14px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums">
+                ${totals.totalArea.toFixed(2)} SF &nbsp;/&nbsp; ${totals.totalLinear.toFixed(2)} LF &nbsp;/&nbsp; ${totals.totalCount.toFixed(0)} EA
+              </td>
+              <td style="padding:12px 14px;font-size:14px"></td>
+            </tr>`;
 
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Contractor Report - ${safeName}</title>
+    <title>Quantity Takeoff Report — ${safeName}</title>
     <style>
       @page { size: letter; margin: 0.5in; }
-      * { box-sizing: border-box; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        margin: 0;
-        font-family: Arial, Helvetica, sans-serif;
-        color: #0f172a;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #1e293b;
         background: #ffffff;
-        line-height: 1.45;
+        line-height: 1.5;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
-      .report {
-        max-width: 900px;
-        margin: 0 auto;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 12px;
-        margin-bottom: 20px;
-      }
-      .title {
-        margin: 0;
-        font-size: 24px;
-        font-weight: 700;
-      }
-      .meta {
-        margin-top: 4px;
-        color: #475569;
-        font-size: 13px;
-      }
-      .summary {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-      .card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 10px 12px;
-        background: #f8fafc;
-      }
-      .card .label {
-        margin: 0;
-        color: #64748b;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-      .card .value {
-        margin: 2px 0 0;
-        font-size: 20px;
-        font-weight: 700;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #e2e8f0;
-      }
-      thead th {
-        text-align: left;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        background: #e2e8f0;
-        color: #334155;
-        padding: 10px;
-        border-bottom: 1px solid #cbd5e1;
-      }
-      tbody td {
-        padding: 10px;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 14px;
-      }
-      tbody tr:last-child td {
-        border-bottom: none;
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .no-print { display: none !important; }
       }
     </style>
   </head>
   <body>
-    <main class="report">
-      <header class="header">
+    <div style="max-width:880px;margin:0 auto;padding:32px 24px">
+
+      <!-- Header -->
+      <header style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0f766e;padding-bottom:16px;margin-bottom:28px">
         <div>
-          <h1 class="title">Contractor Report</h1>
-          <div class="meta"><strong>Project:</strong> ${safeName}</div>
+          <div style="font-size:22px;font-weight:800;color:#1e293b;letter-spacing:-0.02em">
+            <span style="color:#0f766e">&#9650;</span> MeasureX Takeoff
+          </div>
+          <div style="font-size:13px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:0.06em">Quantity Takeoff Report</div>
         </div>
-        <div class="meta"><strong>Date:</strong> ${dateLabel}</div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:700;color:#1e293b">${safeName}</div>
+          <div style="font-size:13px;color:#64748b;margin-top:2px">${dateLabel}</div>
+        </div>
       </header>
 
-      <section class="summary">
-        <article class="card">
-          <p class="label">Total Area</p>
-          <p class="value">${totals.totalArea.toFixed(2)} SF</p>
-        </article>
-        <article class="card">
-          <p class="label">Total Linear</p>
-          <p class="value">${totals.totalLinear.toFixed(2)} LF</p>
-        </article>
-        <article class="card">
-          <p class="label">Total Count</p>
-          <p class="value">${totals.totalCount.toFixed(2)} EA</p>
-        </article>
+      <!-- Summary Cards -->
+      <section style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px">
+        <div style="border:2px solid #0f766e;border-radius:10px;padding:16px 18px;background:#f0fdfa">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;font-weight:600">Total Area</div>
+          <div style="font-size:26px;font-weight:800;color:#0f766e;margin-top:4px;font-variant-numeric:tabular-nums">${totals.totalArea.toFixed(2)} <span style="font-size:14px;font-weight:600;color:#64748b">SF</span></div>
+        </div>
+        <div style="border:2px solid #0f766e;border-radius:10px;padding:16px 18px;background:#f0fdfa">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;font-weight:600">Total Linear</div>
+          <div style="font-size:26px;font-weight:800;color:#0f766e;margin-top:4px;font-variant-numeric:tabular-nums">${totals.totalLinear.toFixed(2)} <span style="font-size:14px;font-weight:600;color:#64748b">LF</span></div>
+        </div>
+        <div style="border:2px solid #0f766e;border-radius:10px;padding:16px 18px;background:#f0fdfa">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;font-weight:600">Total Count</div>
+          <div style="font-size:26px;font-weight:800;color:#0f766e;margin-top:4px;font-variant-numeric:tabular-nums">${totals.totalCount.toFixed(0)} <span style="font-size:14px;font-weight:600;color:#64748b">EA</span></div>
+        </div>
       </section>
 
+      <!-- Quantities Table -->
       <section>
-        <table>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden">
           <thead>
-            <tr>
-              <th>Classification</th>
-              <th>Type</th>
-              <th style="text-align:right">Quantity</th>
-              <th>Unit</th>
+            <tr style="background:#1e293b">
+              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#f1f5f9;padding:12px 14px;font-weight:700">Classification</th>
+              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#f1f5f9;padding:12px 14px;font-weight:700">Type</th>
+              <th style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#f1f5f9;padding:12px 14px;font-weight:700">Quantity</th>
+              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#f1f5f9;padding:12px 14px;font-weight:700">Unit</th>
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml || '<tr><td colspan="4" style="text-align:center;color:#64748b">No classifications available.</td></tr>'}
+            ${rowsHtml || '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:24px;font-size:14px">No classifications available.</td></tr>'}
+            ${rows.length > 0 ? totalsRow : ''}
           </tbody>
         </table>
       </section>
-    </main>
+
+      <!-- Footer -->
+      <footer style="text-align:center;margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0">
+        <div style="font-size:12px;color:#94a3b8">Generated by MeasureX &middot; measurex.ai &middot; ${dateLabel}</div>
+      </footer>
+
+    </div>
   </body>
 </html>`;
 }
@@ -258,7 +219,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="contractor-report.html"',
         'Cache-Control': 'no-store',
         'Content-Length': String(new TextEncoder().encode(html).byteLength),
       },
