@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Assembly, Material } from '@/lib/types';
@@ -76,6 +76,8 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formulaMap, setFormulaMap] = useState<Record<string, string>>({});
+  const costDebounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Compute quantities per classification from polygons + scale (mirrors QuantitiesPanel logic)
   const quantitiesByClass = useMemo(() => {
@@ -178,11 +180,21 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
         if (cancelled) return;
         if (Array.isArray(data.assemblies) && data.assemblies.length > 0) {
           setAssemblies(data.assemblies.map(mapRow));
+          const fm: Record<string, string> = {};
+          for (const row of data.assemblies as Array<{ id: string; quantityFormula?: string }>) {
+            if (row.quantityFormula) fm[row.id] = row.quantityFormula;
+          }
+          setFormulaMap(fm);
         } else {
           // Auto-seed default templates on first open
           const seeded = await seedDefaults(projectId);
           if (!cancelled && seeded.length > 0) {
             setAssemblies(seeded);
+            const fm: Record<string, string> = {};
+            for (let i = 0; i < seeded.length; i++) {
+              fm[seeded[i].id] = DEFAULT_TEMPLATES[i].quantityFormula;
+            }
+            setFormulaMap(fm);
           }
         }
       })
@@ -240,6 +252,46 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     return 'EA';
   }
 
+
+  /** Projected quantity using quantityFormula — sums across ALL matching classifications. */
+  function projectedQuantity(assembly: Assembly): number {
+    const formula = formulaMap[assembly.id];
+    if (!formula) return quantity(assembly); // fallback to classification-linked qty
+    let total = 0;
+    for (const cls of classifications) {
+      const q = quantitiesByClass[cls.id];
+      if (!q) continue;
+      if (formula === 'area' && cls.type === 'area') total += q.areaReal;
+      else if (formula === 'linear' && cls.type === 'linear') total += q.lengthReal;
+      else if (formula === 'count' && cls.type === 'count') total += q.count;
+    }
+    return total;
+  }
+
+  const handleUnitCostChange = useCallback(
+    (assembly: Assembly, newCost: number) => {
+      // Optimistic local update — update first material's unitCost to reflect new total
+      const diff = newCost - unitCost(assembly);
+      const updatedMaterials = assembly.materials.map((m, i) =>
+        i === 0 ? { ...m, unitCost: m.unitCost + diff } : m,
+      );
+      updateAssembly(assembly.id, { ...assembly, materials: updatedMaterials });
+
+      // Debounced API call
+      if (costDebounceTimers.current[assembly.id]) {
+        clearTimeout(costDebounceTimers.current[assembly.id]);
+      }
+      costDebounceTimers.current[assembly.id] = setTimeout(() => {
+        if (!projectId) return;
+        fetch(`/api/projects/${projectId}/assemblies/${assembly.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ unitCost: newCost }),
+        }).catch((err) => console.error('Failed to update unit cost:', err));
+      }, 300);
+    },
+    [projectId, updateAssembly, classifications],
+  );
 
   function handleEdit(assembly: Assembly) {
     setEditingAssembly(assembly);
@@ -410,12 +462,25 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
                   {classificationName(assembly.classificationId)}
                 </span>
 
-                <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#8892a0]">
-                  ${uc.toFixed(2)}/{unit}
+                <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#8892a0] flex items-center gap-0.5">
+                  $
+                  <input
+                    type="number"
+                    step={0.01}
+                    min={0}
+                    value={uc.toFixed(2)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleUnitCostChange(assembly, parseFloat(e.target.value) || 0);
+                    }}
+                    className="w-16 bg-transparent border border-[#8892a0]/30 rounded px-1 py-0 text-right text-[10px] font-mono text-[#e5e7eb] focus:outline-none focus:border-[#00d4ff]"
+                  />
+                  /{unit}
                 </span>
 
                 <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-emerald-400">
-                  ${tc.toFixed(2)}
+                  ${(uc * projectedQuantity(assembly)).toFixed(2)}
                 </span>
 
                 <button
@@ -459,6 +524,18 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
                   <div className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2">
                     <span className="font-semibold text-emerald-400">Total Cost</span>
                     <span className="font-mono text-emerald-400 font-semibold">${tc.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2">
+                    <span>Projected Qty</span>
+                    <span className="font-mono text-[#e5e7eb]">
+                      {projectedQuantity(assembly).toFixed(2)} {unit}
+                    </span>
+                  </div>
+                  <div className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2">
+                    <span className="font-semibold text-[#00d4ff]">Projected Total</span>
+                    <span className="font-mono text-[#00d4ff] font-semibold">
+                      ${(uc * projectedQuantity(assembly)).toFixed(2)}
+                    </span>
                   </div>
 
                   {/* Materials */}
@@ -504,7 +581,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
         <div className="px-3 py-2 border-t border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)] flex items-center justify-between">
           <span className="text-xs text-[#8892a0] font-mono">TOTAL</span>
           <span className="text-sm font-mono text-emerald-400 font-semibold">
-            ${assemblies.reduce((sum, a) => sum + totalCost(a), 0).toFixed(2)}
+            ${assemblies.reduce((sum, a) => sum + unitCost(a) * projectedQuantity(a), 0).toFixed(2)}
           </span>
         </div>
       )}
