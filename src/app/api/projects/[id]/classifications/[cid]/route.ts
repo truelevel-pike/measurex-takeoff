@@ -15,6 +15,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {
+  return patchClassification(req, params);
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {
+  return patchClassification(req, params);
+}
+
+async function patchClassification(req: Request, params: Promise<{ id: string; cid: string }>) {
   try {
     await initDataDir();
     const { id, cid } = await params;

@@ -111,7 +111,7 @@ export async function updateClassification(
   const result = await request<{ classification: Classification }>(
     `/api/projects/${projectId}/classifications/${id}`,
     {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }

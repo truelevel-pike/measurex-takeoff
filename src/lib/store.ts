@@ -9,6 +9,7 @@ import type {
   Assembly,
   ClassificationGroup,
   Markup,
+  Annotation,
 } from './types';
 import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea } from './polygon-utils';
 
@@ -20,6 +21,7 @@ const trimLower = (s: string) => s.trim().toLowerCase();
 interface HistorySnapshot {
   classifications: Classification[];
   polygons: Polygon[];
+  annotations: Annotation[];
   scale: ScaleCalibration | null;
   scales: Record<number, ScaleCalibration>;
   selectedClassification: string | null;
@@ -35,7 +37,8 @@ export type Tool =
   | 'split'
   | 'cut'
   | 'ai'
-  | 'measure';
+  | 'measure'
+  | 'annotate';
 
 export interface Store extends ProjectState {
   // UI state
@@ -67,6 +70,11 @@ export interface Store extends ProjectState {
   updatePolygon: (id: string, patch: Partial<Polygon>) => void;
   deletePolygon: (id: string) => void;
   setSelectedPolygon: (id: string | null) => void;
+
+  // Actions — Annotations
+  addAnnotation: (a: Omit<Annotation, 'id'>) => string;
+  updateAnnotation: (id: string, patch: Partial<Omit<Annotation, 'id'>>) => void;
+  deleteAnnotation: (id: string) => void;
 
   // Merge/Split/Cut
   mergePolygons: (id1: string, id2: string) => void;
@@ -152,6 +160,7 @@ function snapshot(state: Store): HistorySnapshot {
   return {
     classifications: structuredClone(state.classifications),
     polygons: structuredClone(state.polygons),
+    annotations: structuredClone(state.annotations ?? []),
     scale: state.scale ? structuredClone(state.scale) : null,
     scales: structuredClone(state.scales),
     selectedClassification: state.selectedClassification,
@@ -166,6 +175,7 @@ export const useStore = create<Store>()(
   // ProjectState
   classifications: [],
   polygons: [],
+  annotations: [],
   scale: null,
   scales: {},
   currentPage: 1,
@@ -301,6 +311,43 @@ export const useStore = create<Store>()(
 
   setSelectedPolygon: (id) => set({ selectedPolygon: id, selectedPolygonId: id }),
 
+  addAnnotation: (a) => {
+    const s = get();
+    const id = crypto.randomUUID();
+    const annotation: Annotation = {
+      id,
+      page: a.page,
+      x: a.x,
+      y: a.y,
+      text: a.text,
+      color: a.color,
+      fontSize: a.fontSize,
+    };
+    const before = snapshot(s);
+    set({ annotations: [...(s.annotations ?? []), annotation], undoStack: [...s.undoStack, before], redoStack: [] });
+    return id;
+  },
+
+  updateAnnotation: (id, patch) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
+      annotations: (s.annotations ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)),
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+  },
+
+  deleteAnnotation: (id) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
+      annotations: (s.annotations ?? []).filter((a) => a.id !== id),
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+  },
+
   // Geometry actions (wired by higher-level tools calling polygon-utils)
   mergePolygons: (id1, id2) => {
     const s = get();
@@ -399,9 +446,16 @@ export const useStore = create<Store>()(
       seenPoly.add(p.id);
       return true;
     });
+    const seenAnnotation = new Set<string>();
+    const dedupedAnnotations = (state.annotations || []).filter((a) => {
+      if (!a?.id || seenAnnotation.has(a.id)) return false;
+      seenAnnotation.add(a.id);
+      return true;
+    });
     set({
       classifications: structuredClone(dedupedClassifications),
       polygons: structuredClone(dedupedPolygons),
+      annotations: structuredClone(dedupedAnnotations),
       scale: state.scale ? structuredClone(state.scale) : null,
       scales: structuredClone(state.scales || {}),
       currentPage: state.currentPage || 1,
@@ -424,6 +478,7 @@ export const useStore = create<Store>()(
     set({
       classifications: prev.classifications,
       polygons: prev.polygons,
+      annotations: prev.annotations,
       scale: prev.scale,
       scales: prev.scales,
       selectedClassification: prev.selectedClassification,
@@ -442,6 +497,7 @@ export const useStore = create<Store>()(
     set({
       classifications: next.classifications,
       polygons: next.polygons,
+      annotations: next.annotations,
       scale: next.scale,
       scales: next.scales,
       selectedClassification: next.selectedClassification,
@@ -590,6 +646,7 @@ export const useStore = create<Store>()(
       partialize: (state) => ({
         classifications: state.classifications,
         polygons: state.polygons,
+        annotations: state.annotations,
         scale: state.scale,
         scales: state.scales,
         currentPage: state.currentPage,

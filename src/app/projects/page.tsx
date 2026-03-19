@@ -318,10 +318,11 @@ export default function ProjectsPage() {
 
   // Onboarding steps
   const onboardingSteps = useMemo(() => [
-    { label: 'Create a project', done: projects.length > 0 },
-    { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0) },
-    { label: 'Run AI takeoff', done: false },
-    { label: 'Export quantities', done: false },
+    { label: 'Create a project', done: projects.length > 0, hint: '' },
+    { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0), hint: '' },
+    { label: 'Set the scale', done: false, hint: 'Click the "No scale" indicator in the toolbar to calibrate your drawing scale.' },
+    { label: 'Run AI takeoff', done: false, hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
+    { label: 'Export quantities', done: false, hint: '' },
   ], [projects]);
   const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
 
@@ -543,11 +544,16 @@ export default function ProjectsPage() {
                 <h3 className="font-semibold text-base">Your First Takeoff</h3>
                 <button aria-label="Dismiss onboarding" onClick={dismissOnboarding} className="text-zinc-400 hover:text-white"><X size={16} /></button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {onboardingSteps.map((step, i) => (
-                  <div key={i} className={`flex items-center gap-2 text-sm ${step.done ? 'text-green-400' : 'text-zinc-400'}`}>
-                    {step.done ? <CheckCircle2 size={16} className="text-green-400 shrink-0" /> : <Circle size={16} className="text-zinc-500 shrink-0" />}
-                    <span className={step.done ? 'line-through' : ''}>{step.label}</span>
+                  <div key={i} className={`flex flex-col gap-1 text-sm rounded-lg p-2 ${step.done ? 'bg-green-900/20' : 'bg-zinc-700/30'}`}>
+                    <div className={`flex items-center gap-2 ${step.done ? 'text-green-400' : 'text-zinc-300'}`}>
+                      {step.done ? <CheckCircle2 size={16} className="text-green-400 shrink-0" /> : <Circle size={16} className="text-zinc-500 shrink-0" />}
+                      <span className={step.done ? 'line-through' : 'font-medium'}>{step.label}</span>
+                    </div>
+                    {step.hint && !step.done && (
+                      <span className="text-xs text-zinc-500 ml-6">{step.hint}</span>
+                    )}
                   </div>
                 ))}
               </div>

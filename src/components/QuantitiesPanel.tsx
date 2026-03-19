@@ -15,6 +15,14 @@ const TYPE_OPTIONS = [
   { value: 'count', label: 'Count (EA)' },
 ] as const;
 
+const CLASSIFICATION_COLOR_PRESETS = [
+  '#dc2626', '#ef4444', '#f87171', '#b91c1c',
+  '#ea580c', '#f97316', '#fb923c', '#c2410c',
+  '#ca8a04', '#eab308', '#facc15', '#a16207',
+  '#16a34a', '#22c55e', '#4ade80', '#15803d',
+  '#2563eb', '#3b82f6', '#60a5fa', '#1d4ed8',
+] as const;
+
 type ClassificationType = Classification['type'];
 
 type ClassTotals = {
@@ -31,6 +39,57 @@ function normalizeHexInput(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return '';
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+}
+
+function ColorPickerField({
+  colorValue,
+  onColorChange,
+  swatchLabel,
+}: {
+  colorValue: string;
+  onColorChange: (value: string) => void;
+  swatchLabel: string;
+}) {
+  const normalized = normalizeHexInput(colorValue);
+  const preview = isHexColor(normalized) ? normalized : '#3b82f6';
+
+  return (
+    <div className="mb-2">
+      <div className="grid grid-cols-10 gap-1.5 mb-2">
+        {CLASSIFICATION_COLOR_PRESETS.map((preset) => {
+          const isSelected = normalized.toLowerCase() === preset.toLowerCase();
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => onColorChange(preset)}
+              className={`w-5 h-5 rounded border ${isSelected ? 'border-white ring-1 ring-[#00d4ff]/80' : 'border-[#00d4ff]/30'}`}
+              style={{ backgroundColor: preset }}
+              aria-label={`Use preset ${preset}`}
+              title={preset}
+            />
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2 items-center">
+        <div
+          className="w-6 h-6 rounded border border-[#00d4ff]/30 flex-shrink-0"
+          style={{ backgroundColor: preview, boxShadow: `0 0 6px ${preview}55` }}
+          aria-label={swatchLabel}
+          title={preview}
+        />
+        <input
+          type="text"
+          value={colorValue}
+          onChange={(event) => onColorChange(event.target.value)}
+          className="flex-1 px-2 py-1 border rounded text-[12px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
+          placeholder="#3b82f6"
+          aria-label="Custom hex color"
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function QuantitiesPanel() {
@@ -67,6 +126,7 @@ export default function QuantitiesPanel() {
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState<ClassificationType>('area');
   const [editColorHex, setEditColorHex] = useState('#3b82f6');
+  const [editOriginalColor, setEditOriginalColor] = useState('#3b82f6');
   const [editError, setEditError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -240,12 +300,29 @@ export default function QuantitiesPanel() {
     setEditName(classification.name);
     setEditType(classification.type);
     setEditColorHex(classification.color);
+    setEditOriginalColor(classification.color);
     setEditError(null);
   }
 
   function cancelEditing() {
+    if (editingId) {
+      const original = normalizeHexInput(editOriginalColor);
+      const current = normalizeHexInput(editColorHex);
+      if (isHexColor(original) && isHexColor(current) && original.toLowerCase() !== current.toLowerCase()) {
+        updateClassification(editingId, { color: original });
+      }
+    }
     setEditingId(null);
     setEditError(null);
+  }
+
+  function applyEditColor(classificationId: string, rawValue: string) {
+    setEditColorHex(rawValue);
+    setEditError(null);
+    const normalized = normalizeHexInput(rawValue);
+    if (isHexColor(normalized)) {
+      updateClassification(classificationId, { color: normalized });
+    }
   }
 
   function saveEditing(classification: Classification) {
@@ -364,37 +441,29 @@ export default function QuantitiesPanel() {
 
       {showNewClassification && (
         <form className="mx-2 mb-2 p-2 bg-[#0e1016] border border-[#00d4ff]/20 rounded-lg" onSubmit={handleAddClassification}>
-          <input
-            placeholder="Classification name"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            className="w-full px-2 py-1 border rounded text-[13px] mb-2 outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
-            autoFocus
-          />
-
-          <div className="flex gap-2 items-center mb-2">
-            <input
-              type="color"
-              value={isHexColor(newColorHex) ? newColorHex : '#3b82f6'}
-              onChange={(event) => {
-                setNewColorHex(event.target.value);
-                setNewClassificationError(null);
-              }}
-              className="w-8 h-8 border rounded cursor-pointer bg-transparent"
-              aria-label="Color picker"
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className="w-4 h-4 rounded border border-[#00d4ff]/30 flex-shrink-0"
+              style={{ backgroundColor: isHexColor(normalizeHexInput(newColorHex)) ? normalizeHexInput(newColorHex) : '#3b82f6' }}
+              aria-label="New classification color preview"
             />
             <input
-              type="text"
-              value={newColorHex}
-              onChange={(event) => {
-                setNewColorHex(event.target.value);
-                setNewClassificationError(null);
-              }}
-              className="flex-1 px-2 py-1 border rounded text-[12px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
-              placeholder="#3b82f6"
-              aria-label="Hex color"
+              placeholder="Classification name"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              className="w-full px-2 py-1 border rounded text-[13px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
+              autoFocus
             />
           </div>
+
+          <ColorPickerField
+            colorValue={newColorHex}
+            onColorChange={(value) => {
+              setNewColorHex(value);
+              setNewClassificationError(null);
+            }}
+            swatchLabel="New classification color preview"
+          />
 
           <select
             value={newType}
@@ -484,40 +553,29 @@ export default function QuantitiesPanel() {
             <div key={classification.id}>
               {isEditing ? (
                 <div className="mx-1 my-1 p-2 bg-[#0e1016] border border-[#00d4ff]/20 rounded-lg">
-                  <input
-                    placeholder="Classification name"
-                    value={editName}
-                    onChange={(event) => {
-                      setEditName(event.target.value);
-                      setEditError(null);
-                    }}
-                    className="w-full px-2 py-1 border rounded text-[13px] mb-2 outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
-                    autoFocus
-                  />
-
-                  <div className="flex gap-2 items-center mb-2">
-                    <input
-                      type="color"
-                      value={isHexColor(editColorHex) ? editColorHex : '#3b82f6'}
-                      onChange={(event) => {
-                        setEditColorHex(event.target.value);
-                        setEditError(null);
-                      }}
-                      className="w-8 h-8 border rounded cursor-pointer bg-transparent"
-                      aria-label="Edit color picker"
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className="w-4 h-4 rounded border border-[#00d4ff]/30 flex-shrink-0"
+                      style={{ backgroundColor: classification.color, boxShadow: `0 0 6px ${classification.color}55` }}
+                      aria-label="Edit classification color preview"
                     />
                     <input
-                      type="text"
-                      value={editColorHex}
+                      placeholder="Classification name"
+                      value={editName}
                       onChange={(event) => {
-                        setEditColorHex(event.target.value);
+                        setEditName(event.target.value);
                         setEditError(null);
                       }}
-                      className="flex-1 px-2 py-1 border rounded text-[12px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
-                      placeholder="#3b82f6"
-                      aria-label="Edit hex color"
+                      className="w-full px-2 py-1 border rounded text-[13px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
+                      autoFocus
                     />
                   </div>
+
+                  <ColorPickerField
+                    colorValue={editColorHex}
+                    onColorChange={(value) => applyEditColor(classification.id, value)}
+                    swatchLabel="Edit classification color preview"
+                  />
 
                   <select
                     value={editType}
