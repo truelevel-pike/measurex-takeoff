@@ -119,7 +119,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   }, [setTool, onClose]);
 
   const handleSelectScale = useCallback(
-    (label: string) => {
+    async (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
       let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
@@ -139,7 +139,10 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       if (currentPage >= 1) {
         setScaleForPage(currentPage, cal);
       }
-      addToast(`Scale set to ${label}`, 'success', 3000);
+      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+      if (getNotificationPrefs().scaleChanged) {
+        addToast(`Scale set to ${label}`, 'success', 3000);
+      }
       handleClose();
     },
     [currentPage, setScale, setScaleForPage, handleClose, addToast],

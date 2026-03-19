@@ -229,7 +229,7 @@ describe('broadcastToProject', () => {
     expect(ctrl2.enqueue).toHaveBeenCalledTimes(1);
 
     // Decode the enqueued message and verify SSE format
-    const encoded = ctrl1.enqueue.mock.calls[0][0] as Uint8Array;
+    const encoded = (ctrl1.enqueue as jest.Mock).mock.calls[0][0] as Uint8Array;
     const message = new TextDecoder().decode(encoded);
     expect(message).toContain('id: 1');
     expect(message).toContain('"event":"polygon:created"');
@@ -249,8 +249,8 @@ describe('broadcastToProject', () => {
     broadcastToProject(projectId, 'evt1', {});
     broadcastToProject(projectId, 'evt2', {});
 
-    const msg1 = new TextDecoder().decode(ctrl.enqueue.mock.calls[0][0] as Uint8Array);
-    const msg2 = new TextDecoder().decode(ctrl.enqueue.mock.calls[1][0] as Uint8Array);
+    const msg1 = new TextDecoder().decode((ctrl.enqueue as jest.Mock).mock.calls[0][0] as Uint8Array);
+    const msg2 = new TextDecoder().decode((ctrl.enqueue as jest.Mock).mock.calls[1][0] as Uint8Array);
 
     expect(msg1).toContain('id: 1');
     expect(msg2).toContain('id: 2');
