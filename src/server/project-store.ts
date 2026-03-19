@@ -755,7 +755,7 @@ export async function createPolygon(
     // so inserts succeed even if the columns haven't been migrated yet.
     if (data.confidence != null) row.confidence = data.confidence;
     if (data.detectedByModel != null) row.detected_by_model = data.detectedByModel;
-    const { error } = await sb.from('mx_polygons').insert(row);
+    const { error } = await sb.from('mx_polygons').upsert(row, { onConflict: 'id' });
     if (error) throw new Error(`createPolygon: ${error.message}`);
     const created: Polygon = {
       id,
