@@ -852,7 +852,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)] relative">
         <span className="font-mono tracking-wider">QUANTITIES</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" suppressHydrationWarning>
           <span className="text-xs text-gray-300 font-normal">
             {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
           </span>

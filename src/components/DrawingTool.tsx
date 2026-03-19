@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
@@ -33,6 +33,20 @@ export default function DrawingTool() {
   const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
   const snapPolygons = polygons.filter((polygon) => polygon.pageNumber === drawingPage);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Cache the container's bounding rect so rapid clicks never read a stale/zero rect
+  // (can happen mid-layout when getBoundingClientRect() is called during a React re-render).
+  // Updated on mount and on every resize via ResizeObserver.
+  const cachedRectRef = useRef<DOMRect | null>(null);
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    cachedRectRef.current = el.getBoundingClientRect();
+    const ro = new ResizeObserver(() => {
+      cachedRectRef.current = el.getBoundingClientRect();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const pointsRef = useRef<Point[]>([]);
   const { addToast } = useToast();
 
@@ -55,10 +69,16 @@ export default function DrawingTool() {
   const CLOSE_THRESHOLD_PX = 25;
 
   // Convert click coordinates to base (scale=1) PDF page coordinate space
-  // so polygon points are zoom-independent, then snap to nearest vertex/midpoint
+  // so polygon points are zoom-independent, then snap to nearest vertex/midpoint.
+  // Uses cachedRectRef (updated on resize) to avoid stale/zero rect reads during
+  // rapid clicks while React is mid-render (fixes BUG-DRAW-002 coordinate drift).
   const getCoords = useCallback((e: React.MouseEvent): Point => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
+    // Prefer fresh rect; fall back to cached rect if container temporarily has zero dims.
+    const freshRect = containerRef.current?.getBoundingClientRect();
+    const rect = (freshRect && freshRect.width > 0 && freshRect.height > 0)
+      ? freshRect
+      : cachedRectRef.current;
+    if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     const x = (clickX / rect.width) * baseDims.width;
@@ -156,7 +176,8 @@ export default function DrawingTool() {
       const clickCls = cls;
       const currentPoints = pointsRef.current;
       if (clickCls?.type !== 'linear' && currentPoints.length >= 3) {
-        const rect = containerRef.current?.getBoundingClientRect();
+        const freshR = containerRef.current?.getBoundingClientRect();
+        const rect = (freshR && freshR.width > 0) ? freshR : cachedRectRef.current;
         const screenX = rect ? (currentPoints[0].x / baseDims.width) * rect.width + rect.left : 0;
         const screenY = rect ? (currentPoints[0].y / baseDims.height) * rect.height + rect.top : 0;
         const dx = e.clientX - screenX;
@@ -185,8 +206,11 @@ export default function DrawingTool() {
   );
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const freshRect = containerRef.current?.getBoundingClientRect();
+    const rect = (freshRect && freshRect.width > 0 && freshRect.height > 0)
+      ? freshRect
+      : cachedRectRef.current;
+    if (!rect || rect.width === 0 || rect.height === 0) return;
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     const x = (clickX / rect.width) * baseDims.width;
