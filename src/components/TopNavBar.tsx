@@ -28,7 +28,6 @@ import {
   Share2,
   Printer,
 } from 'lucide-react';
-import ReTogal from './ReTogal';
 import { useToast } from './Toast';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 
@@ -113,7 +112,6 @@ export default function TopNavBar({
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
   const is3DEnabled = useFeatureFlag('3d-view');
-  const currentPage = useStore((s) => s.currentPage);
   const { addToast } = useToast();
 
   const [shareLoading, setShareLoading] = React.useState(false);
@@ -454,31 +452,35 @@ export default function TopNavBar({
         <nav aria-label="Actions" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {!isMobile && (
             <>
+              {/* AI Takeoff — clean single button like Togal */}
               <button
-                aria-label={aiLoading ? 'AI Takeoff running, please wait' : 'Run AI Takeoff'}
+                aria-label={aiLoading ? 'AI Takeoff running…' : 'Run AI Takeoff on current page'}
                 aria-busy={aiLoading}
-                onClick={aiAllPagesMode ? onAITakeoffAllPages : onAITakeoff}
+                onClick={onAITakeoff}
                 disabled={aiLoading}
                 style={{
-                  background: aiLoading ? 'rgba(136,146,160,0.3)' : '#12121a',
-                  color: aiLoading ? '#8892a0' : '#e0faff',
-                  border: '1px solid rgba(0,212,255,0.3)',
+                  background: aiLoading ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+                  color: '#fff',
+                  border: '1px solid rgba(34,197,94,0.5)',
                   borderRadius: 8,
-                  padding: '6px 14px',
+                  padding: '6px 16px',
                   fontSize: 13,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: aiLoading ? 'default' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
+                  letterSpacing: 0.2,
+                  boxShadow: aiLoading ? 'none' : '0 0 12px rgba(34,197,94,0.25)',
                   transition: 'all 150ms ease',
-                  boxShadow: '0 0 10px rgba(0,212,255,0.12) inset',
                 }}
-                onMouseEnter={(e) => !aiLoading && (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)')}
+                onMouseEnter={(e) => { if (!aiLoading) e.currentTarget.style.boxShadow = '0 0 20px rgba(34,197,94,0.5)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = aiLoading ? 'none' : '0 0 12px rgba(34,197,94,0.25)'; }}
               >
-                {aiLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-                {aiAllPagesProgress ? `Page ${aiAllPagesProgress.current}/${aiAllPagesProgress.total}` : aiLoading ? 'Analyzing…' : 'AI Takeoff'}
+                {aiLoading
+                  ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Analyzing…</>
+                  : <><Sparkles size={14} aria-hidden="true" /> Re-Takeoff</>
+                }
               </button>
               <select
                 value={aiModel ?? "gpt-5.4"}
@@ -487,7 +489,7 @@ export default function TopNavBar({
                 style={{
                   background: '#12121a',
                   color: '#e0faff',
-                  border: '1px solid rgba(0,212,255,0.18)',
+                  border: '1px solid rgba(34,197,94,0.3)',
                   borderRadius: 6,
                   padding: '4px 8px',
                   fontSize: 12,
@@ -501,23 +503,6 @@ export default function TopNavBar({
                 <option value="anthropic/claude-opus-4.6">Claude Opus 4.6</option>
                 <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
               </select>
-              <label className="flex items-center gap-1 text-xs cursor-pointer select-none" style={{ color: '#8892a0' }}>
-                <input
-                  type="checkbox"
-                  checked={aiAllPagesMode ?? false}
-                  onChange={(e) => onAiAllPagesModeChange?.(e.target.checked)}
-                  className="accent-cyan-400"
-                />
-                All Pages
-              </label>
-              {hasRunTakeoff && onAITakeoff && (
-                <ReTogal
-                  currentPage={currentPage}
-                  hasScale={hasScale ?? false}
-                  hasRunTakeoff={hasRunTakeoff}
-                  onRunTakeoff={onAITakeoff}
-                />
-              )}
               <button
                 aria-label="Open MX Chat"
                 onClick={onChat}
@@ -680,11 +665,16 @@ export default function TopNavBar({
           <button
             onClick={() => { onAITakeoff?.(); setShowMobileMenu(false); }}
             disabled={aiLoading}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0faff] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
-            style={{ touchAction: 'manipulation' }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-white min-h-[44px]"
+            style={{
+              touchAction: 'manipulation',
+              background: aiLoading ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+              border: '1px solid rgba(34,197,94,0.5)',
+              fontWeight: 700,
+            }}
           >
             {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {aiLoading ? 'Analyzing...' : 'AI Takeoff'}
+            {aiLoading ? 'Analyzing…' : 'Re-Takeoff'}
           </button>
           <button
             onClick={() => { onChat?.(); setShowMobileMenu(false); }}

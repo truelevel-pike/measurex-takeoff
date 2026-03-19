@@ -730,13 +730,28 @@ function PageInner() {
         const canvas = pdfViewerRef.current?.getPageCanvas?.();
         setPatternSearchPageImage(canvas ? canvas.toDataURL('image/png') : null);
         setShowPatternSearch(v => !v);
+      } else if (e.key >= '1' && e.key <= '7' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const targetPage = parseInt(e.key, 10);
+        if (targetPage <= totalPages) {
+          setCurrentPageNum(targetPage);
+          setCurrentPage(targetPage, totalPages);
+          safeGoToPage(targetPage, 'keyboard-number');
+        }
+      } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId, totalPages, safeGoToPage, setCurrentPageNum, setCurrentPage]);
 
   // Listen for custom event from SmartTools pattern search button
   useEffect(() => {

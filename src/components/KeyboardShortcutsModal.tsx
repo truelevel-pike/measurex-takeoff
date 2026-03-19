@@ -15,19 +15,24 @@ type ShortcutEntry = {
 };
 
 const shortcuts: ShortcutEntry[] = [
+  { keyCombo: 'V', action: 'Select tool' },
+  { keyCombo: 'H', action: 'Pan tool' },
   { keyCombo: 'D', action: 'Draw tool' },
-  { keyCombo: 'S', action: 'Select tool' },
-  { keyCombo: 'P', action: 'Pan tool' },
-  { keyCombo: 'A', action: 'AI tool' },
+  { keyCombo: 'A', action: 'AI Takeoff' },
+  { keyCombo: 'G', action: 'Merge / Group tool' },
+  { keyCombo: 'S', action: 'Split tool' },
+  { keyCombo: 'C', action: 'Cut tool' },
   { keyCombo: 'M', action: 'Measure tool' },
-  { keyCombo: 'Escape', action: 'Cancel / close' },
+  { keyCombo: 'Escape', action: 'Cancel / deselect' },
   { keyCombo: 'Delete / Backspace', action: 'Delete selected polygon' },
   { keyCombo: 'Ctrl+Z', action: 'Undo' },
-  { keyCombo: 'Ctrl+Shift+Z', action: 'Redo' },
+  { keyCombo: 'Ctrl+Y / Ctrl+Shift+Z', action: 'Redo' },
   { keyCombo: 'Ctrl+D', action: 'Duplicate last polygon' },
+  { keyCombo: '1–7', action: 'Jump to page 1–7' },
+  { keyCombo: 'F', action: 'Toggle fullscreen' },
   { keyCombo: '?', action: 'Show this help' },
-  { keyCombo: 'Page Up / Page Down', action: 'Navigate pages' },
   { keyCombo: '+ / -', action: 'Zoom in/out' },
+  { keyCombo: '0', action: 'Reset zoom' },
   { keyCombo: 'Space (hold)', action: 'Pan mode (hold)' },
 ];
 
