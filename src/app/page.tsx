@@ -291,6 +291,9 @@ function PageInner() {
 
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Pending page text: queued when text is extracted before projectId is set (new upload race).
+  // Flushed to server once projectId becomes available.
+  const pendingPageTextRef = useRef<Map<number, { text: string; sheetName: string | null }>>(new Map());
   const [projectName, setProjectName] = useState<string | null>(null);
   // Show the full viewer layout (sidebars, panels, overlays) when a project has data,
   // even if pdfFile is null (PDF isn't stored server-side, user needs to re-upload).
@@ -536,6 +539,23 @@ function PageInner() {
     if (!pid) return;
     hydrateProject(pid);
   }, [search, hydrateProject]);
+
+  // Flush any pending page text that was extracted before projectId was set
+  useEffect(() => {
+    if (!projectId) return;
+    const pending = pendingPageTextRef.current;
+    if (pending.size === 0) return;
+    for (const [pageNum, { text, sheetName }] of pending) {
+      const body: Record<string, unknown> = { pageNum, text };
+      if (sheetName) body.sheet_name = sheetName;
+      fetch(`/api/projects/${projectId}/pages`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => {/* best-effort */});
+    }
+    pending.clear();
+  }, [projectId]);
 
   // Connect SSE when project is loaded
   useEffect(() => {
@@ -1055,6 +1075,12 @@ function PageInner() {
       setSheetName(pageNum, sheetName);
     }
 
+    // E6: If projectId isn't set yet (new upload race), queue text for flush when it arrives.
+    // PDFViewer also PATCHes text directly, but its ref may still be undefined at this point.
+    if (!projectId) {
+      pendingPageTextRef.current.set(pageNum, { text, sheetName });
+    }
+
     // QA-006: Detect scale from text — only reached when text is non-empty
     const detected = detectScaleFromText(text);
     if (detected) {
@@ -1070,7 +1096,7 @@ function PageInner() {
         setShowAutoScalePopup(true);
       }
     }
-  }, [setCurrentPage, setSheetName]);
+  }, [projectId, setCurrentPage, setSheetName]);
 
   const handleAcceptScale = useCallback(() => {
     if (detectedScale) {
