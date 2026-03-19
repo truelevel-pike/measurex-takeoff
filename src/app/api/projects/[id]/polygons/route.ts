@@ -4,6 +4,7 @@ import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { broadcastToProject } from '@/app/api/ws/route';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
+import { emitPluginEvent } from '@/lib/plugin-system';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,6 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
     broadcastToProject(id, 'polygon:created', polygon);
     fireWebhook(id, 'polygon.created', polygon);
+    await emitPluginEvent('onPolygonCreated', polygon, id);
     return NextResponse.json({ polygon });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

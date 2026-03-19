@@ -8,6 +8,7 @@ import {
 } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
 import { fireWebhook } from '@/lib/webhooks';
+import { emitPluginEvent } from '@/lib/plugin-system';
 import type { AIDetectedElement } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
@@ -143,6 +144,7 @@ export async function POST(
       classificationCount: createdClassifications,
       skipped,
     });
+    await emitPluginEvent('onTakeoffCompleted', elements, id);
 
     return NextResponse.json({
       created: { classifications: createdClassifications, polygons: createdPolygons },

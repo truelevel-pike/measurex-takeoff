@@ -3,6 +3,7 @@ import { getClassifications, createClassification, initDataDir } from '@/server/
 import { broadcastToProject } from '@/app/api/ws/route';
 import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
+import { emitPluginEvent } from '@/lib/plugin-system';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
     broadcastToProject(id, 'classification:created', classification);
     fireWebhook(id, 'classification.created', classification);
+    await emitPluginEvent('onClassificationCreated', classification, id);
     return NextResponse.json({ classification });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
