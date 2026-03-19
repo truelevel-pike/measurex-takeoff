@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import PDFViewer from '@/components/PDFViewer';
 import CanvasOverlay from '@/components/CanvasOverlay';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
+import { ToastProvider } from '@/components/Toast';
 import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
 
 interface SharedProject {
@@ -161,6 +162,7 @@ export default function SharedViewPage() {
   }
 
   return (
+    <ToastProvider>
     <div className="h-screen w-screen flex flex-col" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
       {/* Header */}
       <header
@@ -305,5 +307,6 @@ export default function SharedViewPage() {
         <a href="/" style={{ color: '#00d4ff', textDecoration: 'none', fontSize: 11 }}>Get MeasureX &rarr;</a>
       </footer>
     </div>
+    </ToastProvider>
   );
 }
