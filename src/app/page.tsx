@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { File as FileIcon } from 'lucide-react';
+import { File as FileIcon, GitCompare } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
@@ -33,7 +33,7 @@ import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
-import ScalePopup from '@/components/ScalePopup';
+// ScalePopup removed — AutoScalePopup is the sole confirmation dialog (GAP-006)
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
@@ -106,8 +106,7 @@ function PageInner() {
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const setScale = useStore((s) => s.setScale);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
-  const setShowScalePopup = useStore((s) => s.setShowScalePopup);
-  const showScalePopup = useStore((s) => s.showScalePopup);
+  // showScalePopup removed — GAP-006: AutoScalePopup is the sole confirmation
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const setSheetName = useStore((s) => s.setSheetName);
 
@@ -157,6 +156,7 @@ function PageInner() {
   // Chat & Image Search panel state
   const [showChat, setShowChat] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -611,18 +611,16 @@ function PageInner() {
       setDetectedScale(detected);
       setCurrentPageNum(pageNum);
       setCurrentPage(pageNum, useStore.getState().totalPages);
-      setShowScalePopup(true);
 
-      // GAP-006: Show AutoScalePopup if confidence >= 0.65 and not permanently dismissed
-      if (detected.confidence >= 0.65) {
-        const hidden = typeof window !== 'undefined' && localStorage.getItem('measurex_hide_scale_popup') === 'true';
-        if (!hidden) {
-          setDetectedScaleInfo({ scale: detected.scale.label, confidence: detected.confidence });
-          setShowAutoScalePopup(true);
-        }
+      // GAP-006: Show AutoScalePopup as the sole confirmation dialog.
+      // Scale is NOT applied until user explicitly accepts.
+      const hidden = typeof window !== 'undefined' && localStorage.getItem('measurex_hide_scale_popup') === 'true';
+      if (!hidden) {
+        setDetectedScaleInfo({ scale: detected.scale.label, confidence: detected.confidence });
+        setShowAutoScalePopup(true);
       }
     }
-  }, [setShowScalePopup, setCurrentPage, setSheetName]);
+  }, [setCurrentPage, setSheetName]);
 
   const handleAcceptScale = useCallback(() => {
     if (detectedScale) {
@@ -630,15 +628,8 @@ function PageInner() {
       setScale(cal);
       setScaleForPage(currentPageNum, cal);
     }
-    setShowScalePopup(false);
     setDetectedScale(null);
-  }, [detectedScale, currentPageNum, setScale, setScaleForPage, setShowScalePopup]);
-
-  const handleManualScale = useCallback(() => {
-    setShowScalePopup(false);
-    setDetectedScale(null);
-    setShowCalModal(true);
-  }, [setShowScalePopup]);
+  }, [detectedScale, currentPageNum, setScale, setScaleForPage]);
 
   // Install automation API for browser/AI drivers
   useEffect(() => {
@@ -745,6 +736,7 @@ function PageInner() {
         projectName={projectName || undefined}
         onChat={() => setShowChat((v) => !v)}
         onToggleImageSearch={() => setShowImageSearch((v) => !v)}
+        onCompare={() => setShowCompare(true)}
         sheetName={sheetNames[currentPageNum] || `Page ${currentPageNum}`}
         pageIndex={pdfFile && pdfPageCountReady ? currentPageNum - 1 : undefined}
         totalPages={pdfFile && pdfPageCountReady ? totalPages : undefined}
@@ -907,10 +899,7 @@ function PageInner() {
         <LeftToolbar />
       </div>
 
-      {showScalePopup && detectedScale && (
-        <ScalePopup detectedScaleText={detectedScale.scale.label} onAccept={handleAcceptScale} onManual={handleManualScale} />
-      )}
-
+      {/* GAP-006: Single confirmation dialog before applying detected scale */}
       {showAutoScalePopup && detectedScaleInfo && (
         <AutoScalePopup
           detectedScale={detectedScaleInfo.scale}
@@ -960,6 +949,23 @@ function PageInner() {
 
       {showChat && <TogalChat onClose={() => setShowChat(false)} />}
       {showImageSearch && <AIImageSearch onClose={() => setShowImageSearch(false)} />}
+
+      {/* Compare modal stub */}
+      {showCompare && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCompare(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <GitCompare size={40} className="text-[#00d4ff] mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-white mb-2">Compare Projects</h2>
+            <p className="text-sm text-gray-400 mb-6">Select two projects to compare takeoff quantities side-by-side.</p>
+            <button
+              onClick={() => setShowCompare(false)}
+              className="bg-[rgba(0,212,255,0.15)] border border-[rgba(0,212,255,0.4)] text-[#00d4ff] px-5 py-2 rounded-lg font-medium text-sm hover:bg-[rgba(0,212,255,0.25)] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

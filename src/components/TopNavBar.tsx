@@ -39,6 +39,7 @@ interface TopNavBarProps {
   projectName?: string;
   onChat?: () => void;
   onToggleImageSearch?: () => void;
+  onCompare?: () => void;
 }
 
 export default function TopNavBar({
@@ -52,6 +53,7 @@ export default function TopNavBar({
   onAITakeoff,
   onChat,
   onToggleImageSearch,
+  onCompare,
   aiLoading,
   onExport,
   onSave,
@@ -256,7 +258,7 @@ export default function TopNavBar({
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
-              <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" />
+              <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
               <NavIconButton ariaLabel="Export to Excel" srLabel="Export to Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Export to Excel" onClick={onExport} />
             </>
           )}
