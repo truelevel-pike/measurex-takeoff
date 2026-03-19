@@ -1060,7 +1060,35 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       )}
 
       <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list>
-        {filtered.map((classification, classIndex) => {
+        {orderedListItems.map((item) => {
+          if (item.kind === 'header') {
+            const isTradeCollapsed = collapsedTrades.has(item.trade);
+            const tradeTotalArea = (tradeGrouped[item.trade] ?? []).reduce((sum, cls) => {
+              const t = totalsByClassification.get(cls.id);
+              return sum + (t ? t.areaReal : 0);
+            }, 0);
+            return (
+              <div key={`trade-${item.trade}`} className="mb-0.5 mt-1 first:mt-0">
+                <div
+                  className="flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer hover:bg-[#0e1016] select-none"
+                  onClick={() => toggleTradeCollapse(item.trade)}
+                >
+                  {isTradeCollapsed ? (
+                    <ChevronRight size={12} className="text-gray-400 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown size={12} className="text-gray-400 shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="font-mono text-[11px] text-[#8892a0] uppercase tracking-wider flex-1">{item.trade}</span>
+                  <span className="text-[10px] font-mono text-[#00d4ff]/70">{item.count}</span>
+                  {tradeTotalArea > 0 && (
+                    <span className="text-[10px] font-mono text-gray-500">{formatArea(tradeTotalArea, measurementSettings)}</span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          const { classification, classIndex } = item;
           const totals = totalsByClassification.get(classification.id) ?? { count: 0, areaReal: 0, lengthReal: 0 };
           const polygonsForClassification = polygonsByClassification.get(classification.id) ?? [];
           const deductions = getDeductions(classification);
@@ -1340,42 +1368,22 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                             </div>
                           )}
                           <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="text-[10px] text-gray-300 font-mono uppercase">Auto-Backout (Openings)</span>
-                              <button type="button" onClick={() => addAutoBackout(classification)} className="text-[10px] text-[#00d4ff] hover:text-[#9eeeff]">+Add</button>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] text-gray-300 font-mono uppercase">Auto-Detected Openings</span>
                             </div>
                             {autoDeductions.length === 0 ? (
-                              <div className="text-[10px] text-gray-500">No auto-backouts.</div>
+                              <div className="text-[10px] text-gray-500">No door/window overlaps detected.</div>
                             ) : (
-                              autoDeductions.map((ab, idx) => (
-                                <div key={idx} className="flex items-center gap-1 mb-0.5">
-                                  <select
-                                    value={ab.countClassificationId}
-                                    onChange={e => updateAutoBackout(classification, idx, { countClassificationId: e.target.value })}
-                                    className="flex-1 border border-[#00d4ff]/20 rounded px-1 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none"
-                                    aria-label="Count classification to backout"
-                                  >
-                                    <option value="">Select count class…</option>
-                                    {classifications.filter(c => c.type === 'count').map(c => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                  </select>
-                                  <input
-                                    type="number"
-                                    value={ab.openingWidthFt}
-                                    onChange={e => updateAutoBackout(classification, idx, { openingWidthFt: parseFloat(e.target.value) || 0 })}
-                                    placeholder="3.0"
-                                    className="w-16 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none"
-                                    aria-label="Opening width in feet"
-                                  />
-                                  <span className="text-[9px] text-gray-500">ft</span>
-                                  <button type="button" onClick={() => deleteAutoBackout(classification, idx)} className="w-5 h-5 rounded border border-[#00d4ff]/20 text-[11px] text-gray-300 hover:text-white" aria-label="Remove auto-backout">×</button>
+                              <div className="space-y-0.5">
+                                {autoDeductions.map((ad, idx) => (
+                                  <div key={`auto-${idx}`} className="flex items-center justify-between gap-1 text-[10px] text-gray-300">
+                                    <span className="truncate">{ad.openingClassificationName}</span>
+                                    <span className="font-mono text-[#e5e7eb] whitespace-nowrap">-{formatLinear(ad.deductionValue, measurementSettings)}</span>
+                                  </div>
+                                ))}
+                                <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
+                                  Opening backout: -{formatLinear(autoDeductTotal, measurementSettings)}
                                 </div>
-                              ))
-                            )}
-                            {autoDeductions.length > 0 && (
-                              <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
-                                Auto-backout: -{autoDeductTotal.toFixed(1)} ft ({autoDeductions.map(ab => { const c = classifications.find(cl => cl.id === ab.countClassificationId); return c ? `${polygonsByClassification.get(c.id)?.length ?? 0}×${ab.openingWidthFt}ft` : ''; }).filter(Boolean).join(' + ')})
                               </div>
                             )}
                           </div>
