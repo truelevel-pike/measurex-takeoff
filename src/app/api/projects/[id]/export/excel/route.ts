@@ -192,7 +192,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const assemblyRows = assemblies.map((assembly) => {
       const classification = classifications.find((c) => c.id === assembly.classificationId);
-      const quantityRow = quantityByClassificationId.get(assembly.classificationId);
+      const quantityRow = assembly.classificationId ? quantityByClassificationId.get(assembly.classificationId) : undefined;
       const quantity = quantityForAssembly(assembly.quantityFormula, quantityRow);
       const totalCost = round2(quantity * assembly.unitCost);
       return {
