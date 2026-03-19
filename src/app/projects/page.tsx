@@ -798,6 +798,29 @@ export default function ProjectsPage() {
             <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-5 mb-5">
               <h3 className="font-semibold text-sm mb-3">Create New Project</h3>
               <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">PDF Drawing (optional)</label>
+                  <label className="flex items-center gap-2 bg-zinc-700 border border-zinc-600 rounded-lg px-4 py-2 text-sm text-zinc-300 cursor-pointer hover:border-zinc-500 transition-colors">
+                    <Upload size={14} className="text-zinc-400 shrink-0" />
+                    <span className="truncate">{pdfFile ? pdfFile.name : 'Choose PDF file...'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={e => handleFileSelect(e.target.files?.[0] || null)}
+                    />
+                    {pdfFile && (
+                      <button
+                        type="button"
+                        aria-label="Remove file"
+                        onClick={e => { e.preventDefault(); setPdfFile(null); }}
+                        className="ml-auto text-zinc-400 hover:text-white shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </label>
+                </div>
                 <div className="flex gap-3">
                   <input
                     aria-label="Project name"
@@ -811,10 +834,10 @@ export default function ProjectsPage() {
                   <button aria-label="Create project" onClick={handleCreate}
                     disabled={creating || !newName.trim()}
                     className="bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:text-zinc-400 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors">
-                    {creating ? 'Creating...' : 'Create'}
+                    {creating ? (pdfFile ? 'Uploading...' : 'Creating...') : (pdfFile ? 'Create & Upload' : 'Create')}
                   </button>
                   <button aria-label="Cancel create"
-                    onClick={() => { setShowCreate(false); setNewName(''); setNewProjectTags([]); }}
+                    onClick={() => { setShowCreate(false); setNewName(''); setPdfFile(null); setNewProjectTags([]); }}
                     className="text-zinc-400 hover:text-white px-3 text-sm">
                     Cancel
                   </button>
@@ -853,15 +876,43 @@ export default function ProjectsPage() {
               </button>
             </div>
           ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-16">
-              <Folder size={48} className="text-zinc-600 mx-auto mb-4" aria-hidden />
-              <div className="text-lg text-zinc-400 mb-2">No projects yet</div>
-              <div className="text-sm text-zinc-500 mb-4">Click &quot;New Project&quot; to get started</div>
+            <div className="flex flex-col items-center py-16">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center transition-colors ${
+                  dragOver
+                    ? 'border-blue-400 bg-blue-600/10'
+                    : 'border-zinc-600 bg-zinc-800/50 hover:border-zinc-500'
+                }`}
+              >
+                <Upload size={40} className={`mx-auto mb-3 ${dragOver ? 'text-blue-400' : 'text-zinc-500'}`} aria-hidden />
+                <div className={`text-lg font-medium mb-1 ${dragOver ? 'text-blue-300' : 'text-zinc-300'}`}>
+                  {dragOver ? 'Drop PDF here' : 'Drag & drop a PDF'}
+                </div>
+                <div className="text-sm text-zinc-500 mb-5">or upload to create your first project</div>
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) handlePdfUpload(file);
+                    };
+                    input.click();
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors inline-flex items-center gap-2"
+                >
+                  <Upload size={14} /> Upload PDF
+                </button>
+              </div>
               <button
                 onClick={() => setShowCreate(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors inline-flex items-center gap-2"
+                className="mt-4 text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
               >
-                <Plus size={14} /> New Project
+                or create a blank project
               </button>
             </div>
           ) : viewMode === 'grid' ? (
@@ -923,6 +974,9 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex items-center gap-3 text-xs text-zinc-400">
                         <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{fmtDate(p)}</span>
+                        {(p.pageCount || p.state?.totalPages || 0) > 0 && (
+                          <span className="flex items-center gap-1"><FileText size={11} aria-hidden />{p.pageCount || p.state?.totalPages} pages</span>
+                        )}
                         {polyCount > 0 && <span>{polyCount} drawings</span>}
                         {clsCount > 0 && <span>{clsCount} cls</span>}
                       </div>
@@ -1076,6 +1130,15 @@ export default function ProjectsPage() {
           onClose={() => setDuplicateTarget(null)}
           onDuplicated={(newId) => { loadProjects(); handleOpen(newId); }}
         />
+      )}
+
+      {/* Upload spinner overlay */}
+      {uploading && (
+        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
+          <Loader2 size={48} className="text-blue-400 animate-spin mb-4" />
+          <div className="text-lg font-semibold text-white">Uploading &amp; processing PDF...</div>
+          <div className="text-sm text-zinc-400 mt-1">This may take a moment</div>
+        </div>
       )}
 
       {showAutoName && (
