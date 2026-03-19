@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPolygons, createPolygon, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
@@ -28,21 +28,21 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     const { id } = paramsResult.data;
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    const bodyResult = PolygonSchema.passthrough().safeParse(body);
+    const bodyResult = PolygonSchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
-    const { points, classificationId } = bodyResult.data;
+    const data = bodyResult.data;
     // Compute area/perimeter from points if caller didn't supply them
-    const computedArea = points.length >= 3 ? calculatePolygonArea(points) : 0;
-    const computedLinear = points.length >= 2 ? calculateLinearFeet(points, 1, true) : 0;
+    const computedArea = data.points.length >= 3 ? calculatePolygonArea(data.points) : 0;
+    const computedLinear = data.points.length >= 2 ? calculateLinearFeet(data.points, 1, true) : 0;
     const polygon = await createPolygon(id, {
-      id: body.id,
-      points,
-      classificationId,
-      pageNumber: body.pageNumber || 1,
-      area: body.area ?? computedArea,
-      linearFeet: body.linearFeet ?? computedLinear,
-      isComplete: body.isComplete ?? true,
-      label: body.label,
+      id: data.id,
+      points: data.points,
+      classificationId: data.classificationId,
+      pageNumber: data.pageNumber || 1,
+      area: data.area ?? computedArea,
+      linearFeet: data.linearFeet ?? computedLinear,
+      isComplete: data.isComplete ?? true,
+      label: data.label,
     });
     broadcastToProject(id, 'polygon:created', polygon);
     fireWebhook(id, 'polygon.created', polygon);

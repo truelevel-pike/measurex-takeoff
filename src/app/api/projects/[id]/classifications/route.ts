@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
@@ -27,15 +27,15 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     const { id } = paramsResult.data;
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    const bodyResult = ClassificationCreateSchema.passthrough().safeParse(body);
+    const bodyResult = ClassificationCreateSchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
-    const { name, type } = bodyResult.data;
+    const data = bodyResult.data;
     const classification = await createClassification(id, {
       id: body.id,
-      name,
-      type,
-      color: body.color || '#3b82f6',
-      visible: body.visible ?? true,
+      name: data.name,
+      type: data.type,
+      color: data.color || '#3b82f6',
+      visible: data.visible ?? true,
       formula: body.formula,
       formulaUnit: body.formulaUnit,
       formulaSavedToLibrary: body.formulaSavedToLibrary,

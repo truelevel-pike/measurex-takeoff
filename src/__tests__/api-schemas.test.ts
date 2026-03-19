@@ -151,12 +151,19 @@ describe('ProjectUpdateSchema', () => {
 });
 
 describe('PolygonSchema', () => {
-  it('rejects polygon with < 3 points', () => {
+  it('rejects polygon with < 2 points', () => {
+    const result = PolygonSchema.safeParse({
+      classificationId: '550e8400-e29b-41d4-a716-446655440001',
+      points: [{ x: 0, y: 0 }],
+    });
+    expect(result.success).toBe(false);
+  });
+  it('accepts polygon with 2 points (linear)', () => {
     const result = PolygonSchema.safeParse({
       classificationId: '550e8400-e29b-41d4-a716-446655440001',
       points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
   it('accepts valid polygon', () => {
     const result = PolygonSchema.safeParse({
@@ -251,17 +258,27 @@ describe('parseParams', () => {
 });
 
 describe('validationError', () => {
-  it('returns a Response with status 422', () => {
-    // Response.json is available in Node 18+ and in Next.js runtime
+  beforeAll(() => {
     if (typeof Response === 'undefined' || typeof Response.json !== 'function') {
-      // Polyfill for Jest environment
       (globalThis as Record<string, unknown>).Response = {
         json: (body: unknown, init?: { status?: number }) => ({ body, status: init?.status ?? 200 }),
       };
     }
+  });
+
+  it('returns a Response with status 400', () => {
     const result = ProjectIdSchema.safeParse({ id: 'bad' });
     if (result.success) throw new Error('Expected failure');
     const response = validationError(result.error);
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(400);
+  });
+
+  it('includes error details in the response body', () => {
+    const result = PolygonSchema.safeParse({ classificationId: 'not-uuid', points: [] });
+    if (result.success) throw new Error('Expected failure');
+    const response = validationError(result.error) as unknown as { body: { error: string; details: unknown }; status: number };
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Validation failed');
+    expect(response.body.details).toBeDefined();
   });
 });

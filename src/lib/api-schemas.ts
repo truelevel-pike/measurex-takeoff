@@ -13,9 +13,12 @@ export const PointSchema = z.object({ x: z.number(), y: z.number() });
 export const PolygonSchema = z.object({
   id: z.string().uuid().optional(),
   classificationId: z.string().uuid(),
-  points: z.array(PointSchema).min(3),
+  points: z.array(PointSchema).min(2, 'Must have at least 2 points'),
   pageNumber: z.number().int().positive().optional(),
   label: z.string().optional(),
+  area: z.number().nonnegative().optional(),
+  linearFeet: z.number().nonnegative().optional(),
+  isComplete: z.boolean().optional(),
 });
 
 // Classification
@@ -135,6 +138,8 @@ export const AiTakeoffBodySchema = z.object({
   imageBase64: z.string().min(1),
   pageWidth: z.number().positive(),
   pageHeight: z.number().positive(),
+  projectId: z.string().uuid().optional(),
+  pageNumber: z.number().int().positive().optional(),
 });
 
 // AI Takeoff options
@@ -164,6 +169,6 @@ export function parseParams<T extends z.ZodTypeAny>(
 export function validationError(errors: z.ZodError) {
   return Response.json(
     { error: 'Validation failed', details: errors.flatten() },
-    { status: 422 }
+    { status: 400 }
   );
 }
