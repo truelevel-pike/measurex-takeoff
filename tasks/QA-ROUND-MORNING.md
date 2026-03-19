@@ -35,17 +35,29 @@ POST /api/projects/3d174adc.../polygons (invalid UUID) → 400 validation error 
 |---|-------|--------|-------|
 | 1 | Calls OpenAI | PASS | Two routes: `/api/ai-takeoff` uses gpt-4o, `/api/projects/[id]/ai-takeoff` uses gpt-4o-mini via ai-engine.ts |
 | 2 | Valid prompt | PASS | Detailed system prompt with COUNT/AREA/LINEAR categorization |
-| 3 | Parses polygons from response | PASS | `parseDetectedElements()` handles type-specific polygon shapes |
-| 4 | SSE events | PASS | Broadcasts `ai-takeoff:started` and `ai-takeoff:complete` |
+| 3 | Parses polygons from response | PASS | JSON array extraction, type filtering, confidence/color assignment |
+| 4 | SSE events | PASS | Broadcasts `ai-takeoff:started` and `ai-takeoff:complete` (fixed in round 2) |
 | 5 | Creates classifications + polygons in DB | PASS | Full persistence via store + deduplication logic |
 
 ### API Test
 ```
-POST /api/projects/3d174adc.../ai-takeoff {"page":3} → requires PDF on disk
+POST /api/projects/3d174adc.../ai-takeoff {"page":3} → requires OPENAI_API_KEY
 ```
 Note: Route expects `page` field (not `pageNumber`).
 
-### Bugs Found: None (minor observations: two routes use different models, coordinate format differs — documented but not bugs)
+### Bugs Found & Fixed
+
+**BUG-QA-001**: Linear distance in apply route only used first 2 points
+- **File**: `src/app/api/projects/[id]/ai-takeoff/apply/route.ts:124`
+- **Problem**: `euclidean(element.points[0], element.points[1])` ignored all intermediate polyline vertices. Multi-segment walls/beams would have incorrect linear footage.
+- **Fix**: Loop through all segments and sum distances
+- **Commit**: `a6b47df`
+
+**BUG-QA-002**: AI takeoff main route missing SSE broadcast events
+- **File**: `src/app/api/projects/[id]/ai-takeoff/route.ts`
+- **Problem**: No `ai-takeoff:started` or `ai-takeoff:complete` SSE events sent to connected clients. UI had no way to show progress during analysis.
+- **Fix**: Added `broadcastToProject()` calls before and after `analyzePageImage()`
+- **Commit**: `842382d`
 
 ---
 
@@ -57,24 +69,21 @@ Note: Route expects `page` field (not `pageNumber`).
 | 1 | Chat component exists | PASS | MXChat.tsx (primary, SSE streaming) + TogalChat.tsx (secondary) |
 | 2 | API route at /api/chat | PASS | SSE streaming, GPT-4o, builds context from classifications |
 | 3 | Uses OpenAI with project context | PASS | System prompt includes quantities, classifications |
-| 4 | MX Chat button in page.tsx | PASS | MXChat rendered at line ~1554 |
+| 4 | MX Chat button in page.tsx | PASS | MXChat rendered at line ~1567 |
 
 ### API Test
 ```
-POST /api/chat {"message":"...", "context":{}} → streams SSE correctly
+POST /api/chat {"message":"..."} → 503 (OPENAI_API_KEY not set — correct behavior)
+POST /api/projects/3d174adc.../chat {"message":"..."} → was 404, now 503 (correct after fix)
 ```
 
-### BUG-QA-002: TogalChat parses SSE as JSON (CRITICAL)
-- **File**: `src/components/TogalChat.tsx:96`
-- **Problem**: Called `response.json()` on an SSE `text/event-stream` response, then expected `data.reply`. Always crashes with JSON parse error.
-- **Fix**: Replaced with proper SSE stream reader that accumulates `data: {content}` chunks, matching MXChat's approach.
-- **Commit**: `45ecc42`
+### Bugs Found & Fixed
 
-### BUG-QA-004: MXChat SSE buffer not flushed (LOW)
-- **File**: `src/components/MXChat.tsx:142-167`
-- **Problem**: When SSE stream ends, any remaining data in the buffer (partial final line) is discarded, potentially dropping the last few characters.
-- **Fix**: Added buffer flush after the read loop exits.
-- **Commit**: `f8a5f29`
+**BUG-QA-003**: No project-scoped chat route
+- **File**: `src/app/api/projects/[id]/chat/` (did not exist)
+- **Problem**: Only `/api/chat` existed, which requires client-side context injection. No way to call chat with automatic server-side project data (polygons, classifications, scale). Curl testing at `/api/projects/:id/chat` returned 404.
+- **Fix**: Created `src/app/api/projects/[id]/chat/route.ts` that fetches polygons, classifications, and scale from DB server-side, builds context, and calls OpenAI with full project awareness. Returns non-streaming JSON for API/curl use.
+- **Commit**: `e0419ea`
 
 ---
 
@@ -86,19 +95,21 @@ POST /api/chat {"message":"...", "context":{}} → streams SSE correctly
 | 1 | ScaleCalibration component | PASS | Orchestrator with presets + manual modes |
 | 2 | "No scale — tap to set" button | PASS | `BottomStatusBar.tsx:54`, orange AlertTriangle icon, calls `onScaleClick` |
 | 3 | Opens scale panel | PASS | Connected to `setShowScaleCalibPanel` in page.tsx |
-| 4 | Can set 1/4" = 1' | PASS | Preset scales include architectural ratios |
-| 5 | POST /api/projects/:id/scale | PASS | Sets scale, broadcasts `scale:updated` via SSE |
+| 4 | POST /api/projects/:id/scale | PASS | Sets scale, broadcasts `scale:updated` via SSE |
+| 5 | QuantitiesPanel recalculates | PASS | Uses `getPixelsPerUnitForPage()` → area/(ppu²), linear/ppu |
 
 ### API Test
 ```
-POST /api/projects/3d174adc.../scale {"pixelsPerUnit":48,"unit":"ft","pageNumber":3} → 200
+POST /api/projects/3d174adc.../scale {"pixelsPerUnit":48,"unit":"ft","pageNumber":3} → 200 ✓
 ```
 
-### BUG-QA-003: ManualCalibration Enter Number validation unit mismatch (MEDIUM)
-- **File**: `src/components/ManualCalibration.tsx:104`
-- **Problem**: Validation converted real-world measurement to inches (`ft*12 + in`) but save handler converted to feet (`ft + in/12`). With input 5ft 6in: validation checks 66 inches > 0, save computes 5.5 feet. The validation could reject valid inputs or accept invalid ones at boundary values.
-- **Fix**: Changed validation to match save: `(parseFloat(realFt) || 0) + (parseFloat(realIn) || 0) / 12`
-- **Commit**: `395f43d`
+### Bugs Found & Fixed
+
+**BUG-QA-004**: Scale POST used raw body instead of validated data
+- **File**: `src/app/api/projects/[id]/scale/route.ts:32`
+- **Problem**: Destructured `pixelsPerUnit`, `unit`, `pageNumber` from raw `body` instead of `bodyResult.data`. Zod validation ran but its sanitized output was ignored — unvalidated data passed to `setScale()`.
+- **Fix**: Use `bodyResult.data` for validated fields (`pixelsPerUnit`, `unit`, `pageNumber`). Extract `label` and `source` from raw body with type guards since they aren't in the schema.
+- **Commit**: `d467e38`
 
 ---
 
@@ -106,11 +117,15 @@ POST /api/projects/3d174adc.../scale {"pixelsPerUnit":48,"unit":"ft","pageNumber
 
 | Bug ID | Severity | Component | Description | Fixed | Commit |
 |--------|----------|-----------|-------------|-------|--------|
-| BUG-QA-002 | CRITICAL | TogalChat | Parsed SSE stream as JSON — every chat request crashed | Yes | `45ecc42` |
-| BUG-QA-003 | MEDIUM | ManualCalibration | Enter Number validation used inches, save used feet | Yes | `395f43d` |
-| BUG-QA-004 | LOW | MXChat | SSE buffer not flushed after stream ends | Yes | `f8a5f29` |
+| BUG-QA-001 | MEDIUM | AI Takeoff Apply | Linear distance only used first 2 of N polyline points | Yes | `a6b47df` |
+| BUG-QA-002 | LOW | AI Takeoff | No SSE broadcast events during analysis | Yes | `842382d` |
+| BUG-QA-003 | MEDIUM | MX Chat | No project-scoped chat route — 404 on `/api/projects/:id/chat` | Yes | `e0419ea` |
+| BUG-QA-004 | LOW | Scale | POST used raw body instead of Zod-validated data | Yes | `d467e38` |
 
 ### Build Verification
 - `npx tsc --noEmit` — clean, no errors
-- All 3 fixes committed individually
-- Dev server responding 200 on all tested routes
+- All 4 fixes committed individually
+- Dev server responding correctly on all tested routes
+
+### Environment Note
+- `OPENAI_API_KEY` is not configured in `.env.local` — AI features (chat, takeoff) return 503 until set
