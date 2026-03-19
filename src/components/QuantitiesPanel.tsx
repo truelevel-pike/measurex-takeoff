@@ -953,6 +953,30 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       </div>
       {showHistory && <VersionHistory onClose={() => setShowHistory(false)} />}
 
+      {polygons.length > 0 && (() => {
+        let totalAreaSF = 0;
+        let totalLF = 0;
+        let totalEA = 0;
+        for (const c of classifications) {
+          const t = totalsByClassification.get(c.id);
+          if (!t) continue;
+          if (c.type === 'area') totalAreaSF += t.areaReal;
+          else if (c.type === 'linear') totalLF += t.lengthReal;
+          else if (c.type === 'count') totalEA += t.count;
+        }
+        return (
+          <div className="px-3 py-1 border-b border-[#00d4ff]/10 bg-[rgba(10,10,15,0.4)]">
+            <span className="text-[10px] font-mono text-gray-400">
+              {totalAreaSF > 0 && <>{formatArea(totalAreaSF, measurementSettings)}</>}
+              {totalAreaSF > 0 && totalLF > 0 && ' · '}
+              {totalLF > 0 && <>{formatLinear(totalLF, measurementSettings)}</>}
+              {(totalAreaSF > 0 || totalLF > 0) && totalEA > 0 && ' · '}
+              {totalEA > 0 && <>{totalEA} EA</>}
+            </span>
+          </div>
+        );
+      })()}
+
       {showTakeoffSearch && (
         <div className="px-2 pt-2 pb-1 border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.4)]">
           <div className="flex items-center gap-2">

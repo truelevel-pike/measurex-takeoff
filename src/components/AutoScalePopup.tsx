@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AlertCircle, AlertTriangle, Check, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Check, Sparkles, X } from 'lucide-react';
 import { useFocusTrap } from '@/lib/use-focus-trap';
 
 const AUTO_DISMISS_MS = 10_000;
@@ -112,8 +112,10 @@ export default function AutoScalePopup({
         <h3 className="text-sm font-semibold tracking-wide">Scale Auto-Detected</h3>
       </div>
 
-      <div className="text-2xl font-bold leading-tight mb-2">{detectedScale}</div>
-      <p className="text-sm text-gray-300 mb-3">Use this scale?</p>
+      <div className="mb-3">
+        <span className="text-[10px] uppercase tracking-wider text-gray-400">Detected</span>
+        <div className="text-2xl font-bold font-mono leading-tight text-white mt-0.5">{detectedScale}</div>
+      </div>
 
       <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-3 ${confidenceMeta.className}`}>
         <Check size={12} />
@@ -126,11 +128,6 @@ export default function AutoScalePopup({
           <p>Scale detection uncertain — please verify manually</p>
         </div>
       )}
-
-      <div className="flex items-start gap-2 text-sm text-gray-300 mb-4">
-        <AlertCircle size={16} className="mt-0.5 text-gray-400" />
-        <p>Please verify this scale before proceeding with takeoff</p>
-      </div>
 
       <label className="flex items-center gap-2 text-sm text-gray-300 mb-4 cursor-pointer select-none">
         <input
@@ -149,7 +146,7 @@ export default function AutoScalePopup({
           className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium px-3 py-2 transition text-sm"
         >
           <X size={14} />
-          <span>Reject</span>
+          <span>Set Manually</span>
           <kbd className="ml-1 text-[10px] text-gray-400 bg-gray-800 px-1 rounded">Esc</kbd>
         </button>
         <button
@@ -158,7 +155,7 @@ export default function AutoScalePopup({
           className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-2 transition text-sm"
         >
           <Check size={14} />
-          <span>Accept</span>
+          <span>Accept Scale</span>
           <kbd className="ml-1 text-[10px] text-emerald-200 bg-emerald-700 px-1 rounded">↵</kbd>
         </button>
       </div>

@@ -47,14 +47,7 @@ export default function MXChat({ onClose }: MXChatProps) {
   const ppu = scale?.pixelsPerUnit ?? 1;
   const unit = scale?.unit ?? 'ft';
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: "Hi! I'm MeasureX AI. Ask me anything about your takeoff — areas, costs, or classifications.",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +126,6 @@ export default function MXChat({ onClose }: MXChatProps) {
     try {
       const context = buildContext();
       const historyForApi = newMessages
-        .filter((m) => m.id !== 'welcome')
         .map((m) => ({ role: m.role, content: m.text }));
 
       abortRef.current = new AbortController();
@@ -331,6 +323,30 @@ export default function MXChat({ onClose }: MXChatProps) {
           gap: 12,
         }}
       >
+        {messages.length === 0 && !isLoading && (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              padding: '24px 16px',
+            }}
+          >
+            <MessageSquare size={32} style={{ color: '#00d4ff', opacity: 0.8 }} />
+            <span style={{ fontWeight: 600, fontSize: 15, color: '#e0faff' }}>
+              Ask me about your takeoff.
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;How many windows on page 3?&rdquo;</span>
+              <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;Total linear footage of walls?&rdquo;</span>
+              <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;Compare floors 1 and 2?&rdquo;</span>
+            </div>
+          </div>
+        )}
+
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -425,7 +441,7 @@ export default function MXChat({ onClose }: MXChatProps) {
       </div>
 
       {/* Suggested questions */}
-      {showSuggestions && messages.length <= 1 && (
+      {showSuggestions && messages.length === 0 && (
         <div
           style={{
             padding: '0 12px 8px',
