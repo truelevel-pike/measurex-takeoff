@@ -51,7 +51,7 @@ export function calculatePolygonArea(
 export function calculateLinearLength(
   points: { x: number; y: number }[],
   scale: ScaleConfig,
-  closed = false,
+  closed = true,
 ): number | null {
   if (!points || points.length < 2) return 0;
   if (!scale.pixelsPerFoot) return null;

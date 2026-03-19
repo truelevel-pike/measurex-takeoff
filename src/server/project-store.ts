@@ -280,12 +280,15 @@ export async function updatePage(
   pageNum: number,
   patch: Partial<PageInfo>,
 ): Promise<PageInfo | null> {
+  const updateData: Record<string, unknown> = {};
+  if (patch.width !== undefined) updateData.width = patch.width;
+  if (patch.height !== undefined) updateData.height = patch.height;
+  if (patch.text !== undefined) updateData.pdf_url = patch.text;
+
+  if (Object.keys(updateData).length === 0) return null;
+
   if (isSupabaseMode()) {
     const sb = getClient();
-    const updateData: Record<string, unknown> = {};
-    if (patch.width !== undefined) updateData.width = patch.width;
-    if (patch.height !== undefined) updateData.height = patch.height;
-    if (patch.text !== undefined) updateData.pdf_url = patch.text;
 
     const { data, error } = await sb
       .from('mx_pages')
@@ -311,6 +314,41 @@ export async function updatePage(
   pages[idx] = { ...pages[idx], ...patch };
   await writeJson(filePath, pages);
   return pages[idx];
+}
+
+export async function deletePage(
+  projectId: string,
+  pageNumber: number,
+): Promise<boolean> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    // Clean up associated scales and polygons for this page
+    await sb.from('mx_scales').delete().eq('project_id', projectId).eq('page_number', pageNumber);
+    await sb.from('mx_polygons').delete().eq('project_id', projectId).eq('page_number', pageNumber);
+    const { data, error } = await sb
+      .from('mx_pages')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('page_number', pageNumber)
+      .select('page_number');
+    if (error) throw new Error(`deletePage: ${error.message}`);
+    return (data?.length ?? 0) > 0;
+  }
+
+  // File mode: remove the page and associated polygons
+  const pagesPath = path.join(projectDir(projectId), 'pages.json');
+  const pages = await readJson<PageInfo[]>(pagesPath, []);
+  const filtered = pages.filter((p) => p.pageNum !== pageNumber);
+  if (filtered.length === pages.length) return false;
+  await writeJson(pagesPath, filtered);
+
+  // Clean up polygons for this page
+  const polygonsPath = path.join(projectDir(projectId), 'polygons.json');
+  const polygons = await readJson<Polygon[]>(polygonsPath, []);
+  const filteredPolygons = polygons.filter((p) => p.pageNumber !== pageNumber);
+  await writeJson(polygonsPath, filteredPolygons);
+
+  return true;
 }
 
 // ── Classifications CRUD ───────────────────────────────────────────────
@@ -485,7 +523,7 @@ export async function createPolygon(
       isComplete: data.isComplete ?? true,
       label: data.label,
     };
-    recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: created });
+    await recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: created });
     return created;
   }
 
@@ -494,7 +532,7 @@ export async function createPolygon(
   const poly: Polygon = { id, ...data };
   list.push(poly);
   await writeJson(filePath, list);
-  recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: poly });
+  await recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: poly });
   return poly;
 }
 
@@ -562,7 +600,7 @@ export async function updatePolygon(
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
-    recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: updated });
+    await recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: updated });
     return updated;
   }
 
@@ -573,7 +611,7 @@ export async function updatePolygon(
   const beforeData = { ...list[idx] };
   list[idx] = { ...list[idx], ...patch };
   await writeJson(filePath, list);
-  recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData, afterData: list[idx] });
+  await recordHistory({ projectId, actionType: 'update', entityType: 'polygon', entityId: polygonId, beforeData, afterData: list[idx] });
   return list[idx];
 }
 
@@ -591,7 +629,7 @@ export async function deletePolygon(projectId: string, polygonId: string): Promi
     if (error) throw new Error(`deletePolygon: ${error.message}`);
     const deleted = (data?.length ?? 0) > 0;
     if (deleted) {
-      recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: null });
+      await recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: beforeRow, afterData: null });
     }
     return deleted;
   }
@@ -602,7 +640,7 @@ export async function deletePolygon(projectId: string, polygonId: string): Promi
   const filtered = list.filter((p) => p.id !== polygonId);
   if (filtered.length === list.length) return false;
   await writeJson(filePath, filtered);
-  recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: existing, afterData: null });
+  await recordHistory({ projectId, actionType: 'delete', entityType: 'polygon', entityId: polygonId, beforeData: existing, afterData: null });
   return true;
 }
 
