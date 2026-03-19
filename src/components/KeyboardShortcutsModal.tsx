@@ -24,6 +24,7 @@ const shortcuts: ShortcutEntry[] = [
   { keyCombo: 'Delete / Backspace', action: 'Delete selected polygon' },
   { keyCombo: 'Ctrl+Z', action: 'Undo' },
   { keyCombo: 'Ctrl+Shift+Z', action: 'Redo' },
+  { keyCombo: 'Ctrl+D', action: 'Duplicate last polygon' },
   { keyCombo: '?', action: 'Show this help' },
   { keyCombo: 'Page Up / Page Down', action: 'Navigate pages' },
   { keyCombo: '+ / -', action: 'Zoom in/out' },

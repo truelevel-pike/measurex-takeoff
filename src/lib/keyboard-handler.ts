@@ -47,6 +47,26 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
         return;
       }
 
+      // Ctrl+D — Duplicate last polygon with offset
+      if ((event.metaKey || event.ctrlKey) && lower === 'd') {
+        event.preventDefault();
+        const last = store.lastPolygon;
+        if (!last) return;
+        const offset = 20;
+        const newId = store.addPolygon({
+          points: last.points.map((pt) => ({ x: pt.x + offset, y: pt.y + offset })),
+          classificationId: last.classificationId,
+          pageNumber: last.pageNumber,
+          area: last.area,
+          linearFeet: last.linearFeet,
+          label: last.label,
+          isComplete: true,
+        });
+        store.setSelectedPolygon(newId);
+        store.setTool('select');
+        return;
+      }
+
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
         store.deleteSelected?.();
