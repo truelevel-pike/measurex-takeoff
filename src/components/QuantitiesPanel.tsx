@@ -197,11 +197,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [projectId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
+  const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('project') || localStorage.getItem('measurex_project_id');
-  });
+    setProjectId(params.get('project') || localStorage.getItem('measurex_project_id'));
+  }, []);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
