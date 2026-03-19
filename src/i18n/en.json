@@ -1,0 +1,23 @@
+{
+  "button.save": "Save",
+  "button.cancel": "Cancel",
+  "button.delete": "Delete",
+  "button.edit": "Edit",
+  "button.upload": "Upload",
+  "button.download": "Download",
+  "button.export": "Export",
+  "button.close": "Close",
+  "button.next": "Next",
+  "button.back": "Back",
+  "button.submit": "Submit",
+  "label.loading": "Loading",
+  "label.error": "Error",
+  "label.success": "Success",
+  "label.settings": "Settings",
+  "label.language": "Language",
+  "error.something_went_wrong": "Something went wrong",
+  "error.please_try_again": "Please try again",
+  "error.file_too_large": "File too large",
+  "error.invalid_format": "Invalid format",
+  "error.not_found": "Not found"
+}

@@ -71,6 +71,27 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const onPageChangeRef = useRef(onPageChange);
     useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
 
+    // Final cleanup guard for worker/doc resources on component unmount.
+    useEffect(() => {
+      return () => {
+        retryCancelRef.current?.();
+        retryCancelRef.current = null;
+        pendingRender.current = null;
+        try { renderTaskRef.current?.cancel?.(); } catch {}
+        renderTaskRef.current = null;
+        if (renderCompleteResolveRef.current) {
+          const resolve = renderCompleteResolveRef.current;
+          renderCompleteResolveRef.current = null;
+          resolve(null);
+        }
+        const doc = pdfDocRef.current;
+        pdfDocRef.current = null;
+        if (doc) {
+          void doc.destroy();
+        }
+      };
+    }, []);
+
     // Offline detection
     useEffect(() => {
       const goOffline = () => setIsOffline(true);

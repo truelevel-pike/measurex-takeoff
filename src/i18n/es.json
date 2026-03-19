@@ -1,0 +1,23 @@
+{
+  "button.save": "Guardar",
+  "button.cancel": "Cancelar",
+  "button.delete": "Eliminar",
+  "button.edit": "Editar",
+  "button.upload": "Subir",
+  "button.download": "Descargar",
+  "button.export": "Exportar",
+  "button.close": "Cerrar",
+  "button.next": "Siguiente",
+  "button.back": "Atrás",
+  "button.submit": "Enviar",
+  "label.loading": "Cargando",
+  "label.error": "Error",
+  "label.success": "Éxito",
+  "label.settings": "Configuración",
+  "label.language": "Idioma",
+  "error.something_went_wrong": "Algo salió mal",
+  "error.please_try_again": "Por favor, inténtalo de nuevo",
+  "error.file_too_large": "Archivo demasiado grande",
+  "error.invalid_format": "Formato no válido",
+  "error.not_found": "No encontrado"
+}

@@ -28,6 +28,7 @@ export function findNearestSnapPoint(
 ): SnapPoint | null {
   let best: SnapPoint | null = null;
   let bestDist = snapRadius;
+  const gridSize = options.gridSize > 0 ? options.gridSize : 20;
 
   // Check polygon-based snap points (vertices + midpoints)
   if (options.vertices || options.midpoints) {
@@ -62,12 +63,14 @@ export function findNearestSnapPoint(
   }
 
   // Check grid snap
-  if (options.grid && options.gridSize > 0) {
-    const snapped = snapToGrid(x, y, options.gridSize);
-    const d = Math.hypot(snapped.x - x, snapped.y - y);
-    if (d < bestDist) {
-      bestDist = d;
-      best = { x: snapped.x, y: snapped.y, type: 'grid' };
+  if (options.grid) {
+    const gridCandidates = getGridSnapPoints(x, y, gridSize, snapRadius);
+    for (const snapped of gridCandidates) {
+      const d = Math.hypot(snapped.x - x, snapped.y - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { x: snapped.x, y: snapped.y, type: 'grid' };
+      }
     }
   }
 
@@ -86,6 +89,31 @@ export function snapToGrid(
     x: Math.round(x / gridSize) * gridSize,
     y: Math.round(y / gridSize) * gridSize,
   };
+}
+
+/**
+ * Generate nearby grid intersections around the cursor.
+ */
+function getGridSnapPoints(
+  x: number,
+  y: number,
+  gridSize: number,
+  snapRadius: number,
+): Array<{ x: number; y: number }> {
+  const base = snapToGrid(x, y, gridSize);
+  const range = Math.max(1, Math.ceil(snapRadius / gridSize));
+  const points: Array<{ x: number; y: number }> = [];
+
+  for (let gx = -range; gx <= range; gx++) {
+    for (let gy = -range; gy <= range; gy++) {
+      points.push({
+        x: base.x + gx * gridSize,
+        y: base.y + gy * gridSize,
+      });
+    }
+  }
+
+  return points;
 }
 
 /**

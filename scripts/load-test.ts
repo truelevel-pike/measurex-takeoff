@@ -1,11 +1,24 @@
 /**
- * Load test for MeasureX takeoff workflow.
+ * MeasureX Load Test — Wave 13
  *
- * Run:
- *   npx ts-node scripts/load-test.ts --workers 10 --requests 5 --url http://localhost:3000
+ * Spawns 10 concurrent API clients. Each client:
+ *   1. Creates a project
+ *   2. Creates a classification
+ *   3. Creates 20 polygons
+ *   4. Gets quantities
+ *   5. Exports CSV (contractor report)
+ *
+ * Reports: requests/sec, avg latency, p99 latency, error rate
+ *
+ * Usage:
+ *   npm run load-test
+ *   npm run load-test -- --url http://localhost:3001
+ *   npm run load-test -- --workers 5
  */
 
 export {};
+
+const POLYGONS_PER_CLIENT = 20;
 
 type HttpMethod = "GET" | "POST" | "DELETE";
 
@@ -21,7 +34,6 @@ type RequestMetric = {
 type LoadConfig = {
   baseUrl: string;
   workers: number;
-  requestsPerWorker: number;
 };
 
 type ProjectCreateResponse = {
@@ -37,7 +49,6 @@ type ClassificationCreateResponse = {
 function parseArgs(argv: string[]): LoadConfig {
   let baseUrl = process.env.MEASUREX_URL || "http://localhost:3000";
   let workers = 10;
-  let requestsPerWorker = 5;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -45,34 +56,13 @@ function parseArgs(argv: string[]): LoadConfig {
     if (arg === "--url") {
       baseUrl = argv[i + 1] || baseUrl;
       i++;
-      continue;
-    }
-
-    if (arg.startsWith("--url=")) {
+    } else if (arg.startsWith("--url=")) {
       baseUrl = arg.slice("--url=".length);
-      continue;
-    }
-
-    if (arg === "--workers") {
+    } else if (arg === "--workers") {
       workers = Number(argv[i + 1] || workers);
       i++;
-      continue;
-    }
-
-    if (arg.startsWith("--workers=")) {
+    } else if (arg.startsWith("--workers=")) {
       workers = Number(arg.slice("--workers=".length));
-      continue;
-    }
-
-    if (arg === "--requests") {
-      requestsPerWorker = Number(argv[i + 1] || requestsPerWorker);
-      i++;
-      continue;
-    }
-
-    if (arg.startsWith("--requests=")) {
-      requestsPerWorker = Number(arg.slice("--requests=".length));
-      continue;
     }
   }
 
@@ -80,17 +70,17 @@ function parseArgs(argv: string[]): LoadConfig {
     throw new Error(`Invalid --workers value: ${workers}`);
   }
 
-  if (!Number.isInteger(requestsPerWorker) || requestsPerWorker <= 0) {
-    throw new Error(`Invalid --requests value: ${requestsPerWorker}`);
-  }
+  return { baseUrl: baseUrl.replace(/\/$/, ""), workers };
+}
 
-  return { baseUrl: baseUrl.replace(/\/$/, ""), workers, requestsPerWorker };
+function errorMessage(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return null;
-
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -101,8 +91,7 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 function percentile(sortedValues: number[], p: number): number {
   if (sortedValues.length === 0) return 0;
   const rank = Math.ceil((p / 100) * sortedValues.length) - 1;
-  const idx = Math.min(sortedValues.length - 1, Math.max(0, rank));
-  return sortedValues[idx];
+  return sortedValues[Math.min(sortedValues.length - 1, Math.max(0, rank))];
 }
 
 function formatMs(ms: number): string {
@@ -113,10 +102,7 @@ function formatPct(value: number): string {
   return `${value.toFixed(2)}%`;
 }
 
-function errorMessage(value: unknown): string {
-  if (value instanceof Error) return value.message;
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
+// ── Tracked Fetch ──────────────────────────────────────────────────────
 
 async function requestTracked(
   metrics: RequestMetric[],
@@ -126,7 +112,6 @@ async function requestTracked(
   body?: unknown,
 ): Promise<unknown> {
   const started = performance.now();
-  let recorded = false;
 
   try {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -137,214 +122,217 @@ async function requestTracked(
 
     const payload = await parseJsonSafe(res);
     const durationMs = performance.now() - started;
-    const ok = res.ok;
 
     metrics.push({
       endpoint: path,
       method,
       durationMs,
-      ok,
+      ok: res.ok,
       status: res.status,
-      error: ok ? undefined : `HTTP ${res.status}`,
+      error: res.ok ? undefined : `HTTP ${res.status}`,
     });
-    recorded = true;
 
-    if (!ok) {
+    if (!res.ok) {
       const details = typeof payload === "string" ? payload : JSON.stringify(payload);
       throw new Error(`${method} ${path} failed: HTTP ${res.status} ${details}`);
     }
 
     return payload;
   } catch (err: unknown) {
-    if (!recorded) {
-      const durationMs = performance.now() - started;
-      metrics.push({
-        endpoint: path,
-        method,
-        durationMs,
-        ok: false,
-        error: errorMessage(err),
-      });
-    }
-
+    const durationMs = performance.now() - started;
+    metrics.push({
+      endpoint: path,
+      method,
+      durationMs,
+      ok: false,
+      error: errorMessage(err),
+    });
     throw err;
   }
 }
 
-async function runWorkflowIteration(
+// ── Test Data Helpers ──────────────────────────────────────────────────
+
+function randomHexColor(): string {
+  const hex = Math.floor(Math.random() * 0xffffff)
+    .toString(16)
+    .padStart(6, "0");
+  return `#${hex}`;
+}
+
+function randomPoints(n: number): { x: number; y: number }[] {
+  const cx = Math.random() * 800 + 100;
+  const cy = Math.random() * 600 + 100;
+  const r = Math.random() * 50 + 20;
+  return Array.from({ length: n }, (_, i) => {
+    const angle = (2 * Math.PI * i) / n;
+    return {
+      x: Math.round((cx + r * Math.cos(angle)) * 100) / 100,
+      y: Math.round((cy + r * Math.sin(angle)) * 100) / 100,
+    };
+  });
+}
+
+// ── Client Workflow ────────────────────────────────────────────────────
+
+async function runClient(
   metrics: RequestMetric[],
   baseUrl: string,
-  workerId: number,
-  iteration: number,
+  clientId: number,
 ): Promise<void> {
   let projectId = "";
 
   try {
-    const projectData = (await requestTracked(metrics, baseUrl, "POST", "/api/projects", {
-      name: `Load Test Project W${workerId}-I${iteration}`,
+    // 1. Create project
+    const projData = (await requestTracked(metrics, baseUrl, "POST", "/api/projects", {
+      name: `Load Test Project ${clientId}`,
     })) as ProjectCreateResponse;
 
-    projectId = projectData.project?.id || projectData.id || "";
-    if (!projectId) {
-      throw new Error("Create project response did not include project id");
-    }
+    projectId = projData.project?.id || projData.id || "";
+    if (!projectId) throw new Error("Create project response missing project id");
 
-    const classificationData = (await requestTracked(
+    // 2. Create classification
+    const classData = (await requestTracked(
       metrics,
       baseUrl,
       "POST",
       `/api/projects/${projectId}/classifications`,
       {
-        name: `Area-${workerId}-${iteration}`,
+        name: `Area Class ${clientId}`,
         type: "area",
-        color: "#3b82f6",
+        color: randomHexColor(),
       },
     )) as ClassificationCreateResponse;
 
-    const classificationId = classificationData.classification?.id || classificationData.id || "";
-    if (!classificationId) {
-      throw new Error("Create classification response did not include classification id");
+    const classificationId = classData.classification?.id || classData.id || "";
+    if (!classificationId) throw new Error("Create classification response missing id");
+
+    // 3. Create 20 polygons
+    for (let i = 0; i < POLYGONS_PER_CLIENT; i++) {
+      await requestTracked(
+        metrics,
+        baseUrl,
+        "POST",
+        `/api/projects/${projectId}/polygons`,
+        {
+          classificationId,
+          points: randomPoints(4 + Math.floor(Math.random() * 4)),
+          pageNumber: 1,
+          label: `poly-${clientId}-${i}`,
+        },
+      );
     }
 
-    await requestTracked(metrics, baseUrl, "POST", `/api/projects/${projectId}/polygons`, {
-      classificationId,
-      pageNumber: 1,
-      points: [
-        { x: 100, y: 100 },
-        { x: 400, y: 100 },
-        { x: 400, y: 350 },
-        { x: 100, y: 350 },
-      ],
-    });
-
+    // 4. Get quantities
     await requestTracked(metrics, baseUrl, "GET", `/api/projects/${projectId}/quantities`);
+
+    // 5. Export CSV (contractor report)
+    await requestTracked(metrics, baseUrl, "GET", `/api/projects/${projectId}/export/contractor`);
   } finally {
+    // Cleanup: delete the project
     if (projectId) {
       try {
         await requestTracked(metrics, baseUrl, "DELETE", `/api/projects/${projectId}`);
       } catch {
-        // Keep test running even if cleanup fails; failure already tracked.
+        // Cleanup failure already tracked in metrics
       }
     }
   }
 }
 
-async function runWorker(
-  metrics: RequestMetric[],
-  config: LoadConfig,
-  workerId: number,
-): Promise<{ completed: number; failed: number }> {
-  let completed = 0;
-  let failed = 0;
+// ── Report ─────────────────────────────────────────────────────────────
 
-  for (let i = 1; i <= config.requestsPerWorker; i++) {
-    try {
-      await runWorkflowIteration(metrics, config.baseUrl, workerId, i);
-      completed++;
-    } catch {
-      failed++;
-    }
-  }
-
-  return { completed, failed };
-}
-
-function printSummary(
+function printReport(
   config: LoadConfig,
   metrics: RequestMetric[],
-  workflowResults: Array<{ completed: number; failed: number }>,
   elapsedMs: number,
 ): void {
-  const totalRequests = metrics.length;
-  const successfulRequests = metrics.filter((m) => m.ok).length;
-  const failedRequests = totalRequests - successfulRequests;
-  const successRate = totalRequests === 0 ? 0 : (successfulRequests / totalRequests) * 100;
+  const total = metrics.length;
+  const successes = metrics.filter((m) => m.ok).length;
+  const failures = total - successes;
+  const errorRate = total === 0 ? 0 : (failures / total) * 100;
   const latencies = metrics.map((m) => m.durationMs).sort((a, b) => a - b);
+  const avgLatency = latencies.reduce((s, d) => s + d, 0) / (latencies.length || 1);
+  const rps = total / (elapsedMs / 1000);
 
-  const totalWorkflows = config.workers * config.requestsPerWorker;
-  const workflowsCompleted = workflowResults.reduce((sum, r) => sum + r.completed, 0);
-  const workflowsFailed = workflowResults.reduce((sum, r) => sum + r.failed, 0);
-
-  const errors = new Map<string, number>();
-  for (const metric of metrics) {
-    if (!metric.ok) {
-      const key = metric.error || (metric.status ? `HTTP ${metric.status}` : "Unknown error");
-      errors.set(key, (errors.get(key) || 0) + 1);
-    }
-  }
-
-  const errorRows = [...errors.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([message, count]) => [message, String(count)]);
-
-  const summaryRows: Array<[string, string]> = [
+  const rows: Array<[string, string]> = [
     ["Base URL", config.baseUrl],
-    ["Workers", String(config.workers)],
-    ["Iterations per worker", String(config.requestsPerWorker)],
-    ["Total workflows", String(totalWorkflows)],
-    ["Workflows completed", String(workflowsCompleted)],
-    ["Workflows failed", String(workflowsFailed)],
-    ["Total requests", String(totalRequests)],
-    ["Successful requests", String(successfulRequests)],
-    ["Failed requests", String(failedRequests)],
-    ["Success rate", formatPct(successRate)],
+    ["Concurrent clients", String(config.workers)],
+    ["Polygons per client", String(POLYGONS_PER_CLIENT)],
+    ["Total requests", String(total)],
+    ["Successful", String(successes)],
+    ["Failed", String(failures)],
+    ["Requests/sec", rps.toFixed(1)],
+    ["Avg latency", formatMs(avgLatency)],
     ["p50 latency", formatMs(percentile(latencies, 50))],
     ["p95 latency", formatMs(percentile(latencies, 95))],
     ["p99 latency", formatMs(percentile(latencies, 99))],
-    ["Elapsed", formatMs(elapsedMs)],
+    ["Error rate", formatPct(errorRate)],
+    ["Wall time", formatMs(elapsedMs)],
   ];
 
-  const leftWidth = Math.max(...summaryRows.map(([k]) => k.length), "Metric".length);
-  const rightWidth = Math.max(...summaryRows.map(([, v]) => v.length), "Value".length);
+  const lw = Math.max(...rows.map(([k]) => k.length), "Metric".length);
+  const rw = Math.max(...rows.map(([, v]) => v.length), "Value".length);
+  const border = `+-${"-".repeat(lw)}-+-${"-".repeat(rw)}-+`;
 
-  const border = `+-${"-".repeat(leftWidth)}-+-${"-".repeat(rightWidth)}-+`;
-  console.log("\nLoad Test Summary");
+  console.log("\n══════════════════════════════════════════");
+  console.log("  MeasureX Load Test Results");
+  console.log("══════════════════════════════════════════");
   console.log(border);
-  console.log(`| ${"Metric".padEnd(leftWidth)} | ${"Value".padEnd(rightWidth)} |`);
+  console.log(`| ${"Metric".padEnd(lw)} | ${"Value".padEnd(rw)} |`);
   console.log(border);
-  for (const [metric, value] of summaryRows) {
-    console.log(`| ${metric.padEnd(leftWidth)} | ${value.padEnd(rightWidth)} |`);
+  for (const [metric, value] of rows) {
+    console.log(`| ${metric.padEnd(lw)} | ${value.padEnd(rw)} |`);
   }
   console.log(border);
 
-  if (errorRows.length > 0) {
-    const errLeftWidth = Math.max(...errorRows.map(([e]) => e.length), "Error".length);
-    const errRightWidth = Math.max(...errorRows.map(([, c]) => c.length), "Count".length);
-    const errBorder = `+-${"-".repeat(errLeftWidth)}-+-${"-".repeat(errRightWidth)}-+`;
-
-    console.log("\nTop Errors");
-    console.log(errBorder);
-    console.log(`| ${"Error".padEnd(errLeftWidth)} | ${"Count".padEnd(errRightWidth)} |`);
-    console.log(errBorder);
-    for (const [message, count] of errorRows) {
-      console.log(`| ${message.padEnd(errLeftWidth)} | ${count.padEnd(errRightWidth)} |`);
+  // Top errors breakdown
+  if (failures > 0) {
+    const errorMap = new Map<string, number>();
+    for (const m of metrics.filter((m) => !m.ok)) {
+      const key = m.error || `HTTP ${m.status}`;
+      errorMap.set(key, (errorMap.get(key) || 0) + 1);
     }
-    console.log(errBorder);
+    const errorRows = [...errorMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    console.log("\n  Top Errors:");
+    for (const [msg, count] of errorRows) {
+      console.log(`    [${count}x] ${msg}`);
+    }
   }
+  console.log("");
 }
+
+// ── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
   const config = parseArgs(process.argv.slice(2));
-  const metrics: RequestMetric[] = [];
 
   console.log(
-    `Starting MeasureX load test: workers=${config.workers}, requests=${config.requestsPerWorker}, url=${config.baseUrl}`,
+    `\nStarting load test: ${config.workers} clients × ${POLYGONS_PER_CLIENT} polygons against ${config.baseUrl}`,
   );
 
+  const metrics: RequestMetric[] = [];
   const started = performance.now();
-  const workflowResults = await Promise.all(
-    Array.from({ length: config.workers }, (_, i) => runWorker(metrics, config, i + 1)),
+
+  const results = await Promise.allSettled(
+    Array.from({ length: config.workers }, (_, i) => runClient(metrics, config.baseUrl, i)),
   );
+
   const elapsedMs = performance.now() - started;
 
-  printSummary(config, metrics, workflowResults, elapsedMs);
+  const fatalErrors = results.filter((r) => r.status === "rejected");
+  if (fatalErrors.length > 0) {
+    console.error(`\n${fatalErrors.length} client(s) threw fatal errors:`);
+    for (const f of fatalErrors) {
+      if (f.status === "rejected") console.error("  ", errorMessage(f.reason));
+    }
+  }
 
-  const failedRequests = metrics.filter((m) => !m.ok).length;
-  process.exit(failedRequests > 0 ? 1 : 0);
+  printReport(config, metrics, elapsedMs);
+  process.exit(fatalErrors.length > 0 ? 1 : 0);
 }
 
 main().catch((err: unknown) => {
-  console.error(`Load test failed to run: ${errorMessage(err)}`);
+  console.error(`Load test failed: ${errorMessage(err)}`);
   process.exit(1);
 });

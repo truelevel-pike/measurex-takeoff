@@ -44,6 +44,7 @@ type ClassTotals = {
   areaReal: number;
   lengthReal: number;
 };
+type ClassificationDeduction = { label: string; quantity: number };
 
 function isHexColor(value: string): boolean {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
@@ -180,6 +181,8 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [groupColor, setGroupColor] = useState('#3b82f6');
   const [groupSelectedClassificationIds, setGroupSelectedClassificationIds] = useState<Set<string>>(new Set());
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
 
   const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
 
@@ -339,9 +342,33 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return totals;
   }, [classifications, polygonsByClassification, ppu]);
 
+  useEffect(() => {
+    setDeductionsByClassification((prev) => {
+      const validIds = new Set(classifications.map((classification) => classification.id));
+      let changed = false;
+      const next: Record<string, ClassificationDeduction[]> = {};
+      for (const [classificationId, deductions] of Object.entries(prev)) {
+        if (validIds.has(classificationId)) {
+          next[classificationId] = deductions;
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [classifications]);
+
+  function getDeductions(classification: Classification): ClassificationDeduction[] {
+    return deductionsByClassification[classification.id] ?? classification.deductions ?? [];
+  }
+
+  function getDeductionTotal(classification: Classification): number {
+    return getDeductions(classification).reduce((sum, deduction) => sum + (Number(deduction.quantity) || 0), 0);
+  }
+
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
     if (classification.type === 'area') return formatArea(totals.areaReal, measurementSettings);
-    if (classification.type === 'linear') return formatLinear(totals.lengthReal, measurementSettings);
+    if (classification.type === 'linear') return formatLinear(totals.lengthReal - getDeductionTotal(classification), measurementSettings);
     return formatCount(totals.count);
   }
 
@@ -522,6 +549,44 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setEditError(null);
   }
 
+  function addDeduction(classification: Classification) {
+    setDeductionsByClassification((prev) => {
+      const current = prev[classification.id] ?? classification.deductions ?? [];
+      return {
+        ...prev,
+        [classification.id]: [...current, { label: '', quantity: 0 }],
+      };
+    });
+  }
+
+  function updateDeduction(
+    classification: Classification,
+    deductionIndex: number,
+    patch: Partial<ClassificationDeduction>
+  ) {
+    setDeductionsByClassification((prev) => {
+      const current = prev[classification.id] ?? classification.deductions ?? [];
+      const next = current.map((deduction, index) => (
+        index === deductionIndex ? { ...deduction, ...patch } : deduction
+      ));
+      return {
+        ...prev,
+        [classification.id]: next,
+      };
+    });
+  }
+
+  function deleteDeduction(classification: Classification, deductionIndex: number) {
+    setDeductionsByClassification((prev) => {
+      const current = prev[classification.id] ?? classification.deductions ?? [];
+      const next = current.filter((_, index) => index !== deductionIndex);
+      return {
+        ...prev,
+        [classification.id]: next,
+      };
+    });
+  }
+
   const handleSwitchToQuantities = useCallback(() => setActiveTab('quantities'), []);
   const handleSwitchToAssemblies = useCallback(() => setActiveTab('assemblies'), []);
   const handleSwitchToEstimate = useCallback(() => setActiveTab('estimate'), []);
@@ -568,8 +633,26 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       updateGroup(editingGroupId, {
         name: trimmedName,
         color: groupColor,
-        classificationIds: Array.from(groupSelectedClassificationIds),
       });
+      // Use moveClassificationToGroup so classifications are removed from other groups
+      groupSelectedClassificationIds.forEach((cid) => {
+        moveClassificationToGroup(cid, editingGroupId);
+      });
+      // Remove classifications that were unchecked
+      const currentGroup = groups.find((g) => g.id === editingGroupId);
+      if (currentGroup) {
+        currentGroup.classificationIds.forEach((cid) => {
+          if (!groupSelectedClassificationIds.has(cid)) {
+            // Remove from this group by updating without it
+            const updated = useStore.getState().groups.find((g) => g.id === editingGroupId);
+            if (updated) {
+              updateGroup(editingGroupId, {
+                classificationIds: updated.classificationIds.filter((id) => id !== cid),
+              });
+            }
+          }
+        });
+      }
     } else {
       addGroup(trimmedName, groupColor);
       // find the newly added group and assign classifications
@@ -880,6 +963,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         {filtered.map((classification, classIndex) => {
           const totals = totalsByClassification.get(classification.id) ?? { count: 0, areaReal: 0, lengthReal: 0 };
           const polygonsForClassification = polygonsByClassification.get(classification.id) ?? [];
+          const deductions = getDeductions(classification);
+          const deductionTotal = getDeductionTotal(classification);
+          const netLinear = totals.lengthReal - deductionTotal;
           const isExpanded = expanded.has(classification.id);
           const isSelected = selectedClassification === classification.id;
           const isEditing = editingId === classification.id;
@@ -1084,7 +1170,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   ) : (
                     <>
                       <div className="text-[10px] py-0.5 text-gray-300 font-mono">
-                        Total: {totals.count} items - {formatArea(totals.areaReal, measurementSettings)} - {formatLinear(totals.lengthReal, measurementSettings)}
+                        {classification.type === 'linear'
+                          ? `Total: ${totals.count} items - Raw ${formatLinear(totals.lengthReal, measurementSettings)} - Net ${formatLinear(netLinear, measurementSettings)}`
+                          : `Total: ${totals.count} items - ${formatArea(totals.areaReal, measurementSettings)} - ${formatLinear(totals.lengthReal, measurementSettings)}`}
                       </div>
                       {polygonsForClassification.map((polygon, index) => {
                         const areaReal = polygon.area / (ppu * ppu);
@@ -1101,6 +1189,59 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                           </div>
                         );
                       })}
+                      {classification.type === 'linear' && (
+                        <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-[10px] text-gray-300 font-mono uppercase">Deductions</span>
+                            <button
+                              type="button"
+                              onClick={() => addDeduction(classification)}
+                              className="text-[10px] text-[#00d4ff] hover:text-[#9eeeff]"
+                            >
+                              +Add Deduction
+                            </button>
+                          </div>
+                          {deductions.length === 0 ? (
+                            <div className="text-[10px] text-gray-500">No deductions added.</div>
+                          ) : (
+                            <div className="space-y-1">
+                              {deductions.map((deduction, deductionIndex) => (
+                                <div key={`${classification.id}-deduction-${deductionIndex}`} className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={deduction.label}
+                                    onChange={(event) => updateDeduction(classification, deductionIndex, { label: event.target.value })}
+                                    placeholder="Door 3ft"
+                                    className="flex-1 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                                    aria-label="Deduction label"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={deduction.quantity}
+                                    onChange={(event) => {
+                                      const parsed = Number.parseFloat(event.target.value);
+                                      updateDeduction(classification, deductionIndex, { quantity: Number.isFinite(parsed) ? parsed : 0 });
+                                    }}
+                                    className="w-20 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                                    aria-label="Deduction quantity"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteDeduction(classification, deductionIndex)}
+                                    className="w-5 h-5 rounded border border-[#00d4ff]/20 text-[11px] text-gray-300 hover:text-white"
+                                    aria-label="Delete deduction"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
+                            Net LF = {formatLinear(totals.lengthReal, measurementSettings)} - {formatLinear(deductionTotal, measurementSettings)} = {formatLinear(netLinear, measurementSettings)}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -1138,12 +1279,21 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               if (!totals) return null;
               return (
                 <div key={group.id} className="rounded border border-[#00d4ff]/15 bg-[#0e1016] overflow-hidden">
-                  <div className="flex items-center gap-2 px-2 py-1.5">
+                  <div
+                    className="flex items-center gap-2 px-2 py-1.5 cursor-pointer select-none"
+                    onClick={() => setCollapsedGroups((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(group.id)) next.delete(group.id);
+                      else next.add(group.id);
+                      return next;
+                    })}
+                  >
+                    {collapsedGroups.has(group.id) ? <ChevronRight size={12} className="text-gray-400 shrink-0" /> : <ChevronDown size={12} className="text-gray-400 shrink-0" />}
                     <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: group.color }} />
                     <span className="flex-1 text-[12px] text-white font-medium truncate">{group.name}</span>
                     <button
                       type="button"
-                      onClick={() => handleOpenGroupModal(group.id)}
+                      onClick={(e) => { e.stopPropagation(); handleOpenGroupModal(group.id); }}
                       className="text-gray-400 hover:text-[#00d4ff] transition-colors"
                       aria-label={`Edit group ${group.name}`}
                     >
@@ -1151,13 +1301,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteGroup(group.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }}
                       className="text-gray-400 hover:text-red-400 transition-colors"
                       aria-label={`Delete group ${group.name}`}
                     >
                       <Trash2 size={11} />
                     </button>
                   </div>
+                  {!collapsedGroups.has(group.id) && (
                   <div className="border-t border-[#00d4ff]/10 px-2 py-1">
                     {group.classificationIds.map((cid) => {
                       const cls = classifications.find((c) => c.id === cid);
@@ -1177,6 +1328,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                       <span className="font-mono">{formatArea(totals.combined.areaReal, measurementSettings)}</span>
                     </div>
                   </div>
+                  )}
                 </div>
               );
             })}

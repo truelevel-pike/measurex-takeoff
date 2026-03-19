@@ -35,6 +35,9 @@ import AutoNameTool from '@/components/AutoNameTool';
 import RecentProjectsSection, { saveRecentProject } from '@/components/RecentProjectsSection';
 import DuplicateProjectModal from '@/components/DuplicateProjectModal';
 import RecentProjects from '@/components/RecentProjects';
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
+import TagInput from '@/components/TagInput';
+import { getActiveWorkspace } from '@/lib/workspace';
 
 /* ── Project thumbnail helpers ─────────────────────────────────── */
 const THUMB_PALETTE = [
@@ -71,6 +74,7 @@ interface ProjectRow {
   pageCount?: number;
   state?: ProjectState;
   thumbnail?: string;
+  tags?: string[];
 }
 
 /** Format a project date — handles camelCase and snake_case API fields */
@@ -110,6 +114,18 @@ function loadFolders(): FolderItem[] {
 function saveFolders(f: FolderItem[]) {
   localStorage.setItem('mx-folders', JSON.stringify(f));
 }
+// Tags stored per-project in localStorage
+function loadProjectTags(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('mx-project-tags');
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+function saveProjectTags(tags: Record<string, string[]>) {
+  localStorage.setItem('mx-project-tags', JSON.stringify(tags));
+}
+
 function loadOnboardingDismissed(): boolean {
   if (typeof window === 'undefined') return false;
   return localStorage.getItem('mx-onboarding-complete') === 'true';
@@ -145,6 +161,8 @@ export default function ProjectsPage() {
   const [editFolderName, setEditFolderName] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<{ id: string; name: string } | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [newProjectTags, setNewProjectTags] = useState<string[]>([]);
 
   // Load persisted local state
   useEffect(() => {
@@ -159,7 +177,12 @@ export default function ProjectsPage() {
       const res = await fetch('/api/projects');
       if (!res.ok) throw new Error(`Failed to load projects (${res.status})`);
       const data = await res.json();
-      setProjects(data.projects || []);
+      const projectTags = loadProjectTags();
+      const enriched = (data.projects || []).map((p: ProjectRow) => ({
+        ...p,
+        tags: projectTags[p.id] || [],
+      }));
+      setProjects(enriched);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load projects';
       setError(message);
@@ -204,8 +227,15 @@ export default function ProjectsPage() {
       });
       if (!res.ok) throw new Error(`Create failed (${res.status})`);
       const data = await res.json();
+      // Save tags for the new project
+      if (newProjectTags.length > 0) {
+        const allProjectTags = loadProjectTags();
+        allProjectTags[data.project.id] = newProjectTags;
+        saveProjectTags(allProjectTags);
+      }
       setShowCreate(false);
       setNewName('');
+      setNewProjectTags([]);
       handleOpen(data.project.id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Create failed';
@@ -299,10 +329,19 @@ export default function ProjectsPage() {
       const folder = folders.find(f => f.id === activeSection);
       if (folder) list = list.filter(p => folder.projectIds.includes(p.id));
     }
+    // Workspace filter — only show projects in the active workspace (empty = show all)
+    const ws = getActiveWorkspace();
+    if (ws.projectIds.length > 0) {
+      list = list.filter(p => ws.projectIds.includes(p.id));
+    }
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q));
+    }
+    // Tag filter (OR logic)
+    if (selectedTags.length > 0) {
+      list = list.filter(p => p.tags?.some(t => selectedTags.includes(t)));
     }
 
     const sorted = [...list];
@@ -323,7 +362,7 @@ export default function ProjectsPage() {
     }
 
     return sorted;
-  }, [projects, activeSection, starredIds, searchQuery, folders, sortBy]);
+  }, [projects, activeSection, starredIds, searchQuery, folders, sortBy, selectedTags]);
 
   // Onboarding steps
   const onboardingSteps = useMemo(() => [
@@ -334,6 +373,21 @@ export default function ProjectsPage() {
     { label: 'Export quantities', done: false, hint: '' },
   ], [projects]);
   const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
+
+  // Collect all unique tags from all projects
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const p of projects) {
+      if (p.tags) p.tags.forEach(t => tags.add(t));
+    }
+    return [...tags].sort();
+  }, [projects]);
+
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  }, []);
 
   const dismissOnboarding = () => {
     setShowOnboarding(false);
@@ -364,6 +418,9 @@ export default function ProjectsPage() {
           <FileSpreadsheet size={22} className="text-blue-400 shrink-0" aria-hidden />
           <span className="text-lg font-bold">MeasureX</span>
           <span className="text-zinc-400 text-sm ml-1 hidden sm:inline">Projects</span>
+          <div className="hidden sm:block ml-2">
+            <WorkspaceSwitcher />
+          </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
           {/* Search in header */}
@@ -589,6 +646,34 @@ export default function ProjectsPage() {
 
           <RecentProjects />
 
+          {/* Tag filter */}
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-4">
+              <span className="text-xs text-zinc-400 mr-1">Tags:</span>
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    selectedTags.includes(tag)
+                      ? 'bg-blue-600/30 text-blue-300 border-blue-500/50'
+                      : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-zinc-200'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+              {selectedTags.length > 0 && (
+                <button
+                  onClick={() => setSelectedTags([])}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 ml-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Section header + view toggle */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">{sectionLabel}</h2>
@@ -610,26 +695,32 @@ export default function ProjectsPage() {
           {showCreate && (
             <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-5 mb-5">
               <h3 className="font-semibold text-sm mb-3">Create New Project</h3>
-              <div className="flex gap-3">
-                <input
-                  aria-label="Project name"
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  placeholder="Project name (e.g., 123 Main St Addition)"
-                  className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-4 py-2 text-sm text-white placeholder-zinc-400 outline-none focus:border-blue-500"
-                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                  autoFocus
-                />
-                <button aria-label="Create project" onClick={handleCreate}
-                  disabled={creating || !newName.trim()}
-                  className="bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:text-zinc-400 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors">
-                  {creating ? 'Creating...' : 'Create'}
-                </button>
-                <button aria-label="Cancel create"
-                  onClick={() => { setShowCreate(false); setNewName(''); }}
-                  className="text-zinc-400 hover:text-white px-3 text-sm">
-                  Cancel
-                </button>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <input
+                    aria-label="Project name"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    placeholder="Project name (e.g., 123 Main St Addition)"
+                    className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-4 py-2 text-sm text-white placeholder-zinc-400 outline-none focus:border-blue-500"
+                    onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                    autoFocus
+                  />
+                  <button aria-label="Create project" onClick={handleCreate}
+                    disabled={creating || !newName.trim()}
+                    className="bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:text-zinc-400 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors">
+                    {creating ? 'Creating...' : 'Create'}
+                  </button>
+                  <button aria-label="Cancel create"
+                    onClick={() => { setShowCreate(false); setNewName(''); setNewProjectTags([]); }}
+                    className="text-zinc-400 hover:text-white px-3 text-sm">
+                    Cancel
+                  </button>
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">Tags</label>
+                  <TagInput value={newProjectTags} onChange={setNewProjectTags} allTags={allTags} />
+                </div>
               </div>
             </div>
           )}
@@ -730,6 +821,15 @@ export default function ProjectsPage() {
                         {polyCount > 0 && <span>{polyCount} drawings</span>}
                         {clsCount > 0 && <span>{clsCount} cls</span>}
                       </div>
+                      {p.tags && p.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {p.tags.map(tag => (
+                            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/20">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

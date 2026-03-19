@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '@/lib/store';
@@ -29,63 +29,131 @@ function PageThumbnailSidebar({
   onPageSelect,
   pdfDoc,
 }: PageThumbnailSidebarProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
   const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
+  const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
   const [collapsed, setCollapsed] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
+  const renderQueueRef = useRef<number[]>([]);
+  const queuedPagesRef = useRef<Set<number>>(new Set());
+  const requestedPagesRef = useRef<Set<number>>(new Set());
+  const activeRenderCountRef = useRef(0);
+  const renderSessionRef = useRef(0);
 
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
   const sheetNames = useStore((s) => s.sheetNames);
 
-  // Render thumbnails from PDF document at low DPI — parallel with progressive reveal
+  const processThumbnailQueue = useCallback(() => {
+    const activeSession = renderSessionRef.current;
+    if (!pdfDoc) return;
+    const thumbScale = 0.2;
+    const maxConcurrentRenders = 2;
+
+    while (activeRenderCountRef.current < maxConcurrentRenders) {
+      const pageNumber = renderQueueRef.current.shift();
+      if (!pageNumber) break;
+      queuedPagesRef.current.delete(pageNumber);
+      activeRenderCountRef.current += 1;
+
+      void (async () => {
+        try {
+          const page = await pdfDoc.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: thumbScale });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          await (page as any).render({ canvasContext: ctx, viewport }).promise;
+          if (renderSessionRef.current !== activeSession) return;
+          setThumbnails((prev) => {
+            if (prev[pageNumber - 1]) return prev;
+            const next = [...prev];
+            next[pageNumber - 1] = canvas.toDataURL('image/png');
+            return next;
+          });
+        } catch {
+          if (renderSessionRef.current !== activeSession) return;
+          setFailedPages((prev) => new Set(prev).add(pageNumber));
+        } finally {
+          activeRenderCountRef.current = Math.max(0, activeRenderCountRef.current - 1);
+          if (renderSessionRef.current === activeSession) {
+            processThumbnailQueue();
+          }
+        }
+      })();
+    }
+  }, [pdfDoc]);
+
+  // Reset thumbnail generation state when the loaded PDF changes.
   useEffect(() => {
+    renderSessionRef.current += 1;
+    renderQueueRef.current = [];
+    queuedPagesRef.current.clear();
+    requestedPagesRef.current.clear();
+    activeRenderCountRef.current = 0;
+
     if (!pdfDoc || totalPages <= 0) {
       setThumbnails([]);
       setFailedPages(new Set());
+      setVisiblePages(new Set());
       return;
     }
 
-    let cancelled = false;
-    const thumbScale = 0.2;
-
     setThumbnails(Array(totalPages).fill(null));
     setFailedPages(new Set());
+    setVisiblePages(new Set([currentPage]));
+  }, [pdfDoc, totalPages, currentPage]);
 
-    const renderPage = async (pageNumber: number): Promise<string | null> => {
-      if (cancelled) return null;
-      try {
-        const page = await pdfDoc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: thumbScale });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return null;
-        await (page as any).render({ canvasContext: ctx, viewport }).promise;
-        return canvas.toDataURL('image/png');
-      } catch {
-        if (!cancelled) {
-          setFailedPages((prev) => new Set(prev).add(pageNumber));
-        }
-        return null;
-      }
-    };
+  // Observe page buttons and mark pages that are within ~2 viewport heights.
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!root || collapsed) return;
 
-    Array.from({ length: totalPages }, (_, i) => {
-      const pageNumber = i + 1;
-      renderPage(pageNumber).then((dataUrl) => {
-        if (cancelled) return;
-        setThumbnails((prev) => {
-          const next = [...prev];
-          next[i] = dataUrl;
+    const marginPx = Math.max(root.clientHeight * 2, 200);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setVisiblePages((prev) => {
+          const next = new Set(prev);
+          for (const entry of entries) {
+            const attr = (entry.target as HTMLElement).dataset.pageNumber;
+            const pageNumber = attr ? Number(attr) : NaN;
+            if (!Number.isFinite(pageNumber)) continue;
+            if (entry.isIntersecting) next.add(pageNumber);
+            else next.delete(pageNumber);
+          }
+          next.add(currentPage);
           return next;
         });
-      });
-    });
+      },
+      {
+        root,
+        rootMargin: `${marginPx}px 0px ${marginPx}px 0px`,
+        threshold: 0,
+      }
+    );
 
-    return () => { cancelled = true; };
-  }, [pdfDoc, totalPages]);
+    root.querySelectorAll<HTMLElement>('[data-page-number]').forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [collapsed, drawingSets, totalPages, currentPage]);
+
+  // Queue only near-viewport pages and render thumbnails with max concurrency 2.
+  useEffect(() => {
+    if (!pdfDoc || totalPages <= 0) return;
+
+    for (const pageNumber of visiblePages) {
+      if (pageNumber < 1 || pageNumber > totalPages) continue;
+      if (requestedPagesRef.current.has(pageNumber)) continue;
+      requestedPagesRef.current.add(pageNumber);
+      if (queuedPagesRef.current.has(pageNumber)) continue;
+      queuedPagesRef.current.add(pageNumber);
+      renderQueueRef.current.push(pageNumber);
+    }
+
+    processThumbnailQueue();
+  }, [visiblePages, pdfDoc, totalPages, processThumbnailQueue]);
 
   // Group pages by drawing set
   const groupedPages = useMemo(() => {
@@ -114,7 +182,7 @@ function PageThumbnailSidebar({
     const thumb = thumbnails[page - 1];
 
     return (
-      <div key={page} className="relative group/page">
+      <div key={page} className="relative group/page" data-page-number={page}>
         <button
           type="button"
           onClick={() => onPageSelect(page)}
@@ -196,6 +264,7 @@ function PageThumbnailSidebar({
 
   return (
     <div
+      ref={scrollContainerRef}
       className={`hidden md:flex flex-col shrink-0 bg-[rgba(18,18,26,0.8)] border-r border-[#00d4ff]/20 overflow-y-auto ${
         collapsed ? 'w-6' : 'w-20'
       }`}

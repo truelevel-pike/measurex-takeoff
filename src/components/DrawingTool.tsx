@@ -8,7 +8,7 @@ import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
 
 const SNAP_SCREEN_PX = 15;
-const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: false, gridSize: 0 } as const;
+const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: true, gridSize: 20 } as const;
 
 function openPathDistance(pts: Point[], ppu: number): number {
   let total = 0;
@@ -251,7 +251,7 @@ export default function DrawingTool() {
         ))}
         {/* Snap indicator — yellow ring when cursor is snapped */}
         {snapIndicator && cursor && (
-          <circle cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#fbbf24" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#fbbf24" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         )}
         {/* Crosshair cursor indicator */}
         {cursor && (

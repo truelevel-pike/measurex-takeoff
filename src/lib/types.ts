@@ -19,6 +19,7 @@ export interface Classification {
   color: string; // hex color
   type: 'area' | 'linear' | 'count';
   visible: boolean;
+  deductions?: Array<{ label: string; quantity: number }>;
   formula?: string;
   formulaUnit?: string;
   formulaSavedToLibrary?: boolean;

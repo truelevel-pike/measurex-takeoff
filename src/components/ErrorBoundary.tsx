@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { trackError } from "@/lib/error-tracker";
+import { captureError } from "@/lib/error-tracker";
 
 interface Props {
   children: React.ReactNode;
@@ -28,7 +28,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       boundaryName: this.props.name ?? "unknown",
     };
 
-    trackError(error, context);
+    captureError(error, context);
 
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
       const payload = JSON.stringify({

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import ReTogal from './ReTogal';
 import { useToast } from './Toast';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 interface TopNavBarProps {
   sheetName?: string;
@@ -168,6 +169,9 @@ export default function TopNavBar({
           <div className="hidden md:flex items-baseline gap-2 select-none" aria-label="MeasureX Takeoff Engine">
             <span className="font-mono tracking-wider text-white text-sm">MEASUREX</span>
             <span className="font-mono tracking-wider text-[#00d4ff] text-[10px]">TAKEOFF ENGINE</span>
+          </div>
+          <div className="hidden md:block">
+            <WorkspaceSwitcher />
           </div>
 
           {!isMobile && onSave && (

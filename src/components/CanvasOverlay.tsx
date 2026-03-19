@@ -36,6 +36,27 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function getPolygonColor(
+  polygon: { color?: string },
+  classificationColor?: string
+): string {
+  const polygonColor = polygon.color?.trim();
+  if (polygonColor) return polygonColor;
+  return classificationColor?.trim() || '#93c5fd';
+}
+
+function getPolygonFillOpacity(
+  polygon: { fillOpacity?: number },
+  isSelected: boolean,
+  isHighlighted: boolean
+): number {
+  if (isSelected) return 0.5;
+  if (isHighlighted) return 0.45;
+  const opacity = polygon.fillOpacity;
+  if (typeof opacity !== 'number' || opacity <= 0) return 0.3;
+  return opacity;
+}
+
 function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedPolygonId }: CanvasOverlayProps = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -389,20 +410,22 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         {polygons.map((poly) => {
           const cls = classificationById.get(poly.classificationId);
           if (cls && !cls.visible) return null;
-          const color = cls?.color || '#93c5fd';
           const isSelected = selectedPolygons.includes(poly.id) || selectedPolygon === poly.id;
           const isHighlighted = highlightedPolygonId === poly.id;
           const isDraggingThis = dragging?.polygonId === poly.id;
           const displayPoints = isDraggingThis && dragPoints ? dragPoints : poly.points;
           const pointsStr = displayPoints.map((p: Point) => `${p.x},${p.y}`).join(' ');
+          const polyWithDisplay = poly as typeof poly & { color?: string; fillOpacity?: number };
+          const color = getPolygonColor(polyWithDisplay, cls?.color);
+          const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted);
 
           return (
             <g key={poly.id}>
               <polygon
                 points={pointsStr}
-                fill={hexToRgba(color, isHighlighted ? 0.45 : 0.3)}
-                stroke={isHighlighted ? '#fde047' : (isSelected ? '#00ff88' : color)}
-                strokeWidth={isHighlighted ? 4 : (isSelected ? 3 : 1.5)}
+                fill={hexToRgba(color, fillOpacity)}
+                stroke={color}
+                strokeWidth={1.5}
                 vectorEffect="non-scaling-stroke"
                 style={{
                   cursor: currentTool === 'select' ? 'pointer' : 'default',
@@ -430,6 +453,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   opacity={0.75}
                   vectorEffect="non-scaling-stroke"
                   pointerEvents="none"
+                  data-polygon-id={poly.id}
                 />
               )}
               {/* Corner handles when selected */}
@@ -453,11 +477,13 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               {/* Polygon label: measurement annotation (area/length/count) */}
               {(() => {
                 const pts = displayPoints;
-                if (pts.length < 3) return null;
+                const clsType = cls?.type ?? 'area';
+                // Count markers have 1 point, linear can have 2 — allow labels for those
+                const minPts = clsType === 'count' ? 1 : clsType === 'linear' ? 2 : 3;
+                if (pts.length < minPts) return null;
                 const centX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
                 const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
                 if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
-                const clsType = cls?.type ?? 'area';
                 const ppu = scale?.pixelsPerUnit || 1;
                 // For count: show number of polygons in this classification on this page
                 const countForClass = clsType === 'count'

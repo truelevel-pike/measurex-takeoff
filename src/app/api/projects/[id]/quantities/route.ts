@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getScale, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { withCache } from '@/lib/with-cache';
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -49,11 +50,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       };
     });
 
-    return NextResponse.json({ quantities, scale: scale || null }, {
-      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=30' },
-    });
+    return NextResponse.json({ quantities, scale: scale || null });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
-}
+});
 

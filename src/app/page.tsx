@@ -516,7 +516,23 @@ function PageInner() {
       const isEditable = tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement as HTMLElement)?.isContentEditable;
       if (isEditable) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        const lastPoly = useStore.getState().lastPolygon;
+        if (lastPoly) {
+          const offset = 20;
+          useStore.getState().addPolygon({
+            points: lastPoly.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
+            classificationId: lastPoly.classificationId,
+            pageNumber: lastPoly.pageNumber,
+            area: lastPoly.area,
+            linearFeet: lastPoly.linearFeet,
+            isComplete: true,
+            label: lastPoly.label,
+          });
+          addToast('Polygon duplicated', 'info');
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {

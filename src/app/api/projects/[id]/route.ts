@@ -4,6 +4,7 @@ import type { Classification, Polygon } from '@/lib/types';
 import type { PageInfo } from '@/server/project-store';
 import { ProjectIdSchema, ProjectPutSchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
+import { withCache } from '@/lib/with-cache';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -58,7 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withCache({ noStore: true }, async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -97,9 +98,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     console.error("[project route]", err);
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
-}
+});
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withCache({ noStore: true }, async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -115,9 +116,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const DELETE = withCache({ noStore: true }, async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -129,4 +130,4 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     console.error("[project route]", err);
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
-}
+});

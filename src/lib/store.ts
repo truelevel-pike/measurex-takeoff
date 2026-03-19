@@ -172,6 +172,9 @@ export interface Store extends ProjectState {
   // Focus polygon (for "find on canvas")
   focusedPolygonId: string | null;
   focusPolygon: (id: string | null) => void;
+
+  // Last polygon added (for Ctrl+D duplicate) — NOT persisted
+  lastPolygon: Polygon | null;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -307,7 +310,7 @@ export const useStore = create<Store>()(
       label,
     };
     const before = snapshot(s);
-    set({ polygons: [...s.polygons, polygon], undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ polygons: [...s.polygons, polygon], lastPolygon: polygon, undoStack: [...s.undoStack, before], redoStack: [] });
     return id;
   },
 
@@ -726,6 +729,9 @@ export const useStore = create<Store>()(
     selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
   })),
   clearSelectedPolygons: () => set({ selectedPolygons: [], selectedPolygon: null, selectedPolygonId: null }),
+
+  // ─── Last Polygon (for Ctrl+D duplicate) ───
+  lastPolygon: null,
 
   // ─── Focus Polygon ───
   focusedPolygonId: null,

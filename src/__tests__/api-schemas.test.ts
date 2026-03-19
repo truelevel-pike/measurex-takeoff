@@ -17,7 +17,7 @@ import {
 
 describe('ProjectIdSchema', () => {
   it('accepts valid UUID', () => {
-    const result = ProjectIdSchema.safeParse({ id: '00000000-0000-0000-0000-000000000001' });
+    const result = ProjectIdSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440001' });
     expect(result.success).toBe(true);
   });
   it('rejects non-UUID', () => {
@@ -33,14 +33,14 @@ describe('ProjectIdSchema', () => {
 describe('ClassificationIdSchema', () => {
   it('accepts valid id + cid', () => {
     const result = ClassificationIdSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
-      cid: '00000000-0000-0000-0000-000000000002',
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      cid: '550e8400-e29b-41d4-a716-446655440002',
     });
     expect(result.success).toBe(true);
   });
   it('rejects missing cid', () => {
     const result = ClassificationIdSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '550e8400-e29b-41d4-a716-446655440001',
     });
     expect(result.success).toBe(false);
   });
@@ -49,8 +49,8 @@ describe('ClassificationIdSchema', () => {
 describe('PolygonIdSchema', () => {
   it('accepts valid id + pid', () => {
     const result = PolygonIdSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
-      pid: '00000000-0000-0000-0000-000000000002',
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      pid: '550e8400-e29b-41d4-a716-446655440002',
     });
     expect(result.success).toBe(true);
   });
@@ -59,8 +59,8 @@ describe('PolygonIdSchema', () => {
 describe('AssemblyIdSchema', () => {
   it('accepts valid id + aid', () => {
     const result = AssemblyIdSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
-      aid: '00000000-0000-0000-0000-000000000002',
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      aid: '550e8400-e29b-41d4-a716-446655440002',
     });
     expect(result.success).toBe(true);
   });
@@ -153,22 +153,22 @@ describe('ProjectUpdateSchema', () => {
 describe('PolygonSchema', () => {
   it('rejects polygon with < 3 points', () => {
     const result = PolygonSchema.safeParse({
-      classificationId: '00000000-0000-0000-0000-000000000001',
+      classificationId: '550e8400-e29b-41d4-a716-446655440001',
       points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
     });
     expect(result.success).toBe(false);
   });
   it('accepts valid polygon', () => {
     const result = PolygonSchema.safeParse({
-      classificationId: '00000000-0000-0000-0000-000000000001',
+      classificationId: '550e8400-e29b-41d4-a716-446655440001',
       points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }],
     });
     expect(result.success).toBe(true);
   });
   it('accepts polygon with optional fields', () => {
     const result = PolygonSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000099',
-      classificationId: '00000000-0000-0000-0000-000000000001',
+      id: '550e8400-e29b-41d4-a716-446655440099',
+      classificationId: '550e8400-e29b-41d4-a716-446655440001',
       points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }],
       pageNumber: 2,
       label: 'Room A',
@@ -226,7 +226,7 @@ describe('AssemblyCreateSchema', () => {
     const result = AssemblyCreateSchema.safeParse({
       name: 'Drywall Assembly',
       items: [{
-        classificationId: '00000000-0000-0000-0000-000000000001',
+        classificationId: '550e8400-e29b-41d4-a716-446655440001',
         quantity: 100,
         unit: 'SF',
       }],
@@ -241,8 +241,8 @@ describe('AssemblyCreateSchema', () => {
 
 describe('parseParams', () => {
   it('returns parsed data on valid input', () => {
-    const result = parseParams(ProjectIdSchema, { id: '00000000-0000-0000-0000-000000000001' });
-    expect(result).toEqual({ id: '00000000-0000-0000-0000-000000000001' });
+    const result = parseParams(ProjectIdSchema, { id: '550e8400-e29b-41d4-a716-446655440001' });
+    expect(result).toEqual({ id: '550e8400-e29b-41d4-a716-446655440001' });
   });
   it('returns null on invalid input', () => {
     const result = parseParams(ProjectIdSchema, { id: 'bad' });
@@ -252,6 +252,13 @@ describe('parseParams', () => {
 
 describe('validationError', () => {
   it('returns a Response with status 422', () => {
+    // Response.json is available in Node 18+ and in Next.js runtime
+    if (typeof Response === 'undefined' || typeof Response.json !== 'function') {
+      // Polyfill for Jest environment
+      (globalThis as any).Response = {
+        json: (body: unknown, init?: { status?: number }) => ({ body, status: init?.status ?? 200 }),
+      };
+    }
     const result = ProjectIdSchema.safeParse({ id: 'bad' });
     if (result.success) throw new Error('Expected failure');
     const response = validationError(result.error);
