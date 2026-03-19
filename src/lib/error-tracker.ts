@@ -1,57 +1,57 @@
-const STORAGE_KEY = "mx_errors";
+/**
+ * Lightweight error tracker with a circular buffer (last 50 errors).
+ * Wires to window.onerror / window.onunhandledrejection on the client.
+ */
+
 const MAX_ERRORS = 50;
 
-export interface TrackedErrorEntry {
+export interface ErrorEntry {
   timestamp: string;
   message: string;
   stack?: string;
-  context?: Record<string, unknown>;
-  userAgent: string;
-  url: string;
+  context: Record<string, unknown>;
 }
 
-function readStoredErrors(): TrackedErrorEntry[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
+const buffer: ErrorEntry[] = [];
 
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed as TrackedErrorEntry[];
-  } catch {
-    return [];
-  }
-}
-
-export function trackError(error: Error, context?: Record<string, unknown>): void {
-  const entry: TrackedErrorEntry = {
+/**
+ * Record an error into the circular buffer.
+ */
+export function captureError(
+  error: Error | unknown,
+  context: Record<string, unknown> = {},
+): void {
+  const entry: ErrorEntry = {
     timestamp: new Date().toISOString(),
-    message: error.message,
-    stack: error.stack,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
     context,
-    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-    url: typeof window !== "undefined" ? window.location.href : "unknown",
   };
 
-  if (typeof window !== "undefined") {
-    try {
-      const existing = readStoredErrors();
-      existing.push(entry);
-      const trimmed = existing.slice(-MAX_ERRORS);
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    } catch {
-      // Ignore storage failures and still emit to console for visibility.
-    }
+  if (buffer.length >= MAX_ERRORS) {
+    buffer.shift();
   }
+  buffer.push(entry);
 
-  console.error("[mx:error-tracker]", entry);
+  // Also log for dev visibility
+  console.error("[mx:error-tracker]", entry.message);
+}
+
+/**
+ * Return all captured errors (oldest first).
+ */
+export function getErrors(): ErrorEntry[] {
+  return [...buffer];
+}
+
+// ── Wire up global handlers (client-side only) ────────────────────────
+
+if (typeof window !== "undefined") {
+  window.onerror = (message, source, lineno, colno, error) => {
+    captureError(error ?? message, { source, lineno, colno });
+  };
+
+  window.onunhandledrejection = (event: PromiseRejectionEvent) => {
+    captureError(event.reason, { type: "unhandledrejection" });
+  };
 }

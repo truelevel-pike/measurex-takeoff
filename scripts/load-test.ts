@@ -126,6 +126,7 @@ async function requestTracked(
   body?: unknown,
 ): Promise<unknown> {
   const started = performance.now();
+  let recorded = false;
 
   try {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -146,6 +147,7 @@ async function requestTracked(
       status: res.status,
       error: ok ? undefined : `HTTP ${res.status}`,
     });
+    recorded = true;
 
     if (!ok) {
       const details = typeof payload === "string" ? payload : JSON.stringify(payload);
@@ -154,15 +156,16 @@ async function requestTracked(
 
     return payload;
   } catch (err: unknown) {
-    const durationMs = performance.now() - started;
-
-    metrics.push({
-      endpoint: path,
-      method,
-      durationMs,
-      ok: false,
-      error: errorMessage(err),
-    });
+    if (!recorded) {
+      const durationMs = performance.now() - started;
+      metrics.push({
+        endpoint: path,
+        method,
+        durationMs,
+        ok: false,
+        error: errorMessage(err),
+      });
+    }
 
     throw err;
   }
