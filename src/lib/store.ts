@@ -303,6 +303,34 @@ export const useStore = create<Store>()(
     });
   },
 
+  mergeClassifications: (survivorId, mergedIds) => {
+    const s = get();
+    const idsToRemove = mergedIds.filter((id) => id !== survivorId);
+    if (idsToRemove.length === 0) return;
+    const removeSet = new Set(idsToRemove);
+    const before = snapshot(s);
+    set({
+      classifications: s.classifications.filter((c) => !removeSet.has(c.id)),
+      polygons: s.polygons.map((p) =>
+        removeSet.has(p.classificationId) ? { ...p, classificationId: survivorId } : p,
+      ),
+      groups: s.groups.map((g) => ({
+        ...g,
+        classificationIds: g.classificationIds.filter((cid) => !removeSet.has(cid)),
+        breakdowns: g.breakdowns.map((b) => ({
+          ...b,
+          classificationIds: b.classificationIds.filter((cid) => !removeSet.has(cid)),
+        })),
+      })),
+      assemblies: s.assemblies.map((a) =>
+        removeSet.has(a.classificationId) ? { ...a, classificationId: survivorId } : a,
+      ),
+      selectedClassification: removeSet.has(s.selectedClassification ?? '') ? survivorId : s.selectedClassification,
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+  },
+
   // Polygons
   addPolygon: ({ points, classificationId, pageNumber, area, linearFeet, label, isComplete = true }) => {
     const s = get();

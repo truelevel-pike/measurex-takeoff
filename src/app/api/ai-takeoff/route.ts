@@ -75,6 +75,52 @@ function toCountMarker(point: { x: number; y: number }, radius = 8): Array<{ x: 
   ];
 }
 
+/**
+ * Fuzzy-match an AI-detected classification name against existing ones.
+ * Returns the existing classification ID if a reasonable match is found, else null.
+ * Rules: same type required, then checks exact match, substring, or common word overlap.
+ */
+function fuzzyMatchClassification(
+  name: string,
+  type: string,
+  existingClassifications: Array<{ id: string; name: string; type: string }>,
+): string | null {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return null;
+
+  // Build candidates of same type
+  const candidates = existingClassifications.filter(
+    (c) => c.type.toLowerCase() === type.toLowerCase(),
+  );
+
+  // 1. Exact match (case-insensitive)
+  for (const c of candidates) {
+    if (c.name.trim().toLowerCase() === needle) return c.id;
+  }
+
+  // 2. Substring match — either direction (e.g. "Room" matches "Room/Space", "Living Room" matches "Room")
+  for (const c of candidates) {
+    const existing = c.name.trim().toLowerCase();
+    if (existing.includes(needle) || needle.includes(existing)) return c.id;
+  }
+
+  // 3. Significant word overlap (split on spaces, slashes, hyphens)
+  const splitWords = (s: string) =>
+    s.split(/[\s\/\-]+/).filter((w) => w.length > 2);
+  const needleWords = splitWords(needle);
+  if (needleWords.length > 0) {
+    for (const c of candidates) {
+      const existingWords = splitWords(c.name.trim().toLowerCase());
+      const overlap = needleWords.filter((w) => existingWords.includes(w));
+      if (overlap.length > 0 && overlap.length >= Math.min(needleWords.length, existingWords.length)) {
+        return c.id;
+      }
+    }
+  }
+
+  return null;
+}
+
 function extractOpenAIText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -299,6 +345,7 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
       }
       const clsData = await clsRes.json();
       const classMap = new Map<string, string>();
+      const existingClassifications: Array<{ id: string; name: string; type: string }> = [];
       for (const cls of Array.isArray(clsData.classifications) ? clsData.classifications : []) {
         if (!cls || typeof cls !== 'object') continue;
         const name = String((cls as { name?: unknown }).name || '').trim();
@@ -306,6 +353,7 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
         const id = String((cls as { id?: unknown }).id || '').trim();
         if (!name || !type || !id) continue;
         classMap.set(`${type.toLowerCase()}::${name.toLowerCase()}`, id);
+        existingClassifications.push({ id, name, type });
       }
 
       // Delete all existing polygons for this page before inserting the new batch.
@@ -316,6 +364,16 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
       for (const el of results) {
         const clsKey = `${el.type.toLowerCase()}::${el.classification.toLowerCase()}`;
         let classificationId = classMap.get(clsKey);
+
+        // Fuzzy-match against existing classifications if no exact match
+        if (!classificationId) {
+          const fuzzyId = fuzzyMatchClassification(el.classification, el.type, existingClassifications);
+          if (fuzzyId) {
+            classificationId = fuzzyId;
+            // Cache for subsequent elements with the same name
+            classMap.set(clsKey, fuzzyId);
+          }
+        }
 
         if (!classificationId) {
           const createClassRes = await fetch(`${apiBase}/api/projects/${projectId}/classifications`, {

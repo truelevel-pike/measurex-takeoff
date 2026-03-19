@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, GitMerge, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, X } from 'lucide-react';
 import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
@@ -167,6 +167,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const deleteClassification = useStore((s) => s.deleteClassification);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
   const toggleClassification = useStore((s) => s.toggleClassification);
+  const mergeClassifications = useStore((s) => s.mergeClassifications);
 
   const showQuantitiesDrawer = useStore((s) => s.showQuantitiesDrawer);
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
@@ -219,6 +220,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   });
   const [collapsedTrades, setCollapsedTrades] = useState<Set<TradeGroup>>(new Set());
   const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
+  const [mergeSurvivorId, setMergeSurvivorId] = useState<string | null>(null);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [lastUpdatedTime] = useState(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -737,6 +741,70 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     window.open(`/api/projects/${projectId}/export/json`, '_blank');
   }, [projectId]);
 
+  const handleToggleMergeMode = useCallback(() => {
+    setMergeMode((v) => {
+      if (v) {
+        setMergeSelected(new Set());
+        setMergeSurvivorId(null);
+      }
+      return !v;
+    });
+  }, []);
+
+  const handleToggleMergeSelect = useCallback((id: string) => {
+    setMergeSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        // If this was the survivor, clear it
+        setMergeSurvivorId((sid) => (sid === id ? null : sid));
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleExecuteMerge = useCallback(async () => {
+    if (!mergeSurvivorId || mergeSelected.size < 2) return;
+    const idsToMerge = Array.from(mergeSelected);
+
+    // Client-side: reassign polygons + remove merged classifications
+    mergeClassifications(mergeSurvivorId, idsToMerge);
+
+    // Server-side: reassign polygons then delete merged classifications
+    if (projectId) {
+      const removedIds = idsToMerge.filter((id) => id !== mergeSurvivorId);
+      for (const id of removedIds) {
+        try {
+          // Reassign polygons belonging to this classification to the survivor
+          const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
+          if (polyRes.ok) {
+            const polyData = await polyRes.json();
+            const polys = Array.isArray(polyData.polygons) ? polyData.polygons : [];
+            for (const p of polys) {
+              if (p.classificationId === id) {
+                await fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ classificationId: mergeSurvivorId }),
+                });
+              }
+            }
+          }
+          // Delete the merged classification
+          await fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' });
+        } catch {
+          // Best-effort — client state is already correct
+        }
+      }
+    }
+
+    setMergeMode(false);
+    setMergeSelected(new Set());
+    setMergeSurvivorId(null);
+  }, [mergeSurvivorId, mergeSelected, mergeClassifications, projectId]);
+
   const handleOpenGroupModal = useCallback((existingGroupId?: string) => {
     if (existingGroupId) {
       const group = groups.find((g) => g.id === existingGroupId);
@@ -901,6 +969,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           <span className="text-xs text-gray-300 font-normal">
             {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
           </span>
+          {classifications.length >= 2 && (
+            <button
+              type="button"
+              onClick={handleToggleMergeMode}
+              className={`p-1 rounded hover:bg-gray-700/60 transition-colors ${mergeMode ? 'text-[#00d4ff]' : 'text-gray-400 hover:text-gray-200'}`}
+              aria-label={mergeMode ? 'Cancel merge' : 'Merge classifications'}
+              title={mergeMode ? 'Cancel Merge' : 'Merge Classifications'}
+            >
+              <GitMerge size={14} aria-hidden="true" />
+            </button>
+          )}
           {filtered.length >= 3 && (
             <button
               type="button"
@@ -995,6 +1074,58 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           </div>
         );
       })()}
+
+      {mergeMode && (
+        <div className="px-3 py-2 border-b border-amber-500/30 bg-amber-500/10">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-mono text-amber-300 tracking-wider flex items-center gap-1">
+              <GitMerge size={12} /> MERGE MODE
+            </span>
+            <button type="button" onClick={handleToggleMergeMode} className="text-gray-400 hover:text-white">
+              <X size={14} />
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-300 mb-2">
+            Select 2+ classifications to merge, then pick the one to keep.
+          </p>
+          {mergeSelected.size >= 2 && (
+            <div className="mb-2">
+              <label className="text-[11px] text-gray-400 block mb-1">Keep as:</label>
+              <div className="flex flex-col gap-1">
+                {Array.from(mergeSelected).map((id) => {
+                  const cls = classifications.find((c) => c.id === id);
+                  if (!cls) return null;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setMergeSurvivorId(id)}
+                      className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] text-left ${
+                        mergeSurvivorId === id
+                          ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/40'
+                          : 'bg-[#0e1016] text-gray-300 border border-transparent hover:border-gray-600'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: cls.color }} />
+                      {cls.name}
+                      {mergeSurvivorId === id && <Check size={10} className="ml-auto" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleExecuteMerge}
+            disabled={!mergeSurvivorId || mergeSelected.size < 2}
+            className="w-full rounded px-2 py-1.5 text-xs font-medium flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed bg-amber-600 hover:bg-amber-500 text-white"
+          >
+            <GitMerge size={12} />
+            Merge {mergeSelected.size} Classifications
+          </button>
+        </div>
+      )}
 
       {showTakeoffSearch && (
         <div className="px-2 pt-2 pb-1 border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.4)]">
@@ -1305,6 +1436,21 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   data-classification-row
                   data-classification-id={classification.id}
                 >
+                  {mergeMode && (
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); handleToggleMergeSelect(classification.id); }}
+                      className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                        mergeSelected.has(classification.id)
+                          ? 'bg-amber-500 border-amber-400'
+                          : 'border-gray-500 hover:border-amber-400'
+                      }`}
+                      aria-label={mergeSelected.has(classification.id) ? 'Deselect for merge' : 'Select for merge'}
+                    >
+                      {mergeSelected.has(classification.id) && <Check size={10} className="text-white" />}
+                    </button>
+                  )}
+
                   {totals.count > 0 || classification.type === 'count' ? (
                     isExpanded ? (
                       <ChevronDown size={12} className="text-gray-300" aria-hidden="true" />
