@@ -31,6 +31,7 @@ import BottomStatusBar from '@/components/BottomStatusBar';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
+import ScaleCalibrationPanel from '@/components/ScaleCalibrationPanel';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
 import ScaleCalibration from '@/components/ScaleCalibration';
@@ -143,6 +144,8 @@ function PageInner() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [currentPageNum, setCurrentPageNum] = useState(1);
   const [showCalModal, setShowCalModal] = useState(false);
+  const [showScaleCalibPanel, setShowScaleCalibPanel] = useState(false);
+  const [calibrationClicks, setCalibrationClicks] = useState<{x: number, y: number}[]>([]);
   const [detectedScale, setDetectedScale] = useState<DetectedScale | null>(null);
   const [pdfTextureUrl, setPdfTextureUrl] = useState<string | null>(null);
 
@@ -1069,7 +1072,7 @@ function PageInner() {
             )}
           </div>
 
-          <BottomStatusBar onScaleClick={() => setShowCalModal(true)} />
+          <BottomStatusBar onScaleClick={() => setShowScaleCalibPanel(true)} />
         </div>
 
         <QuantitiesPanel />
@@ -1098,6 +1101,30 @@ function PageInner() {
       )}
 
       {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
+      {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}
+
+      {/* Calibration draw overlay — captures two clicks when tool is 'calibrate' */}
+      {currentTool === ('calibrate' as string) && (
+        <div
+          className="fixed inset-0 z-40"
+          style={{ cursor: 'crosshair', background: 'transparent' }}
+          onClick={(e) => {
+            const canvas = pdfViewerRef.current?.getPageCanvas?.();
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const next = [...calibrationClicks, { x, y }];
+            setCalibrationClicks(next);
+            if (next.length >= 2) {
+              const [p1, p2] = next;
+              const lengthPx = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+              window.dispatchEvent(new CustomEvent('calibration-line-complete', { detail: { lengthPx } }));
+              setCalibrationClicks([]);
+            }
+          }}
+        />
+      )}
       <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
       {aiLoading && (
