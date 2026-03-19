@@ -54,6 +54,8 @@ interface TopNavBarProps {
   aiAllPagesProgress?: { current: number; total: number } | null;
   onAITakeoffAllPages?: () => void | Promise<void>;
   onSettings?: () => void;
+  onToggleTakeoffSearch?: () => void;
+  isTakeoffSearchOpen?: boolean;
 }
 
 export default function TopNavBar({
@@ -81,6 +83,8 @@ export default function TopNavBar({
   aiAllPagesProgress,
   onAITakeoffAllPages,
   onSettings,
+  onToggleTakeoffSearch,
+  isTakeoffSearchOpen,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -340,6 +344,14 @@ export default function TopNavBar({
                 Share
               </button>
               <NavIconButton
+                ariaLabel={isTakeoffSearchOpen ? 'Hide takeoff search' : 'Show takeoff search'}
+                srLabel={isTakeoffSearchOpen ? 'Hide takeoff search' : 'Show takeoff search'}
+                icon={<Search size={17} aria-hidden="true" />}
+                tooltip="Search Takeoff"
+                onClick={onToggleTakeoffSearch}
+                ariaPressed={isTakeoffSearchOpen}
+              />
+              <NavIconButton
                 ariaLabel="Project settings"
                 srLabel="Project settings"
                 icon={<Settings size={17} aria-hidden="true" />}
@@ -433,6 +445,13 @@ export default function TopNavBar({
             style={{ touchAction: 'manipulation' }}
           >
             <Share2 size={16} /> Share
+          </button>
+          <button
+            onClick={() => { onToggleTakeoffSearch?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Search size={16} /> {isTakeoffSearchOpen ? 'Hide Search' : 'Search Takeoff'}
           </button>
           <button
             onClick={() => { onSettings?.(); setShowMobileMenu(false); }}

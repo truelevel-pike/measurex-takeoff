@@ -96,7 +96,22 @@ function ColorPickerField({
   );
 }
 
-export default function QuantitiesPanel() {
+/** Small SVG shape indicator to distinguish classifications without relying on color alone. */
+const SHAPES = ['circle', 'square', 'triangle', 'diamond'] as const;
+function ClassificationShape({ index, color, size = 10 }: { index: number; color: string; size?: number }) {
+  const shape = SHAPES[index % SHAPES.length];
+  const half = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="flex-shrink-0">
+      {shape === 'circle' && <circle cx={half} cy={half} r={half - 1} fill={color} />}
+      {shape === 'square' && <rect x={1} y={1} width={size - 2} height={size - 2} fill={color} />}
+      {shape === 'triangle' && <polygon points={`${half},1 ${size - 1},${size - 1} 1,${size - 1}`} fill={color} />}
+      {shape === 'diamond' && <polygon points={`${half},0 ${size},${half} ${half},${size} 0,${half}`} fill={color} />}
+    </svg>
+  );
+}
+
+function QuantitiesPanel() {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
