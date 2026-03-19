@@ -101,7 +101,8 @@ export default function AutoScalePopup({
         <h3 className="text-sm font-semibold tracking-wide">Scale Auto-Detected</h3>
       </div>
 
-      <div className="text-2xl font-bold leading-tight mb-3">{detectedScale}</div>
+      <div className="text-2xl font-bold leading-tight mb-2">{detectedScale}</div>
+      <p className="text-sm text-gray-300 mb-3">Use this scale?</p>
 
       <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-3 ${confidenceMeta.className}`}>
         <Check size={12} />
@@ -137,7 +138,7 @@ export default function AutoScalePopup({
           className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium px-3 py-2 transition text-sm"
         >
           <X size={14} />
-          <span>Ignore</span>
+          <span>Reject</span>
           <kbd className="ml-1 text-[10px] text-gray-400 bg-gray-800 px-1 rounded">Esc</kbd>
         </button>
         <button
@@ -146,7 +147,7 @@ export default function AutoScalePopup({
           className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-2 transition text-sm"
         >
           <Check size={14} />
-          <span>Accept Scale</span>
+          <span>Accept</span>
           <kbd className="ml-1 text-[10px] text-emerald-200 bg-emerald-700 px-1 rounded">↵</kbd>
         </button>
       </div>

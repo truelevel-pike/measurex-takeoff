@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF } from '@/server/pdf-processor';
+import { extractSheetName } from '@/lib/sheet-namer';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,8 +21,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await fs.writeFile(filePath, buffer);
     const result = await processPDF(filePath, id);
 
-    // Store pages
+    // GAP-001: Extract sheet names and store pages
     for (const page of result.pages) {
+      const sheetName = extractSheetName(page.text ?? '');
+      if (sheetName) {
+        page.name = sheetName;
+      }
       await createPage(id, page);
     }
 

@@ -26,6 +26,7 @@ export interface PageInfo {
   width: number;
   height: number;
   text: string;
+  name?: string;
 }
 
 // ── Mode detection ────────────────────────────────────────────────────
@@ -273,6 +274,7 @@ export async function createPage(projectId: string, page: PageInfo): Promise<Pag
         width: page.width,
         height: page.height,
         pdf_url: page.text ?? null,
+        name: page.name ?? null,
       },
       { onConflict: 'project_id,page_number' },
     );
@@ -303,6 +305,7 @@ export async function getPages(projectId: string): Promise<PageInfo[]> {
       width: row.width,
       height: row.height,
       text: row.pdf_url ?? '',
+      name: row.name ?? undefined,
     }));
   }
 

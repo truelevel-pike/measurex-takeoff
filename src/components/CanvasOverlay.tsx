@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
-import { calculatePolygonArea } from '@/lib/polygon-utils';
+import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 
 export interface PolygonContextMenuPayload {
   polygonId: string;
@@ -97,7 +97,13 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       e.preventDefault();
       setDragPoints((prev) => {
         if (prev) {
-          updatePolygon(dragging.polygonId, { points: prev, area: calculatePolygonArea(prev) });
+          const polygon = allPolygons.find((p) => p.id === dragging.polygonId);
+          const cls = polygon ? classifications.find((c) => c.id === polygon.classificationId) : null;
+          const isLinear = cls?.type === 'linear';
+          const ppu = scale?.pixelsPerUnit || 1;
+          const area = calculatePolygonArea(prev);
+          const linearFeet = isLinear ? calculateLinearFeet(prev, ppu, false) : 0;
+          updatePolygon(dragging.polygonId, { points: prev, area, linearFeet });
         }
         return null;
       });
@@ -110,7 +116,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, toSvgCoords, updatePolygon]);
+  }, [dragging, toSvgCoords, updatePolygon, allPolygons, classifications, scale]);
 
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);

@@ -41,7 +41,11 @@ type SSEEvent =
   | { event: 'assembly:updated'; data: Assembly }
   | { event: 'assembly:deleted'; data: { id: string } }
   | { event: 'ai-takeoff:started'; data: { page: number } }
-  | { event: 'ai-takeoff:complete'; data: unknown };
+  | { event: 'ai-takeoff:complete'; data: unknown }
+  | { event: 'project:updated'; data: { id: string; name?: string; totalPages?: number; [key: string]: unknown } }
+  | { event: 'project:deleted'; data: { id: string } }
+  | { event: 'page:updated'; data: { pageNum: number; [key: string]: unknown } }
+  | { event: string; data: unknown };
 
 function handleSSEMessage(raw: MessageEvent) {
   let parsed: SSEEvent;
@@ -73,7 +77,12 @@ function handleSSEMessage(raw: MessageEvent) {
     }
     case 'polygon:updated': {
       const poly = parsed.data;
-      store.updatePolygon(poly.id, poly);
+      if (store.polygons.some((p) => p.id === poly.id)) {
+        store.updatePolygon(poly.id, poly);
+      } else {
+        // Upsert: treat as created if not found locally
+        useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
+      }
       emitActivity('polygon:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
@@ -92,7 +101,12 @@ function handleSSEMessage(raw: MessageEvent) {
     }
     case 'classification:updated': {
       const cls = parsed.data;
-      store.updateClassification(cls.id, cls);
+      if (store.classifications.some((c) => c.id === cls.id)) {
+        store.updateClassification(cls.id, cls);
+      } else {
+        // Upsert: treat as created if not found locally
+        useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
+      }
       emitActivity('classification:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
@@ -137,6 +151,44 @@ function handleSSEMessage(raw: MessageEvent) {
     }
     case 'ai-takeoff:complete': {
       emitActivity('ai-takeoff:complete', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    case 'project:updated': {
+      const { name, totalPages } = parsed.data as { id: string; name?: string; totalPages?: number };
+      if (name !== undefined) {
+        // Project name is stored in page.tsx local state; emit activity so it can react
+      }
+      if (totalPages !== undefined) {
+        useStore.setState({ totalPages });
+      }
+      emitActivity('project:updated', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    case 'project:deleted': {
+      const { id } = parsed.data as { id: string };
+      if (id === currentProjectId) {
+        disconnectFromProject();
+        // Redirect to projects list if the active project was deleted
+        if (typeof window !== 'undefined') {
+          window.location.href = '/projects';
+        }
+      }
+      emitActivity('project:deleted', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    case 'page:updated': {
+      const pageData = parsed.data as { pageNum: number; width?: number; height?: number; [key: string]: unknown };
+      if (pageData.width !== undefined && pageData.height !== undefined) {
+        useStore.getState().setPageBaseDimensions(pageData.pageNum, {
+          width: pageData.width,
+          height: pageData.height,
+        });
+      }
+      emitActivity('page:updated', parsed.data as unknown as Record<string, unknown>);
+      break;
+    }
+    default: {
+      console.warn('[ws-client] Unknown SSE event type:', parsed.event);
       break;
     }
   }
