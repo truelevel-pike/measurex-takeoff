@@ -1,13 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import PDFViewer from '@/components/PDFViewer';
-import CanvasOverlay from '@/components/CanvasOverlay';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import { ToastProvider } from '@/components/Toast';
-import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
+import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2, FileText } from 'lucide-react';
 
 interface SharedProject {
   id: string;
@@ -53,7 +51,6 @@ export default function SharedViewPage() {
   const token = params?.token as string;
 
   const [project, setProject] = useState<SharedProject | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -81,7 +78,7 @@ export default function SharedViewPage() {
         setProject(proj);
         setProjectId(proj.id);
 
-        // Hydrate the Zustand store so QuantitiesPanel and CanvasOverlay work
+        // Hydrate the Zustand store so QuantitiesPanel works
         hydrateState({
           classifications: proj.state.classifications,
           polygons: proj.state.polygons,
@@ -91,17 +88,6 @@ export default function SharedViewPage() {
           totalPages: proj.state.totalPages,
           annotations: [],
         });
-
-        // Fetch the PDF binary so the viewer can render it
-        try {
-          const pdfRes = await fetch(`/api/projects/${proj.id}/pdf`);
-          if (pdfRes.ok && !cancelled) {
-            const blob = await pdfRes.blob();
-            setPdfFile(new File([blob], `${proj.id}.pdf`, { type: 'application/pdf' }));
-          }
-        } catch {
-          // PDF may not exist (e.g. deleted) — overlay still works without it
-        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load shared project');
       } finally {
@@ -130,6 +116,33 @@ export default function SharedViewPage() {
       return next;
     });
   }, [totalPages, setCurrentPage]);
+
+  // Compute per-page quantities summary
+  const pageQuantities = useMemo(() => {
+    if (!project) return [];
+    const currentPageNum = pageIndex + 1;
+    const pagePolygons = project.state.polygons.filter(
+      (p) => p.pageNumber === currentPageNum && p.isComplete,
+    );
+    return project.state.classifications.map((cls) => {
+      const matching = pagePolygons.filter((p) => p.classificationId === cls.id);
+      let value: string;
+      let unit: string;
+      if (cls.type === 'area') {
+        const total = matching.reduce((sum, p) => sum + (p.area || 0), 0);
+        value = total.toFixed(2);
+        unit = 'sqft';
+      } else if (cls.type === 'linear') {
+        const total = matching.reduce((sum, p) => sum + (p.linearFeet || 0), 0);
+        value = total.toFixed(2);
+        unit = 'ft';
+      } else {
+        value = String(matching.length);
+        unit = 'count';
+      }
+      return { ...cls, value, unit, count: matching.length };
+    }).filter((c) => c.count > 0);
+  }, [project, pageIndex]);
 
   const sheetName = project?.state.sheetNames?.[pageIndex + 1];
   const badge = sheetName && !sheetName.startsWith('Page ')
@@ -260,17 +273,83 @@ export default function SharedViewPage() {
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* PDF + overlay */}
-        <div className="flex-1 relative overflow-hidden">
-          <PDFViewer
-            file={pdfFile}
-            onPageChange={(page) => {
-              setPageIndex(page - 1);
-              setCurrentPage(page, totalPages);
-            }}
-            cursor="default"
-          />
-          <CanvasOverlay />
+        {/* PDF preview notice + inline quantities summary */}
+        <div className="flex-1 relative overflow-auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>
+          {/* PDF notice */}
+          <div style={{
+            background: 'rgba(0,212,255,0.05)',
+            border: '1px solid rgba(0,212,255,0.2)',
+            borderRadius: 12,
+            padding: '24px 32px',
+            textAlign: 'center',
+            maxWidth: 520,
+            width: '100%',
+            marginBottom: 24,
+          }}>
+            <FileText size={40} style={{ color: '#00d4ff', margin: '0 auto 12px' }} />
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#e0faff', marginBottom: 6 }}>
+              Takeoff Summary &mdash; {sheetName || `Page ${pageIndex + 1}`}
+            </h2>
+            <p style={{ fontSize: 13, color: '#7a8a94', lineHeight: 1.5 }}>
+              This is a read-only summary of the takeoff measurements. Open the project in MeasureX to view the full PDF with markup overlays.
+            </p>
+            <a
+              href={`/?project=${project.id}`}
+              className="inline-flex items-center gap-2 mt-4 px-5 py-2 rounded-lg text-sm font-semibold"
+              style={{
+                background: 'rgba(0,212,255,0.15)',
+                border: '1px solid rgba(0,212,255,0.4)',
+                color: '#00d4ff',
+                textDecoration: 'none',
+              }}
+            >
+              <ExternalLink size={14} />
+              Open in MeasureX
+            </a>
+          </div>
+
+          {/* Inline quantities summary table for current page */}
+          {pageQuantities.length > 0 ? (
+            <div style={{ maxWidth: 520, width: '100%' }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Quantities &mdash; {sheetName || `Page ${pageIndex + 1}`}
+              </h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(0,212,255,0.15)' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 8px 8px 0', color: '#6b7280', fontWeight: 500 }}>Classification</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: '#6b7280', fontWeight: 500 }}>Type</th>
+                    <th style={{ textAlign: 'right', padding: '8px 0 8px 8px', color: '#6b7280', fontWeight: 500 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageQuantities.map((q) => (
+                    <tr key={q.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '8px 8px 8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: 12,
+                          height: 12,
+                          borderRadius: 3,
+                          background: q.color,
+                          flexShrink: 0,
+                        }} />
+                        <span style={{ color: '#e0e0e0' }}>{q.name}</span>
+                      </td>
+                      <td style={{ padding: 8, color: '#7a8a94' }}>{q.type}</td>
+                      <td style={{ padding: '8px 0 8px 8px', textAlign: 'right', color: '#e0faff', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
+                        {q.value} <span style={{ color: '#6b7280', fontWeight: 400, fontSize: 11 }}>{q.unit}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ color: '#4b5563', fontSize: 13, marginTop: 8 }}>
+              No measurements on this page.
+            </p>
+          )}
         </div>
 
         {/* Quantities panel (read-only) */}
