@@ -39,6 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
   } catch (err: any) {
+    console.error("[project route]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -78,6 +79,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updated = await updateProject(id, metaPatch);
     return NextResponse.json({ project: updated });
   } catch (err: any) {
+    console.error("[project route]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -93,6 +95,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const ok = await deleteProject(id);
     return NextResponse.json({ ok });
   } catch (err: any) {
+    console.error("[project route]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

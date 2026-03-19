@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PageThumbnailSidebarProps {
   totalPages: number;
@@ -17,11 +18,14 @@ export default function PageThumbnailSidebar({
   pdfDoc,
 }: PageThumbnailSidebarProps) {
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
+  const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
+  const [collapsed, setCollapsed] = useState(false);
 
   // Render thumbnails from PDF document at low DPI — parallel with progressive reveal
   useEffect(() => {
     if (!pdfDoc || totalPages <= 0) {
       setThumbnails([]);
+      setFailedPages(new Set());
       return;
     }
 
@@ -30,6 +34,7 @@ export default function PageThumbnailSidebar({
 
     // Pre-fill with nulls so page buttons render immediately (showing page numbers)
     setThumbnails(Array(totalPages).fill(null));
+    setFailedPages(new Set());
 
     const renderPage = async (pageNumber: number): Promise<string | null> => {
       if (cancelled) return null;
@@ -44,6 +49,9 @@ export default function PageThumbnailSidebar({
         await (page as any).render({ canvasContext: ctx, viewport }).promise;
         return canvas.toDataURL('image/png');
       } catch {
+        if (!cancelled) {
+          setFailedPages((prev) => new Set(prev).add(pageNumber));
+        }
         return null;
       }
     };
@@ -68,10 +76,21 @@ export default function PageThumbnailSidebar({
 
   return (
     <div
-      className="hidden lg:flex flex-col w-20 shrink-0 bg-[rgba(18,18,26,0.8)] border-r border-[#00d4ff]/20 overflow-y-auto"
+      className={`hidden md:flex flex-col shrink-0 bg-[rgba(18,18,26,0.8)] border-r border-[#00d4ff]/20 overflow-y-auto ${
+        collapsed ? 'w-6' : 'w-20'
+      }`}
       aria-label="Page thumbnails"
     >
-      {Array.from({ length: totalPages }, (_, i) => {
+      <button
+        type="button"
+        onClick={() => setCollapsed((prev) => !prev)}
+        className="flex items-center justify-center h-8 border-b border-[#00d4ff]/20 text-gray-300 hover:bg-[#0e1016]"
+        aria-label={collapsed ? 'Expand page thumbnails' : 'Collapse page thumbnails'}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      {!collapsed && Array.from({ length: totalPages }, (_, i) => {
         const page = i + 1;
         const isActive = page === currentPage;
         const thumb = thumbnails[i];
@@ -98,16 +117,19 @@ export default function PageThumbnailSidebar({
                 }`}
                 draggable={false}
               />
+            ) : failedPages.has(page) ? (
+              <span
+                className="w-14 h-[52px] rounded-sm flex items-center justify-center text-red-400 text-sm font-bold ring-1 ring-gray-700 bg-[#1a1a2e]"
+                aria-label={`Thumbnail failed for page ${page}`}
+              >
+                !
+              </span>
             ) : (
               <div
-                className={`w-14 h-[52px] rounded-sm flex items-center justify-center text-xs font-mono ${
-                  isActive
-                    ? 'ring-2 ring-blue-500 ring-offset-1 bg-[#00d4ff]/10 text-[#00d4ff]'
-                    : 'ring-1 ring-gray-700 bg-[#1a1a2e] text-gray-500'
+                className={`w-14 h-[52px] rounded-sm animate-pulse bg-zinc-700 ${
+                  isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
                 }`}
-              >
-                {page}
-              </div>
+              />
             )}
             <span
               className={`text-[10px] font-mono ${

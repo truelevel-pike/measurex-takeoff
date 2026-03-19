@@ -33,6 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       dimensions: result.pages.map((p) => ({ page: p.pageNum, width: p.width, height: p.height })),
     });
   } catch (err: any) {
+    console.error("[upload route]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
