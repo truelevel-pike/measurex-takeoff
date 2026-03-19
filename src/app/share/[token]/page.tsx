@@ -544,6 +544,19 @@ export default function SharedViewPage() {
             <Printer size={14} />
             Print
           </button>
+          {/* Download PDF button */}
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+            style={{
+              background: 'rgba(0,212,255,0.12)',
+              border: '1px solid rgba(0,212,255,0.4)',
+              color: '#00d4ff',
+            }}
+          >
+            <Download size={14} />
+            Download PDF
+          </button>
           <a
             href={`/?project=${project.id}`}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
