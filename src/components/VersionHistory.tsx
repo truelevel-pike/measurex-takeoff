@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Camera, Clock, CheckCircle, RotateCcw, X, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { History, Camera, Clock, CheckCircle, ChevronDown, ChevronRight, RotateCcw, X, Loader2, Plus, Pencil, Trash2, User } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import SnapshotPanel from '@/components/SnapshotPanel';
@@ -16,8 +16,8 @@ interface ApiHistoryEntry {
   actionType: 'create' | 'update' | 'delete';
   entityType: 'polygon' | 'classification' | 'scale';
   entityId: string | null;
-  beforeData: unknown | null;
-  afterData: unknown | null;
+  beforeData: Record<string, unknown> | null;
+  afterData: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -68,6 +68,16 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+function formatTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 const ACTION_BADGE: Record<string, { label: string; className: string; Icon: typeof Plus }> = {
   create: { label: 'CREATE', className: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30', Icon: Plus },
   update: { label: 'UPDATE', className: 'text-amber-400 bg-amber-400/10 border-amber-400/30', Icon: Pencil },
@@ -79,6 +89,131 @@ function truncateId(id: string | null): string {
   return id.length > 8 ? id.slice(0, 8) + '…' : id;
 }
 
+/** Generate a human-readable description from the history entry. */
+function describeEntry(entry: ApiHistoryEntry): string {
+  const entityLabel = entry.entityType.charAt(0).toUpperCase() + entry.entityType.slice(1);
+  const nameFromData =
+    (entry.afterData as Record<string, unknown>)?.name ??
+    (entry.beforeData as Record<string, unknown>)?.name;
+  const name = typeof nameFromData === 'string' ? ` "${nameFromData}"` : '';
+
+  switch (entry.actionType) {
+    case 'create':
+      return `Created ${entityLabel.toLowerCase()}${name}`;
+    case 'update': {
+      if (entry.beforeData && entry.afterData) {
+        const changed = getChangedKeys(entry.beforeData as Record<string, unknown>, entry.afterData as Record<string, unknown>);
+        if (changed.length > 0) {
+          return `Updated ${entityLabel.toLowerCase()}${name}: ${changed.join(', ')}`;
+        }
+      }
+      return `Updated ${entityLabel.toLowerCase()}${name}`;
+    }
+    case 'delete':
+      return `Deleted ${entityLabel.toLowerCase()}${name}`;
+    default:
+      return `${entry.actionType} ${entityLabel.toLowerCase()}`;
+  }
+}
+
+/** Get the keys that changed between before and after data. */
+function getChangedKeys(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  const changed: string[] = [];
+  for (const key of keys) {
+    if (key === 'updated_at' || key === 'updatedAt' || key === 'created_at' || key === 'createdAt') continue;
+    if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+      changed.push(key.replace(/_/g, ' '));
+    }
+  }
+  return changed;
+}
+
+/** Render a before/after diff for a history entry. */
+function ChangeDetail({ entry }: { entry: ApiHistoryEntry }) {
+  const before = entry.beforeData as Record<string, unknown> | null;
+  const after = entry.afterData as Record<string, unknown> | null;
+
+  if (!before && !after) {
+    return <p className="text-[10px] text-gray-500 italic">No detail available</p>;
+  }
+
+  if (entry.actionType === 'create' && after) {
+    return (
+      <div className="space-y-0.5">
+        {Object.entries(after).map(([key, value]) => {
+          if (key === 'id' || key === 'project_id' || key === 'projectId') return null;
+          if (key.endsWith('_at') || key.endsWith('At')) return null;
+          return (
+            <div key={key} className="flex gap-2 text-[10px]">
+              <span className="text-gray-500 min-w-[60px]">{key.replace(/_/g, ' ')}</span>
+              <span className="text-emerald-400 truncate">{formatValue(value)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (entry.actionType === 'delete' && before) {
+    return (
+      <div className="space-y-0.5">
+        {Object.entries(before).map(([key, value]) => {
+          if (key === 'id' || key === 'project_id' || key === 'projectId') return null;
+          if (key.endsWith('_at') || key.endsWith('At')) return null;
+          return (
+            <div key={key} className="flex gap-2 text-[10px]">
+              <span className="text-gray-500 min-w-[60px]">{key.replace(/_/g, ' ')}</span>
+              <span className="text-red-400 line-through truncate">{formatValue(value)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (entry.actionType === 'update' && before && after) {
+    const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    const changedEntries: [string, unknown, unknown][] = [];
+    for (const key of allKeys) {
+      if (key === 'id' || key === 'project_id' || key === 'projectId') continue;
+      if (key.endsWith('_at') || key.endsWith('At')) continue;
+      if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+        changedEntries.push([key, before[key], after[key]]);
+      }
+    }
+    if (changedEntries.length === 0) {
+      return <p className="text-[10px] text-gray-500 italic">No visible changes</p>;
+    }
+    return (
+      <div className="space-y-1">
+        {changedEntries.map(([key, oldVal, newVal]) => (
+          <div key={key} className="text-[10px]">
+            <span className="text-gray-500">{key.replace(/_/g, ' ')}</span>
+            <div className="flex gap-1 ml-2">
+              <span className="text-red-400 line-through truncate">{formatValue(oldVal)}</span>
+              <span className="text-gray-600">→</span>
+              <span className="text-emerald-400 truncate">{formatValue(newVal)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <p className="text-[10px] text-gray-500 italic">No detail available</p>;
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return value.length > 50 ? value.slice(0, 50) + '…' : value;
+  if (Array.isArray(value)) return `[${value.length} items]`;
+  if (typeof value === 'object') return JSON.stringify(value).slice(0, 50) + '…';
+  return String(value);
+}
+
 export default function VersionHistory({ onClose }: VersionHistoryProps) {
   const undoStack = useStore((s) => s.undoStack);
   const undo = useStore((s) => s.undo);
@@ -88,6 +223,7 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
   const [loading, setLoading] = useState(true);
   const [apiEntries, setApiEntries] = useState<ApiHistoryEntry[] | null>(null);
   const [restoringEntryId, setRestoringEntryId] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
 
   // Get projectId from localStorage (same pattern as page.tsx)
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -154,6 +290,10 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
     }
   }
 
+  function toggleExpand(id: string) {
+    setExpandedEntryId((prev) => (prev === id ? null : id));
+  }
+
   const hasRealData = apiEntries !== null && apiEntries.length > 0;
 
   return (
@@ -214,40 +354,81 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
             <span className="ml-2 text-xs text-gray-500">Loading history…</span>
           </div>
         ) : hasRealData ? (
-          apiEntries.map((entry) => {
+          apiEntries.map((entry, idx) => {
             const badge = ACTION_BADGE[entry.actionType];
+            const isExpanded = expandedEntryId === entry.id;
+            const isFirst = idx === 0;
             return (
-              <div
-                key={entry.id}
-                className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
-              >
-                <div className="mt-0.5">
-                  <badge.Icon size={14} className={badge.className.split(' ')[0]} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-medium border rounded px-1.5 py-0.5 ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                    <span className="text-[10px] text-gray-400">{entry.entityType}</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    {truncateId(entry.entityId)} · {timeAgo(entry.createdAt)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleApiRestore(entry)}
-                  disabled={restoringEntryId === entry.id}
-                  className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              <div key={entry.id}>
+                <div
+                  className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                    isExpanded ? 'bg-gray-800/80' : 'hover:bg-gray-800/60'
+                  }`}
+                  onClick={() => toggleExpand(entry.id)}
                 >
-                  {restoringEntryId === entry.id ? (
-                    <Loader2 size={10} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={10} />
-                  )}
-                  {restoringEntryId === entry.id ? 'Restoring…' : 'Restore'}
-                </button>
+                  <div className="mt-0.5 flex-shrink-0">
+                    {isExpanded ? (
+                      <ChevronDown size={14} className="text-gray-400" />
+                    ) : (
+                      <ChevronRight size={14} className="text-gray-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[10px] font-medium border rounded px-1.5 py-0.5 ${badge.className}`}>
+                        {badge.label}
+                      </span>
+                      <span className="text-[10px] text-gray-400">{entry.entityType}</span>
+                      {isFirst && (
+                        <span className="text-[9px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 rounded px-1 py-0">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-300 mt-0.5 truncate">
+                      {describeEntry(entry)}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                        <User size={9} />
+                        Anonymous
+                      </span>
+                      <span className="text-[10px] text-gray-600">·</span>
+                      <span className="text-[10px] text-gray-500" title={formatTimestamp(entry.createdAt)}>
+                        {timeAgo(entry.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleApiRestore(entry);
+                    }}
+                    disabled={restoringEntryId === entry.id}
+                    className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    {restoringEntryId === entry.id ? (
+                      <Loader2 size={10} className="animate-spin" />
+                    ) : (
+                      <RotateCcw size={10} />
+                    )}
+                    {restoringEntryId === entry.id ? 'Restoring…' : 'Restore'}
+                  </button>
+                </div>
+
+                {/* Expanded detail view showing what changed */}
+                {isExpanded && (
+                  <div className="ml-8 mr-2 mb-1 px-3 py-2 rounded-b-lg bg-gray-800/40 border-l-2 border-gray-700">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-medium">
+                      Changes
+                    </div>
+                    <ChangeDetail entry={entry} />
+                    <div className="mt-1.5 pt-1.5 border-t border-gray-700/50 text-[10px] text-gray-600">
+                      {formatTimestamp(entry.createdAt)} · ID: {truncateId(entry.entityId)}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
