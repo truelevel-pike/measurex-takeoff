@@ -490,12 +490,14 @@ export default function ProjectsPage() {
       });
       if (!uploadRes.ok) throw new Error(`Upload failed (${uploadRes.status})`);
 
-      // 3. Redirect
+      // 3. Refresh project list then redirect
+      await loadProjects();
       saveRecentProject(projectId, name);
       router.push(`/?project=${projectId}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       setError(message);
+      await loadProjects();
       setUploading(false);
     }
   };
