@@ -30,6 +30,7 @@ import {
   Upload,
   Loader2,
   BookOpen,
+  GraduationCap,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { ProjectState } from '@/lib/types';
@@ -737,6 +738,25 @@ export default function ProjectsPage() {
               className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors ${activeSection === 'archived' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
             >
               <Archive size={15} aria-hidden /> Archived
+            </button>
+
+            {/* Divider */}
+            <div className="border-t border-zinc-700 my-2" />
+
+            {/* Library */}
+            <button
+              onClick={() => router.push('/library')}
+              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors text-zinc-300"
+            >
+              <BookOpen size={15} aria-hidden /> Library
+            </button>
+
+            {/* Learn */}
+            <button
+              onClick={() => router.push('/learn')}
+              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors text-zinc-300"
+            >
+              <GraduationCap size={15} aria-hidden /> Learn
             </button>
           </nav>
         </aside>

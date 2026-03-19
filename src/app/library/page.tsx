@@ -6,6 +6,9 @@ import {
   ArrowLeft,
   BookOpen,
   Building2,
+  Check,
+  ChevronDown,
+  Download,
   Loader2,
   Plus,
   Trash2,
@@ -24,6 +27,11 @@ interface LibraryItem {
   is_org: boolean;
   created_by: string | null;
   created_at: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
 }
 
 const TYPE_BADGE_STYLES: Record<string, string> = {
@@ -52,6 +60,14 @@ export default function LibraryPage() {
   const [formUnitCost, setFormUnitCost] = useState('0');
   const [formSaving, setFormSaving] = useState(false);
 
+  // Import to project
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [importItem, setImportItem] = useState<LibraryItem | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+
   const fetchItems = useCallback(async () => {
     if (!isConfigured()) {
       setError('Supabase not configured');
@@ -76,6 +92,22 @@ export default function LibraryPage() {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  const fetchProjects = useCallback(async () => {
+    setProjectsLoading(true);
+    try {
+      const res = await fetch('/api/projects');
+      const data = await res.json();
+      setProjects(data.projects ?? []);
+      if (data.projects?.length > 0) {
+        setSelectedProjectId(data.projects[0].id);
+      }
+    } catch {
+      setProjects([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, []);
 
   const orgItems = items.filter((i) => i.is_org);
   const myItems = items.filter((i) => !i.is_org);
@@ -120,6 +152,43 @@ export default function LibraryPage() {
       setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete template');
+    }
+  }
+
+  async function handleImportOpen(item: LibraryItem) {
+    setImportItem(item);
+    setImportSuccess(null);
+    await fetchProjects();
+  }
+
+  async function handleImportConfirm() {
+    if (!importItem || !selectedProjectId) return;
+    setImportingId(importItem.id);
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/classifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: importItem.name,
+          type: importItem.type,
+          color: importItem.color,
+          visible: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? 'Import failed');
+      }
+      setImportSuccess(importItem.id);
+      setTimeout(() => {
+        setImportItem(null);
+        setImportSuccess(null);
+      }, 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to import');
+      setImportItem(null);
+    } finally {
+      setImportingId(null);
     }
   }
 
@@ -202,7 +271,13 @@ export default function LibraryPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {orgItems.map((item) => (
-                  <LibraryCard key={item.id} item={item} />
+                  <LibraryCard
+                    key={item.id}
+                    item={item}
+                    onImport={handleImportOpen}
+                    importingId={importingId}
+                    importSuccess={importSuccess}
+                  />
                 ))}
                 {orgItems.length === 0 && (
                   <p className="text-sm text-[#8892a0] col-span-full">No organization templates yet.</p>
@@ -332,7 +407,14 @@ export default function LibraryPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {myItems.map((item) => (
-                  <LibraryCard key={item.id} item={item} onDelete={handleDelete} />
+                  <LibraryCard
+                    key={item.id}
+                    item={item}
+                    onDelete={handleDelete}
+                    onImport={handleImportOpen}
+                    importingId={importingId}
+                    importSuccess={importSuccess}
+                  />
                 ))}
                 {myItems.length === 0 && !showForm && (
                   <p className="text-sm text-[#8892a0] col-span-full">
@@ -344,6 +426,116 @@ export default function LibraryPage() {
           </>
         )}
       </div>
+
+      {/* Import to Project Modal */}
+      {importItem && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setImportItem(null)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-sm rounded-xl border shadow-2xl"
+              style={{ background: '#111827', borderColor: 'rgba(0,212,255,0.25)', color: '#e5e7eb' }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Import to project"
+            >
+              <div
+                className="flex items-center justify-between border-b px-4 py-3"
+                style={{ borderColor: 'rgba(0,212,255,0.2)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Download size={15} className="text-[#00d4ff]" />
+                  <h2 className="font-mono text-sm tracking-wider text-[#00d4ff]">IMPORT TO PROJECT</h2>
+                </div>
+                <button
+                  onClick={() => setImportItem(null)}
+                  className="rounded border p-1 text-[#b0dff0] hover:border-[#00d4ff]/60"
+                  style={{ borderColor: 'rgba(0,212,255,0.3)' }}
+                  aria-label="Close"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="px-4 py-4">
+                {/* Template preview */}
+                <div
+                  className="flex items-center gap-3 p-3 rounded-lg border mb-4"
+                  style={{ background: '#0a0a0f', borderColor: 'rgba(0,212,255,0.15)' }}
+                >
+                  <div className="w-7 h-7 rounded-md flex-shrink-0" style={{ backgroundColor: importItem.color }} />
+                  <div>
+                    <div className="text-sm font-medium text-white">{importItem.name}</div>
+                    <div className="text-xs text-[#8892a0]">
+                      {TYPE_LABELS[importItem.type]} · ${importItem.unit_cost.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project selector */}
+                <label className="block text-xs text-[#8892a0] mb-1.5">Select Project</label>
+                {projectsLoading ? (
+                  <div className="flex items-center gap-2 py-2 text-sm text-[#8892a0]">
+                    <Loader2 size={14} className="animate-spin" /> Loading projects…
+                  </div>
+                ) : projects.length === 0 ? (
+                  <p className="text-sm text-[#8892a0]">No projects found.</p>
+                ) : (
+                  <div className="relative">
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="w-full appearance-none rounded border px-3 py-2 text-sm outline-none pr-8"
+                      style={{
+                        background: '#0a0a0f',
+                        borderColor: 'rgba(0,212,255,0.2)',
+                        color: '#e0e0e0',
+                      }}
+                    >
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8892a0] pointer-events-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="flex items-center justify-end gap-2 border-t px-4 py-3"
+                style={{ borderColor: 'rgba(0,212,255,0.2)' }}
+              >
+                <button
+                  onClick={() => setImportItem(null)}
+                  className="rounded border px-3 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10"
+                  style={{ borderColor: 'rgba(0,212,255,0.3)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportConfirm}
+                  disabled={!selectedProjectId || importingId === importItem.id || importSuccess === importItem.id}
+                  className="flex items-center gap-1.5 rounded px-4 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                  style={{ background: '#00d4ff', color: '#00131d' }}
+                >
+                  {importSuccess === importItem.id ? (
+                    <><Check size={13} /> Imported!</>
+                  ) : importingId === importItem.id ? (
+                    <><Loader2 size={13} className="animate-spin" /> Importing…</>
+                  ) : (
+                    <><Download size={13} /> Import</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -351,9 +543,15 @@ export default function LibraryPage() {
 function LibraryCard({
   item,
   onDelete,
+  onImport,
+  importingId,
+  importSuccess,
 }: {
   item: LibraryItem;
   onDelete?: (id: string) => void;
+  onImport: (item: LibraryItem) => void;
+  importingId: string | null;
+  importSuccess: string | null;
 }) {
   return (
     <div
@@ -369,7 +567,7 @@ function LibraryCard({
         style={{ backgroundColor: item.color }}
       />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white truncate">{item.name}</span>
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${TYPE_BADGE_STYLES[item.type] ?? ''}`}
@@ -380,16 +578,39 @@ function LibraryCard({
         <div className="text-xs text-[#8892a0] mt-1">
           ${item.unit_cost.toFixed(2)} / {TYPE_LABELS[item.type]?.split(' ')[1]?.replace('(', '').replace(')', '') ?? 'unit'}
         </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={() => onImport(item)}
+            disabled={importingId === item.id}
+            className="flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+            style={{
+              borderColor: importSuccess === item.id ? 'rgba(16,185,129,0.5)' : 'rgba(0,212,255,0.3)',
+              color: importSuccess === item.id ? '#10b981' : '#00d4ff',
+              background: importSuccess === item.id ? 'rgba(16,185,129,0.1)' : 'transparent',
+            }}
+            aria-label={`Import ${item.name} to project`}
+          >
+            {importSuccess === item.id ? (
+              <><Check size={10} /> Imported</>
+            ) : importingId === item.id ? (
+              <><Loader2 size={10} className="animate-spin" /> Importing…</>
+            ) : (
+              <><Download size={10} /> Import</>
+            )}
+          </button>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(item.id)}
+              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity p-1"
+              aria-label={`Delete ${item.name}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
-      {onDelete && (
-        <button
-          onClick={() => onDelete(item.id)}
-          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity p-1"
-          aria-label={`Delete ${item.name}`}
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
     </div>
   );
 }
