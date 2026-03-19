@@ -1949,13 +1949,27 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           );
         })}
 
-        {visibleCount < orderedListItems.length && (
+        {visibleCount < summaryFilteredItems.length && (
           <button
             type="button"
             onClick={() => setVisibleCount((c) => c + LOAD_STEP)}
             className="w-full py-2 text-center text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
           >
-            Load more ({orderedListItems.length - visibleCount} remaining)
+            Load more ({summaryFilteredItems.length - visibleCount} remaining)
+          </button>
+        )}
+
+        {summaryExcludedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('detailed');
+              localStorage.setItem('mx-quantities-view-mode', 'detailed');
+              localStorage.setItem('mx-quantities-interacted', '1');
+            }}
+            className="w-full py-2 text-center text-[11px] text-gray-500 hover:text-[#00d4ff] transition-colors"
+          >
+            + {summaryExcludedCount} more classifications — switch to Detailed
           </button>
         )}
 
