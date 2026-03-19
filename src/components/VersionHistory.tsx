@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { History, Clock, CheckCircle, RotateCcw, X, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/components/Toast';
 
 interface VersionHistoryProps {
   onClose: () => void;
@@ -27,6 +28,7 @@ interface MockEntry {
 }
 
 function generateMockEntries(undoStackLength: number): MockEntry[] {
+  if (undoStackLength <= 0) return [];
   const now = new Date();
   const descriptions = [
     'Current state',
@@ -40,7 +42,7 @@ function generateMockEntries(undoStackLength: number): MockEntry[] {
     'Updated polygon area',
     'Set scale manually',
   ];
-  const count = Math.max(undoStackLength, 3);
+  const count = Math.min(undoStackLength + 1, descriptions.length);
   const entries: MockEntry[] = [];
   for (let i = 0; i < count && i < descriptions.length; i++) {
     const time = new Date(now.getTime() - i * 7 * 60 * 1000);
@@ -54,7 +56,7 @@ function generateMockEntries(undoStackLength: number): MockEntry[] {
   return entries;
 }
 
-function formatRelativeTime(dateStr: string): string {
+function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
@@ -79,9 +81,11 @@ function truncateId(id: string | null): string {
 export default function VersionHistory({ onClose }: VersionHistoryProps) {
   const undoStack = useStore((s) => s.undoStack);
   const undo = useStore((s) => s.undo);
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [apiEntries, setApiEntries] = useState<ApiHistoryEntry[] | null>(null);
+  const [restoringEntryId, setRestoringEntryId] = useState<string | null>(null);
 
   // Get projectId from localStorage (same pattern as page.tsx)
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -118,8 +122,33 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
     const idx = mockEntries.indexOf(entry);
     if (idx > 0 && idx <= undoStack.length) {
       for (let i = 0; i < idx; i++) undo();
+      addToast(`Restored to "${entry.description}"`, 'success');
     } else {
-      window.alert(`Restore to "${entry.description}" — not enough history to restore this far back.`);
+      addToast(`Restore to "${entry.description}" is not available.`, 'info');
+    }
+  }
+
+  async function handleApiRestore(entry: ApiHistoryEntry) {
+    if (!projectId) {
+      addToast('Restore is not available: missing project ID.', 'error');
+      return;
+    }
+
+    setRestoringEntryId(entry.id);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history/${entry.id}/restore`, {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        addToast('Version restored.', 'success');
+      } else {
+        addToast('Restore is not yet implemented for this history entry.', 'info');
+      }
+    } catch {
+      addToast('Restore is not yet implemented for this history entry.', 'info');
+    } finally {
+      setRestoringEntryId(null);
     }
   }
 
@@ -174,47 +203,68 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
                     <span className="text-[10px] text-gray-400">{entry.entityType}</span>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    {truncateId(entry.entityId)} · {formatRelativeTime(entry.createdAt)}
+                    {truncateId(entry.entityId)} · {timeAgo(entry.createdAt)}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleApiRestore(entry)}
+                  disabled={restoringEntryId === entry.id}
+                  className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {restoringEntryId === entry.id ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : (
+                    <RotateCcw size={10} />
+                  )}
+                  {restoringEntryId === entry.id ? 'Restoring…' : 'Restore'}
+                </button>
               </div>
             );
           })
         ) : (
-          mockEntries.map((entry) => (
-            <div
-              key={entry.id}
-              className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
-            >
-              <div className="mt-0.5">
-                {entry.isCurrent ? (
-                  <CheckCircle size={14} className="text-emerald-400" />
-                ) : (
-                  <Clock size={14} className="text-gray-500" />
-                )}
+          mockEntries.length > 0 ? (
+            mockEntries.map((entry) => (
+              <div
+                key={entry.id}
+                className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
+              >
+                <div className="mt-0.5">
+                  {entry.isCurrent ? (
+                    <CheckCircle size={14} className="text-emerald-400" />
+                  ) : (
+                    <Clock size={14} className="text-gray-500" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-200 truncate">{entry.description}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{entry.timestamp}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {entry.isCurrent ? (
+                    <span className="text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 rounded px-1.5 py-0.5">
+                      Current
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(entry)}
+                      className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
+                    >
+                      <RotateCcw size={10} />
+                      Restore
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-200 truncate">{entry.description}</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">{entry.timestamp}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {entry.isCurrent ? (
-                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 rounded px-1.5 py-0.5">
-                    Current
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleRestore(entry)}
-                    className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
-                  >
-                    <RotateCcw size={10} />
-                    Restore
-                  </button>
-                )}
-              </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <History size={18} className="text-gray-600 mb-2" />
+              <p className="text-sm font-medium text-gray-300">No history yet</p>
+              <p className="text-xs text-gray-500 mt-1">Changes will appear here after your first edit.</p>
             </div>
-          ))
+          )
         )}
       </div>
 
