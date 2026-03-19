@@ -1,13 +1,17 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Download, Eye, EyeOff, History, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
+import { CLASSIFICATION_LIBRARY } from '@/lib/classification-library';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
+import { useMeasurementSettings } from '@/lib/use-measurement-settings';
+import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
+import MeasurementSettingsPanel from './MeasurementSettings';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -129,6 +133,10 @@ export default function QuantitiesPanel() {
   const [editOriginalColor, setEditOriginalColor] = useState('#3b82f6');
   const [editError, setEditError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
+  const [showMeasurementSettings, setShowMeasurementSettings] = useState(false);
+
+  const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
 
   const drawerRef = useRef<HTMLDivElement>(null);
   const newClassNameRef = useRef<HTMLInputElement>(null);
@@ -224,9 +232,9 @@ export default function QuantitiesPanel() {
   }, [classifications, polygonsByClassification, ppu]);
 
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
-    if (classification.type === 'area') return `${totals.areaReal.toFixed(1)} sq ft`;
-    if (classification.type === 'linear') return `${totals.lengthReal.toFixed(1)} ft`;
-    return `${totals.count} EA`;
+    if (classification.type === 'area') return formatArea(totals.areaReal, measurementSettings);
+    if (classification.type === 'linear') return formatLinear(totals.lengthReal, measurementSettings);
+    return formatCount(totals.count);
   }
 
   function toggleExpanded(classificationId: string) {
@@ -253,7 +261,16 @@ export default function QuantitiesPanel() {
   ) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      activateClassification(classificationId, isSelected);
+      toggleExpanded(classificationId);
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      const classification = filtered.find((c) => c.id === classificationId);
+      if (classification) {
+        handleDeleteClassification(classification);
+      }
       return;
     }
 
@@ -274,7 +291,11 @@ export default function QuantitiesPanel() {
     const nextIndex = event.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
     if (nextIndex < 0 || nextIndex >= rows.length) return;
 
-    rows[nextIndex]?.focus();
+    // Update keyboard selection to the target row
+    const targetRow = rows[nextIndex];
+    const targetId = targetRow?.getAttribute('data-classification-id');
+    if (targetId) setSelectedClassificationId(targetId);
+    targetRow?.focus();
   }
 
   function handleAddClassification(event: React.FormEvent<HTMLFormElement>) {
@@ -417,7 +438,7 @@ export default function QuantitiesPanel() {
         </button>
       </div>
 
-      <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)]">
+      <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)] relative">
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-300 font-normal">
@@ -443,7 +464,23 @@ export default function QuantitiesPanel() {
           >
             <History size={14} />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowMeasurementSettings((v) => !v)}
+            className={`p-1 rounded hover:bg-gray-700/60 transition-colors ${showMeasurementSettings ? 'text-[#00d4ff]' : 'text-gray-400 hover:text-gray-200'}`}
+            aria-label="Measurement settings"
+            title="Measurement Settings"
+          >
+            <Settings size={14} />
+          </button>
         </div>
+        {showMeasurementSettings && (
+          <MeasurementSettingsPanel
+            settings={measurementSettings}
+            onChange={setMeasurementSettings}
+            onClose={() => setShowMeasurementSettings(false)}
+          />
+        )}
       </div>
       {showHistory && <VersionHistory onClose={() => setShowHistory(false)} />}
 
@@ -648,12 +685,16 @@ export default function QuantitiesPanel() {
               ) : (
                 <div
                   className={`group flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer ${
-                    isSelected ? 'bg-[#00d4ff]/10 border border-[#00d4ff]/40' : 'hover:bg-[#0e1016]'
+                    isSelected ? 'bg-[#00d4ff]/10 border border-[#00d4ff]/40'
+                    : selectedClassificationId === classification.id ? 'bg-[#00d4ff]/5 border border-[#00d4ff]/20'
+                    : 'hover:bg-[#0e1016]'
                   }`}
-                  onClick={() => activateClassification(classification.id, isSelected)}
+                  onClick={() => { setSelectedClassificationId(classification.id); activateClassification(classification.id, isSelected); }}
                   onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id, isSelected)}
+                  onFocus={() => setSelectedClassificationId(classification.id)}
                   tabIndex={0}
                   data-classification-row
+                  data-classification-id={classification.id}
                 >
                   {totals.count > 0 || classification.type === 'count' ? (
                     isExpanded ? (
@@ -679,7 +720,7 @@ export default function QuantitiesPanel() {
                   ) : (
                     <>
                       <span className="text-[10px] font-mono text-[#8892a0] flex-shrink-0">
-                        {classification.type === 'area' ? 'SF' : 'FT'}
+                        {classification.type === 'area' ? AREA_UNIT_LABELS[measurementSettings.areaUnit].toUpperCase() : LINEAR_UNIT_LABELS[measurementSettings.linearUnit].toUpperCase()}
                       </span>
                       <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
                         {formatClassificationTotal(classification, totals)}
@@ -778,7 +819,7 @@ export default function QuantitiesPanel() {
                   ) : (
                     <>
                       <div className="text-[10px] py-0.5 text-gray-300 font-mono">
-                        Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq ft - {totals.lengthReal.toFixed(1)} ft
+                        Total: {totals.count} items - {formatArea(totals.areaReal, measurementSettings)} - {formatLinear(totals.lengthReal, measurementSettings)}
                       </div>
                       {polygonsForClassification.map((polygon, index) => {
                         const areaReal = polygon.area / (ppu * ppu);
@@ -790,7 +831,7 @@ export default function QuantitiesPanel() {
                               {classification.name} #{index + 1}
                             </span>
                             <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
-                              A {areaReal.toFixed(1)} sq ft | L {lengthReal.toFixed(1)} ft
+                              A {formatArea(areaReal, measurementSettings)} | L {formatLinear(lengthReal, measurementSettings)}
                             </span>
                           </div>
                         );
