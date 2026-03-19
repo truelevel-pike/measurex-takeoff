@@ -315,6 +315,16 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return items;
   }, [groupByTrade, filtered, tradeGrouped, collapsedTrades]);
 
+  // Load-more pagination for large lists (35+ items)
+  const LOAD_STEP = 20;
+  const [visibleCount, setVisibleCount] = useState(30);
+  const visibleItems = useMemo(
+    () => orderedListItems.slice(0, visibleCount),
+    [orderedListItems, visibleCount]
+  );
+  // Reset visible count when search changes
+  useEffect(() => { setVisibleCount(30); }, [searchLower]);
+
   const classificationById = useMemo(() => {
     const byId = new Map<string, Classification>();
     for (const classification of classifications) {
@@ -1137,7 +1147,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         </div>
       )}
 
-      <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list>
+      <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list style={{ contain: 'layout style' }}>
         {isLoading && (
           <div className="py-2 px-1.5 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -1156,7 +1166,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             </p>
           </div>
         )}
-        {orderedListItems.map((item) => {
+        {visibleItems.map((item) => {
           if (item.kind === 'header') {
             const isTradeCollapsed = collapsedTrades.has(item.trade);
             const tradeTotalArea = (tradeGrouped[item.trade] ?? []).reduce((sum, cls) => {
@@ -1528,6 +1538,16 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             </div>
           );
         })}
+
+        {visibleCount < orderedListItems.length && (
+          <button
+            type="button"
+            onClick={() => setVisibleCount((c) => c + LOAD_STEP)}
+            className="w-full py-2 text-center text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
+          >
+            Load more ({orderedListItems.length - visibleCount} remaining)
+          </button>
+        )}
 
         {filtered.length === 0 && (
           <div className="text-center text-xs py-8 text-gray-300">
