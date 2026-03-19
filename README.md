@@ -1,63 +1,78 @@
 # MeasureX Takeoff
 
-AI-powered construction PDF takeoff tool — upload blueprints, draw measurements, run AI detection, and export quantities.
+AI-powered construction takeoff tool — measure areas, count items, and extract quantities from architectural PDF plans.
 
-## Project Structure
+## Features
 
-```
-src/
-├── app/                  # Next.js App Router pages & API routes
-│   ├── api/              # REST endpoints (projects, polygons, ai-takeoff, etc.)
-│   ├── projects/         # Project management pages
-│   ├── settings/         # Settings pages
-│   └── print/            # Print preview
-├── components/           # React UI components (PDFViewer, CanvasOverlay, QuantitiesPanel, etc.)
-├── hooks/                # Custom React hooks
-├── lib/                  # Utilities, types, Zustand store, geometry engine
-├── server/               # Server-side logic (project store, AI engine, PDF processor)
-└── stories/              # Storybook component stories
-supabase/                 # Database migrations
-scripts/                  # E2E test scripts
-docs/                     # OpenAPI spec & AI agent guide
-```
+- **PDF Viewer** — multi-page PDF rendering with zoom, pan, and page thumbnails
+- **Drawing Tools** — polygon, polyline, and measurement tools for marking up plans
+- **AI Takeoff** — GPT-4 Vision automatically detects and classifies elements across pages
+- **Scale Calibration** — set scale from presets or draw-to-calibrate for precise measurements
+- **Classifications** — custom types (area/linear/count) with color coding and visibility toggles
+- **Quantities Panel** — real-time area, length, and count totals per classification
+- **3D View** — extrude floor plans into a 3D model with wall heights
+- **Export** — Excel export with per-sheet and total quantities
+- **Collaboration** — real-time sync via SSE, share links, version history
+- **Project Dashboard** — create, open, and manage multiple projects
 
-## Environment Variables
+## Stack
 
-Copy the example env file and fill in your values:
+- **Framework:** Next.js 15 (App Router) + React 19
+- **State:** Zustand
+- **PDF Rendering:** pdfjs-dist
+- **UI:** Tailwind CSS v4 + shadcn/ui components
+- **3D:** React Three Fiber (@react-three/fiber, @react-three/drei)
+- **AI:** OpenAI GPT-4 Vision via `/api/ai-takeoff`
+- **Backend:** File-based JSON storage (local dev) or Supabase (production)
+- **TypeScript:** Strict mode
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- OpenAI API key (for AI Takeoff feature)
+- Supabase project (optional, for production storage)
+
+### Installation
 
 ```bash
-cp .env.example .env.local
-```
-
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous/public key |
-
-## Dev Setup
-
-```bash
-# Clone the repo
-git clone <repo-url>
-cd measurex-takeoff
-
-# Install dependencies
 npm install
+```
 
-# Copy environment variables
-cp .env.example .env.local
-# Edit .env.local with your Supabase credentials
+### Environment Variables
 
-# Start the dev server
+Create a `.env.local` file:
+
+```env
+# Required for AI Takeoff
+OPENAI_API_KEY=sk-...
+
+# Optional: Supabase (omit to use local file storage)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+### Development
+
+```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Test Commands
+### Build
 
 ```bash
-# Unit tests (Jest)
+npm run build
+npm start
+```
+
+## Testing
+
+```bash
+# Run all tests
 npm test
 
 # Watch mode
@@ -65,25 +80,57 @@ npm run test:watch
 
 # Coverage report
 npm run test:coverage
-
-# Vitest
-npx vitest
-
-# E2E API tests
-npm run test:e2e
-
-# Storybook (component explorer)
-npm run storybook
 ```
 
-## API Docs
+## Storybook
 
-API Docs available at [/api/docs](http://localhost:3000/api/docs) when running locally. The OpenAPI spec is also served as JSON at `/api/openapi.json`.
+```bash
+# Start Storybook dev server
+npm run storybook
 
-## Deploy to Vercel
+# Build static Storybook
+npm run build-storybook
+```
 
-1. Connect the repo to [Vercel](https://vercel.com).
-2. Set environment variables in the Vercel dashboard:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Deploy — Vercel auto-detects the Next.js framework.
+## Project Structure
+
+```
+src/
+├── app/                  # Next.js App Router pages + API routes
+│   ├── api/              # REST API endpoints
+│   │   ├── ai-takeoff/   # OpenAI Vision integration
+│   │   ├── projects/     # Project CRUD
+│   │   ├── polygons/     # Polygon CRUD
+│   │   └── ws/           # SSE real-time updates
+│   ├── page.tsx          # Main takeoff canvas
+│   └── projects/         # Project dashboard
+├── components/           # React UI components (60+)
+│   ├── PDFViewer.tsx     # Core PDF rendering + interaction
+│   ├── DrawingTool.tsx   # Canvas drawing engine
+│   ├── TopNavBar.tsx     # Primary navigation + AI Takeoff
+│   ├── QuantitiesPanel.tsx # Takeoff quantities sidebar
+│   └── ...
+├── lib/                  # Utilities, store, types
+│   ├── store.ts          # Zustand state management
+│   ├── polygon-utils.ts  # Geometry calculations
+│   ├── sheet-namer.ts    # AI sheet name extraction
+│   └── ws-client.ts      # SSE client
+└── server/               # Server-only modules
+    └── project-store.ts  # Project persistence (file/Supabase)
+```
+
+## API Reference
+
+See [`docs/openapi.yaml`](./docs/openapi.yaml) for the full OpenAPI 3.0 spec.
+
+Key endpoints:
+- `GET /api/projects` — list projects
+- `POST /api/projects` — create project
+- `GET /api/projects/:id` — get project with state
+- `PATCH /api/projects/:id` — update project metadata
+- `POST /api/ai-takeoff` — run AI detection on a page image
+- `GET /api/ws` — SSE stream for real-time updates
+
+## License
+
+Private — all rights reserved.
