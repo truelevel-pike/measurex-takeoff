@@ -210,7 +210,12 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
             if (!data) return;
             const serverId = data?.assembly?.id;
             if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
-              updateAssembly(assembly.id, { id: serverId });
+              // Replace temp ID with server-assigned ID across the entire assembly
+              setAssemblies(
+                useStore.getState().assemblies.map((a) =>
+                  a.id === assembly.id ? { ...a, id: serverId } : a,
+                ),
+              );
             }
           })
           .catch((err) => console.error('API createAssembly failed:', err));
