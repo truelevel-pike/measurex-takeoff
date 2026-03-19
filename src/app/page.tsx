@@ -73,6 +73,56 @@ const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | '
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
+const MAX_CLASSIFICATIONS = 20;
+
+function autoMergeToLimit(
+  classifications: Classification[],
+  mergeClassificationsFn: (survivorId: string, ids: string[]) => void,
+  maxCount = MAX_CLASSIFICATIONS
+) {
+  if (classifications.length <= maxCount) return;
+
+  const normalize = (name: string) =>
+    name.trim().toLowerCase().replace(/[\/\-]+/g, ' ').replace(/\s+/g, ' ');
+  const splitWords = (name: string) =>
+    normalize(name).split(' ').filter((w) => w.length > 2);
+  const isSimilar = (a: string, b: string) => {
+    const na = normalize(a), nb = normalize(b);
+    if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+    const wa = splitWords(a), wb = splitWords(b);
+    if (!wa.length || !wb.length) return false;
+    const overlap = wa.filter((w) => wb.includes(w));
+    return overlap.length >= Math.min(wa.length, wb.length);
+  };
+
+  let remaining = [...classifications];
+
+  while (remaining.length > maxCount) {
+    let bestI = -1, bestJ = -1;
+    for (let i = 0; i < remaining.length && bestI === -1; i++) {
+      for (let j = i + 1; j < remaining.length; j++) {
+        if (isSimilar(remaining[i].name, remaining[j].name)) {
+          bestI = i;
+          bestJ = j;
+          break;
+        }
+      }
+    }
+
+    if (bestI === -1) {
+      bestI = remaining.length - 2;
+      bestJ = remaining.length - 1;
+    }
+
+    const a = remaining[bestI];
+    const b = remaining[bestJ];
+    const survivor = a.name.length <= b.name.length ? a : b;
+    const loser = survivor === a ? b : a;
+
+    mergeClassificationsFn(survivor.id, [survivor.id, loser.id]);
+    remaining = remaining.filter((c) => c.id !== loser.id);
+  }
+}
 
 interface TakeoffSearchResult {
   id: string;
@@ -661,6 +711,12 @@ function PageInner() {
       // Return to the original page
       safeGoToPage(originalPage, 'ai-takeoff:return');
       await reloadProjectPolygonsAndClassifications(projectId);
+
+      // Auto-merge similar classifications if over limit
+      const currentClassifications = useStore.getState().classifications;
+      if (currentClassifications.length > MAX_CLASSIFICATIONS) {
+        autoMergeToLimit(currentClassifications, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
+      }
 
       localStorage.setItem('mx-onboarding-takeoff-run', 'true');
       const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
@@ -1298,6 +1354,12 @@ function PageInner() {
 
     safeGoToPage(originalPage, 'ai-takeoff-all-pages:return');
     await reloadProjectPolygonsAndClassifications(projectId);
+
+    // Auto-merge similar classifications if over limit
+    const premergeClassifications = useStore.getState().classifications || [];
+    if (premergeClassifications.length > MAX_CLASSIFICATIONS) {
+      autoMergeToLimit(premergeClassifications, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
+    }
 
     const elapsedMs = Date.now() - startTime;
     // Gather unique classifications from the reloaded store

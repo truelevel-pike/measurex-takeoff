@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, GitMerge, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, GitMerge, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, Wand2, X } from 'lucide-react';
 import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
@@ -76,6 +76,64 @@ function normalizeHexInput(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return '';
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+}
+
+interface MergeSuggestion {
+  survivor: Classification;
+  duplicates: Classification[];
+  reason: string;
+}
+
+function suggestMerges(classifications: Classification[]): MergeSuggestion[] {
+  const suggestions: MergeSuggestion[] = [];
+  const visited = new Set<string>();
+
+  function normalize(name: string): string {
+    return name.trim().toLowerCase().replace(/[\/\-]+/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  function splitWords(name: string): string[] {
+    return normalize(name).split(' ').filter((w) => w.length > 2);
+  }
+
+  function isSimilar(a: string, b: string): boolean {
+    const na = normalize(a);
+    const nb = normalize(b);
+    if (na === nb) return true;
+    if (na.includes(nb) || nb.includes(na)) return true;
+    const wa = splitWords(a);
+    const wb = splitWords(b);
+    if (wa.length === 0 || wb.length === 0) return false;
+    const overlap = wa.filter((w) => wb.includes(w));
+    return overlap.length >= Math.min(wa.length, wb.length);
+  }
+
+  for (let i = 0; i < classifications.length; i++) {
+    const cls = classifications[i];
+    if (visited.has(cls.id)) continue;
+
+    const group: Classification[] = [cls];
+    for (let j = i + 1; j < classifications.length; j++) {
+      const other = classifications[j];
+      if (visited.has(other.id)) continue;
+      if (isSimilar(cls.name, other.name)) {
+        group.push(other);
+      }
+    }
+
+    if (group.length > 1) {
+      const survivor = group.reduce((a, b) => a.name.length <= b.name.length ? a : b);
+      const duplicates = group.filter((c) => c.id !== survivor.id);
+      group.forEach((c) => visited.add(c.id));
+      suggestions.push({
+        survivor,
+        duplicates,
+        reason: `Similar names: ${group.map((c) => c.name).join(', ')}`,
+      });
+    }
+  }
+
+  return suggestions;
 }
 
 function ColorPickerField({
@@ -218,11 +276,21 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('measurex_group_by_trade') === 'true';
   });
+  const [viewMode, setViewMode] = useState<'summary' | 'detailed'>(() => {
+    if (typeof window === 'undefined') return 'summary';
+    const stored = localStorage.getItem('mx-quantities-view-mode');
+    if (stored === 'detailed' || stored === 'summary') return stored;
+    const hasInteracted = localStorage.getItem('mx-quantities-interacted');
+    return hasInteracted ? 'detailed' : 'summary';
+  });
   const [collapsedTrades, setCollapsedTrades] = useState<Set<TradeGroup>>(new Set());
   const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
   const [mergeSurvivorId, setMergeSurvivorId] = useState<string | null>(null);
+  const [showCleanUpDialog, setShowCleanUpDialog] = useState(false);
+  const [cleanUpSuggestions, setCleanUpSuggestions] = useState<MergeSuggestion[]>([]);
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<number>>(new Set());
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [lastUpdatedTime] = useState(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -328,10 +396,6 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   // Load-more pagination for large lists (35+ items)
   const LOAD_STEP = 20;
   const [visibleCount, setVisibleCount] = useState(30);
-  const visibleItems = useMemo(
-    () => orderedListItems.slice(0, visibleCount),
-    [orderedListItems, visibleCount]
-  );
   // Reset visible count when search changes
   useEffect(() => { setVisibleCount(30); }, [searchLower]);
 
@@ -460,6 +524,37 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     }
     return result;
   }, [classifications, totalsByClassification]);
+
+  // Summary mode: top-10 classifications by primary metric
+  const SUMMARY_LIMIT = 10;
+  const summaryFilteredItems = useMemo<typeof orderedListItems>(() => {
+    if (viewMode === 'detailed' || filtered.length <= SUMMARY_LIMIT) return orderedListItems;
+    const ranked = [...filtered].sort((a, b) => {
+      const ta = totalsByClassification.get(a.id);
+      const tb = totalsByClassification.get(b.id);
+      if (!ta || !tb) return 0;
+      if (a.type === 'area') return tb.areaReal - ta.areaReal;
+      if (a.type === 'linear') return tb.lengthReal - ta.lengthReal;
+      return tb.count - ta.count;
+    });
+    const topIds = new Set(ranked.slice(0, SUMMARY_LIMIT).map((c) => c.id));
+    return orderedListItems
+      .filter((item) => item.kind !== 'row' || topIds.has(item.classification.id))
+      .filter((item, idx, arr) => {
+        if (item.kind !== 'header') return true;
+        const next = arr[idx + 1];
+        return next?.kind === 'row';
+      });
+  }, [viewMode, filtered, orderedListItems, totalsByClassification]);
+
+  const summaryExcludedCount = viewMode === 'summary' && filtered.length > SUMMARY_LIMIT
+    ? filtered.length - SUMMARY_LIMIT
+    : 0;
+
+  const visibleItems = useMemo(
+    () => summaryFilteredItems.slice(0, visibleCount),
+    [summaryFilteredItems, visibleCount]
+  );
 
   function getDeductions(classification: Classification): ClassificationDeduction[] {
     return deductionsByClassification[classification.id] ?? classification.deductions ?? [];
@@ -805,6 +900,46 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setMergeSurvivorId(null);
   }, [mergeSurvivorId, mergeSelected, mergeClassifications, projectId]);
 
+  const handleOpenCleanUp = useCallback(() => {
+    const suggestions = suggestMerges(classifications);
+    if (suggestions.length === 0) return;
+    setCleanUpSuggestions(suggestions);
+    setAcceptedSuggestions(new Set(suggestions.map((_, i) => i)));
+    setShowCleanUpDialog(true);
+  }, [classifications]);
+
+  const handleExecuteCleanUp = useCallback(async () => {
+    const toExecute = cleanUpSuggestions.filter((_, i) => acceptedSuggestions.has(i));
+    for (const suggestion of toExecute) {
+      const allIds = [suggestion.survivor.id, ...suggestion.duplicates.map((d) => d.id)];
+      mergeClassifications(suggestion.survivor.id, allIds);
+      if (projectId) {
+        const removedIds = suggestion.duplicates.map((d) => d.id);
+        for (const id of removedIds) {
+          try {
+            const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
+            if (polyRes.ok) {
+              const { polygons = [] } = await polyRes.json();
+              for (const p of polygons) {
+                if (p.classificationId === id) {
+                  await fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ classificationId: suggestion.survivor.id }),
+                  });
+                }
+              }
+            }
+            await fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' });
+          } catch { /* best effort */ }
+        }
+      }
+    }
+    setShowCleanUpDialog(false);
+    setCleanUpSuggestions([]);
+    setAcceptedSuggestions(new Set());
+  }, [cleanUpSuggestions, acceptedSuggestions, mergeClassifications, projectId]);
+
   const handleOpenGroupModal = useCallback((existingGroupId?: string) => {
     if (existingGroupId) {
       const group = groups.find((g) => g.id === existingGroupId);
@@ -907,6 +1042,72 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
   const panel = (
     <>
+      {showCleanUpDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-[#13141a] border border-[#00d4ff]/25 rounded-xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-4 max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Wand2 size={16} className="text-cyan-400" />
+                Clean Up Classifications
+              </h3>
+              <button onClick={() => setShowCleanUpDialog(false)} className="text-gray-400 hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">
+              Found {cleanUpSuggestions.length} group{cleanUpSuggestions.length !== 1 ? 's' : ''} of similar classifications.
+              Accept suggestions to merge duplicates into a single name.
+            </p>
+            <div className="overflow-y-auto flex flex-col gap-3 flex-1">
+              {cleanUpSuggestions.map((suggestion, i) => (
+                <div key={i} className={`rounded-lg p-3 border ${acceptedSuggestions.has(i) ? 'border-cyan-500/40 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/30 opacity-60'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-400 mb-1">{suggestion.reason}</div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {suggestion.duplicates.map((d) => (
+                          <span key={d.id} className="text-xs bg-red-900/30 border border-red-700/40 text-red-300 rounded px-1.5 py-0.5 line-through">
+                            {d.name}
+                          </span>
+                        ))}
+                        <span className="text-xs text-gray-400 mx-1">{'\u2192'}</span>
+                        <span className="text-xs bg-green-900/30 border border-green-700/40 text-green-300 rounded px-1.5 py-0.5 font-semibold">
+                          {suggestion.survivor.name}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setAcceptedSuggestions((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      })}
+                      className={`text-xs px-2 py-1 rounded border ${acceptedSuggestions.has(i) ? 'border-cyan-500/40 text-cyan-300 bg-cyan-900/20' : 'border-gray-600 text-gray-400 hover:border-gray-400'}`}
+                    >
+                      {acceptedSuggestions.has(i) ? '\u2713 Accept' : 'Skip'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
+              <span className="text-xs text-gray-400">{acceptedSuggestions.size} of {cleanUpSuggestions.length} accepted</span>
+              <div className="flex gap-2">
+                <button onClick={() => setShowCleanUpDialog(false)} className="px-3 py-1.5 text-xs text-gray-400 border border-gray-600 rounded hover:border-gray-400">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExecuteCleanUp}
+                  disabled={acceptedSuggestions.size === 0}
+                  className="px-3 py-1.5 text-xs text-white rounded border border-cyan-500/40 bg-cyan-900/20 hover:bg-cyan-900/40 disabled:opacity-40"
+                >
+                  Apply {acceptedSuggestions.size} Merge{acceptedSuggestions.size !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Assemblies / Estimate tabs — conditionally renders to avoid hooks-of-rules violation */}
       {activeTab === 'assemblies' ? (
         <AssembliesPanel onSwitchToQuantities={handleSwitchToQuantities} onSwitchToEstimate={handleSwitchToEstimate} />
@@ -980,6 +1181,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               <GitMerge size={14} aria-hidden="true" />
             </button>
           )}
+          {classifications.length >= 3 && (
+            <button
+              type="button"
+              onClick={handleOpenCleanUp}
+              className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-[#00d4ff] transition-colors"
+              title="Clean Up — merge similar classifications"
+              aria-label="Clean up similar classifications"
+            >
+              <Wand2 size={14} aria-hidden="true" />
+            </button>
+          )}
           {filtered.length >= 3 && (
             <button
               type="button"
@@ -989,6 +1201,22 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               title={groupByTrade ? 'Ungrouped view' : 'Group by Trade'}
             >
               <Layers size={14} aria-hidden="true" />
+            </button>
+          )}
+          {filtered.length > SUMMARY_LIMIT && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = viewMode === 'summary' ? 'detailed' : 'summary';
+                setViewMode(next);
+                localStorage.setItem('mx-quantities-view-mode', next);
+                if (next === 'detailed') localStorage.setItem('mx-quantities-interacted', '1');
+              }}
+              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors font-mono tracking-wide ${viewMode === 'summary' ? 'border-[#00d4ff]/40 text-[#00d4ff]' : 'border-gray-600 text-gray-400 hover:text-gray-200 hover:border-gray-400'}`}
+              title={viewMode === 'summary' ? `Showing top ${SUMMARY_LIMIT} — click for all` : 'Showing all — click for top 10 summary'}
+              aria-label={viewMode === 'summary' ? 'Switch to Detailed view' : 'Switch to Summary view'}
+            >
+              {viewMode === 'summary' ? 'Summary' : 'Detailed'}
             </button>
           )}
           {projectId && (
@@ -1473,10 +1701,15 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     if (clsPolygons.length === 0) return null;
                     const avgConf = clsPolygons.reduce((sum, p) => sum + (p.confidence ?? 0), 0) / clsPolygons.length;
                     const confPct = Math.round(avgConf * 100);
-                    const confColor = avgConf > 0.8 ? 'rgba(34,197,94,0.25)' : avgConf >= 0.5 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)';
-                    const confTextColor = avgConf > 0.8 ? '#4ade80' : avgConf >= 0.5 ? '#facc15' : '#f87171';
+                    const confColor = avgConf >= 0.85 ? 'rgba(34,197,94,0.25)' : avgConf >= 0.70 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)';
+                    const confTextColor = avgConf >= 0.85 ? '#4ade80' : avgConf >= 0.70 ? '#facc15' : '#f87171';
+                    const confLevel = avgConf >= 0.85 ? 'high' : avgConf >= 0.70 ? 'medium' : 'low';
                     return (
-                      <span className="text-[9px] px-1 rounded flex-shrink-0" style={{ backgroundColor: confColor, color: confTextColor, opacity: 0.85 }}>{confPct}%</span>
+                      <span
+                        className="text-[9px] px-1 rounded flex-shrink-0"
+                        style={{ backgroundColor: confColor, color: confTextColor, opacity: 0.85 }}
+                        title={`AI confidence: ${confPct}% (${confLevel})`}
+                      >{confPct}%</span>
                     );
                   })()}
 
