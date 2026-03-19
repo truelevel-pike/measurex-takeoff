@@ -9,6 +9,7 @@ import { calculatePolygonArea } from '@/lib/polygon-utils';
 
 interface AssembliesPanelProps {
   onSwitchToQuantities: () => void;
+  onSwitchToEstimate?: () => void;
 }
 
 /** Quantity totals per classification, computed from polygons + scale. */
@@ -18,7 +19,7 @@ interface ClassQuantity {
   lengthReal: number;  // linear ft
 }
 
-export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPanelProps) {
+export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstimate }: AssembliesPanelProps) {
   const projectId = useStore((s) => s.projectId);
   const assemblies = useStore((s) => s.assemblies);
   const classifications = useStore((s) => s.classifications);
@@ -238,16 +239,25 @@ export default function AssembliesPanel({ onSwitchToQuantities }: AssembliesPane
         <button
           type="button"
           onClick={onSwitchToQuantities}
-          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+          className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >
           Quantities
         </button>
         <button
           type="button"
-          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
+          className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
         >
           Assemblies
         </button>
+        {onSwitchToEstimate && (
+          <button
+            type="button"
+            onClick={onSwitchToEstimate}
+            className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+          >
+            Estimate
+          </button>
+        )}
       </div>
 
       {/* Add button */}

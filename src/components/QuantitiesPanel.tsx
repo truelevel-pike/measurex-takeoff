@@ -9,6 +9,7 @@ import { useMeasurementSettings } from '@/lib/use-measurement-settings';
 import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
+import EstimateSummary from './EstimateSummary';
 import MeasurementSettingsPanel from './MeasurementSettings';
 import ClassificationLibrary from './ClassificationLibrary';
 
@@ -127,7 +128,7 @@ interface QuantitiesPanelProps {
 export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
-  const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
+  const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies' | 'estimate'>('quantities');
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
@@ -503,25 +504,34 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
   const panel = (
     <>
-      {/* Assemblies tab — conditionally renders in JSX to avoid hooks-of-rules violation */}
+      {/* Assemblies / Estimate tabs — conditionally renders to avoid hooks-of-rules violation */}
       {activeTab === 'assemblies' ? (
-        <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} />
+        <AssembliesPanel onSwitchToQuantities={() => setActiveTab('quantities')} onSwitchToEstimate={() => setActiveTab('estimate')} />
+      ) : activeTab === 'estimate' ? (
+        <EstimateSummary onSwitchToQuantities={() => setActiveTab('quantities')} onSwitchToAssemblies={() => setActiveTab('assemblies')} />
       ) : (
       <>
       {/* Tab bar */}
       <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
         <button
           type="button"
-          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
+          className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
         >
           Quantities
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('assemblies')}
-          className="flex-1 px-3 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+          className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >
           Assemblies
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('estimate')}
+          className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
+        >
+          Estimate
         </button>
       </div>
 
