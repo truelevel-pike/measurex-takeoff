@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Camera, ChevronRight, Copy, Info, Trash } from 'lucide-react';
+import { Camera, ChevronRight, Copy, Info, Tag, Trash } from 'lucide-react';
 
 interface ContextMenuProps {
   x: number;
@@ -20,6 +20,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const updatePolygon = useStore((s) => s.updatePolygon);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const projectId = useStore((s) => s.projectId);
+  const setSelectedClassification = useStore((s) => s.setSelectedClassification);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const [focusIndex, setFocusIndex] = useState(-1);
@@ -30,7 +31,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const polygon = polygons.find((p) => p.id === polygonId);
 
   // Menu items list for keyboard navigation (stable reference)
-  const menuItems = useMemo(() => ['properties', 'duplicate', 'reclassify', 'delete', 'snapshot'], []);
+  const menuItems = useMemo(() => ['properties', 'duplicate', 'reclassify', 'gotoclass', 'delete', 'snapshot'], []);
 
   const handleDelete = useCallback(() => {
     if (!confirmDelete) {
@@ -71,6 +72,12 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
     onClose();
   }, [setSelectedPolygon, polygonId, onOpenProperties, onClose]);
 
+  const handleGoToClassification = useCallback(() => {
+    if (!polygon) return;
+    setSelectedClassification(polygon.classificationId);
+    onClose();
+  }, [polygon, setSelectedClassification, onClose]);
+
   const handleSnapshot = useCallback(async () => {
     if (!projectId || snapshotStatus !== 'idle') return;
     setSnapshotStatus('saving');
@@ -106,13 +113,14 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
         if (item === 'properties') handleOpenProperties();
         else if (item === 'duplicate') handleCopy();
         else if (item === 'reclassify') setShowClassifications((v) => !v);
+        else if (item === 'gotoclass') handleGoToClassification();
         else if (item === 'delete') handleDelete();
         else if (item === 'snapshot') void handleSnapshot();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focusIndex, menuItems, handleOpenProperties, handleCopy, handleDelete, handleSnapshot, onClose]);
+  }, [focusIndex, menuItems, handleOpenProperties, handleCopy, handleGoToClassification, handleDelete, handleSnapshot, onClose]);
 
   // Scroll to close
   useEffect(() => {
@@ -198,13 +206,23 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
         </div>
       )}
 
+      {/* Go to Classification */}
+      <button
+        role="menuitem"
+        className={itemClass(3)}
+        onMouseEnter={() => setFocusIndex(3)}
+        onClick={handleGoToClassification}
+      >
+        <Tag size={14} className="text-slate-400" /> Go to Classification
+      </button>
+
       <div className="my-1 border-t border-slate-700/50" />
 
       {/* Delete */}
       <button
         role="menuitem"
-        className={itemClass(3, confirmDelete ? 'text-red-400 bg-red-500/10' : 'text-red-400')}
-        onMouseEnter={() => setFocusIndex(3)}
+        className={itemClass(4, confirmDelete ? 'text-red-400 bg-red-500/10' : 'text-red-400')}
+        onMouseEnter={() => setFocusIndex(4)}
         onClick={handleDelete}
       >
         <Trash size={14} /> {confirmDelete ? 'Click again to confirm' : 'Delete'}
@@ -213,8 +231,8 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Add to snapshot */}
       <button
         role="menuitem"
-        className={itemClass(4, 'text-slate-400')}
-        onMouseEnter={() => setFocusIndex(4)}
+        className={itemClass(5, 'text-slate-400')}
+        onMouseEnter={() => setFocusIndex(5)}
         onClick={() => void handleSnapshot()}
         disabled={snapshotStatus !== 'idle'}
       >

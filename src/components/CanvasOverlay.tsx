@@ -74,6 +74,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const projectId = useStore((s) => s.projectId);
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
+  const addPolygon = useStore((s) => s.addPolygon);
+  const setSelectedClassification = useStore((s) => s.setSelectedClassification);
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
@@ -87,6 +89,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const [dragPoints, setDragPoints] = useState<Point[] | null>(null);
   const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
   const [showBatchClassificationPicker, setShowBatchClassificationPicker] = useState(false);
+  const [showFloatingReclassify, setShowFloatingReclassify] = useState(false);
 
   const toSvgCoords = useCallback(
     (e: React.MouseEvent | MouseEvent): Point => {
@@ -312,7 +315,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   );
 
   const handleVertexMouseDown = useCallback(
-    (e: React.MouseEvent<SVGCircleElement>) => {
+    (e: React.MouseEvent<SVGRectElement>) => {
       const polygonId = e.currentTarget.dataset.polygonId;
       const vertexIndexRaw = e.currentTarget.dataset.vertexIndex;
       if (!polygonId || !vertexIndexRaw) return;
@@ -359,6 +362,55 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     },
     [handleBatchReclassify]
   );
+
+  // Close floating reclassify when selection changes
+  useEffect(() => {
+    setShowFloatingReclassify(false);
+  }, [selectedPolygonId]);
+
+  // Floating toolbar: single-selected polygon on current page
+  const singleSelectedPoly = useMemo(() => {
+    if (selectedPolygons.length > 1) return null;
+    if (!selectedPolygonId) return null;
+    return polygons.find((p) => p.id === selectedPolygonId) ?? null;
+  }, [selectedPolygonId, selectedPolygons, polygons]);
+
+  const floatingToolbarPos = useMemo(() => {
+    if (!singleSelectedPoly || singleSelectedPoly.points.length === 0) return null;
+    const pts = singleSelectedPoly.points;
+    const centX = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const centY = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    return { centX, centY };
+  }, [singleSelectedPoly]);
+
+  const handleFloatingDelete = useCallback(() => {
+    if (!singleSelectedPoly) return;
+    deletePolygon(singleSelectedPoly.id);
+    if (projectId) {
+      fetch(`/api/projects/${projectId}/polygons/${singleSelectedPoly.id}`, { method: 'DELETE' }).catch((err) =>
+        console.error('API deletePolygon failed:', err)
+      );
+    }
+  }, [singleSelectedPoly, deletePolygon, projectId]);
+
+  const handleFloatingDuplicate = useCallback(() => {
+    if (!singleSelectedPoly) return;
+    addPolygon({
+      points: singleSelectedPoly.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })),
+      classificationId: singleSelectedPoly.classificationId,
+      pageNumber: singleSelectedPoly.pageNumber,
+      area: singleSelectedPoly.area,
+      linearFeet: singleSelectedPoly.linearFeet,
+      isComplete: singleSelectedPoly.isComplete,
+      label: singleSelectedPoly.label,
+    });
+  }, [singleSelectedPoly, addPolygon]);
+
+  const handleFloatingReclassify = useCallback((classId: string) => {
+    if (!singleSelectedPoly) return;
+    updatePolygon(singleSelectedPoly.id, { classificationId: classId });
+    setShowFloatingReclassify(false);
+  }, [singleSelectedPoly, updatePolygon]);
 
   const handleWrapperMouseDownCapture = useCallback(() => {
     wrapperRef.current?.focus();
@@ -513,11 +565,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               {/* Corner handles when selected */}
               {isSelected &&
                 displayPoints.map((pt: Point, i: number) => (
-                  <circle
+                  <rect
                     key={i}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={5}
+                    x={pt.x - 4}
+                    y={pt.y - 4}
+                    width={8}
+                    height={8}
                     fill={isDraggingThis && dragging.vertexIndex === i ? '#ff6600' : '#00d4ff'}
                     stroke="#fff"
                     strokeWidth={1.5}
@@ -525,7 +578,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     style={{ cursor: 'grab' }}
                     data-polygon-id={poly.id}
                     data-vertex-index={i}
-                    onMouseDown={handleVertexMouseDown}
+                    onMouseDown={handleVertexMouseDown as unknown as React.MouseEventHandler<SVGRectElement>}
                   />
                 ))}
               {/* Confidence indicator dot */}
@@ -582,7 +635,14 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 const rectX = centX - labelW / 2;
                 const rectY = centY - labelH / 2;
                 return (
-                  <g pointerEvents="none">
+                  <g
+                    pointerEvents={isSelected ? 'all' : 'none'}
+                    style={{ cursor: isSelected ? 'pointer' : undefined }}
+                    onDoubleClick={isSelected ? (e) => {
+                      e.stopPropagation();
+                      setShowFloatingReclassify(true);
+                    } : undefined}
+                  >
                     <rect
                       x={rectX}
                       y={rectY}
@@ -748,6 +808,152 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           )}
         </div>
       )}
+      {/* Floating edit toolbar for single-selected polygon */}
+      {currentTool === 'select' && singleSelectedPoly && floatingToolbarPos && (() => {
+        const svgEl = wrapperRef.current?.querySelector('svg');
+        const svgRect = svgEl?.getBoundingClientRect();
+        if (!svgRect || baseDims.width === 0) return null;
+        const scaleX = svgRect.width / baseDims.width;
+        const scaleY = svgRect.height / baseDims.height;
+        const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
+        const screenY = svgRect.top + floatingToolbarPos.centY * scaleY;
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left: screenX,
+              top: screenY - 44,
+              transform: 'translateX(-50%)',
+              zIndex: 70,
+              display: 'flex',
+              gap: 2,
+              padding: '4px 6px',
+              borderRadius: 8,
+              background: 'rgba(17,24,39,0.95)',
+              border: '1px solid rgba(148,163,184,0.35)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title="Delete"
+              onClick={handleFloatingDelete}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'transparent',
+                color: '#f87171',
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+            <button
+              type="button"
+              title="Reclassify"
+              onClick={() => setShowFloatingReclassify((v) => !v)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: showFloatingReclassify ? 'rgba(56,189,248,0.2)' : 'transparent',
+                color: '#93c5fd',
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            </button>
+            <button
+              type="button"
+              title="Duplicate"
+              onClick={handleFloatingDuplicate}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'transparent',
+                color: '#94a3b8',
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            </button>
+          </div>
+        );
+      })()}
+      {/* Floating reclassify dropdown */}
+      {showFloatingReclassify && singleSelectedPoly && floatingToolbarPos && (() => {
+        const svgEl = wrapperRef.current?.querySelector('svg');
+        const svgRect = svgEl?.getBoundingClientRect();
+        if (!svgRect || baseDims.width === 0) return null;
+        const scaleX = svgRect.width / baseDims.width;
+        const scaleY = svgRect.height / baseDims.height;
+        const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
+        const screenY = svgRect.top + floatingToolbarPos.centY * scaleY;
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left: screenX,
+              top: screenY - 48 - 8,
+              transform: 'translate(-50%, -100%)',
+              zIndex: 80,
+              minWidth: 180,
+              maxHeight: 220,
+              overflowY: 'auto',
+              padding: 6,
+              borderRadius: 8,
+              background: 'rgba(17,24,39,0.97)',
+              border: '1px solid rgba(148,163,184,0.35)',
+              boxShadow: '0 12px 24px rgba(0,0,0,0.45)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {classifications.map((cls) => (
+              <button
+                key={cls.id}
+                type="button"
+                onClick={() => handleFloatingReclassify(cls.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  textAlign: 'left',
+                  fontSize: 12,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  color: singleSelectedPoly.classificationId === cls.id ? '#fff' : '#e2e8f0',
+                  background: singleSelectedPoly.classificationId === cls.id ? 'rgba(56,189,248,0.18)' : 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    background: cls.color,
+                    flexShrink: 0,
+                  }}
+                />
+                {cls.name}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
