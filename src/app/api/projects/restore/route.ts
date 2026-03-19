@@ -8,13 +8,21 @@ import {
   updateProject,
   initDataDir,
   getProject,
+  restoreSnapshot,
 } from '@/server/project-store';
 
+// Restore a project from either a full export object or a snapshot ID.
 export async function POST(req: Request) {
   try {
     await initDataDir();
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+
+    // Snapshot restore path: { projectId, snapshotId }
+    if (body.projectId && body.snapshotId) {
+      const result = await restoreSnapshot(body.projectId as string, body.snapshotId as string);
+      return NextResponse.json({ ok: true, ...result });
+    }
 
     const { project } = body as { version?: number; exportedAt?: string; project?: Record<string, unknown> };
     if (!project || typeof project !== 'object') {

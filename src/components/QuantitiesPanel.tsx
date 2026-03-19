@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
@@ -14,6 +14,7 @@ import AssembliesPanel from './AssembliesPanel';
 import EstimatesTab from './EstimatesTab';
 import MeasurementSettingsPanel from './MeasurementSettings';
 import ClassificationLibrary from './ClassificationLibrary';
+import ImportFromLibraryModal from './ImportFromLibraryModal';
 import UserPreferencesPanel from './UserPreferencesPanel';
 import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
 import type { AutoDeduction } from '@/server/geometry-engine';
@@ -180,6 +181,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [takeoffSearchQuery, setTakeoffSearchQuery] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+  const [showImportFromLibrary, setShowImportFromLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   useEffect(() => {
@@ -1077,15 +1079,24 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         </form>
       )}
 
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-2 flex gap-2">
         <button
           type="button"
           onClick={handleOpenTemplateLibrary}
-          className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
+          className="flex-1 border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           aria-label="Classification Templates"
         >
           <Layers size={13} aria-hidden="true" />
           Templates
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowImportFromLibrary(true)}
+          className="flex-1 border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
+          aria-label="Import from Library"
+        >
+          <BookOpen size={13} aria-hidden="true" />
+          Import Library
         </button>
       </div>
 
@@ -1594,6 +1605,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       </div>
 
       <ClassificationLibrary open={showTemplateLibrary} onClose={handleCloseTemplateLibrary} />
+      <ImportFromLibraryModal open={showImportFromLibrary} onClose={() => setShowImportFromLibrary(false)} />
       <UserPreferencesPanel open={showPreferences} onClose={() => setShowPreferences(false)} />
 
       {/* ── Group Create/Edit Modal ── */}

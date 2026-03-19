@@ -3,6 +3,23 @@ import { initDataDir, getProject, generateShareToken, getShareToken, revokeShare
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
 
+export const GET = withCache({ noStore: true }, async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await initDataDir();
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+
+    const token = await getShareToken(id);
+    return NextResponse.json({ token: token ?? null });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+  }
+});
+
 export const POST = withCache({ noStore: true }, async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },

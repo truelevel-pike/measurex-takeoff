@@ -182,7 +182,7 @@ export default function SharedViewPage() {
           <span className="font-mono tracking-wider text-white text-sm">MEASUREX</span>
           <span className="font-mono tracking-wider text-[10px]" style={{ color: '#00d4ff' }}>SHARED VIEW</span>
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} />
-          <span className="text-zinc-400 text-sm truncate max-w-[300px]">{project.name}</span>
+          <span className="truncate max-w-[300px]" style={{ color: '#ffffff', fontSize: '0.875rem' }}>{project.name}</span>
         </div>
 
         {/* Center: page nav */}
@@ -234,20 +234,25 @@ export default function SharedViewPage() {
           </button>
         </div>
 
-        {/* Right: open in MeasureX */}
-        <a
-          href={`/?project=${project.id}`}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
-          style={{
-            background: '#12121a',
-            border: '1px solid rgba(0,212,255,0.3)',
-            color: '#00d4ff',
-            textDecoration: 'none',
-          }}
-        >
-          <ExternalLink size={14} />
-          Open in MeasureX
-        </a>
+        {/* Right: read-only badge + open in MeasureX */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '2px 8px', fontWeight: 500 }}>
+            Read-only preview
+          </span>
+          <a
+            href={`/?project=${project.id}`}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+            style={{
+              background: '#12121a',
+              border: '1px solid rgba(0,212,255,0.3)',
+              color: '#00d4ff',
+              textDecoration: 'none',
+            }}
+          >
+            <ExternalLink size={14} />
+            Open in MeasureX
+          </a>
+        </div>
       </header>
       <div style={{ height: 2, background: 'linear-gradient(90deg, rgba(0,212,255,0) 0%, rgba(0,212,255,0.6) 50%, rgba(0,212,255,0) 100%)' }} />
 
@@ -278,6 +283,27 @@ export default function SharedViewPage() {
           <QuantitiesPanel />
         </div>
       </div>
+
+      {/* Footer */}
+      <footer
+        style={{
+          height: 36,
+          background: 'rgba(10,10,15,0.95)',
+          borderTop: '1px solid rgba(0,212,255,0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          fontSize: 11,
+          color: '#6b7280',
+          flexShrink: 0,
+          fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        }}
+      >
+        <span>&copy; 2026 MeasureX &middot; Shared View</span>
+        <span style={{ color: '#4b5563' }}>Powered by MeasureX Takeoff Engine</span>
+        <a href="/" style={{ color: '#00d4ff', textDecoration: 'none', fontSize: 11 }}>Get MeasureX &rarr;</a>
+      </footer>
     </div>
   );
 }

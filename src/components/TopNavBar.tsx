@@ -6,6 +6,7 @@ import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useFeatureFlag } from '@/hooks/use-feature-flag';
 import {
+  BookOpen,
   LayoutGrid,
   ChevronLeft,
   ChevronRight,
@@ -59,6 +60,8 @@ interface TopNavBarProps {
   onSettings?: () => void;
   onToggleTakeoffSearch?: () => void;
   isTakeoffSearchOpen?: boolean;
+  onToggleTextSearch?: () => void;
+  isTextSearchOpen?: boolean;
   onGoToPage?: (page: number) => void;
   aiModel?: string;
   onAiModelChange?: (model: string) => void;
@@ -112,6 +115,7 @@ export default function TopNavBar({
   const { addToast } = useToast();
 
   const [shareLoading, setShareLoading] = React.useState(false);
+  const [isShared, setIsShared] = React.useState(false);
   const [isEditingPage, setIsEditingPage] = React.useState(false);
   const [pageInputValue, setPageInputValue] = React.useState('');
   const pageInputRef = React.useRef<HTMLInputElement>(null);
@@ -120,6 +124,17 @@ export default function TopNavBar({
   const [nameInputValue, setNameInputValue] = React.useState('');
   const [nameSaving, setNameSaving] = React.useState(false);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Check if project already has a share token on mount
+  React.useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    fetch(`/api/projects/${projectId}/share`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (!cancelled && data?.token) setIsShared(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   const handleCopyLink = React.useCallback(async () => {
     try {
@@ -162,7 +177,8 @@ export default function TopNavBar({
         document.body.removeChild(ta);
         if (!copied) throw new Error('Clipboard unavailable');
       }
-      addToast('Share link copied to clipboard', 'success');
+      setIsShared(true);
+      addToast('Copied! Share link is ready to paste.', 'success');
     } catch (error) {
       console.error('Failed to copy share link:', error);
       addToast('Failed to copy share link', 'error');
@@ -343,6 +359,12 @@ export default function TopNavBar({
                 {projectName}
               </span>
             )
+          )}
+          {isShared && !isMobile && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: '2px 7px' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+              Shared
+            </span>
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
           <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />
