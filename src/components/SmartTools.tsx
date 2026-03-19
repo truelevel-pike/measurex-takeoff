@@ -67,6 +67,7 @@ export default function SmartTools() {
   const addClassification = useStore((s) => s.addClassification);
   const addPolygon = useStore((s) => s.addPolygon);
   const updatePolygon = useStore((s) => s.updatePolygon);
+  const updateClassification = useStore((s) => s.updateClassification);
   const currentPage = useStore((s) => s.currentPage);
 
   const [doorWidth, setDoorWidth] = useState(DEFAULT_DOOR_WIDTH);
@@ -110,33 +111,44 @@ export default function SmartTools() {
     let windowCount = 0;
     for (const p of polygons) {
       if (p.pageNumber !== currentPage) continue;
-      const cls = doorClassifications.find((c) => c.id === p.classificationId);
-      if (cls) doorCount++;
-      const wcls = windowClassifications.find((c) => c.id === p.classificationId);
-      if (wcls) windowCount++;
+      if (doorClassifications.some((c) => c.id === p.classificationId)) doorCount++;
+      if (windowClassifications.some((c) => c.id === p.classificationId)) windowCount++;
     }
 
     const totalDeduction = doorCount * doorWidth + windowCount * windowWidth;
+    if (totalDeduction === 0) {
+      showStatus('No doors or windows found on this page to back out');
+      return;
+    }
 
-    // Update each wall polygon's linearFeet
+    // Build deduction label with breakdown
+    const parts: string[] = [];
+    if (doorCount > 0) parts.push(`Doors: ${doorCount}×${doorWidth}ft`);
+    if (windowCount > 0) parts.push(`Windows: ${windowCount}×${windowWidth}ft`);
+    const deductionLabel = `Door/Window Backout (${parts.join(', ')})`;
+
+    // Store deduction at the classification level (non-destructive)
     let updated = 0;
-    for (const wp of polygons) {
-      if (wp.pageNumber !== currentPage) continue;
-      const cls = wallClassifications.find((c) => c.id === wp.classificationId);
-      if (!cls) continue;
-      // Proportionally deduct from each wall segment
-      const wallPolygons = polygons.filter(
-        (p) => p.pageNumber === currentPage && wallClassifications.some((wc) => wc.id === p.classificationId)
+    for (const wc of wallClassifications) {
+      // Check that this wall classification has polygons on the current page
+      const hasPolygonsOnPage = polygons.some(
+        (p) => p.classificationId === wc.id && p.pageNumber === currentPage
       );
-      const share = wallPolygons.length > 0 ? totalDeduction / wallPolygons.length : 0;
-      const newLf = Math.max(0, wp.linearFeet - share);
-      updatePolygon(wp.id, { linearFeet: newLf });
+      if (!hasPolygonsOnPage) continue;
+
+      // Replace any existing backout deduction, then add the new one
+      const existing = (wc.deductions ?? []).filter(
+        (d) => !d.label.startsWith('Door/Window Backout')
+      );
+      updateClassification(wc.id, {
+        deductions: [...existing, { label: deductionLabel, quantity: totalDeduction }],
+      });
       updated++;
     }
 
-    showStatus(`Backed out ${doorCount} doors, ${windowCount} windows (−${totalDeduction.toFixed(1)} ft) from ${updated} wall segments`);
+    showStatus(`Backed out ${doorCount} doors, ${windowCount} windows (−${totalDeduction.toFixed(1)} ft) from ${updated} wall classifications`);
     recordAction('Backout Doors/Windows', handleBackout);
-  }, [polygons, wallClassifications, doorClassifications, windowClassifications, doorWidth, windowWidth, currentPage, updatePolygon, showStatus, recordAction]);
+  }, [polygons, wallClassifications, doorClassifications, windowClassifications, doorWidth, windowWidth, currentPage, updateClassification, showStatus, recordAction]);
 
   // --- Tool: Auto-classify Wall Centerline ---
   const handleWallCenterline = useCallback(() => {

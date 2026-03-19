@@ -241,7 +241,8 @@ export async function updateProject(
   const filePath = path.join(projectDir(projectId), 'project.json');
   const existing = await readJson<ProjectMeta | null>(filePath, null);
   if (!existing) return null;
-  const { thumbnail: _, ...safePatch } = patch;
+  const { thumbnail: _thumbnail, ...safePatch } = patch;
+  void _thumbnail;
   const updated = { ...existing, ...safePatch, updatedAt: now };
   await writeJson(filePath, updated);
   return updated;

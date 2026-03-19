@@ -479,7 +479,8 @@ export const useStore = create<Store>()(
     });
   },
 
-  cutPolygon: (id, _) => {
+  cutPolygon: (id, cutShape) => {
+    void cutShape;
     const s = get();
     const before = snapshot(s);
     set({

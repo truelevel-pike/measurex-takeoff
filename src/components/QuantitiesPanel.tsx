@@ -13,6 +13,8 @@ import EstimateSummary from './EstimateSummary';
 import MeasurementSettingsPanel from './MeasurementSettings';
 import ClassificationLibrary from './ClassificationLibrary';
 import UserPreferencesPanel from './UserPreferencesPanel';
+import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
+import type { AutoDeduction } from '@/server/geometry-engine';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -29,6 +31,40 @@ const CLASSIFICATION_COLOR_PRESETS = [
 ] as const;
 
 type ClassificationType = Classification['type'];
+
+const TRADE_GROUPS: Record<string, string[]> = {
+  "Concrete": ["slab", "footing", "foundation", "concrete", "topping"],
+  "Framing": ["wall", "partition", "framing", "stud", "header"],
+  "Flooring": ["floor", "carpet", "tile", "hardwood", "lvp", "living", "bedroom", "kitchen"],
+  "Roofing": ["roof", "shingle", "membrane"],
+  "Electrical": ["electrical", "panel", "conduit", "outlet"],
+  "Plumbing": ["plumbing", "pipe", "drain", "fixture"],
+  "Exterior": ["exterior", "facade", "siding", "window", "door"],
+  "Other": [],
+};
+
+function groupClassifications(items: Classification[]): Record<string, Classification[]> {
+  const result: Record<string, Classification[]> = {};
+  for (const trade of Object.keys(TRADE_GROUPS)) {
+    result[trade] = [];
+  }
+  for (const cls of items) {
+    const name = cls.name.toLowerCase();
+    let matched = false;
+    for (const [trade, keywords] of Object.entries(TRADE_GROUPS)) {
+      if (trade === 'Other') continue;
+      if (keywords.some((kw) => name.includes(kw))) {
+        result[trade].push(cls);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      result['Other'].push(cls);
+    }
+  }
+  return result;
+}
 
 export interface TakeoffSearchResult {
   id: string;
@@ -186,6 +222,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [groupSelectedClassificationIds, setGroupSelectedClassificationIds] = useState<Set<string>>(new Set());
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [groupByTrade, setGroupByTrade] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('measurex_group_by_trade') === 'true';
+  });
+  const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
   const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
 
   const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
@@ -232,6 +273,28 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     },
     [classifications, searchLower]
   );
+  const tradeGrouped = useMemo(
+    () => groupClassifications(filtered),
+    [filtered]
+  );
+
+  const handleToggleGroupByTrade = useCallback(() => {
+    setGroupByTrade((prev) => {
+      const next = !prev;
+      localStorage.setItem('measurex_group_by_trade', String(next));
+      return next;
+    });
+  }, []);
+
+  const toggleTradeCollapse = useCallback((trade: string) => {
+    setCollapsedTrades((prev) => {
+      const next = new Set(prev);
+      if (next.has(trade)) next.delete(trade);
+      else next.add(trade);
+      return next;
+    });
+  }, []);
+
   const classificationById = useMemo(() => {
     const byId = new Map<string, Classification>();
     for (const classification of classifications) {
@@ -725,6 +788,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           <span className="text-xs text-gray-300 font-normal">
             {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
           </span>
+          {filtered.length >= 3 && (
+            <button
+              type="button"
+              onClick={handleToggleGroupByTrade}
+              className={`p-1 rounded hover:bg-gray-700/60 transition-colors ${groupByTrade ? 'text-[#00d4ff]' : 'text-gray-400 hover:text-gray-200'}`}
+              aria-label={groupByTrade ? 'Disable trade grouping' : 'Group by trade'}
+              title={groupByTrade ? 'Ungrouped view' : 'Group by Trade'}
+            >
+              <Layers size={14} aria-hidden="true" />
+            </button>
+          )}
           {projectId && (
             <button
               type="button"
