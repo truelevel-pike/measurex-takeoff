@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -25,6 +26,10 @@ function nameToColor(name: string): string {
 }
 
 export async function POST(req: Request) {
+  // Rate limit: 10 req/min per IP
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const parsed = AiTakeoffBodySchema.safeParse(body);
