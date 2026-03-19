@@ -227,12 +227,16 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           if (!canvas) return;
           const ctx = canvas.getContext('2d')!;
           const dpr = window.devicePixelRatio || 1;
+          // Large PDF support: DPR clamped to prevent canvas overflow on high-DPI displays
+          const MAX_CANVAS_DIM = 4096;
+          const clampedDpr = Math.min(dpr, MAX_CANVAS_DIM / Math.max(viewport.width, viewport.height, 1));
+          const effectiveDpr = Math.max(1, clampedDpr);
 
-          canvas.width = viewport.width * dpr;
-          canvas.height = viewport.height * dpr;
+          canvas.width = viewport.width * effectiveDpr;
+          canvas.height = viewport.height * effectiveDpr;
           canvas.style.width = `${viewport.width}px`;
           canvas.style.height = `${viewport.height}px`;
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
 
           const dims = { width: viewport.width, height: viewport.height };
           setPageDimensions(dims);
@@ -696,7 +700,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         {/* Error fallback */}
         {loadError ? (
           <div className="flex items-center justify-center w-full h-full">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 text-center max-w-sm">
+            <div data-testid="pdf-load-error" className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 text-center max-w-sm">
               <FileX size={48} className="text-zinc-500 mx-auto mb-4" />
               <div className="text-lg font-semibold text-zinc-200 mb-2">Could not load PDF</div>
               <div className="text-sm text-zinc-400 mb-4">Please check the file and try again.</div>
