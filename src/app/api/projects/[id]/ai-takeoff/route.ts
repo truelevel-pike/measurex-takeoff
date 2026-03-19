@@ -65,7 +65,8 @@ export async function POST(
 
     return NextResponse.json({ elements });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'AI takeoff failed';
+    const raw = err instanceof Error ? err.message : 'AI takeoff failed';
+    const message = `Takeoff failed — try a different model or check your internet connection (${raw})`;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

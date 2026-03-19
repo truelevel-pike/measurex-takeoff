@@ -440,7 +440,8 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
 
     return NextResponse.json({ results, persistedPolygons });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'AI takeoff failed';
+    const raw = err instanceof Error ? err.message : 'AI takeoff failed';
+    const message = `Takeoff failed — try a different model or check your internet connection (${raw})`;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

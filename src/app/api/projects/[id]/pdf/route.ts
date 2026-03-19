@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const buf = await loadPDF(id);
     if (!buf) {
-      return NextResponse.json({ error: 'PDF not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Unable to load PDF — the file may be corrupted or too large (max 50MB)' }, { status: 404 });
     }
 
     return new Response(buf.buffer as ArrayBuffer, {
@@ -26,6 +26,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
   } catch (err: unknown) {
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    return NextResponse.json({ error: `Unable to load PDF — the file may be corrupted or too large (max 50MB)` }, { status: 500 });
   }
 }

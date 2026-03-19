@@ -1306,6 +1306,13 @@ export default function ProjectsPage() {
 
       {/* What's New modal */}
       {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+
+      {/* Version footer */}
+      <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center py-2 pointer-events-none">
+        <span className="text-[11px] text-zinc-600 font-medium tracking-wide pointer-events-auto select-none">
+          MeasureX v1.0.0
+        </span>
+      </footer>
     </div>
   );
 }
