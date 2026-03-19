@@ -15,6 +15,7 @@ interface RawElement {
   quantity?: number;
   points?: Array<{ x: number; y: number }>;
   color?: string;
+  confidence?: number;
 }
 
 interface DetectedElement {
@@ -23,6 +24,7 @@ interface DetectedElement {
   classification: string;
   points: Array<{ x: number; y: number }>;
   color: string;
+  confidence: number;
 }
 
 /**
@@ -112,6 +114,7 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
       const color = typeof el.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(el.color)
         ? el.color
         : nameToColor(name);
+      const confidence = typeof el.confidence === 'number' ? el.confidence : 0.85;
       return {
         name,
         type,
@@ -119,6 +122,7 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
         quantity,
         points,
         color,
+        confidence,
       };
     });
 
@@ -127,13 +131,13 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
     if (el.type === 'count') {
       if (el.points.length === 1 && el.quantity > 1) {
         for (let i = 0; i < el.quantity; i++) {
-          expanded.push({ name: el.name, type: el.type, classification: el.classification, points: [el.points[0]], color: el.color });
+          expanded.push({ name: el.name, type: el.type, classification: el.classification, points: [el.points[0]], color: el.color, confidence: el.confidence });
         }
         continue;
       }
       if (el.points.length > 1) {
         for (const point of el.points) {
-          expanded.push({ name: el.name, type: el.type, classification: el.classification, points: [point], color: el.color });
+          expanded.push({ name: el.name, type: el.type, classification: el.classification, points: [point], color: el.color, confidence: el.confidence });
         }
         continue;
       }
@@ -145,6 +149,7 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
       classification: el.classification,
       points: el.points,
       color: el.color,
+      confidence: el.confidence,
     });
   }
 
@@ -220,7 +225,7 @@ LINEAR items (type: "linear") — return two endpoints:
 
 For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex) }. No prose, no markdown fences.
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex), confidence: number (0.0-1.0, your confidence in the detection accuracy) }. No prose, no markdown fences.
 
 COORDINATE FORMAT: All x and y values MUST be NORMALIZED — floating-point numbers between 0.0 and 1.0, relative to the full image dimensions (0,0 = top-left corner, 1,1 = bottom-right corner). Do NOT return pixel values.
 
@@ -332,6 +337,8 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
             points: persistPoints,
             pageNumber: page,
             label: el.name,
+            confidence: el.confidence ?? 0.85,
+            detectedByModel: resolvedModel,
           }),
         });
         if (!polyRes.ok) {

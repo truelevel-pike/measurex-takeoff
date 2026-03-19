@@ -61,6 +61,8 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
       linearFeet: data.linearFeet ?? computedLinear,
       isComplete: data.isComplete ?? true,
       label: data.label,
+      confidence: data.confidence,
+      detectedByModel: data.detectedByModel,
     });
     broadcastToProject(id, 'polygon:created', polygon);
     fireWebhook(id, 'polygon.created', polygon);

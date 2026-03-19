@@ -19,6 +19,8 @@ export const PolygonSchema = z.object({
   area: z.number().nonnegative().optional(),
   linearFeet: z.number().nonnegative().optional(),
   isComplete: z.boolean().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  detectedByModel: z.string().optional(),
 });
 
 // Classification

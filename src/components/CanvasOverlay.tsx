@@ -450,7 +450,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     onContextMenu={handlePolygonContextMenu as unknown as React.MouseEventHandler<SVGPolylineElement>}
                     aria-label={cls?.name ?? 'Unknown classification'}
                   >
-                    <title>{cls?.name ?? 'Polyline'}</title>
+                    <title>{`${cls?.name ?? 'Polyline'}${poly.confidence !== undefined ? ` | ${Math.round(poly.confidence * 100)}% confidence` : ''}${poly.detectedByModel ? ` | Model: ${poly.detectedByModel}` : ''}`}</title>
                   </polyline>
                   {/* Endpoint dots for linear */}
                   {displayPoints.length >= 2 && [0, displayPoints.length - 1].map((idx) => (
@@ -480,7 +480,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   onContextMenu={handlePolygonContextMenu}
                   aria-label={cls?.name ?? 'Unknown classification'}
                 >
-                  <title>{cls?.name ?? 'Polygon'}</title>
+                  <title>{`${cls?.name ?? 'Polygon'}${poly.confidence !== undefined ? ` | ${Math.round(poly.confidence * 100)}% confidence` : ''}${poly.detectedByModel ? ` | Model: ${poly.detectedByModel}` : ''}`}</title>
                 </polygon>
               )}
               {isSelected && (
@@ -528,6 +528,27 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     onMouseDown={handleVertexMouseDown}
                   />
                 ))}
+              {/* Confidence indicator dot */}
+              {poly.confidence !== undefined && (() => {
+                const pts = displayPoints;
+                if (pts.length === 0) return null;
+                const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+                const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+                const confColor = poly.confidence > 0.8 ? '#22c55e' : poly.confidence >= 0.5 ? '#eab308' : '#ef4444';
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy - 14}
+                    r={5}
+                    fill={confColor}
+                    stroke="#fff"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
+                    opacity={0.85}
+                  />
+                );
+              })()}
               {/* Polygon label: measurement annotation (area/length/count) */}
               {(() => {
                 const pts = displayPoints;

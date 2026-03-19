@@ -1282,6 +1282,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   <ClassificationShape index={classIndex} color={classification.color} />
 
                   <span className={`flex-1 font-medium truncate text-[12px] ${classification.type === 'count' && totals.count === 0 ? 'text-gray-500' : 'text-[#e5e7eb]'}`}>{classification.name}</span>
+                  {(() => {
+                    const clsPolygons = polygons.filter((p) => p.classificationId === classification.id && p.confidence !== undefined);
+                    if (clsPolygons.length === 0) return null;
+                    const avgConf = clsPolygons.reduce((sum, p) => sum + (p.confidence ?? 0), 0) / clsPolygons.length;
+                    const confPct = Math.round(avgConf * 100);
+                    const confColor = avgConf > 0.8 ? 'rgba(34,197,94,0.25)' : avgConf >= 0.5 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)';
+                    const confTextColor = avgConf > 0.8 ? '#4ade80' : avgConf >= 0.5 ? '#facc15' : '#f87171';
+                    return (
+                      <span className="text-[9px] px-1 rounded flex-shrink-0" style={{ backgroundColor: confColor, color: confTextColor, opacity: 0.85 }}>{confPct}%</span>
+                    );
+                  })()}
 
                   {classification.type === 'count' ? (
                     <span className={`text-[14px] font-bold font-mono px-1.5 py-0.5 rounded ${totals.count === 0 ? 'text-gray-500 bg-[#0e1016]/50' : 'text-[#00d4ff] bg-[#0e1016]'}`}>

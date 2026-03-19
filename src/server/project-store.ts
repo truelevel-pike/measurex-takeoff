@@ -740,6 +740,8 @@ export async function createPolygon(
       linear_pixels: data.linearFeet ?? 0,
       is_complete: data.isComplete ?? true,
       label: data.label ?? null,
+      confidence: data.confidence ?? null,
+      detected_by_model: data.detectedByModel ?? null,
     };
     const { error } = await sb.from('mx_polygons').insert(row);
     if (error) throw new Error(`createPolygon: ${error.message}`);
@@ -752,6 +754,8 @@ export async function createPolygon(
       linearFeet: row.linear_pixels,
       isComplete: data.isComplete ?? true,
       label: data.label,
+      confidence: data.confidence,
+      detectedByModel: data.detectedByModel,
     };
     await recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: created });
     return created;
@@ -783,6 +787,8 @@ export async function getPolygons(projectId: string): Promise<Polygon[]> {
       linearFeet: row.linear_pixels as number,
       isComplete: row.is_complete as boolean,
       label: (row.label as string | null) ?? undefined,
+      confidence: (row.confidence as number | null) ?? undefined,
+      detectedByModel: (row.detected_by_model as string | null) ?? undefined,
       createdAt: (row.created_at as string | null) ?? undefined,
       updatedAt: (row.updated_at as string | null) ?? undefined,
     }));

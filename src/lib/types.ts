@@ -9,6 +9,8 @@ export interface Polygon {
   linearFeet: number; // raw pixel length (stored as linear_pixels in DB)
   isComplete: boolean;
   label?: string;
+  confidence?: number;       // 0-1, AI detection confidence
+  detectedByModel?: string;  // e.g. "GPT-5.4", "Gemini Flash", "Claude"
   createdAt?: string;
   updatedAt?: string;
 }
