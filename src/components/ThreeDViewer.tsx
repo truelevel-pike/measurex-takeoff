@@ -11,7 +11,8 @@ import {
   OrthographicCamera,
 } from '@react-three/drei';
 import { CanvasTexture, RepeatWrapping, TextureLoader, ClampToEdgeWrapping } from 'three';
-import { Box, Layers3 } from 'lucide-react';
+import { Box, Layers3, Clock } from 'lucide-react';
+import { useToast } from '@/components/Toast';
 
 type CameraMode = 'perspective' | 'orthographic';
 
@@ -173,6 +174,8 @@ export default function ThreeDViewer({
 }: ThreeDViewerProps) {
   const [cameraMode, setCameraMode] = useState<CameraMode>('perspective');
   const [showGrid, setShowGrid] = useState(true);
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const { addToast } = useToast();
 
   return (
     <div
@@ -309,10 +312,41 @@ export default function ThreeDViewer({
 
       {show3D && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-[rgba(18,18,26,0.9)] backdrop-blur-sm border border-[#00d4ff]/20 rounded-lg p-1 shadow-[0_0_20px_rgba(0,212,255,0.15)]">
-          <button className="h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition">Combine</button>
-          <button className="h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition">Merge Lines</button>
-          <button className="h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition">Rotate</button>
-          <button className="h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition">Snap</button>
+          <button
+            onClick={() => addToast('Combine — merges selected objects into a single group. Coming soon!', 'info')}
+            className="relative h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition"
+          >
+            Combine
+            <Clock size={8} className="absolute -top-1 -right-1 text-yellow-400" />
+          </button>
+          <button
+            onClick={() => addToast('Merge Lines — joins adjacent line segments into continuous paths. Coming soon!', 'info')}
+            className="relative h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition"
+          >
+            Merge Lines
+            <Clock size={8} className="absolute -top-1 -right-1 text-yellow-400" />
+          </button>
+          <button
+            onClick={() => addToast('Rotate — rotates selected object 90° on Y axis. Coming soon!', 'info')}
+            className="relative h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35 transition"
+          >
+            Rotate
+            <Clock size={8} className="absolute -top-1 -right-1 text-yellow-400" />
+          </button>
+          <button
+            onClick={() => {
+              setSnapEnabled((prev) => !prev);
+              addToast(snapEnabled ? 'Grid snap disabled.' : 'Grid snap enabled — objects will snap to grid intersections. Coming soon!', 'info');
+            }}
+            className={`relative h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition ${
+              snapEnabled
+                ? 'bg-[#00d4ff]/20 border-[#00d4ff]/50 text-[#00d4ff]'
+                : 'bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35'
+            }`}
+          >
+            Snap
+            <Clock size={8} className="absolute -top-1 -right-1 text-yellow-400" />
+          </button>
           <div className="w-px h-6 bg-[#00d4ff]/20 mx-1"></div>
           <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[#8892a0] flex items-center gap-2">
             <Box size={12} className="text-[#00d4ff]" />

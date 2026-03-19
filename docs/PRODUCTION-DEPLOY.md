@@ -99,6 +99,71 @@ Run the end-to-end smoke test against your deployed URL:
 MEASUREX_URL=https://your-app.vercel.app npm run test:e2e
 ```
 
+## Environment Variables (Vercel)
+
+Below is the complete list of environment variables used by MeasureX. Set these in **Vercel → Settings → Environment Variables** (or your hosting provider's equivalent).
+
+### Required
+
+| Variable | Server/Client | Description |
+|----------|---------------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Client | Supabase project URL (e.g. `https://xxxxx.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client | Supabase anon/public API key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Supabase service role key — **keep secret, never expose client-side** |
+| `OPENAI_API_KEY` | Server only | OpenAI API key for AI takeoff, vision search, chat, and sheet naming |
+
+### Optional (External Image Search)
+
+| Variable | Description |
+|----------|-------------|
+| `BING_IMAGE_SEARCH_KEY` | Bing Image Search API subscription key |
+| `BING_IMAGE_SEARCH_ENDPOINT` | Bing endpoint URL (defaults to `https://api.bing.microsoft.com/v7.0/images/search`) |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY` | Google Custom Search JSON API key |
+| `GOOGLE_CUSTOM_SEARCH_CX` | Google Custom Search Engine ID |
+| `UNSPLASH_ACCESS_KEY` | Unsplash API access key |
+
+### Optional (App Config)
+
+| Variable | Description |
+|----------|-------------|
+| `FEATURE_FLAGS` | JSON object of feature flags (e.g. `{"ai_takeoff":true}`) |
+| `ADMIN_KEY` | Secret key for admin endpoints (`/api/admin/*`) |
+| `NEXT_PUBLIC_OPENAI_API_KEY` | Client-side OpenAI key fallback — avoid in production; prefer server-only `OPENAI_API_KEY` |
+| `ANALYZE` | Set to `true` to enable webpack bundle analyzer during build |
+
+> **Tip:** After adding or changing env vars in Vercel, you must **redeploy** for changes to take effect.
+
+---
+
+## Health Check
+
+After deploying, verify the app is running:
+
+```bash
+curl -s https://your-app.vercel.app/api/health | python3 -m json.tool
+```
+
+**Expected response** (HTTP 200):
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-19T12:00:00.000Z",
+  "uptime": 42,
+  "supabaseConnected": true,
+  "version": "0.1.0"
+}
+```
+
+**What to check:**
+- `status` is `"ok"`
+- `supabaseConnected` is `true` — if `false`, your Supabase env vars are missing or incorrect
+- `version` matches your expected release
+
+If the endpoint returns a non-200 status or connection error, the deployment failed — check Vercel build logs.
+
+---
+
 ## Troubleshooting
 
 ### "relation mx_projects does not exist"

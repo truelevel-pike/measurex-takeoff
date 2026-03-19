@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Search, X, Boxes, Plus, CheckSquare, ChevronRight } from 'lucide-react';
+import { Search, X, Boxes, Plus, CheckSquare, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,31 +23,40 @@ interface SelectionBox {
   endY: number;
 }
 
+interface VisionMatch {
+  name: string;
+  count: number;
+  description: string;
+  boundingBoxes?: { x: number; y: number; width: number; height: number }[];
+}
+
+interface VisionResult {
+  matches: VisionMatch[];
+  summary: string;
+  error?: string;
+}
+
 interface PatternSearchProps {
   onClose: () => void;
   onAddToTakeoff?: (matches: PatternMatch[]) => void;
+  /** Base64 data URL of the current PDF page (e.g. from canvas.toDataURL()) */
+  pdfPageImageData?: string | null;
+  /** Current page number */
+  currentPage?: number;
 }
-
-// ─── Stub results ─────────────────────────────────────────────────────────────
-
-const STUB_MATCHES: PatternMatch[] = [
-  { id: '1', label: 'Pattern Match #1', confidence: 97, pageNumber: 1, x: 142, y: 88,  width: 64, height: 48 },
-  { id: '2', label: 'Pattern Match #2', confidence: 94, pageNumber: 1, x: 310, y: 204, width: 64, height: 48 },
-  { id: '3', label: 'Pattern Match #3', confidence: 91, pageNumber: 2, x: 88,  y: 316, width: 64, height: 48 },
-  { id: '4', label: 'Pattern Match #4', confidence: 88, pageNumber: 2, x: 456, y: 122, width: 64, height: 48 },
-  { id: '5', label: 'Pattern Match #5', confidence: 85, pageNumber: 3, x: 200, y: 400, width: 64, height: 48 },
-  { id: '6', label: 'Pattern Match #6', confidence: 81, pageNumber: 3, x: 380, y: 280, width: 64, height: 48 },
-];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearchProps) {
+export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageData, currentPage = 1 }: PatternSearchProps) {
   const [phase, setPhase] = useState<'draw' | 'results'>('draw');
+  const [query, setQuery] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [selection, setSelection] = useState<SelectionBox | null>(null);
   const [results, setResults] = useState<PatternMatch[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -77,16 +86,86 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
     dragStart.current = null;
   }, []);
 
-  const handleSearch = useCallback(() => {
-    if (!selection) return;
+  const handleSearch = useCallback(async () => {
+    if (!query.trim()) return;
+    setError(null);
+    setSummary(null);
     setIsSearching(true);
-    setTimeout(() => {
-      setResults(STUB_MATCHES);
-      setSelected(new Set(STUB_MATCHES.map((m) => m.id)));
+
+    if (!pdfPageImageData) {
+      setError('No PDF page loaded. Please load a PDF first.');
       setIsSearching(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/vision-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: query.trim(),
+          image: pdfPageImageData,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `Request failed (${res.status})` }));
+        throw new Error(errData.error || `Vision search failed (${res.status})`);
+      }
+
+      const data: VisionResult = await res.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setSummary(data.summary || null);
+
+      // Convert VisionMatch[] to PatternMatch[] for the existing UI
+      const patternMatches: PatternMatch[] = [];
+      let matchIndex = 0;
+      for (const vm of data.matches) {
+        if (vm.boundingBoxes && vm.boundingBoxes.length > 0) {
+          for (const bb of vm.boundingBoxes) {
+            matchIndex++;
+            patternMatches.push({
+              id: String(matchIndex),
+              label: vm.name || `Match #${matchIndex}`,
+              confidence: Math.round(100 - matchIndex * 3), // approximate from order
+              pageNumber: currentPage,
+              x: bb.x,
+              y: bb.y,
+              width: bb.width,
+              height: bb.height,
+            });
+          }
+        } else {
+          // No bounding boxes — still show as a result with count
+          for (let i = 0; i < Math.max(1, vm.count); i++) {
+            matchIndex++;
+            patternMatches.push({
+              id: String(matchIndex),
+              label: vm.name || `Match #${matchIndex}`,
+              confidence: Math.round(100 - matchIndex * 3),
+              pageNumber: currentPage,
+              x: 0,
+              y: 0,
+              width: 0,
+              height: 0,
+            });
+          }
+        }
+      }
+
+      setResults(patternMatches);
+      setSelected(new Set(patternMatches.map((m) => m.id)));
       setPhase('results');
-    }, 1200);
-  }, [selection]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Vision search failed.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [query, pdfPageImageData, currentPage]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -107,6 +186,8 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
     setSelection(null);
     setResults([]);
     setSelected(new Set());
+    setError(null);
+    setSummary(null);
   };
 
   // ─── Selection box geometry ───────────────────────────────────────────────
@@ -132,6 +213,7 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
           <div className="flex items-center gap-2">
             <Boxes size={18} className="text-blue-400" />
             <span className="text-white font-semibold text-sm">Pattern Search</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">AI</span>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={18} />
@@ -140,39 +222,65 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
 
         {phase === 'draw' ? (
           <>
-            {/* Instructions */}
+            {/* Query input */}
             <div className="px-5 pt-4 pb-2">
-              <p className="text-gray-300 text-sm">
-                Draw a selection box around a repeating pattern to find all instances across your drawings.
-              </p>
-              <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
-                <ChevronRight size={12} />
-                One drawing at a time
-              </p>
+              <label className="block text-gray-300 text-sm mb-2">
+                Describe the pattern or element to find on this page:
+              </label>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                placeholder='e.g. "doors", "electrical outlets", "windows"'
+                className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-blue-500"
+                style={{ background: '#0f0f1e', border: '1px solid #3d3d6e' }}
+                autoFocus
+              />
+              {!pdfPageImageData && (
+                <p className="text-yellow-400/80 text-xs mt-2 flex items-center gap-1">
+                  <AlertCircle size={12} />
+                  No PDF page loaded — load a PDF to enable AI pattern search.
+                </p>
+              )}
             </div>
 
-            {/* Canvas area */}
+            {/* Canvas area (optional region selection) */}
+            <div className="px-5 pt-1 pb-1">
+              <p className="text-gray-500 text-xs flex items-center gap-1">
+                <ChevronRight size={12} />
+                Optionally draw a region to narrow the search area
+              </p>
+            </div>
             <div
               ref={canvasRef}
-              className="relative mx-5 my-3 rounded-lg overflow-hidden select-none"
+              className="relative mx-5 my-2 rounded-lg overflow-hidden select-none"
               style={{
-                height: 280,
+                height: 200,
                 background: '#0f0f1e',
                 border: '1px dashed #3d3d6e',
-                cursor: isDrawing ? 'crosshair' : 'crosshair',
+                cursor: 'crosshair',
               }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              {/* Grid hint */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center text-gray-600">
-                  <Search size={32} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-xs opacity-50">Click and drag to draw a selection box</p>
+              {/* Preview of PDF page if available */}
+              {pdfPageImageData ? (
+                <img
+                  src={pdfPageImageData}
+                  alt="Current page"
+                  className="absolute inset-0 w-full h-full object-contain opacity-40 pointer-events-none"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center text-gray-600">
+                    <Search size={32} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-xs opacity-50">No page preview available</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Dashed selection rectangle */}
               {selBox && selBox.width > 4 && selBox.height > 4 && (
@@ -191,6 +299,15 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
               )}
             </div>
 
+            {/* Error display */}
+            {error && (
+              <div className="mx-5 mb-2 px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+                   style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <AlertCircle size={14} className="text-red-400 shrink-0" />
+                <span className="text-red-300">{error}</span>
+              </div>
+            )}
+
             {/* Search button */}
             <div className="flex justify-end px-5 pb-5 gap-3">
               <button
@@ -201,15 +318,24 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
               </button>
               <button
                 onClick={handleSearch}
-                disabled={!selection || isSearching}
+                disabled={!query.trim() || !pdfPageImageData || isSearching}
                 className="flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: selection && !isSearching ? '#3b82f6' : '#1e3a5f',
+                  background: query.trim() && pdfPageImageData && !isSearching ? '#3b82f6' : '#1e3a5f',
                   color: '#fff',
                 }}
               >
-                <Search size={14} />
-                {isSearching ? 'Searching…' : 'Search'}
+                {isSearching ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Analyzing…
+                  </>
+                ) : (
+                  <>
+                    <Search size={14} />
+                    Search
+                  </>
+                )}
               </button>
             </div>
           </>
@@ -218,19 +344,29 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
             {/* Results header */}
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
               <span className="text-gray-300 text-sm">
-                Found <span className="text-white font-semibold">{results.length}</span> matches across{' '}
-                <span className="text-white font-semibold">
-                  {new Set(results.map((r) => r.pageNumber)).size}
-                </span>{' '}
-                pages
+                Found <span className="text-white font-semibold">{results.length}</span> matches on page{' '}
+                <span className="text-white font-semibold">{currentPage}</span>
               </span>
               <button onClick={handleReset} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
                 New search
               </button>
             </div>
 
+            {/* AI Summary */}
+            {summary && (
+              <div className="mx-5 mb-2 px-3 py-2 rounded-lg text-xs text-gray-300"
+                   style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                {summary}
+              </div>
+            )}
+
             {/* Results grid */}
             <div className="flex-1 overflow-y-auto px-5 pb-3 space-y-2">
+              {results.length === 0 && (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  No matching patterns found. Try a different query.
+                </div>
+              )}
               {results.map((match) => (
                 <div
                   key={match.id}
@@ -250,7 +386,10 @@ export default function PatternSearch({ onClose, onAddToTakeoff }: PatternSearch
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{match.label}</p>
-                    <p className="text-gray-400 text-xs">Page {match.pageNumber}</p>
+                    <p className="text-gray-400 text-xs">
+                      Page {match.pageNumber}
+                      {match.x > 0 || match.y > 0 ? ` — at (${Math.round(match.x)}%, ${Math.round(match.y)}%)` : ''}
+                    </p>
                   </div>
 
                   {/* Confidence */}

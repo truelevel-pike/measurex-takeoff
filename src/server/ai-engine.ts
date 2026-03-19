@@ -3,6 +3,8 @@
  * Calls gpt-4o-mini to detect construction elements in blueprint images.
  */
 
+import { getOpenAIKey } from '@/lib/openai-guard';
+
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 export interface AIDetectedElement {
@@ -60,8 +62,8 @@ export async function analyzePageImage(
   pageWidth: number,
   pageHeight: number,
 ): Promise<AIDetectedElement[]> {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured — set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in .env.local');
+  const apiKey = getOpenAIKey();
+  if (!apiKey) throw new Error('OpenAI API key not configured — set OPENAI_API_KEY in your environment or .env.local');
 
   const content = [
     {

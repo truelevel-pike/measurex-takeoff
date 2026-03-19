@@ -3,6 +3,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 import { AiTakeoffBodySchema } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 import { broadcastToProject } from '@/lib/sse-broadcast';
+import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -177,10 +178,9 @@ export async function POST(req: Request) {
     if ('error' in validated) return validated.error;
     const { imageBase64, pageWidth, pageHeight, projectId, pageNumber } = validated.data;
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY missing — set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in .env.local' }, { status: 503 });
-    }
+    const guard = checkOpenAIKey();
+    if (guard) return guard;
+    const apiKey = getOpenAIKey()!;
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 

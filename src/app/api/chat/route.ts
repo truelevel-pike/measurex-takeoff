@@ -1,5 +1,6 @@
 import { ChatBodySchema } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
+import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -25,10 +26,9 @@ export async function POST(req: Request) {
       return Response.json({ error: 'message or messages is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return Response.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
-    }
+    const guard = checkOpenAIKey();
+    if (guard) return guard;
+    const apiKey = getOpenAIKey()!;
 
     // Build context block for system prompt
     let contextBlock = '';

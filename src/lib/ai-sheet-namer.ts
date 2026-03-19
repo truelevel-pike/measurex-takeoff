@@ -3,8 +3,10 @@
  * Falls back to OpenAI vision (gpt-4o) when text-based extraction returns null.
  */
 
+import { getOpenAIKey } from '@/lib/openai-guard';
+
 export async function aiSheetNamer(imageBase64: string): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = getOpenAIKey();
   if (!apiKey) return null;
 
   const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;

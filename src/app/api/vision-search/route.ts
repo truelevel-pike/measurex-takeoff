@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 
 interface VisionMatch {
   name: string;
@@ -36,13 +37,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Image is required.' }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key is not configured.' },
-        { status: 500 },
-      );
-    }
+    const guard = checkOpenAIKey();
+    if (guard) return guard;
+    const apiKey = getOpenAIKey()!;
 
     // Ensure the image is a proper data URL
     const imageUrl = image.startsWith('data:') ? image : `data:image/png;base64,${image}`;
