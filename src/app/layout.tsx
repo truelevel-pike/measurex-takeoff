@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
+import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +37,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0f] text-white`}>
         {children}
+        <KeyboardShortcutsPortal />
       </body>
     </html>
   );

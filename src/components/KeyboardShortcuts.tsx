@@ -19,36 +19,30 @@ const sections: ShortcutSection[] = [
   {
     title: 'Tools',
     rows: [
-      { description: 'Select', keys: ['Esc'] },
-      { description: 'Rectangle', keys: ['R'] },
-      { description: 'Circle', keys: ['C'] },
-      { description: 'Arc', keys: ['A'] },
-      { description: 'Pan', keys: ['V'] },
-      { description: 'Merge', keys: ['M'] },
+      { description: 'Select', keys: ['V'] },
+      { description: 'Pan', keys: ['H'] },
+      { description: 'Draw Polygon', keys: ['D'] },
+      { description: 'Merge', keys: ['G'] },
       { description: 'Split', keys: ['S'] },
+      { description: 'Cut', keys: ['C'] },
+      { description: 'Measure', keys: ['M'] },
+      { description: 'AI Takeoff', keys: ['A'] },
     ],
   },
   {
     title: 'Edit',
     rows: [
-      { description: 'Combine Selected', keys: ['Cmd', 'B'] },
-      { description: 'Merge Lines', keys: ['Cmd', 'X'] },
-      { description: 'Undo', keys: ['Cmd', 'Z'] },
-      { description: 'Redo', keys: ['Cmd', 'Shift', 'Z'] },
-      { description: 'Delete Selected', keys: ['Delete'] },
+      { description: 'Undo', keys: ['Ctrl', 'Z'] },
+      { description: 'Redo', keys: ['Ctrl', 'Y'] },
+      { description: 'Delete polygon', keys: ['Delete'] },
     ],
   },
   {
-    title: 'View',
+    title: 'General',
     rows: [
-      { description: 'Zoom In', keys: ['+'] },
-      { description: 'Zoom Out', keys: ['-'] },
-      { description: 'Pan Hold', keys: ['Space'] },
+      { description: 'Cancel / Deselect', keys: ['Esc'] },
+      { description: 'Show shortcuts', keys: ['?'] },
     ],
-  },
-  {
-    title: 'Help',
-    rows: [{ description: 'Show This Dialog', keys: ['?'] }],
   },
 ];
 
@@ -92,14 +86,22 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
         <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
           {sections.map((section) => (
             <section key={section.title} className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">{section.title}</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                {section.title}
+              </h3>
               <div className="space-y-2">
                 {section.rows.map((row) => (
-                  <div key={`${section.title}-${row.description}`} className="flex items-center justify-between gap-4 rounded-md bg-gray-800/50 px-3 py-2">
+                  <div
+                    key={`${section.title}-${row.description}`}
+                    className="flex items-center justify-between gap-4 rounded-md bg-gray-800/50 px-3 py-2"
+                  >
                     <span className="text-sm text-gray-100">{row.description}</span>
                     <div className="flex items-center gap-1">
                       {row.keys.map((key, index) => (
-                        <span key={`${row.description}-${key}-${index}`} className="rounded border border-gray-500 bg-gray-700 px-2 py-0.5 font-mono text-sm text-white">
+                        <span
+                          key={`${row.description}-${key}-${index}`}
+                          className="rounded border border-gray-500 bg-gray-700 px-2 py-0.5 font-mono text-sm text-white"
+                        >
                           {key}
                         </span>
                       ))}

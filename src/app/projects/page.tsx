@@ -32,6 +32,28 @@ import DrawingComparison from '@/components/DrawingComparison';
 import CollaborationPanel from '@/components/CollaborationPanel';
 import AutoNameTool from '@/components/AutoNameTool';
 
+/* ── Project thumbnail helpers ─────────────────────────────────── */
+const THUMB_PALETTE = [
+  '#3B82F6', '#8B5CF6', '#EC4899', '#F97316', '#10B981',
+  '#06B6D4', '#EAB308', '#EF4444', '#6366F1', '#14B8A6',
+];
+
+function nameHash(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function thumbColor(name: string): string {
+  return THUMB_PALETTE[nameHash(name) % THUMB_PALETTE.length];
+}
+
+function thumbInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 interface ProjectRow {
   id: string;
   name: string;
@@ -40,6 +62,9 @@ interface ProjectRow {
   updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
+  pdfPath?: string;
+  pdf_path?: string;
+  pageCount?: number;
   state?: ProjectState;
 }
 
@@ -292,10 +317,11 @@ export default function ProjectsPage() {
   // Onboarding steps
   const onboardingSteps = useMemo(() => [
     { label: 'Create a project', done: projects.length > 0 },
-    { label: 'Upload drawings', done: false },
+    { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0) },
     { label: 'Run AI takeoff', done: false },
     { label: 'Export quantities', done: false },
-  ], [projects.length]);
+  ], [projects]);
+  const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
 
   const dismissOnboarding = () => {
     setShowOnboarding(false);
@@ -519,10 +545,26 @@ export default function ProjectsPage() {
                 {onboardingSteps.map((step, i) => (
                   <div key={i} className={`flex items-center gap-2 text-sm ${step.done ? 'text-green-400' : 'text-zinc-400'}`}>
                     {step.done ? <CheckCircle2 size={16} className="text-green-400 shrink-0" /> : <Circle size={16} className="text-zinc-500 shrink-0" />}
-                    <span>{step.label}</span>
+                    <span className={step.done ? 'line-through' : ''}>{step.label}</span>
                   </div>
                 ))}
               </div>
+              <div className="mt-3">
+                <div className="w-full h-1 rounded bg-zinc-700 overflow-hidden">
+                  <div
+                    className="h-1 bg-green-400 transition-all"
+                    style={{ width: `${(completedOnboardingSteps / onboardingSteps.length) * 100}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-zinc-400">{completedOnboardingSteps}/{onboardingSteps.length} steps complete</div>
+              </div>
+              <button
+                type="button"
+                onClick={dismissOnboarding}
+                className="mt-3 text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
+              >
+                Skip tutorial
+              </button>
             </div>
           )}
 
@@ -621,9 +663,17 @@ export default function ProjectsPage() {
                     onClick={() => handleOpen(p.id)}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
                   >
-                    {/* Thumbnail placeholder */}
-                    <div className="h-28 bg-zinc-700/50 flex items-center justify-center">
-                      <FileSpreadsheet size={32} className="text-zinc-600" aria-hidden />
+                    {/* Project thumbnail */}
+                    <div
+                      className="h-28 flex items-center justify-center"
+                      style={{ backgroundColor: thumbColor(p.name) + '22' }}
+                    >
+                      <span
+                        className="text-2xl font-bold rounded-full w-14 h-14 flex items-center justify-center"
+                        style={{ backgroundColor: thumbColor(p.name), color: '#fff' }}
+                      >
+                        {thumbInitials(p.name)}
+                      </span>
                     </div>
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
@@ -687,7 +737,17 @@ export default function ProjectsPage() {
                             <Star size={14} className={starredIds.has(p.id) ? 'fill-yellow-400 text-yellow-400' : ''} />
                           </button>
                         </td>
-                        <td className="px-4 py-3 font-medium text-white">{p.name}</td>
+                        <td className="px-4 py-3 font-medium text-white">
+                          <span className="flex items-center gap-2.5">
+                            <span
+                              className="text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: thumbColor(p.name), color: '#fff' }}
+                            >
+                              {thumbInitials(p.name)}
+                            </span>
+                            {p.name}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-zinc-400">{fmtDate(p)}</td>
                         <td className="px-4 py-3 text-zinc-400">{polyCount}</td>
                         <td className="px-4 py-3">

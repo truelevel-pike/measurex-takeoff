@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Loader2, Search, X } from 'lucide-react';
+import { useStore } from '@/lib/store';
 
 interface ImageSearchResult {
   id: string;
@@ -19,6 +20,8 @@ interface AIImageSearchProps {
 }
 
 export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
+  const storeProjectId = useStore((s) => s.projectId);
+  const effectiveProjectId = projectId ?? storeProjectId;
   const [query, setQuery] = React.useState('');
   const [searchedQuery, setSearchedQuery] = React.useState('');
   const [results, setResults] = React.useState<ImageSearchResult[]>([]);
@@ -53,7 +56,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
       const res = await fetch('/api/image-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: normalized, projectId }),
+        body: JSON.stringify({ query: normalized, projectId: effectiveProjectId }),
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
@@ -67,7 +70,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, query]);
+  }, [effectiveProjectId, query]);
 
   return (
     <>
@@ -83,7 +86,6 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
         }}
       />
 
-      {/* Modal */}
       <div
         role="dialog"
         aria-modal="true"
@@ -93,7 +95,7 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 540,
+          width: 760,
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 64px)',
           display: 'flex',
@@ -147,14 +149,6 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'all 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
-              e.currentTarget.style.color = '#e0faff';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)';
-              e.currentTarget.style.color = '#8892a0';
             }}
           >
             <X size={14} />
@@ -309,16 +303,8 @@ export function AIImageSearch({ onClose, projectId }: AIImageSearchProps) {
               cursor: 'pointer',
               transition: 'all 150ms ease',
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
-              e.currentTarget.style.color = '#e0e0e0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-              e.currentTarget.style.color = '#8892a0';
-            }}
           >
-            Cancel
+            Close
           </button>
         </div>
       </div>
@@ -394,7 +380,7 @@ function ResultCard({ result, onClick }: { result: ImageSearchResult; onClick: (
         background: hovered ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.03)',
         border: `1px solid ${hovered ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
         borderRadius: 10,
-        padding: '12px 10px',
+        padding: '10px 9px',
         cursor: 'pointer',
         textAlign: 'center',
         transition: 'all 150ms ease',

@@ -15,10 +15,13 @@ interface TogalChatProps {
   onClose: () => void;
 }
 
-interface ChatApiMessage {
-  role: 'user' | 'assistant';
-  content: string;
+interface ChatContext {
+  classificationCount: number;
+  totalArea: number;
+  unit: string;
+  classifications: string[];
 }
+
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -32,8 +35,6 @@ export function TogalChat({ onClose }: TogalChatProps) {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
-  const projectId = useStore((s) => s.projectId);
-
   const ppu = scale?.pixelsPerUnit ?? 1;
   const unit = scale?.unit ?? 'ft';
 
@@ -44,7 +45,7 @@ export function TogalChat({ onClose }: TogalChatProps) {
     {
       id: 'welcome',
       role: 'assistant',
-      text: "Hi! I'm MX. Ask me anything about your takeoff data, measurements, or quantities.",
+      text: "Hi! I'm MeasureX AI. Ask me anything about your takeoff — classifications, areas, or measurements.",
       timestamp: new Date(),
     },
   ]);
@@ -73,24 +74,23 @@ export function TogalChat({ onClose }: TogalChatProps) {
       timestamp: new Date(),
     };
 
-    const nextMessages = [...messages, userMsg];
-    const payloadMessages: ChatApiMessage[] = nextMessages
-      .filter((m) => m.id !== 'welcome')
-      .map((m) => ({ role: m.role, content: m.text }));
-
-    setMessages(nextMessages);
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setError(null);
     setIsLoading(true);
 
     try {
+      const context: ChatContext = {
+        classificationCount,
+        totalArea: totalAreaSqFt,
+        unit,
+        classifications: classifications.map((c) => c.name).slice(0, 10),
+      };
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: payloadMessages,
-          projectId: projectId ?? undefined,
-        }),
+        body: JSON.stringify({ message: text, context }),
       });
 
       const data = await response.json();
@@ -110,9 +110,8 @@ export function TogalChat({ onClose }: TogalChatProps) {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong';
-      setError(message);
+    } catch {
+      setError('Sorry, I could not connect to the AI right now.');
     } finally {
       setIsLoading(false);
     }
