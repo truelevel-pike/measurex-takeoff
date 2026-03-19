@@ -26,6 +26,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       ? project.totalPages
       : (pages.length > 1 ? pages.length : (project.totalPages ?? 1));
 
+    // Build sheetNames and drawingSets maps from stored page data
+    const sheetNames: Record<number, string> = {};
+    const drawingSets: Record<number, string> = {};
+    for (const p of pages) {
+      if (p.name) sheetNames[p.pageNum] = p.name;
+      if (p.drawingSet) drawingSets[p.pageNum] = p.drawingSet;
+    }
+
     return NextResponse.json({
       project: {
         ...project,
@@ -37,6 +45,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           scales: {},
           currentPage: 1,
           totalPages,
+          sheetNames,
+          drawingSets,
         },
       },
     });

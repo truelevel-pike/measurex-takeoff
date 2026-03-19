@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
+import { File as FileIcon, GitCompare, Layers3, Settings } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
@@ -26,6 +26,7 @@ import MobileToolbar from '@/components/MobileToolbar';
 import PDFViewer from '@/components/PDFViewer';
 import CanvasOverlay from '@/components/CanvasOverlay';
 import type { PolygonContextMenuPayload } from '@/components/CanvasOverlay';
+import ZoomControls from '@/components/ZoomControls';
 import ContextMenu from '@/components/ContextMenu';
 import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
@@ -42,6 +43,7 @@ import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
+import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
 import { ToastProvider, useToast } from '@/components/Toast';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
@@ -55,6 +57,9 @@ const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | '
   t: 'annotate',
   a: 'ai',
 };
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.25;
 
 const EMPTY_STATE: ProjectState = {
   classifications: [],
@@ -119,6 +124,8 @@ function PageInner() {
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const setScale = useStore((s) => s.setScale);
   const setScaleForPage = useStore((s) => s.setScaleForPage);
+  const zoomLevel = useStore((s) => s.zoomLevel);
+  const setZoomLevel = useStore((s) => s.setZoomLevel);
   // showScalePopup removed — GAP-006: AutoScalePopup is the sole confirmation
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const setSheetName = useStore((s) => s.setSheetName);
@@ -178,6 +185,7 @@ function PageInner() {
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showProjectSettings, setShowProjectSettings] = useState(false);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -321,6 +329,21 @@ function PageInner() {
         setProjectName(data.project.name || 'Untitled');
         localStorage.setItem('measurex_project_id', data.project.id);
 
+        // Hydrate server-side sheet names and drawing sets (extracted during upload)
+        const serverSheetNames = data?.project?.state?.sheetNames;
+        if (serverSheetNames && typeof serverSheetNames === 'object') {
+          for (const [page, name] of Object.entries(serverSheetNames)) {
+            if (name) setSheetName(Number(page), name as string);
+          }
+        }
+        const serverDrawingSets = data?.project?.state?.drawingSets;
+        if (serverDrawingSets && typeof serverDrawingSets === 'object') {
+          const { setDrawingSet } = useStore.getState();
+          for (const [page, setName] of Object.entries(serverDrawingSets)) {
+            if (setName) setDrawingSet(Number(page), setName as string);
+          }
+        }
+
         // Auto-fetch stored PDF so the viewer loads without re-upload (BUG-R5-002)
         setPdfFetching(true);
         fetch(`/api/projects/${pid}/pdf`, { signal: controller.signal })
@@ -445,6 +468,15 @@ function PageInner() {
       } else if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
         e.preventDefault();
         setShowKeyboardHelp((prev) => !prev);
+      } else if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        setZoomLevel(Math.min(MAX_ZOOM, zoomLevel + ZOOM_STEP));
+      } else if (e.key === '-') {
+        e.preventDefault();
+        setZoomLevel(Math.max(MIN_ZOOM, zoomLevel - ZOOM_STEP));
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setZoomLevel(1);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedPolygon) {
           deletePolygon(selectedPolygon);
@@ -464,7 +496,12 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool]);
+
+  useEffect(() => {
+    if (!pdfFile) return;
+    pdfViewerRef.current?.setZoom(zoomLevel);
+  }, [zoomLevel, pdfFile]);
 
   // Store a PDF doc reference for texture rendering.
   useEffect(() => {
@@ -995,6 +1032,14 @@ function PageInner() {
           pdfViewerRef.current?.goToPage(next);
         }}
       />
+      <button
+        onClick={() => setShowProjectSettings(true)}
+        aria-label="Open project settings"
+        title="Project Settings"
+        className="absolute right-3 top-2 z-50 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[rgba(0,212,255,0.25)] bg-[#12121a] text-[#b0dff0] hover:border-[rgba(0,212,255,0.5)] hover:text-[#e0faff]"
+      >
+        <Settings size={15} />
+      </button>
 
       {/* Floating 2D/3D toggle — always visible */}
       <div className="absolute top-14 left-3 z-50 flex items-center gap-1 bg-[rgba(18,18,26,0.92)] backdrop-blur-sm border border-[#00d4ff]/20 rounded-lg p-1 shadow-[0_0_20px_rgba(0,212,255,0.15)]">
@@ -1071,6 +1116,7 @@ function PageInner() {
                   {currentTool === 'measure' && <MeasurementTool />}
                   {currentTool === 'annotate' && <AnnotationTool />}
                 </PDFViewer>
+                <ZoomControls />
 
                 {menuState && (
                   <ContextMenu
@@ -1184,6 +1230,19 @@ function PageInner() {
 
       {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
       {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}
+      <ProjectSettingsPanel
+        open={showProjectSettings}
+        onClose={() => setShowProjectSettings(false)}
+        projectName={projectName}
+        onProjectNameSaved={(newName) => {
+          setProjectName(newName);
+          persistSaveStatus('Project renamed');
+        }}
+        onProjectDeleted={() => {
+          setProjectId(null);
+          setProjectName(null);
+        }}
+      />
 
       {/* Calibration draw overlay — captures two clicks when tool is 'calibrate' */}
       {currentTool === ('calibrate' as string) && (
