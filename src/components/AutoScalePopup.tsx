@@ -43,8 +43,12 @@ export default function AutoScalePopup({
     onAccept(detectedScale);
   }, [dontShowAgain, detectedScale, onAccept, onDontShowAgain]);
 
-  // Auto-dismiss countdown
+  // Auto-dismiss countdown — only enabled for high-confidence detections (≥0.9).
+  // Medium/low confidence scales require explicit user action to avoid silently
+  // applying a wrong scale that would corrupt all measurements.
+  const autoDismissEnabled = confidence >= 0.9;
   useEffect(() => {
+    if (!autoDismissEnabled) return;
     const id = setInterval(() => {
       const elapsed = Date.now() - startRef.current;
       const left = AUTO_DISMISS_MS - elapsed;
@@ -56,7 +60,7 @@ export default function AutoScalePopup({
       }
     }, 50);
     return () => clearInterval(id);
-  }, [onDismiss]);
+  }, [autoDismissEnabled, onDismiss]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function AutoScalePopup({
             className: 'bg-orange-950 text-orange-300 border border-orange-700',
           };
 
-  const progressPct = (remaining / AUTO_DISMISS_MS) * 100;
+  const progressPct = autoDismissEnabled ? (remaining / AUTO_DISMISS_MS) * 100 : 0;
 
   return (
     <div
@@ -99,12 +103,14 @@ export default function AutoScalePopup({
       aria-label="Scale auto-detected"
       className="fixed top-20 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 w-80 shadow-2xl text-gray-100 overflow-hidden"
     >
-      {/* Countdown timer bar */}
+      {/* Countdown timer bar — only shown when auto-dismiss is active (high confidence) */}
       <div className="absolute top-0 left-0 h-1 bg-cyan-500/30 w-full">
-        <div
-          className="h-full bg-cyan-400 transition-[width] duration-100 ease-linear"
-          style={{ width: `${progressPct}%` }}
-        />
+        {autoDismissEnabled && (
+          <div
+            className="h-full bg-cyan-400 transition-[width] duration-100 ease-linear"
+            style={{ width: `${progressPct}%` }}
+          />
+        )}
       </div>
 
       <div className="flex items-center gap-2 mb-3 mt-1">
@@ -122,10 +128,18 @@ export default function AutoScalePopup({
         <span>{confidenceMeta.label}</span>
       </div>
 
-      {confidence < 0.7 && (
-        <div className="flex items-start gap-2 text-sm text-orange-300 mb-3 bg-orange-950/50 border border-orange-800 rounded-md p-2">
+      {confidence < 0.9 && (
+        <div className={`flex items-start gap-2 text-sm mb-3 rounded-md p-2 ${
+          confidence < 0.7
+            ? 'text-orange-300 bg-orange-950/50 border border-orange-800'
+            : 'text-yellow-300 bg-yellow-950/50 border border-yellow-800'
+        }`}>
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <p>Scale detection uncertain — please verify manually</p>
+          <p>
+            {confidence < 0.7
+              ? 'Scale detection uncertain — please verify manually before accepting'
+              : 'Please verify this scale is correct before accepting'}
+          </p>
         </div>
       )}
 
