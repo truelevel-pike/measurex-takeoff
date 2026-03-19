@@ -76,6 +76,10 @@ npm run test:e2e
 npm run storybook
 ```
 
+## API Docs
+
+API Docs available at [/api/docs](http://localhost:3000/api/docs) when running locally. The OpenAPI spec is also served as JSON at `/api/openapi.json`.
+
 ## Deploy to Vercel
 
 1. Connect the repo to [Vercel](https://vercel.com).
