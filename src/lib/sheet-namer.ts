@@ -4,7 +4,8 @@
  */
 
 // Architectural sheet number patterns like A0.00, A1.01, S2.1, M1.0, E3.01, P1.0
-const SHEET_NUMBER_RE = /\b([ASMEPC]\d{1,2}[.\-]\d{1,3})\b/i;
+// Also matches: A101, A-101, AD1.01, FA1.0 (single/multi-letter prefix + optional dash + digits + optional decimal)
+const SHEET_NUMBER_RE = /\b([A-Z]{1,3}-?\d{1,3}(?:\.\d+)?)\b/i;
 
 // "SHEET N OF M" pattern
 const SHEET_OF_RE = /\bSHEET\s+(\d+)\s+OF\s+(\d+)\b/i;
