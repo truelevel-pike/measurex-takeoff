@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useStore } from '@/lib/store';
+import { useFeatureFlag } from '@/hooks/use-feature-flag';
 import {
   LayoutGrid,
   ChevronLeft,
@@ -95,6 +96,7 @@ export default function TopNavBar({
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
+  const is3DEnabled = useFeatureFlag('3d-view');
   const currentPage = useStore((s) => s.currentPage);
   const { addToast } = useToast();
 
@@ -359,6 +361,7 @@ export default function TopNavBar({
                 onClick={onSettings}
               />
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
+              {is3DEnabled && (
               <NavIconButton
                 ariaLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
                 srLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
@@ -367,6 +370,7 @@ export default function TopNavBar({
                 onClick={toggleShow3D}
                 ariaPressed={show3D}
               />
+              )}
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
@@ -474,6 +478,7 @@ export default function TopNavBar({
           >
             <Download size={16} /> Export Excel
           </button>
+          {is3DEnabled && (
           <button
             onClick={() => { toggleShow3D(); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
@@ -481,6 +486,7 @@ export default function TopNavBar({
           >
             <Layers3 size={16} /> {show3D ? '2D View' : '3D View'}
           </button>
+          )}
           <button
             onClick={() => { setShowQuantitiesDrawer(!showQuantitiesDrawer); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
