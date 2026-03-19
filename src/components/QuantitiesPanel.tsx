@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Eye, EyeOff, History, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Eye, EyeOff, History, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
@@ -56,6 +56,7 @@ export default function QuantitiesPanel() {
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -73,6 +74,15 @@ export default function QuantitiesPanel() {
   const newClassNameRef = useRef<HTMLInputElement>(null);
 
   const ppu = scale?.pixelsPerUnit || 1;
+
+  // Get projectId from URL or localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('project') || localStorage.getItem('measurex_project_id');
+      setProjectId(pid);
+    }
+  }, []);
 
   // Focus first element in drawer when opened on mobile
   useEffect(() => {
@@ -300,6 +310,17 @@ export default function QuantitiesPanel() {
           <span className="text-xs text-gray-300 font-normal">
             {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
           </span>
+          {projectId && (
+            <button
+              type="button"
+              onClick={() => window.open(`/api/projects/${projectId}/export/json`, '_blank')}
+              className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
+              aria-label="Export JSON"
+              title="Export JSON"
+            >
+              <Download size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
