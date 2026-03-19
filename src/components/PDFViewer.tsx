@@ -573,7 +573,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             setTotalPages(doc.numPages);
             totalPagesRef.current = doc.numPages;
             setCurrentPage(1);
-            onPageChange?.(1, doc.numPages);
+            onPageChangeRef.current?.(1, doc.numPages);
           } catch (err) {
             if (isCancelled()) return;
             const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -582,7 +582,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         };
         void loadPdf();
       }
-    }, [file, onPageChange]);
+    }, [file]);
 
     return (
       <div
