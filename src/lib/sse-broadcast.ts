@@ -3,6 +3,7 @@ declare const globalThis: typeof global & {
   __sseClients?: Map<string, Set<ReadableStreamDefaultController>>;
   __projectEventCounters?: Map<string, number>;
   __projectEventBuffer?: Map<string, Array<{ seq: number; event: string; data: unknown }>>;
+  __projectViewers?: Map<string, Set<string>>;
 };
 if (!globalThis.__sseClients) {
   globalThis.__sseClients = new Map();
@@ -13,9 +14,13 @@ if (!globalThis.__projectEventCounters) {
 if (!globalThis.__projectEventBuffer) {
   globalThis.__projectEventBuffer = new Map();
 }
+if (!globalThis.__projectViewers) {
+  globalThis.__projectViewers = new Map();
+}
 export const projectClients = globalThis.__sseClients;
 export const projectEventCounters = globalThis.__projectEventCounters;
 export const projectEventBuffer = globalThis.__projectEventBuffer;
+export const projectViewers = globalThis.__projectViewers;
 
 /** Broadcast an SSE event to all clients subscribed to a project */
 export function broadcastToProject(projectId: string, event: string, data: unknown) {

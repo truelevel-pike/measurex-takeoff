@@ -190,6 +190,12 @@ function handleSSEMessage(raw: MessageEvent) {
       emitActivity('page:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
+    case 'viewer:joined':
+    case 'viewer:left':
+    case 'viewer:count': {
+      emitActivity(parsed.event, parsed.data as Record<string, unknown>);
+      break;
+    }
     default:
       break;
   }

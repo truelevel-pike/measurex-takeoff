@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './Toast';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
+import { useViewerPresence } from '@/hooks/useViewerPresence';
 
 interface TopNavBarProps {
   sheetName?: string;
@@ -118,6 +119,7 @@ export default function TopNavBar({
 
   const [shareLoading, setShareLoading] = React.useState(false);
   const [isShared, setIsShared] = React.useState(false);
+  const { viewerCount } = useViewerPresence(projectId, isShared);
   const [isEditingPage, setIsEditingPage] = React.useState(false);
   const [pageInputValue, setPageInputValue] = React.useState('');
   const pageInputRef = React.useRef<HTMLInputElement>(null);
@@ -370,10 +372,33 @@ export default function TopNavBar({
             )
           )}
           {isShared && !isMobile && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: '2px 7px' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
-              Shared
-            </span>
+            viewerCount >= 1 ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: '2px 7px' }}>
+                <style>{`@keyframes pulse-live{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse-live 2s ease-in-out infinite' }} />
+                Live
+                {viewerCount >= 2 && (
+                  <span style={{ display: 'flex', alignItems: 'center', marginLeft: 2 }}>
+                    {Array.from({ length: Math.min(viewerCount - 1, 2) }).map((_, i) => {
+                      const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff'];
+                      return (
+                        <span key={i} style={{ width: 18, height: 18, borderRadius: '50%', background: colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#000', marginLeft: i > 0 ? -4 : 0, border: '1.5px solid rgba(10,10,15,0.9)' }}>
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                      );
+                    })}
+                    {viewerCount > 3 && (
+                      <span style={{ fontSize: 9, color: '#4ade80', marginLeft: 2 }}>+{viewerCount - 3}</span>
+                    )}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: '2px 7px' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                Shared
+              </span>
+            )
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
           <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />
@@ -691,6 +716,12 @@ export default function TopNavBar({
           className="absolute top-[54px] left-0 right-0 z-50 bg-[#0a0a0f] border-b border-[rgba(0,212,255,0.2)] p-3 flex flex-col gap-2 max-h-[90vh] overflow-y-auto"
           style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
         >
+          {isShared && viewerCount >= 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', fontSize: 11, color: '#4ade80' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse-live 2s ease-in-out infinite' }} />
+              Live · {viewerCount} {viewerCount === 1 ? 'viewer' : 'viewers'}
+            </div>
+          )}
           <button
             onClick={() => { onAITakeoff?.(); setShowMobileMenu(false); }}
             disabled={aiLoading}

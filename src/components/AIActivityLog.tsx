@@ -86,6 +86,10 @@ function eventToLogEntry(event: string, data: Record<string, unknown>): LogEntry
       const count = (data.count as number) ?? 0;
       return { id, timestamp, icon: '\u2728', message: `AI found ${count} ${count === 1 ? 'item' : 'items'}` };
     }
+    case 'viewer:joined':
+      return { id, timestamp, icon: '\u{1F465}', message: 'New viewer joined the project' };
+    case 'viewer:left':
+      return { id, timestamp, icon: '\u{1F44B}', message: 'Viewer left the project' };
     default:
       return null;
   }

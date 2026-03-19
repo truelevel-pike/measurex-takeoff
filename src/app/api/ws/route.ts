@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { projectClients, projectEventBuffer } from '@/lib/sse-broadcast';
+import { projectClients, projectEventBuffer, projectViewers, broadcastToProject } from '@/lib/sse-broadcast';
 
 export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get('projectId');
@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
 
   let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
   let thisController: ReadableStreamDefaultController | null = null;
+  const viewerId = `v-${crypto.randomUUID().slice(0, 8)}`;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -24,6 +25,13 @@ export async function GET(request: NextRequest) {
         projectClients.set(projectId, new Set());
       }
       projectClients.get(projectId)!.add(controller);
+
+      // Track viewer presence
+      if (!projectViewers.has(projectId)) {
+        projectViewers.set(projectId, new Set());
+      }
+      projectViewers.get(projectId)!.add(viewerId);
+      const viewerCount = projectViewers.get(projectId)!.size;
 
       const encoder = new TextEncoder();
 
@@ -48,6 +56,14 @@ export async function GET(request: NextRequest) {
         encoder.encode(`data: ${JSON.stringify({ event: 'connected', data: { projectId } })}\n\n`)
       );
 
+      // Send current viewer count to this client
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ event: 'viewer:count', data: { viewerId, viewerCount } })}\n\n`)
+      );
+
+      // Broadcast viewer joined to all clients
+      broadcastToProject(projectId, 'viewer:joined', { viewerId, viewerCount });
+
       // 15-second keepalive to prevent proxy/load-balancer timeouts
       keepaliveInterval = setInterval(() => {
         try {
@@ -66,6 +82,17 @@ export async function GET(request: NextRequest) {
       if (keepaliveInterval !== null) {
         clearInterval(keepaliveInterval);
         keepaliveInterval = null;
+      }
+
+      // Remove viewer presence
+      const viewers = projectViewers.get(projectId);
+      if (viewers) {
+        viewers.delete(viewerId);
+        const viewerCount = viewers.size;
+        if (viewers.size === 0) {
+          projectViewers.delete(projectId);
+        }
+        broadcastToProject(projectId, 'viewer:left', { viewerId, viewerCount });
       }
 
       // Client disconnected — remove this controller from the registry
