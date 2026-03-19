@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -12,7 +13,7 @@ import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
 import { useIsMobile } from '@/lib/utils';
 import { loadAIResults } from '@/lib/ai-results-loader';
-import { downloadExcel } from '@/lib/export';
+// downloadExcel dynamically imported to avoid bundling XLSX (~300KB) at load time
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
 import { installMeasurexAPI } from '@/lib/measurex-api';
 
@@ -38,10 +39,10 @@ import ScaleCalibrationPanel from '@/components/ScaleCalibrationPanel';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
 import ScaleCalibration from '@/components/ScaleCalibration';
-import ThreeDScene from '@/components/ThreeDScene';
+const ThreeDScene = dynamic(() => import('@/components/ThreeDScene'), { ssr: false });
 import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
-import ComparePanel from '@/components/ComparePanel';
+const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
@@ -893,6 +894,7 @@ function PageInner() {
 
   const handleExportExcel = useCallback(async () => {
     if (!projectId) {
+      const { downloadExcel } = await import('@/lib/export');
       downloadExcel(classifications, polygons, scale, scales);
       return;
     }

@@ -27,8 +27,9 @@ import {
   Pencil,
   XCircle,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import type { ProjectState } from '@/lib/types';
-import DrawingComparison from '@/components/DrawingComparison';
+const DrawingComparison = dynamic(() => import('@/components/DrawingComparison'), { ssr: false });
 import CollaborationPanel from '@/components/CollaborationPanel';
 import AutoNameTool from '@/components/AutoNameTool';
 
