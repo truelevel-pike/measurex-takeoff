@@ -2,19 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-function usePerfQuery(): boolean {
-  const [enabled] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('perf') === '1';
-  });
-  return enabled;
-}
-
 export default function DevPerfOverlay() {
-  const queryEnabled = usePerfQuery();
   const isDev = process.env.NODE_ENV === 'development';
-  const show = isDev || queryEnabled;
+  const show = isDev;
 
   const rafRef = useRef(0);
   const framesRef = useRef(0);

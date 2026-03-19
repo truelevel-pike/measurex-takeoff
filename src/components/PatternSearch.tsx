@@ -215,7 +215,7 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
             <span className="text-white font-semibold text-sm">Pattern Search</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">AI</span>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white transition-colors">
             <X size={18} />
           </button>
         </div>

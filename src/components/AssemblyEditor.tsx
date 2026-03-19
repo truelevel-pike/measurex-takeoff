@@ -65,7 +65,7 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
           <h2 className="text-[#e5e7eb] font-semibold text-sm">
             {assembly ? 'Edit Assembly' : 'New Assembly'}
           </h2>
-          <button type="button" onClick={onClose} className="text-[#8892a0] hover:text-[#e5e7eb]">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-[#8892a0] hover:text-[#e5e7eb]">
             <X size={16} />
           </button>
         </div>
