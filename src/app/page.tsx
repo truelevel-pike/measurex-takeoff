@@ -44,6 +44,8 @@ import AIImageSearch from '@/components/AIImageSearch';
 import PatternSearch from '@/components/PatternSearch';
 import CropOverlay from '@/components/CropOverlay';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
+const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false });
+import { useWhatsNew } from '@/components/WhatsNewModal';
 const ExportPanel = dynamic(() => import('@/components/ExportPanel'), { ssr: false });
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
@@ -208,6 +210,7 @@ function PageInner() {
   const { addToast } = useToast();
 
   const quickTakeoff = useQuickTakeoff();
+  const whatsNew = useWhatsNew();
 
   const show3D = useStore((s) => s.show3D);
   const setShow3D = useStore((s) => s.setShow3D);
@@ -1735,6 +1738,9 @@ function PageInner() {
           }}
         />
       )}
+
+      {/* What's New modal */}
+      {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
 
       {/* GAP-006: Server-detected scale banner from upload response */}
       {uploadDetectedScale && (

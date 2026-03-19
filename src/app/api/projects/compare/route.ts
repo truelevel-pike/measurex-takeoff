@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons } from '@/server/project-store';
+import { getPolygons, getClassifications } from '@/server/project-store';
 import type { Polygon } from '@/lib/types';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
@@ -14,10 +14,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing projectIdA or projectIdB' }, { status: 400 });
     }
 
-    const [polygonsA, polygonsB] = await Promise.all([
+    const [polygonsA, polygonsB, classificationsA, classificationsB] = await Promise.all([
       getPolygons(projectIdA),
       getPolygons(projectIdB),
-    ]) as [Polygon[], Polygon[]];
+      getClassifications(projectIdA),
+      getClassifications(projectIdB),
+    ]);
 
     // Match polygons by classificationId + similar area (within 20%)
     function isMatch(a: Polygon, b: Polygon): boolean {
@@ -30,6 +32,42 @@ export async function POST(req: Request) {
     const removed = polygonsA.filter((a) => !polygonsB.some((b) => isMatch(a, b)));
     const unchanged = polygonsB.filter((b) => !added.includes(b));
 
+    // Build classification-level quantity diff
+    const classNameMap = new Map<string, string>();
+    for (const c of classificationsA) classNameMap.set(c.id, c.name);
+    for (const c of classificationsB) classNameMap.set(c.id, c.name);
+
+    const sumByClass = (polys: Polygon[]) => {
+      const map = new Map<string, number>();
+      for (const p of polys) {
+        map.set(p.classificationId, (map.get(p.classificationId) ?? 0) + p.area);
+      }
+      return map;
+    };
+
+    const totalsA = sumByClass(polygonsA);
+    const totalsB = sumByClass(polygonsB);
+    const allClassIds = new Set([...totalsA.keys(), ...totalsB.keys()]);
+
+    const classificationDiff = [...allClassIds].map((cid) => {
+      const qtyA = totalsA.get(cid) ?? 0;
+      const qtyB = totalsB.get(cid) ?? 0;
+      const delta = qtyB - qtyA;
+      let status: 'added' | 'removed' | 'changed' | 'same';
+      if (qtyA === 0) status = 'added';
+      else if (qtyB === 0) status = 'removed';
+      else if (delta !== 0) status = 'changed';
+      else status = 'same';
+      return {
+        classificationId: cid,
+        name: classNameMap.get(cid) ?? cid,
+        qtyA,
+        qtyB,
+        delta,
+        status,
+      };
+    });
+
     return NextResponse.json({
       added,
       removed,
@@ -39,6 +77,7 @@ export async function POST(req: Request) {
         removedCount: removed.length,
         unchangedCount: unchanged.length,
       },
+      classificationDiff,
     });
   } catch (err: unknown) {
     console.error('[compare route]', err);

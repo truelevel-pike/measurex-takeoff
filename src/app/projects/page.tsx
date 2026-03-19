@@ -41,6 +41,8 @@ import RecentProjects from '@/components/RecentProjects';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import TagInput from '@/components/TagInput';
 import { getActiveWorkspace } from '@/lib/workspace';
+const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false });
+import { useWhatsNew } from '@/components/WhatsNewModal';
 
 /* ── Project thumbnail helpers ─────────────────────────────────── */
 const THUMB_PALETTE = [
@@ -148,6 +150,7 @@ export default function ProjectsPage() {
   const [showCompare, setShowCompare] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
   const [showAutoName, setShowAutoName] = useState(false);
+  const whatsNew = useWhatsNew();
 
   // New dashboard state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -1265,6 +1268,9 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      {/* What's New modal */}
+      {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
     </div>
   );
 }

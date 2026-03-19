@@ -9,6 +9,15 @@ interface Project {
   name: string;
 }
 
+interface ClassificationDiff {
+  classificationId: string;
+  name: string;
+  qtyA: number;
+  qtyB: number;
+  delta: number;
+  status: 'added' | 'removed' | 'changed' | 'same';
+}
+
 interface CompareResult {
   added: Polygon[];
   removed: Polygon[];
@@ -18,6 +27,7 @@ interface CompareResult {
     removedCount: number;
     unchangedCount: number;
   };
+  classificationDiff?: ClassificationDiff[];
 }
 
 interface ComparePanelProps {
@@ -389,6 +399,86 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
                 {result.summary.addedCount + result.summary.removedCount + result.summary.unchangedCount}
               </span>
             </div>
+
+            {/* Classification Quantities */}
+            {result.classificationDiff && result.classificationDiff.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                <label style={labelStyle}>Classification Quantities</label>
+                <div
+                  style={{
+                    border: '1px solid rgba(0,212,255,0.15)',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Table header */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 52px 52px 60px',
+                      gap: 0,
+                      padding: '6px 10px',
+                      background: 'rgba(0,212,255,0.06)',
+                      borderBottom: '1px solid rgba(0,212,255,0.1)',
+                    }}
+                  >
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#8892a0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Classification</span>
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#8892a0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Proj A</span>
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#8892a0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Proj B</span>
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#8892a0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Delta</span>
+                  </div>
+                  {/* Table rows */}
+                  {result.classificationDiff.map((cd) => {
+                    const deltaColor = cd.delta > 0 ? '#22c55e' : cd.delta < 0 ? '#ef4444' : '#9ca3af';
+                    const statusColors: Record<string, { bg: string; fg: string }> = {
+                      added: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e' },
+                      removed: { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+                      changed: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308' },
+                      same: { bg: 'rgba(156,163,175,0.1)', fg: '#9ca3af' },
+                    };
+                    const sc = statusColors[cd.status];
+                    return (
+                      <div
+                        key={cd.classificationId}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 52px 52px 60px',
+                          gap: 0,
+                          padding: '5px 10px',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <span style={{ fontSize: 11, color: '#e0e0e0', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cd.name}</span>
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontFamily: 'monospace',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.5,
+                              padding: '1px 4px',
+                              borderRadius: 3,
+                              background: sc.bg,
+                              color: sc.fg,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {cd.status}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#8892a0', textAlign: 'right' }}>{Math.round(cd.qtyA)}</span>
+                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#8892a0', textAlign: 'right' }}>{Math.round(cd.qtyB)}</span>
+                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: deltaColor, fontWeight: 700, textAlign: 'right' }}>
+                          {cd.delta > 0 ? '+' : ''}{Math.round(cd.delta)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
