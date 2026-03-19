@@ -22,7 +22,7 @@ export function subscribeToActivity(fn: ActivityListener): () => void {
   return () => activityListeners.delete(fn);
 }
 
-function emitActivity(event: string, data: Record<string, unknown>) {
+export function emitActivity(event: string, data: Record<string, unknown>) {
   for (const fn of activityListeners) {
     try { fn(event, data); } catch { /* ignore listener errors */ }
   }

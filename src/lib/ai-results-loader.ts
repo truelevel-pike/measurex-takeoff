@@ -1,6 +1,7 @@
 import type { DetectedElement } from './ai-takeoff';
 import type { Classification, Point, ScaleCalibration } from './types';
 import { calculatePolygonArea, calculateLinearFeet } from './polygon-utils';
+import { emitActivity } from './ws-client';
 
 /**
  * Load AI takeoff results into the zustand store synchronously.
@@ -52,6 +53,8 @@ export function loadAIResults(
     const fresh = readState().classifications;
     const resolvedId = fresh.find((c) => c.id === id || c.name === name)?.id ?? id;
     nameToId.set(name, resolvedId);
+
+    emitActivity('classification:created', { id: resolvedId, name, type: el.type, color: el.color || '#3b82f6' });
   }
 
   const state = readState();
@@ -70,11 +73,13 @@ export function loadAIResults(
 
     if (el.type === 'area' && el.points.length >= 3) {
       const pxArea = calculatePolygonArea(el.points);
-      store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: pxArea, linearFeet: 0, label: el.name });
+      const polyId = store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: pxArea, linearFeet: 0, label: el.name });
+      emitActivity('polygon:created', { id: polyId, label: el.name, classificationId: clsId, type: 'area' });
       stats.areas++;
     } else if (el.type === 'linear' && el.points.length >= 2) {
       const lf = calculateLinearFeet(el.points, ppu, false);
-      store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: 0, linearFeet: lf, label: el.name });
+      const polyId = store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: 0, linearFeet: lf, label: el.name });
+      emitActivity('polygon:created', { id: polyId, label: el.name, classificationId: clsId, type: 'linear' });
       stats.lines++;
     } else if (el.type === 'count' && el.points.length >= 1) {
       const p = el.points[0];
@@ -84,7 +89,8 @@ export function loadAIResults(
         { x: p.x, y: p.y + r },
         { x: p.x - r, y: p.y },
       ];
-      store.addPolygon({ points: marker, classificationId: clsId, pageNumber: page, area: 0, linearFeet: 0, label: el.name });
+      const polyId = store.addPolygon({ points: marker, classificationId: clsId, pageNumber: page, area: 0, linearFeet: 0, label: el.name });
+      emitActivity('polygon:created', { id: polyId, label: el.name, classificationId: clsId, type: 'count' });
       stats.counts++;
     }
   }

@@ -6,6 +6,7 @@ import {
   createClassification,
   createPolygon,
 } from '@/server/project-store';
+import { broadcastToProject } from '@/app/api/ws/route';
 import type { AIDetectedElement } from '@/server/ai-engine';
 
 /**
@@ -90,6 +91,7 @@ export async function POST(
           color: element.color,
           visible: true,
         });
+        broadcastToProject(id, 'classification:created', classification);
         classifications = await getClassifications(id); // refresh
         createdClassifications++;
       }
@@ -126,6 +128,7 @@ export async function POST(
         isComplete: true,
         label: element.name,
       });
+      broadcastToProject(id, 'polygon:created', newPolygon);
 
       existingPolygons.push(newPolygon); // track for dedup within batch
       createdPolygons++;
