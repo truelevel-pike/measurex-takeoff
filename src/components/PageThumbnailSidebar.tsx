@@ -35,23 +35,17 @@ function PageThumbnailSidebar({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
   const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
-  const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
+
   const [collapsed, setCollapsed] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ page: number; x: number; y: number } | null>(null);
   const renderQueueRef = useRef<number[]>([]);
   const queuedPagesRef = useRef<Set<number>>(new Set());
-  const requestedPagesRef = useRef<Set<number>>(new Set());
+
   const activeRenderCountRef = useRef(0);
   const renderSessionRef = useRef(0);
-  const currentPageRef = useRef(currentPage);
-
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
-
-  useEffect(() => {
-    currentPageRef.current = currentPage;
-  }, [currentPage]);
 
   const processThumbnailQueue = useCallback(() => {
     const activeSession = renderSessionRef.current;
@@ -100,86 +94,26 @@ function PageThumbnailSidebar({
     renderSessionRef.current += 1;
     renderQueueRef.current = [];
     queuedPagesRef.current.clear();
-    requestedPagesRef.current.clear();
     activeRenderCountRef.current = 0;
 
     if (!pdfDoc || totalPages <= 0) {
       setThumbnails([]);
       setFailedPages(new Set());
-      setVisiblePages(new Set());
       return;
     }
 
     setThumbnails(Array(totalPages).fill(null));
     setFailedPages(new Set());
-    setVisiblePages(new Set([currentPage]));
-  }, [pdfDoc, totalPages, currentPage]);
 
-  // Observe page buttons and mark pages that are within ~2 viewport heights.
-  useEffect(() => {
-    const root = scrollContainerRef.current;
-    if (!root || collapsed) return;
-
-    const marginPx = Math.max(root.clientHeight * 2, 600);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setVisiblePages((prev) => {
-          const next = new Set(prev);
-          for (const entry of entries) {
-            const attr = (entry.target as HTMLElement).dataset.pageNumber;
-            const pageNumber = attr ? Number(attr) : NaN;
-            if (!Number.isFinite(pageNumber)) continue;
-            if (entry.isIntersecting) next.add(pageNumber);
-            else next.delete(pageNumber);
-          }
-          next.add(currentPageRef.current);
-          return next;
-        });
-      },
-      {
-        root,
-        rootMargin: `${marginPx}px 0px ${marginPx}px 0px`,
-        threshold: 0,
+    // Queue ALL pages eagerly — thumbnails are small and must always be visible.
+    for (let i = 1; i <= totalPages; i++) {
+      if (!queuedPagesRef.current.has(i)) {
+        queuedPagesRef.current.add(i);
+        renderQueueRef.current.push(i);
       }
-    );
-
-    root.querySelectorAll<HTMLElement>('[data-page-number]').forEach((node) => observer.observe(node));
-
-    // Watch for new [data-page-number] nodes added after the initial query
-    const mutationObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          if (node.dataset.pageNumber) {
-            observer.observe(node);
-          }
-          node.querySelectorAll<HTMLElement>('[data-page-number]').forEach((child) => observer.observe(child));
-        }
-      }
-    });
-    mutationObserver.observe(root, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [collapsed, drawingSets, totalPages]);
-
-  // Queue only near-viewport pages and render thumbnails with max concurrency 2.
-  useEffect(() => {
-    if (!pdfDoc || totalPages <= 0) return;
-
-    for (const pageNumber of visiblePages) {
-      if (pageNumber < 1 || pageNumber > totalPages) continue;
-      if (requestedPagesRef.current.has(pageNumber)) continue;
-      requestedPagesRef.current.add(pageNumber);
-      if (queuedPagesRef.current.has(pageNumber)) continue;
-      queuedPagesRef.current.add(pageNumber);
-      renderQueueRef.current.push(pageNumber);
     }
-
     processThumbnailQueue();
-  }, [visiblePages, pdfDoc, totalPages, processThumbnailQueue]);
+  }, [pdfDoc, totalPages, currentPage, processThumbnailQueue]);
 
   // Group pages by drawing set
   const groupedPages = useMemo(() => {
