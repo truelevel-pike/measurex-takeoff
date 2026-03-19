@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY missing — set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in .env.local' }, { status: 500 });
+      return NextResponse.json({ error: 'OPENAI_API_KEY missing — set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in .env.local' }, { status: 503 });
     }
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
@@ -57,7 +57,7 @@ LINEAR items (type: "linear") — return two endpoints:
 
 For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex) }. No prose, no markdown fences.`;
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as NORMALIZED coordinates where x and y are between 0 and 1 relative to the image dimensions (0,0 = top-left, 1,1 = bottom-right), color: string (hex) }. No prose, no markdown fences.`;
 
     const content = [
       { type: 'text', text: 'Analyze this blueprint and return JSON array only. No prose.' },
@@ -71,7 +71,7 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: system },
           { role: 'user', content },
@@ -104,11 +104,18 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
       name?: string;
       type?: 'area' | 'linear' | 'count';
       classification?: string;
+      quantity?: number;
       points?: Array<{ x: number; y: number }>;
       color?: string;
     }
 
-    const results = (parsedJson as RawElement[])
+    // Scale normalized 0-1 coords to actual page pixel dimensions
+    const scalePoint = (p: { x: number; y: number }) => ({
+      x: (Number(p.x) || 0) * pageWidth,
+      y: (Number(p.y) || 0) * pageHeight,
+    });
+
+    const mapped = (parsedJson as RawElement[])
       .filter((el) => Array.isArray(el?.points) && el?.type)
       .map((el) => {
         const name = String(el.name || el.classification || 'Unknown');
@@ -116,18 +123,27 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
           name,
           type: el.type as 'area' | 'linear' | 'count',
           classification: String(el.classification || el.name || name),
-          points: (el.points as Array<{ x: number; y: number }>).map(
-            (p: { x: number; y: number }) => ({
-              x: Number(p.x) || 0,
-              y: Number(p.y) || 0,
-            }),
-          ),
+          quantity: el.type === 'count' ? Math.max(1, Number(el.quantity) || 1) : 1,
+          points: (el.points as Array<{ x: number; y: number }>).map(scalePoint),
           color:
             typeof el.color === 'string' && el.color.startsWith('#')
               ? el.color
               : nameToColor(name),
         };
       });
+
+    // Expand count items: if quantity > number of points, duplicate the single point
+    const results: Array<{ name: string; type: 'area' | 'linear' | 'count'; classification: string; points: Array<{ x: number; y: number }>; color: string }> = [];
+    for (const el of mapped) {
+      if (el.type === 'count' && el.quantity > 1 && el.points.length === 1) {
+        // AI returned one point but quantity > 1 — create one entry per instance
+        for (let i = 0; i < el.quantity; i++) {
+          results.push({ name: el.name, type: el.type, classification: el.classification, points: [el.points[0]], color: el.color });
+        }
+      } else {
+        results.push({ name: el.name, type: el.type, classification: el.classification, points: el.points, color: el.color });
+      }
+    }
 
     return NextResponse.json({ results });
   } catch (err: unknown) {
