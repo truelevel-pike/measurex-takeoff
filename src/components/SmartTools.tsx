@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -74,11 +74,15 @@ export default function SmartTools() {
   const [windowWidth, setWindowWidth] = useState(DEFAULT_WINDOW_WIDTH);
   const [statusMsg, setStatusMsg] = useState<string>('');
 
-  // Track last action for Repeat via refs (no setState needed)
+  // Track last action for Repeat via refs
   const lastActionRef = useRef<(() => void) | null>(null);
   const lastActionLabelRef = useRef<string>('');
-  // Force re-render when last action changes (so the Repeat button enables/disables)
   const [hasLastAction, setHasLastAction] = useState(false);
+
+  // Stable impl refs — updated via useLayoutEffect after each render
+  const backoutRef = useRef<(() => void) | null>(null);
+  const wallCenterlineRef = useRef<(() => void) | null>(null);
+  const smartPasteRef = useRef<(() => Promise<void>) | null>(null);
 
   const recordAction = useCallback((label: string, fn: () => void) => {
     lastActionRef.current = fn;
@@ -106,7 +110,6 @@ export default function SmartTools() {
 
   // --- Tool: Backout Doors/Windows ---
   const handleBackout = useCallback(() => {
-    // Count doors and windows from count-type polygons on current page
     let doorCount = 0;
     let windowCount = 0;
     for (const p of polygons) {
@@ -121,22 +124,17 @@ export default function SmartTools() {
       return;
     }
 
-    // Build deduction label with breakdown
     const parts: string[] = [];
-    if (doorCount > 0) parts.push(`Doors: ${doorCount}×${doorWidth}ft`);
-    if (windowCount > 0) parts.push(`Windows: ${windowCount}×${windowWidth}ft`);
+    if (doorCount > 0) parts.push(`Doors: ${doorCount}x${doorWidth}ft`);
+    if (windowCount > 0) parts.push(`Windows: ${windowCount}x${windowWidth}ft`);
     const deductionLabel = `Door/Window Backout (${parts.join(', ')})`;
 
-    // Store deduction at the classification level (non-destructive)
     let updated = 0;
     for (const wc of wallClassifications) {
-      // Check that this wall classification has polygons on the current page
       const hasPolygonsOnPage = polygons.some(
         (p) => p.classificationId === wc.id && p.pageNumber === currentPage
       );
       if (!hasPolygonsOnPage) continue;
-
-      // Replace any existing backout deduction, then add the new one
       const existing = (wc.deductions ?? []).filter(
         (d) => !d.label.startsWith('Door/Window Backout')
       );
@@ -146,9 +144,11 @@ export default function SmartTools() {
       updated++;
     }
 
-    showStatus(`Backed out ${doorCount} doors, ${windowCount} windows (−${totalDeduction.toFixed(1)} ft) from ${updated} wall classifications`);
-    recordAction('Backout Doors/Windows', handleBackout);
+    showStatus(`Backed out ${doorCount} doors, ${windowCount} windows (-${totalDeduction.toFixed(1)} ft) from ${updated} wall classifications`);
+    recordAction('Backout Doors/Windows', () => { backoutRef.current?.(); });
   }, [polygons, wallClassifications, doorClassifications, windowClassifications, doorWidth, windowWidth, currentPage, updateClassification, showStatus, recordAction]);
+
+  useLayoutEffect(() => { backoutRef.current = handleBackout; }, [handleBackout]);
 
   // --- Tool: Auto-classify Wall Centerline ---
   const handleWallCenterline = useCallback(() => {
@@ -161,14 +161,12 @@ export default function SmartTools() {
       return;
     }
 
-    // Create or find "Wall Centerline" classification
     const clsId = addClassification({
       name: 'Wall Centerline',
       color: '#f59e0b',
       type: 'linear',
     });
 
-    // Re-assign wall polygons to the Wall Centerline classification
     let totalLf = 0;
     for (const wp of wallPolys) {
       updatePolygon(wp.id, { classificationId: clsId });
@@ -176,8 +174,10 @@ export default function SmartTools() {
     }
 
     showStatus(`Wall Centerline: ${wallPolys.length} segments, ${totalLf.toFixed(1)} LF total`);
-    recordAction('Auto-classify Wall Centerline', handleWallCenterline);
+    recordAction('Auto-classify Wall Centerline', () => { wallCenterlineRef.current?.(); });
   }, [polygons, wallClassifications, currentPage, addClassification, updatePolygon, showStatus, recordAction]);
+
+  useLayoutEffect(() => { wallCenterlineRef.current = handleWallCenterline; }, [handleWallCenterline]);
 
   // --- Tool: Smart Paste ---
   const handleSmartPaste = useCallback(async () => {
@@ -192,7 +192,6 @@ export default function SmartTools() {
       let pasted = 0;
       for (const item of data) {
         if (item.points && item.classificationId) {
-          // Offset points to current page context (simple 10px nudge to avoid overlap)
           const offsetPoints = item.points.map((p: { x: number; y: number }) => ({
             x: p.x + 10,
             y: p.y + 10,
@@ -210,11 +209,13 @@ export default function SmartTools() {
       }
 
       showStatus(`Smart Paste: ${pasted} classification(s) pasted to page ${currentPage}`);
-      recordAction('Smart Paste', handleSmartPaste);
+      recordAction('Smart Paste', () => { void smartPasteRef.current?.(); });
     } catch {
       showStatus('Smart Paste: no valid data in clipboard');
     }
   }, [currentPage, addPolygon, showStatus, recordAction]);
+
+  useLayoutEffect(() => { smartPasteRef.current = handleSmartPaste; }, [handleSmartPaste]);
 
   // --- Tool: Repeat Last Action ---
   const handleRepeat = useCallback(() => {
@@ -251,20 +252,24 @@ export default function SmartTools() {
       {hasWalls && (
         <div style={{ display: 'flex', gap: 4, padding: '0 4px', fontSize: 10, color: '#888' }}>
           <label>
-            Door: <input
+            Door:{' '}
+            <input
               type="number"
               value={doorWidth}
               onChange={(e) => setDoorWidth(Number(e.target.value) || 0)}
               style={{ width: 36, background: '#1a1a2e', color: '#b9bedc', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 4, padding: '1px 3px', fontSize: 10 }}
-            /> ft
+            />{' '}
+            ft
           </label>
           <label>
-            Win: <input
+            Win:{' '}
+            <input
               type="number"
               value={windowWidth}
               onChange={(e) => setWindowWidth(Number(e.target.value) || 0)}
               style={{ width: 36, background: '#1a1a2e', color: '#b9bedc', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 4, padding: '1px 3px', fontSize: 10 }}
-            /> ft
+            />{' '}
+            ft
           </label>
         </div>
       )}

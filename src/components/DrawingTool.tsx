@@ -33,16 +33,17 @@ export default function DrawingTool() {
   const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
   const snapPolygons = polygons.filter((polygon) => polygon.pageNumber === drawingPage);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pointsRef = useRef<Point[]>([]);
   const { addToast } = useToast();
-  // Pending single-click timeout — cancelled if a double-click arrives within 250ms
-  const pendingClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus on mount so keyboard events (Esc, Enter) work immediately
   useEffect(() => {
     containerRef.current?.focus();
-    return () => {
-      if (pendingClickTimeout.current) clearTimeout(pendingClickTimeout.current);
-    };
+  }, []);
+
+  const setPointsAndRef = useCallback((next: Point[]) => {
+    pointsRef.current = next;
+    setPoints(next);
   }, []);
 
   // Re-focus when clicking anywhere in the draw area (so Esc/Enter always work)
@@ -91,20 +92,21 @@ export default function DrawingTool() {
   }, [getSelectedClassification, addPolygon, drawingPage, addToast]);
 
   const commitPolygon = useCallback(() => {
+    const currentPoints = pointsRef.current;
     const cls = getSelectedClassification();
     const linear = cls?.type === 'linear';
     const minPts = linear ? 2 : 3;
-    if (points.length < minPts) return;
+    if (currentPoints.length < minPts) return;
     if (!cls) {
       addToast('Please create or select a classification first', 'warning');
       return;
     }
     performance.mark('polygon-draw-start');
-    const areaPx = linear ? 0 : calculatePolygonArea(points);
+    const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
     const ppu = scale?.pixelsPerUnit || 1;
-    const linearFeet = linear ? calculateLinearFeet(points, ppu, false) : 0;
+    const linearFeet = linear ? calculateLinearFeet(currentPoints, ppu, false) : 0;
     addPolygon({
-      points,
+      points: currentPoints,
       classificationId: cls.id,
       pageNumber: drawingPage,
       area: areaPx,
@@ -118,9 +120,9 @@ export default function DrawingTool() {
       if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
       window.__perfMarks.polygonDraw = polyMeasure.duration;
     }
-    setPoints([]);
+    setPointsAndRef([]);
     setTool('select');
-  }, [points, getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale]);
+  }, [getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale, setPointsAndRef]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -141,43 +143,31 @@ export default function DrawingTool() {
 
       // Close polygon if clicking near the first point (area mode only)
       const clickCls = cls;
-      if (clickCls?.type !== 'linear' && points.length >= 3) {
+      const currentPoints = pointsRef.current;
+      if (clickCls?.type !== 'linear' && currentPoints.length >= 3) {
         const rect = containerRef.current?.getBoundingClientRect();
-        const screenX = rect ? (points[0].x / baseDims.width) * rect.width + rect.left : 0;
-        const screenY = rect ? (points[0].y / baseDims.height) * rect.height + rect.top : 0;
+        const screenX = rect ? (currentPoints[0].x / baseDims.width) * rect.width + rect.left : 0;
+        const screenY = rect ? (currentPoints[0].y / baseDims.height) * rect.height + rect.top : 0;
         const dx = e.clientX - screenX;
         const dy = e.clientY - screenY;
         if (Math.hypot(dx, dy) < CLOSE_THRESHOLD_PX) {
-          if (pendingClickTimeout.current) {
-            clearTimeout(pendingClickTimeout.current);
-            pendingClickTimeout.current = null;
-          }
           commitPolygon();
           return;
         }
       }
 
-      // Defer point addition so onDoubleClick can cancel the phantom point
-      if (pendingClickTimeout.current) {
-        clearTimeout(pendingClickTimeout.current);
-      }
-      pendingClickTimeout.current = setTimeout(() => {
-        pendingClickTimeout.current = null;
-        setPoints((prev) => [...prev, pt]);
-      }, 250);
+      // Ignore the second click event in a double-click sequence.
+      if (e.detail > 1) return;
+      const nextPoints = [...currentPoints, pt];
+      setPointsAndRef(nextPoints);
     },
-    [points, getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims]
+    [getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims, setPointsAndRef]
   );
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Cancel the pending single-click point so it never gets added
-      if (pendingClickTimeout.current) {
-        clearTimeout(pendingClickTimeout.current);
-        pendingClickTimeout.current = null;
-      }
       commitPolygon();
     },
     [commitPolygon]
@@ -203,13 +193,13 @@ export default function DrawingTool() {
   }, [baseDims, snapPolygons]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { setPoints([]); setTool('select'); }
+    if (e.key === 'Escape') { setPointsAndRef([]); setTool('select'); }
     if (e.key === 'Enter') { commitPolygon(); }
-    if (e.key === 'Backspace' && points.length > 0) {
+    if (e.key === 'Backspace' && pointsRef.current.length > 0) {
       e.preventDefault();
-      setPoints((prev) => prev.slice(0, -1));
+      setPointsAndRef(pointsRef.current.slice(0, -1));
     }
-  }, [setTool, commitPolygon, points.length]);
+  }, [setTool, commitPolygon, setPointsAndRef]);
 
   const hasScale = scale !== null && scale.pixelsPerUnit > 0;
   const ppu = scale?.pixelsPerUnit || 1;

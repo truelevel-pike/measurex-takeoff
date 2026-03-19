@@ -528,8 +528,8 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpande
         alignItems: 'center',
         justifyContent: 'center',
         transition: 'all 150ms ease',
-        minWidth: 36,
-        minHeight: 36,
+        minWidth: 44,
+        minHeight: 44,
         touchAction: 'manipulation',
       }}
       onMouseEnter={(e) => {
