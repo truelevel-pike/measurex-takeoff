@@ -57,6 +57,7 @@ import QuickTakeoffMode from '@/components/QuickTakeoffMode';
 import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
 import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
+import FirstRunTooltips from '@/components/FirstRunTooltips';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -661,6 +662,7 @@ function PageInner() {
       safeGoToPage(originalPage, 'ai-takeoff:return');
       await reloadProjectPolygonsAndClassifications(projectId);
 
+      localStorage.setItem('mx-onboarding-takeoff-run', 'true');
       const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
       setAiStatus(doneMsg);
       setTimeout(() => setAiStatus(null), 5000);
@@ -1105,6 +1107,7 @@ function PageInner() {
       const cal = detectedToCalibration(detectedScale);
       setScale(cal);
       setScaleForPage(currentPageNum, cal);
+      localStorage.setItem('mx-onboarding-scale-set', 'true');
     }
     setDetectedScale(null);
   }, [detectedScale, currentPageNum, setScale, setScaleForPage]);
@@ -1477,7 +1480,7 @@ function PageInner() {
         currentPagePolygonCount={polygons.filter(p => p.pageNumber === currentPageNum).length}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
-        onExportPanel={() => setShowExport(true)}
+        onExportPanel={() => { localStorage.setItem('mx-onboarding-exported', 'true'); setShowExport(true); }}
         onPrintBlueprint={() => {
           const name = projectName || 'Untitled Project';
           const printUrl = `/print?projectId=${projectId}&name=${encodeURIComponent(name)}&page=${currentPageNum}`;
@@ -1907,6 +1910,9 @@ function PageInner() {
       {/* What's New modal */}
       {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
 
+      {/* First-run tooltips for new editor users */}
+      {projectId && <FirstRunTooltips />}
+
       {/* GAP-006: Server-detected scale banner from upload response */}
       {uploadDetectedScale && (
         <div
@@ -1930,6 +1936,7 @@ function PageInner() {
                 label: uploadDetectedScale.description,
                 source: 'auto',
               });
+              localStorage.setItem('mx-onboarding-scale-set', 'true');
               import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
                 if (getNotificationPrefs().scaleChanged) {
                   addToast('Scale applied: ' + uploadDetectedScale.description, 'success');

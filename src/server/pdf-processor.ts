@@ -184,7 +184,11 @@ export async function renderPageAsImage(
     pdfJsResult = null;
   }
 
-  if (pdfJsResult) {
+  // Guard: if pdfjs rendered a suspiciously small PNG (< 50KB), the page is likely blank
+  // (pdfjs silently produces blank canvases for PDFs with unsupported image formats).
+  // Fall through to pdftoppm which handles these correctly.
+  const MIN_MEANINGFUL_PNG_BYTES = 50 * 1024; // 50KB
+  if (pdfJsResult && pdfJsResult.length >= MIN_MEANINGFUL_PNG_BYTES) {
     pageImageCache.set(cacheKey, pdfJsResult);
     return `data:image/png;base64,${pdfJsResult.toString('base64')}`;
   }

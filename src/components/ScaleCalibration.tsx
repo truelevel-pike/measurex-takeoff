@@ -162,6 +162,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
         setScaleForPage(currentPage, cal);
       }
       persistScale(cal);
+      localStorage.setItem('mx-onboarding-scale-set', 'true');
       const { getNotificationPrefs } = await import('@/components/NotificationSettings');
       if (getNotificationPrefs().scaleChanged) {
         addToast(`Scale set to ${label}`, 'success', 3000);
@@ -194,6 +195,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
         setScaleForPage(currentPage, cal);
       }
       persistScale(cal);
+      localStorage.setItem('mx-onboarding-scale-set', 'true');
       handleClose();
     },
     [currentPage, setScale, setScaleForPage, persistScale, handleClose],

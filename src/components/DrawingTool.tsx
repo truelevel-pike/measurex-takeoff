@@ -228,7 +228,7 @@ export default function DrawingTool() {
   }, [baseDims, snapPolygons]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { setPointsAndRef([]); setTool('select'); }
+    if (e.key === 'Escape') { setPointsAndRef([]); setTool('select'); } // E36: Escape cancel drawing verified
     if (e.key === 'Enter') { commitPolygon(); }
     if (e.key === 'Backspace' && pointsRef.current.length > 0) {
       e.preventDefault();
