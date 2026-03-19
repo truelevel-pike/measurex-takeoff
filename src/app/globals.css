@@ -192,3 +192,92 @@
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Print / PDF export styles ───────────────────────────────────────────── */
+.print-header {
+  display: none;
+}
+
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show print header */
+  .print-header {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 99999;
+    padding: 12px 24px;
+    font-size: 14px;
+    color: #000;
+    background: #fff;
+    border-bottom: 1px solid #ccc;
+    font-family: sans-serif;
+  }
+
+  /* Show the PDF viewer area and everything inside it */
+  #pdf-print-area,
+  #pdf-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Make the viewer fill the page */
+  #pdf-print-area {
+    position: fixed !important;
+    top: 40px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: calc(100vh - 40px) !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  /* Hide HUD controls inside the viewer (zoom pill, zoom buttons) */
+  #pdf-print-area > div:first-child ~ div[style*="position: absolute"][style*="z-index"] {
+    display: none !important;
+  }
+
+  /* Force white background on body */
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure SVG overlays (polygons, labels) are visible and colorful */
+  #pdf-print-area svg {
+    visibility: visible !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  #pdf-print-area svg polygon,
+  #pdf-print-area svg text,
+  #pdf-print-area svg circle,
+  #pdf-print-area svg line {
+    visibility: visible !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Ensure canvas is printed */
+  #pdf-print-area canvas {
+    visibility: visible !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Remove dark backgrounds and shadows from print */
+  #pdf-print-area > div {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}

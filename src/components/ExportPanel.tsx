@@ -422,10 +422,28 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
     showToast('Full export completed!');
   }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
 
-  // ── Export: PDF stub ──
+  // ── Export: Print / PDF ──
+  const currentPage = useStore((s) => s.currentPage);
   const handlePdfExport = useCallback(() => {
-    showToast('PDF export coming soon!');
-  }, [showToast]);
+    // Derive project name from URL params (same as JSON export)
+    const params = new URLSearchParams(window.location.search);
+    const derivedName = params.get('name');
+    const name = derivedName && derivedName.trim().length > 0 ? derivedName : 'Untitled Project';
+
+    // Populate hidden print header
+    const header = document.getElementById('print-header');
+    if (header) {
+      header.innerHTML = `<strong>${name}</strong> &mdash; Page ${currentPage} &mdash; ${new Date().toLocaleDateString()}`;
+    }
+
+    // Close the export panel so it doesn't appear in print
+    onClose();
+
+    // Give the DOM a tick to update, then trigger print
+    requestAnimationFrame(() => {
+      window.print();
+    });
+  }, [currentPage, onClose]);
 
   // ── Export: JSON ──
   const handleJsonExport = useCallback(() => {
@@ -784,11 +802,11 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           </button>
           <button
             onClick={handlePdfExport}
-            aria-label="Export to PDF"
-            className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-600"
+            aria-label="Print page with overlays"
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
-            Export PDF
+            Print / PDF
           </button>
           <button
             onClick={handleJsonExport}

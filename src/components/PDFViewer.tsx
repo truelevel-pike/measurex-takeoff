@@ -607,6 +607,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     return (
       <div
         ref={containerRef}
+        id="pdf-print-area"
         style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative', cursor: isPanning ? 'grabbing' : cursor, touchAction: 'none', background: '#12121a' }}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
