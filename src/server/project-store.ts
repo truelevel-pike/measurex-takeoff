@@ -699,6 +699,29 @@ export async function deleteClassification(
 
 // ── Polygons CRUD ──────────────────────────────────────────────────────
 
+/**
+ * Delete all polygons for a specific project page.
+ * Used by AI takeoff before re-inserting a fresh batch to avoid duplicate-key errors on re-runs.
+ */
+export async function deletePolygonsByPage(projectId: string, pageNumber: number): Promise<void> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb
+      .from('mx_polygons')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('page_number', pageNumber);
+    if (error) throw new Error(`deletePolygonsByPage: ${error.message}`);
+    return;
+  }
+
+  // File mode
+  const filePath = path.join(projectDir(projectId), 'polygons.json');
+  const list = await readJson<Polygon[]>(filePath, []);
+  const filtered = list.filter((p) => p.pageNumber !== pageNumber);
+  await writeJson(filePath, filtered);
+}
+
 export async function createPolygon(
   projectId: string,
   data: Omit<Polygon, 'id'> & { id?: string },

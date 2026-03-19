@@ -3,6 +3,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 import { AiTakeoffBodySchema } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 import { broadcastToProject } from '@/lib/sse-broadcast';
+import { deletePolygonsByPage } from '@/server/project-store';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
@@ -266,6 +267,11 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
         if (!name || !type || !id) continue;
         classMap.set(`${type.toLowerCase()}::${name.toLowerCase()}`, id);
       }
+
+      // Delete all existing polygons for this page before inserting the new batch.
+      // This prevents duplicate-key errors when AI takeoff is re-run on a page that
+      // already has polygons (Re-Togal / second run scenario).
+      await deletePolygonsByPage(projectId, page);
 
       for (const el of results) {
         const clsKey = `${el.type.toLowerCase()}::${el.classification.toLowerCase()}`;
