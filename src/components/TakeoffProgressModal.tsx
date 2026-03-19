@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Loader2, Sparkles, Trophy, Clock, Layers, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Sparkles, BrainCircuit, Trophy, Clock, Layers, Eye } from 'lucide-react';
 
 export interface PageStatus {
   page: number;
@@ -41,7 +41,15 @@ export default function TakeoffProgressModal({
   summary,
   onDismissSummary,
 }: TakeoffProgressModalProps) {
-  if (!open && !summary) return null;
+  const [cancelled, setCancelled] = useState(false);
+  const [cancelledDoneCount, setCancelledDoneCount] = useState(0);
+
+  // Reset cancelled state when modal opens fresh
+  useEffect(() => {
+    if (open) setCancelled(false);
+  }, [open]);
+
+  if (!open && !summary && !cancelled) return null;
 
   // If summary is provided, show the celebratory summary overlay
   if (summary) {
@@ -65,15 +73,27 @@ export default function TakeoffProgressModal({
       {/* Central content */}
       <div className="flex flex-col items-center max-w-2xl w-full px-6">
 
-        {/* Animated sparkle icon */}
+        {/* Animated AI brain icon with spinning ring */}
         <div className="mb-6 relative">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center"
+          <div className="w-20 h-20 rounded-full flex items-center justify-center relative"
             style={{
               background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(0,212,255,0.2))',
-              border: '2px solid rgba(34,197,94,0.4)',
               boxShadow: '0 0 40px rgba(34,197,94,0.3)',
             }}>
-            <Sparkles size={36} className="text-emerald-400 animate-pulse" />
+            {/* Spinning ring */}
+            <div className="absolute inset-0 rounded-full animate-spin"
+              style={{
+                border: '2px solid transparent',
+                borderTopColor: 'rgba(34,197,94,0.7)',
+                borderRightColor: 'rgba(0,212,255,0.5)',
+                animationDuration: '2s',
+              }} />
+            {/* Pulsing glow ring */}
+            <div className="absolute inset-0 rounded-full animate-pulse"
+              style={{
+                border: '2px solid rgba(34,197,94,0.3)',
+              }} />
+            <BrainCircuit size={36} className="text-emerald-400 animate-pulse" />
           </div>
         </div>
 
@@ -81,6 +101,9 @@ export default function TakeoffProgressModal({
         <h1 className="text-3xl font-bold text-white mb-2 text-center">
           Page {currentPage} of {total}
         </h1>
+        {model && (
+          <p className="text-xs text-white/40 mb-2 text-center">Using: <span className="text-white/60">{model}</span></p>
+        )}
         <p className="text-lg text-white/60 mb-8 text-center">
           {runningPage ? (
             <>analyzing <span className="text-[#00d4ff] font-medium">{runningPageName}</span>…</>

@@ -68,6 +68,23 @@ function PageThumbnailSidebar({
     return m;
   }, [polygons]);
 
+  // Classification color breakdown per page for color strip bars
+  const polygonClassBreakdownByPage = useMemo(() => {
+    const m = new Map<number, { color: string; count: number }[]>();
+    for (const [page, pagePolys] of polygonsByPage) {
+      const counts = new Map<string, number>();
+      for (const p of pagePolys) {
+        counts.set(p.classificationId, (counts.get(p.classificationId) ?? 0) + 1);
+      }
+      const breakdown = Array.from(counts.entries())
+        .map(([classId, count]) => ({ color: classColorMap.get(classId) ?? '#00d4ff', count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      m.set(page, breakdown);
+    }
+    return m;
+  }, [polygonsByPage, classColorMap]);
+
   const processThumbnailQueue = useCallback(() => {
     const activeSession = renderSessionRef.current;
     if (!pdfDoc) return;
@@ -170,6 +187,10 @@ function PageThumbnailSidebar({
     const isActive = page === currentPage;
     const thumb = thumbnails[page - 1];
     const setLabel = drawingSets[page] || '';
+    const pagePolygons = polygonsByPage.get(page);
+    const polyCount = pagePolygons?.length ?? 0;
+    const hasPolygons = polyCount > 0;
+    const colorBreakdown = polygonClassBreakdownByPage.get(page);
 
     return (
       <div
@@ -202,13 +223,16 @@ function PageThumbnailSidebar({
                 height={52}
                 unoptimized
                 className={`w-14 h-auto rounded-sm ${
-                  isActive ? 'ring-2 ring-blue-500 ring-offset-1' : 'ring-1 ring-gray-700'
+                  isActive
+                    ? 'ring-2 ring-blue-500 ring-offset-1'
+                    : hasPolygons
+                      ? 'ring-1 ring-gray-700'
+                      : 'ring-1 ring-dashed ring-gray-600/50'
                 }`}
                 draggable={false}
               />
               {/* Polygon overlay preview */}
               {(() => {
-                const pagePolygons = polygonsByPage.get(page);
                 const dims = pageBaseDimensions[page];
                 if (!pagePolygons?.length || !dims) return null;
                 return (
@@ -231,6 +255,26 @@ function PageThumbnailSidebar({
                   </svg>
                 );
               })()}
+              {/* Unanalyzed page hover hint */}
+              {!hasPolygons && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/page:opacity-100 transition-opacity pointer-events-none">
+                  <span className="text-[8px] font-mono text-gray-400 bg-black/50 rounded px-1 py-0.5">▶ AI</span>
+                </div>
+              )}
+              {/* Polygon count badge */}
+              {hasPolygons && (
+                <span className="absolute bottom-0.5 right-0.5 bg-green-500 text-white text-[9px] font-mono font-bold rounded px-1 leading-tight z-10 min-w-[16px] text-center">
+                  {polyCount}
+                </span>
+              )}
+              {/* Classification color strip */}
+              {colorBreakdown && colorBreakdown.length > 0 && (
+                <div className="flex flex-row overflow-hidden rounded-b-sm w-full h-[3px] absolute bottom-0 left-0 right-0">
+                  {colorBreakdown.map((seg, i) => (
+                    <div key={i} style={{ backgroundColor: seg.color, flex: seg.count }} />
+                  ))}
+                </div>
+              )}
             </div>
           ) : failedPages.has(page) ? (
             <span

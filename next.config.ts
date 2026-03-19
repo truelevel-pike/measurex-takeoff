@@ -14,6 +14,7 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  devIndicators: false,
   async headers() {
     return [
       {

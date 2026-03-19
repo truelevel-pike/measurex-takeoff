@@ -33,8 +33,9 @@ export function captureError(
   }
   buffer.push(entry);
 
-  // Also log for dev visibility
-  console.error("[mx:error-tracker]", entry.message);
+  // Log for dev visibility — use console.debug to avoid triggering the
+  // Next.js dev overlay "Issues" badge (it intercepts console.error).
+  console.debug("[mx:error-tracker]", entry.message);
 }
 
 /**
