@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "node --experimental-strip-types scripts/e2e-api-test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
