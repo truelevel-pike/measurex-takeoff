@@ -194,6 +194,8 @@ export interface Store extends ProjectState {
   setIsDefiningGroup: (v: boolean) => void;
 }
 
+const MAX_UNDO_STACK = 50;
+
 function snapshot(state: Store): HistorySnapshot {
   return {
     classifications: structuredClone(state.classifications),
@@ -207,6 +209,12 @@ function snapshot(state: Store): HistorySnapshot {
     selectedPolygons: structuredClone(state.selectedPolygons),
     repeatingGroups: structuredClone(state.repeatingGroups),
   };
+}
+
+/** Push a snapshot onto the undo stack, capping at MAX_UNDO_STACK entries to prevent unbounded memory growth. */
+function pushUndo(existing: HistorySnapshot[], entry: HistorySnapshot): HistorySnapshot[] {
+  const next = [...existing, entry];
+  return next.length > MAX_UNDO_STACK ? next.slice(next.length - MAX_UNDO_STACK) : next;
 }
 
 export const useStore = create<Store>()(
@@ -255,7 +263,7 @@ export const useStore = create<Store>()(
     const tradeGroup = assignTradeGroup(name.trim());
     const next: Classification = { id, name: name.trim(), color: color.trim(), type, visible, tradeGroup };
     const before = snapshot(s);
-    set({ classifications: [...s.classifications, next], undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ classifications: [...s.classifications, next], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
     return id;
   },
 
@@ -272,7 +280,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       classifications: s.classifications.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -297,7 +305,7 @@ export const useStore = create<Store>()(
         })),
       })),
       assemblies: s.assemblies.filter((a) => a.classificationId !== id),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -309,7 +317,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       classifications: s.classifications.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -337,7 +345,7 @@ export const useStore = create<Store>()(
         removeSet.has(a.classificationId) ? { ...a, classificationId: survivorId } : a,
       ),
       selectedClassification: removeSet.has(s.selectedClassification ?? '') ? survivorId : s.selectedClassification,
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -357,7 +365,7 @@ export const useStore = create<Store>()(
       label,
     };
     const before = snapshot(s);
-    set({ polygons: [...s.polygons, polygon], lastPolygon: polygon, undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ polygons: [...s.polygons, polygon], lastPolygon: polygon, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
     return id;
   },
 
@@ -366,7 +374,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       polygons: s.polygons.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -379,7 +387,7 @@ export const useStore = create<Store>()(
       selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
       selectedPolygons: s.selectedPolygons.filter((polygonId) => polygonId !== id),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -429,7 +437,7 @@ export const useStore = create<Store>()(
       selectedPolygons: [],
       selectedPolygon: null,
       selectedPolygonId: null,
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
     if (!s.projectId) return;
@@ -453,7 +461,7 @@ export const useStore = create<Store>()(
       fontSize: a.fontSize,
     };
     const before = snapshot(s);
-    set({ annotations: [...(s.annotations ?? []), annotation], undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ annotations: [...(s.annotations ?? []), annotation], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
     return id;
   },
 
@@ -462,7 +470,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       annotations: (s.annotations ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -472,7 +480,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       annotations: (s.annotations ?? []).filter((a) => a.id !== id),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -496,7 +504,7 @@ export const useStore = create<Store>()(
       selectedPolygon: merged.id,
       selectedPolygonId: merged.id,
       selectedPolygons: [merged.id],
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -520,7 +528,7 @@ export const useStore = create<Store>()(
       selectedPolygon: results[0].id,
       selectedPolygonId: results[0].id,
       selectedPolygons: [results[0].id],
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -534,7 +542,7 @@ export const useStore = create<Store>()(
       selectedPolygons: [],
       selectedPolygon: null,
       selectedPolygonId: null,
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -547,7 +555,7 @@ export const useStore = create<Store>()(
   setScaleForPage: (page, scale) => {
     const s = get();
     const before = snapshot(s);
-    set({ scales: { ...s.scales, [page]: scale }, scale, undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ scales: { ...s.scales, [page]: scale }, scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
   },
   getScaleForPage: (page) => get().scales[page] ?? null,
 
@@ -794,7 +802,7 @@ export const useStore = create<Store>()(
     const now = new Date().toISOString();
     const group: RepeatingGroup = { ...g, id, createdAt: now, updatedAt: now };
     const before = snapshot(s);
-    set({ repeatingGroups: [...s.repeatingGroups, group], undoStack: [...s.undoStack, before], redoStack: [] });
+    set({ repeatingGroups: [...s.repeatingGroups, group], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
     return id;
   },
 
@@ -803,7 +811,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       repeatingGroups: s.repeatingGroups.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: new Date().toISOString() } : g)),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
@@ -813,7 +821,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       repeatingGroups: s.repeatingGroups.filter((g) => g.id !== id),
-      undoStack: [...s.undoStack, before],
+      undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
   },
