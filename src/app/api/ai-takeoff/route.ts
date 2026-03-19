@@ -217,7 +217,7 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5.4',
         messages: [
           { role: 'system', content: system },
           { role: 'user', content },
