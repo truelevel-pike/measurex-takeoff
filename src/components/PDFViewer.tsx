@@ -368,8 +368,13 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
         const pointerX = e.clientX - rect.left;
         const pointerY = e.clientY - rect.top;
-        const pageWidthAtZoom1 = pageDimensions.width > 0 ? pageDimensions.width / prevZoom : 0;
-        const pageHeightAtZoom1 = pageDimensions.height > 0 ? pageDimensions.height / prevZoom : 0;
+        const renderMultiplier = 1.5;
+        const pageWidthAtZoom1 = basePageSize.current.width > 0
+          ? basePageSize.current.width * renderMultiplier
+          : (pageDimensions.width > 0 ? pageDimensions.width / prevZoom : 0);
+        const pageHeightAtZoom1 = basePageSize.current.height > 0
+          ? basePageSize.current.height * renderMultiplier
+          : (pageDimensions.height > 0 ? pageDimensions.height / prevZoom : 0);
         const prevOffsetX = pageWidthAtZoom1 > 0 ? (container.clientWidth - pageWidthAtZoom1 * prevZoom) / 2 : 0;
         const prevOffsetY = pageHeightAtZoom1 > 0 ? (container.clientHeight - pageHeightAtZoom1 * prevZoom) / 2 : 0;
         const nextOffsetX = pageWidthAtZoom1 > 0 ? (container.clientWidth - pageWidthAtZoom1 * nextZoom) / 2 : 0;
@@ -509,8 +514,13 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         if (rect) {
           const pointerX = center.x - rect.left;
           const pointerY = center.y - rect.top;
-          const pageWidthAtZoom1 = pageDimensions.width > 0 ? pageDimensions.width / zoom : 0;
-          const pageHeightAtZoom1 = pageDimensions.height > 0 ? pageDimensions.height / zoom : 0;
+          const renderMultiplier = 1.5;
+          const pageWidthAtZoom1 = basePageSize.current.width > 0
+            ? basePageSize.current.width * renderMultiplier
+            : (pageDimensions.width > 0 ? pageDimensions.width / zoom : 0);
+          const pageHeightAtZoom1 = basePageSize.current.height > 0
+            ? basePageSize.current.height * renderMultiplier
+            : (pageDimensions.height > 0 ? pageDimensions.height / zoom : 0);
           const prevOffsetX = pageWidthAtZoom1 > 0 ? (rect.width - pageWidthAtZoom1 * zoom) / 2 : 0;
           const prevOffsetY = pageHeightAtZoom1 > 0 ? (rect.height - pageHeightAtZoom1 * zoom) / 2 : 0;
           const nextOffsetX = pageWidthAtZoom1 > 0 ? (rect.width - pageWidthAtZoom1 * nextZoom) / 2 : 0;
