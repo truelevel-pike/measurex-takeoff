@@ -241,6 +241,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   }, [scales, scale]);
 
 
+  // Close preferences panel whenever the project changes (prevents auto-open on load)
+  useEffect(() => {
+    setShowPreferences(false);
+  }, [projectId]);
+
   // Focus first element in drawer when opened on mobile
   useEffect(() => {
     if (showQuantitiesDrawer && drawerRef.current) {
@@ -697,7 +702,10 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const handleOpenTemplateLibrary = useCallback(() => setShowTemplateLibrary(true), []);
   const handleCloseTemplateLibrary = useCallback(() => setShowTemplateLibrary(false), []);
   const handleToggleNewClassification = useCallback(() => {
-    setShowNewClassification((prev) => !prev);
+    setShowNewClassification((prev) => {
+      if (!prev) setShowPreferences(false); // mutual exclusion: close preferences when opening
+      return !prev;
+    });
     setNewClassificationError(null);
   }, []);
   const handleCancelNewClassification = useCallback(() => {
@@ -890,7 +898,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           </button>
           <button
             type="button"
-            onClick={() => setShowPreferences(true)}
+            onClick={() => { setShowNewClassification(false); setShowPreferences(true); }}
             className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
             aria-label="User preferences"
             title="User Preferences"

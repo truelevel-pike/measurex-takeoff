@@ -47,7 +47,8 @@ export default function DrawingTool() {
   }, []);
 
   // Re-focus when clicking anywhere in the draw area (so Esc/Enter always work)
-  const handleMouseDown = useCallback(() => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
     containerRef.current?.focus();
   }, []);
 
@@ -135,6 +136,7 @@ export default function DrawingTool() {
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      e.stopPropagation();
       const pt = getCoords(e);
 
       // Guard: require a selected classification before first point
