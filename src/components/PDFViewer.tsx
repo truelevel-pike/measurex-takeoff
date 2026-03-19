@@ -18,8 +18,26 @@ interface PdfJsLib {
   getDocument: (params: { data: ArrayBuffer }) => { promise: Promise<PDFDocumentProxy> };
 }
 
+// Sheet-name detection patterns
+const SHEET_CODE_RE = /\b([A-Z]{1,2})[-.]?(\d{1,3})(?:\.(\d{1,2}))?\b/;
+const SHEET_KEYWORDS = [
+  'Architectural', 'Structural', 'Mechanical', 'Electrical', 'Plumbing',
+  'Civil', 'Floor Plan', 'Site Plan', 'Roof Plan', 'Elevation', 'Section', 'Detail',
+];
+const SHEET_KEYWORD_RE = new RegExp(`\\b(${SHEET_KEYWORDS.join('|')})\\b`, 'i');
+
+function detectSheetName(text: string): string | null {
+  const codeMatch = text.match(SHEET_CODE_RE);
+  if (codeMatch) return codeMatch[0];
+  const kwMatch = text.match(SHEET_KEYWORD_RE);
+  if (kwMatch) return kwMatch[1];
+  return null;
+}
+
 interface PDFViewerProps {
   file?: File | null;
+  /** Project ID — when provided, extracted text and sheet names are PATCHed to the server. */
+  projectId?: string;
   onPageChange?: (page: number, total: number) => void;
   onDimensionsChange?: (dims: { width: number; height: number }) => void;
   onTextExtracted?: (text: string, pageNum: number) => void;
@@ -43,7 +61,7 @@ export interface PDFViewerHandle {
 }
 
 const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
-  ({ file, onPageChange, onDimensionsChange, onTextExtracted, cursor = 'default', children }, ref) => {
+  ({ file, projectId, onPageChange, onDimensionsChange, onTextExtracted, cursor = 'default', children }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
@@ -278,6 +296,18 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
               .map((item: Record<string, unknown>) => ('str' in item ? String(item.str) : '').trim())
               .join('\n');
             onTextExtracted?.(fullText, pageNum);
+
+            // Send extracted text + auto-detected sheet name to server
+            if (projectId && fullText.trim()) {
+              const sheetName = detectSheetName(fullText);
+              const patchBody: Record<string, unknown> = { pageNum, text: fullText };
+              if (sheetName) patchBody.sheet_name = sheetName;
+              fetch(`/api/projects/${projectId}/pages`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patchBody),
+              }).catch(() => {/* best-effort */});
+            }
           } catch {}
         } finally {
           // Only reset rendering flag if this is still the current render
@@ -297,7 +327,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           }
         }
       },
-      [onDimensionsChange, onTextExtracted]
+      [onDimensionsChange, onTextExtracted, projectId]
     );
 
     // ISSUE #6 FIX: pendingRender uses a "latest-wins / dirty-flag" pattern.

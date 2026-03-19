@@ -1493,6 +1493,7 @@ function PageInner() {
                 <PDFViewer
                   ref={pdfViewerRef}
                   file={pdfFile}
+                  projectId={projectId ?? undefined}
                   onTextExtracted={handleTextExtracted}
                   onPageChange={handlePDFPageChange}
                   cursor={

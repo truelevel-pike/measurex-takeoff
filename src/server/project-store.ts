@@ -740,7 +740,7 @@ export async function createPolygon(
 
   if (isSupabaseMode()) {
     const sb = getClient();
-    const row = {
+    const row: Record<string, unknown> = {
       id,
       project_id: projectId,
       classification_id: data.classificationId,
@@ -750,9 +750,11 @@ export async function createPolygon(
       linear_pixels: data.linearFeet ?? 0,
       is_complete: data.isComplete ?? true,
       label: data.label ?? null,
-      confidence: data.confidence ?? null,
-      detected_by_model: data.detectedByModel ?? null,
     };
+    // Only include AI-detection columns when values are present,
+    // so inserts succeed even if the columns haven't been migrated yet.
+    if (data.confidence != null) row.confidence = data.confidence;
+    if (data.detectedByModel != null) row.detected_by_model = data.detectedByModel;
     const { error } = await sb.from('mx_polygons').insert(row);
     if (error) throw new Error(`createPolygon: ${error.message}`);
     const created: Polygon = {
