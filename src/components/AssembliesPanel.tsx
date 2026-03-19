@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Package } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Assembly, Material } from '@/lib/types';
 import AssemblyEditor from './AssemblyEditor';
@@ -104,45 +104,86 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     return map;
   }, [classifications, polygons, scale]);
 
-  // Fetch assemblies from API on mount / when projectId changes
+  // Fetch assemblies from API on mount / when projectId changes; auto-seed defaults if empty
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    interface AssemblyRow {
+      id: string;
+      name: string;
+      classificationId?: string;
+      unitCost?: number;
+      unit?: string;
+      materials?: Assembly['materials'];
+    }
+
+    function mapRow(row: AssemblyRow): Assembly {
+      return {
+        id: row.id,
+        name: row.name,
+        classificationId: row.classificationId ?? '',
+        isLibrary: false,
+        materials: row.materials ?? [
+          {
+            id: row.id,
+            name: row.name,
+            unitCost: row.unitCost ?? 0,
+            wasteFactor: 0,
+            coverageRate: 0,
+            unit: row.unit ?? 'SF',
+          },
+        ],
+      };
+    }
+
+    async function seedDefaults(pid: string): Promise<Assembly[]> {
+      const seeded: Assembly[] = [];
+      for (const tpl of DEFAULT_TEMPLATES) {
+        const totalUnitCost = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
+        const res = await fetch(`/api/projects/${pid}/assemblies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: tpl.name,
+            unit: tpl.unit,
+            unitCost: totalUnitCost,
+            quantityFormula: tpl.quantityFormula,
+          }),
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data?.assembly) {
+          // Merge server ID with full template materials for rich UI display
+          seeded.push({
+            id: data.assembly.id,
+            name: tpl.name,
+            classificationId: '',
+            isLibrary: false,
+            materials: tpl.materials.map((m) => ({ ...m, id: crypto.randomUUID() })),
+          });
+        }
+      }
+      return seeded;
+    }
+
     fetch(`/api/projects/${projectId}/assemblies`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
-        if (Array.isArray(data.assemblies)) {
-          interface AssemblyRow {
-            id: string;
-            name: string;
-            classificationId?: string;
-            unitCost?: number;
-            unit?: string;
-            materials?: Assembly['materials'];
+        if (Array.isArray(data.assemblies) && data.assemblies.length > 0) {
+          setAssemblies(data.assemblies.map(mapRow));
+        } else {
+          // Auto-seed default templates on first open
+          const seeded = await seedDefaults(projectId);
+          if (!cancelled && seeded.length > 0) {
+            setAssemblies(seeded);
           }
-          const mapped: Assembly[] = data.assemblies.map((row: AssemblyRow) => ({
-            id: row.id,
-            name: row.name,
-            classificationId: row.classificationId ?? '',
-            isLibrary: false,
-            materials: row.materials ?? [
-              {
-                id: row.id,
-                name: row.name,
-                unitCost: row.unitCost ?? 0,
-                wasteFactor: 0,
-                coverageRate: 0,
-                unit: row.unit ?? 'SF',
-              },
-            ],
-          }));
-          setAssemblies(mapped);
         }
       })
       .catch((err) => {
@@ -199,18 +240,6 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     return 'EA';
   }
 
-  /** Create an assembly from a default template – opens editor pre-filled. */
-  const handleCreateFromTemplate = useCallback((template: AssemblyTemplate) => {
-    const prefilled: Assembly = {
-      id: crypto.randomUUID(),
-      name: template.name,
-      classificationId: '',
-      isLibrary: false,
-      materials: template.materials.map((m) => ({ ...m, id: crypto.randomUUID() })),
-    };
-    setEditingAssembly(prefilled);
-    setShowEditor(true);
-  }, []);
 
   function handleEdit(assembly: Assembly) {
     setEditingAssembly(assembly);
@@ -464,34 +493,8 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
         )}
 
         {assemblies.length === 0 && !loading && !error && (
-          <div className="px-2 py-3 space-y-2">
-            <p className="text-[11px] text-[#8892a0] text-center mb-3">
-              No assemblies yet. Start from a template or create your own.
-            </p>
-            {DEFAULT_TEMPLATES.map((tpl) => {
-              const totalCostPerUnit = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
-              return (
-                <button
-                  key={tpl.name}
-                  type="button"
-                  onClick={() => handleCreateFromTemplate(tpl)}
-                  className="w-full text-left border border-[#00d4ff]/15 rounded-lg px-3 py-2 hover:bg-[#0e1016] hover:border-[#00d4ff]/30 transition-colors group"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Package size={13} className="text-[#00d4ff] opacity-60 group-hover:opacity-100" />
-                    <span className="text-[12px] font-medium text-[#e5e7eb]">{tpl.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-[#8892a0]">
-                    {tpl.materials.map((m) => (
-                      <span key={m.name}>{m.name} ${m.unitCost}/{tpl.unit}</span>
-                    ))}
-                    <span className="ml-auto font-mono text-emerald-400 font-semibold">
-                      = ${totalCostPerUnit}/{tpl.unit}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="text-center text-xs py-8 text-[#8892a0]">
+            No assemblies found.
           </div>
         )}
       </div>

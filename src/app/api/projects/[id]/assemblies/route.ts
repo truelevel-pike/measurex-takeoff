@@ -5,7 +5,7 @@ import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 const AssemblyBodySchema = z.object({
-  classificationId: z.string().uuid(),
+  classificationId: z.string().uuid().optional(),
   name: z.string().min(1),
   unit: z.string().optional(),
   unitCost: z.number().optional(),
@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!bodyResult.success) return validationError(bodyResult.error);
     const { classificationId, name, unit, unitCost, quantityFormula } = body;
     const assembly = await createAssembly(id, {
-      classificationId,
+      classificationId: classificationId || '',
       name,
       unit: unit || 'SF',
       unitCost: unitCost ?? 0,
