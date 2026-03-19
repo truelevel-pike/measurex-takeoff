@@ -34,36 +34,19 @@ const CLASSIFICATION_COLOR_PRESETS = [
 
 type ClassificationType = Classification['type'];
 
-const TRADE_GROUPS: Record<string, string[]> = {
-  "Concrete": ["slab", "footing", "foundation", "concrete", "topping"],
-  "Framing": ["wall", "partition", "framing", "stud", "header"],
-  "Flooring": ["floor", "carpet", "tile", "hardwood", "lvp", "living", "bedroom", "kitchen"],
-  "Roofing": ["roof", "shingle", "membrane"],
-  "Electrical": ["electrical", "panel", "conduit", "outlet"],
-  "Plumbing": ["plumbing", "pipe", "drain", "fixture"],
-  "Exterior": ["exterior", "facade", "siding", "window", "door"],
-  "Other": [],
-};
-
-function groupClassifications(items: Classification[]): Record<string, Classification[]> {
-  const result: Record<string, Classification[]> = {};
-  for (const trade of Object.keys(TRADE_GROUPS)) {
+/**
+ * Groups a list of classifications by trade.
+ * Prefers the stored `tradeGroup` metadata on the classification; falls back to
+ * keyword-based assignment via `assignTradeGroup` for legacy/ungrouped items.
+ */
+function groupClassificationsByTrade(items: Classification[]): Record<TradeGroup, Classification[]> {
+  const result = {} as Record<TradeGroup, Classification[]>;
+  for (const trade of TRADE_GROUP_ORDER) {
     result[trade] = [];
   }
   for (const cls of items) {
-    const name = cls.name.toLowerCase();
-    let matched = false;
-    for (const [trade, keywords] of Object.entries(TRADE_GROUPS)) {
-      if (trade === 'Other') continue;
-      if (keywords.some((kw) => name.includes(kw))) {
-        result[trade].push(cls);
-        matched = true;
-        break;
-      }
-    }
-    if (!matched) {
-      result['Other'].push(cls);
-    }
+    const trade: TradeGroup = cls.tradeGroup ?? assignTradeGroup(cls.name);
+    result[trade].push(cls);
   }
   return result;
 }
@@ -229,7 +212,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('measurex_group_by_trade') === 'true';
   });
-  const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
+  const [collapsedTrades, setCollapsedTrades] = useState<Set<TradeGroup>>(new Set());
   const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
 
   const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
@@ -284,7 +267,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     [classifications, searchLower]
   );
   const tradeGrouped = useMemo(
-    () => groupClassifications(filtered),
+    () => groupClassificationsByTrade(filtered),
     [filtered]
   );
 
@@ -296,7 +279,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     });
   }, []);
 
-  const toggleTradeCollapse = useCallback((trade: string) => {
+  const toggleTradeCollapse = useCallback((trade: TradeGroup) => {
     setCollapsedTrades((prev) => {
       const next = new Set(prev);
       if (next.has(trade)) next.delete(trade);
@@ -306,7 +289,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   }, []);
 
   // Build a flat ordered list with trade headers interleaved when grouping is active
-  type TradeHeader = { kind: 'header'; trade: string; count: number };
+  type TradeHeader = { kind: 'header'; trade: TradeGroup; count: number };
   type ClassRow = { kind: 'row'; classification: Classification; classIndex: number };
   type ListItem = TradeHeader | ClassRow;
 
@@ -315,7 +298,8 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       return filtered.map((classification, classIndex) => ({ kind: 'row' as const, classification, classIndex }));
     }
     const items: ListItem[] = [];
-    for (const [trade, tradeClassifications] of Object.entries(tradeGrouped)) {
+    for (const trade of TRADE_GROUP_ORDER) {
+      const tradeClassifications = tradeGrouped[trade] ?? [];
       if (tradeClassifications.length === 0) continue;
       items.push({ kind: 'header' as const, trade, count: tradeClassifications.length });
       if (!collapsedTrades.has(trade)) {
@@ -1168,7 +1152,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   ) : (
                     <ChevronDown size={12} className="text-gray-400 shrink-0" aria-hidden="true" />
                   )}
-                  <span className="font-mono text-[11px] text-[#8892a0] uppercase tracking-wider flex-1">{item.trade}</span>
+                  <span className="font-mono text-[11px] text-[#8892a0] uppercase tracking-wider flex-1">{TRADE_GROUP_LABELS[item.trade]}</span>
                   <span className="text-[10px] font-mono text-[#00d4ff]/70">{item.count}</span>
                   {tradeTotalArea > 0 && (
                     <span className="text-[10px] font-mono text-gray-500">{formatArea(tradeTotalArea, measurementSettings)}</span>
