@@ -197,9 +197,9 @@ export default function ProjectsPage() {
       });
       if (!res.ok) throw new Error(`Create failed (${res.status})`);
       const data = await res.json();
-      setProjects(prev => [data.project, ...prev]);
       setShowCreate(false);
       setNewName('');
+      handleOpen(data.project.id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Create failed';
       setError(message);
