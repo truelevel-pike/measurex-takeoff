@@ -46,6 +46,8 @@ interface TopNavBarProps {
   onSave?: () => void;
   saving?: boolean;
   projectName?: string;
+  projectId?: string;
+  onProjectNameSaved?: (name: string) => void;
   onChat?: () => void;
   onToggleImageSearch?: () => void;
   onCompare?: () => void;
@@ -85,6 +87,8 @@ export default function TopNavBar({
   onSettings,
   onToggleTakeoffSearch,
   isTakeoffSearchOpen,
+  projectId,
+  onProjectNameSaved,
   onGoToPage,
 }: TopNavBarProps) {
   const router = useRouter();
@@ -104,6 +108,11 @@ export default function TopNavBar({
   const [isEditingPage, setIsEditingPage] = React.useState(false);
   const [pageInputValue, setPageInputValue] = React.useState('');
   const pageInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [nameInputValue, setNameInputValue] = React.useState('');
+  const [nameSaving, setNameSaving] = React.useState(false);
+  const nameInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleCopyLink = React.useCallback(async () => {
     try {
@@ -231,7 +240,91 @@ export default function TopNavBar({
             </button>
           )}
           {projectName && !isMobile && (
-            <span style={{ color: '#8892a0', fontSize: 11, marginLeft: 6 }} aria-label={`Project: ${projectName}`}>{projectName}</span>
+            isEditingName ? (
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={nameInputValue}
+                onChange={(e) => setNameInputValue(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const trimmed = nameInputValue.trim();
+                    if (!trimmed || trimmed === projectName || !projectId) {
+                      setIsEditingName(false);
+                      return;
+                    }
+                    setNameSaving(true);
+                    try {
+                      const res = await fetch(`/api/projects/${projectId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmed }),
+                      });
+                      if (!res.ok) throw new Error(`Rename failed (${res.status})`);
+                      onProjectNameSaved?.(trimmed);
+                      addToast('Project name updated', 'success');
+                    } catch {
+                      addToast('Failed to rename project', 'error');
+                    } finally {
+                      setNameSaving(false);
+                      setIsEditingName(false);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setIsEditingName(false);
+                  }
+                }}
+                onBlur={async () => {
+                  const trimmed = nameInputValue.trim();
+                  if (!trimmed || trimmed === projectName || !projectId) {
+                    setIsEditingName(false);
+                    return;
+                  }
+                  setNameSaving(true);
+                  try {
+                    const res = await fetch(`/api/projects/${projectId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: trimmed }),
+                    });
+                    if (!res.ok) throw new Error(`Rename failed (${res.status})`);
+                    onProjectNameSaved?.(trimmed);
+                    addToast('Project name updated', 'success');
+                  } catch {
+                    addToast('Failed to rename project', 'error');
+                  } finally {
+                    setNameSaving(false);
+                    setIsEditingName(false);
+                  }
+                }}
+                disabled={nameSaving}
+                style={{
+                  color: '#e0e0e0',
+                  fontSize: 11,
+                  marginLeft: 6,
+                  background: 'rgba(0,0,0,0.4)',
+                  border: '1px solid rgba(0,212,255,0.5)',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  minWidth: 80,
+                }}
+              />
+            ) : (
+              <span
+                onClick={() => {
+                  setIsEditingName(true);
+                  setNameInputValue(projectName);
+                  setTimeout(() => nameInputRef.current?.select(), 0);
+                }}
+                style={{ color: '#8892a0', fontSize: 11, marginLeft: 6, cursor: 'pointer', textDecoration: 'underline dotted rgba(136,146,160,0.4)', textUnderlineOffset: 3 }}
+                aria-label={`Project: ${projectName} (click to edit)`}
+                title="Click to rename project"
+              >
+                {projectName}
+              </span>
+            )
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
           <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />

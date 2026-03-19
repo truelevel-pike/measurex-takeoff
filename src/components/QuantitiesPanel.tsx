@@ -10,7 +10,7 @@ import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LA
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
-import EstimateSummary from './EstimateSummary';
+import EstimatesTab from './EstimatesTab';
 import MeasurementSettingsPanel from './MeasurementSettings';
 import ClassificationLibrary from './ClassificationLibrary';
 import UserPreferencesPanel from './UserPreferencesPanel';
@@ -440,6 +440,19 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return totals;
   }, [classifications, polygonsByClassification, getPixelsPerUnitForPage]);
 
+  // Build a flat Record<classificationId, number> for EstimatesTab
+  const estimateQuantities = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const c of classifications) {
+      const t = totalsByClassification.get(c.id);
+      if (!t) { result[c.id] = 0; continue; }
+      if (c.type === 'area') result[c.id] = t.areaReal;
+      else if (c.type === 'linear') result[c.id] = t.lengthReal;
+      else result[c.id] = t.count;
+    }
+    return result;
+  }, [classifications, totalsByClassification]);
+
   function getDeductions(classification: Classification): ClassificationDeduction[] {
     return deductionsByClassification[classification.id] ?? classification.deductions ?? [];
   }
@@ -823,7 +836,20 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       {activeTab === 'assemblies' ? (
         <AssembliesPanel onSwitchToQuantities={handleSwitchToQuantities} onSwitchToEstimate={handleSwitchToEstimate} />
       ) : activeTab === 'estimate' ? (
-        <EstimateSummary onSwitchToQuantities={handleSwitchToQuantities} onSwitchToAssemblies={handleSwitchToAssemblies} />
+        <aside className="bg-[rgba(18,18,26,0.8)] flex flex-col h-full text-[13px]" aria-label="Estimate panel">
+          <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
+            <button type="button" onClick={handleSwitchToQuantities} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Quantities</button>
+            <button type="button" onClick={handleSwitchToAssemblies} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Assemblies</button>
+            <button type="button" className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]">Estimate</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {projectId ? (
+              <EstimatesTab projectId={projectId} classifications={classifications} quantities={estimateQuantities} />
+            ) : (
+              <div className="text-center text-xs py-8 text-[#8892a0]">No project loaded.</div>
+            )}
+          </div>
+        </aside>
       ) : (
       <>
       {/* Tab bar */}
@@ -1080,6 +1106,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       )}
 
       <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list>
+        {orderedListItems.length === 0 && polygons.length === 0 && !search && (
+          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+            <Layers size={28} className="text-gray-600 mb-3" aria-hidden="true" />
+            <p className="text-[13px] text-gray-400 leading-relaxed">
+              Run AI Takeoff or draw manually to measure this page
+            </p>
+          </div>
+        )}
         {orderedListItems.map((item) => {
           if (item.kind === 'header') {
             const isTradeCollapsed = collapsedTrades.has(item.trade);

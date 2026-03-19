@@ -223,20 +223,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const estimatesSheet = buildEstimatesSheet(rows, unitCosts);
     XLSX.utils.book_append_sheet(wb, estimatesSheet, 'Estimates');
 
-    // Write to buffer — use 'buffer' type, then extract a proper ArrayBuffer slice.
-    // ArrayBuffer satisfies BodyInit; Buffer does not in strict Next.js TS configs.
-    const nodeBuf = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }) as Buffer;
-    const arrayBuf: ArrayBuffer = nodeBuf.buffer.slice(
-      nodeBuf.byteOffset,
-      nodeBuf.byteOffset + nodeBuf.byteLength,
-    ) as ArrayBuffer;
+    // Write to binary array — Uint8Array is a valid BodyInit in every Next.js runtime.
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+    const bytes = new Uint8Array(buf);
     const safeName = projectName.replace(/[^a-zA-Z0-9-_]/g, '-');
 
-    return new Response(arrayBuf, {
+    return new Response(bytes, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="measurex-${safeName}.xlsx"`,
-        'Content-Length': String(nodeBuf.byteLength),
+        'Content-Length': String(bytes.byteLength),
       },
     });
   } catch (err: unknown) {

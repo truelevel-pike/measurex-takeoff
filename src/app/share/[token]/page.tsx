@@ -52,6 +52,7 @@ export default function SharedViewPage() {
   const token = params?.token as string;
 
   const [project, setProject] = useState<SharedProject | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -89,6 +90,17 @@ export default function SharedViewPage() {
           totalPages: proj.state.totalPages,
           annotations: [],
         });
+
+        // Fetch the PDF binary so the viewer can render it
+        try {
+          const pdfRes = await fetch(`/api/projects/${proj.id}/pdf`);
+          if (pdfRes.ok && !cancelled) {
+            const blob = await pdfRes.blob();
+            setPdfFile(new File([blob], `${proj.id}.pdf`, { type: 'application/pdf' }));
+          }
+        } catch {
+          // PDF may not exist (e.g. deleted) — overlay still works without it
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load shared project');
       } finally {
@@ -244,7 +256,7 @@ export default function SharedViewPage() {
         {/* PDF + overlay */}
         <div className="flex-1 relative overflow-hidden">
           <PDFViewer
-            file={null}
+            file={pdfFile}
             onPageChange={(page) => {
               setPageIndex(page - 1);
               setCurrentPage(page, totalPages);

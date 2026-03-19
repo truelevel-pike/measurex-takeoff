@@ -11,7 +11,7 @@ interface EstimatesTabProps {
     name: string;
     color: string;
     type: "area" | "linear" | "count";
-    unit: string;
+    unit?: string;
   }>;
   quantities: Record<string, number>;
 }

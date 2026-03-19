@@ -1254,6 +1254,10 @@ function PageInner() {
         onSave={handleSave}
         saving={saving}
         projectName={projectName || undefined}
+        projectId={projectId || undefined}
+        onProjectNameSaved={(newName) => {
+          setProjectName(newName);
+        }}
         onChat={() => setShowChat((v) => !v)}
         onToggleImageSearch={() => setShowImageSearch((v) => !v)}
         onCompare={() => setShowCompare(true)}
