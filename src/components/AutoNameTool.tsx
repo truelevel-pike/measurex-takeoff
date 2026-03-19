@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Check, X, ChevronRight, Loader2, CheckSquare, Square, RefreshCw } from 'lucide-react';
+import { useFeatureFlag } from '@/hooks/use-feature-flag';
 
 // --- Types ---
 interface RenameItem {
@@ -196,12 +197,58 @@ function ProgressBar({ progress }: { progress: number }) {
 // ---- Main Component ----
 
 export default function AutoNameTool() {
+  const aiSheetNaming = useFeatureFlag('ai-sheet-naming');
   const [state, setState] = useState<'idle' | 'processing' | 'done'>('idle');
   const [progress, setProgress] = useState(0);
   const [items, setItems] = useState<RenameItem[]>([]);
   const [appliedCount, setAppliedCount] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!aiSheetNaming) {
+    return (
+      <div
+        style={{
+          background: '#0a0a0f',
+          border: '1px solid rgba(0,212,255,0.2)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          boxShadow: '0 0 24px rgba(0,212,255,0.1)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 16px',
+            borderBottom: '1px solid rgba(0,212,255,0.15)',
+            background: 'rgba(10,10,15,0.6)',
+          }}
+        >
+          <Sparkles size={17} style={{ color: '#00d4ff' }} />
+          <span
+            style={{
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              fontSize: 13,
+              color: '#e0faff',
+              letterSpacing: 1,
+              textTransform: 'uppercase',
+            }}
+          >
+            AI Auto-Name Tool
+          </span>
+        </div>
+        <div style={{ padding: 16 }}>
+          <p style={{ fontSize: 12, color: '#8892a0', lineHeight: 1.6, margin: 0 }}>
+            Coming soon — AI-powered sheet naming is not yet available.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   function startProcessing() {
     setState('processing');

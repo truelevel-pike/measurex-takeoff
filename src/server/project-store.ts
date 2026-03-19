@@ -909,7 +909,8 @@ export async function setScale(
     return scale;
   }
 
-  const filePath = path.join(projectDir(projectId), 'scale.json');
+  const pageNum = scale.pageNumber ?? 1;
+  const filePath = path.join(projectDir(projectId), `scale-${pageNum}.json`);
   await writeJson(filePath, scale);
   return scale;
 }
@@ -935,7 +936,7 @@ export async function getScale(projectId: string, pageNumber: number = 1): Promi
     };
   }
 
-  return readJson<ScaleCalibration | null>(path.join(projectDir(projectId), 'scale.json'), null);
+  return readJson<ScaleCalibration | null>(path.join(projectDir(projectId), `scale-${pageNumber}.json`), null);
 }
 
 export async function listScales(projectId: string): Promise<ScaleCalibration[]> {
@@ -957,13 +958,17 @@ export async function listScales(projectId: string): Promise<ScaleCalibration[]>
     }));
   }
 
-  // File mode: single scale.json stores one scale (not page-keyed).
-  // Return it as a single-element array if present.
-  const scale = await readJson<ScaleCalibration | null>(
-    path.join(projectDir(projectId), 'scale.json'),
-    null,
-  );
-  return scale ? [scale] : [];
+  // File mode: read all scale-{N}.json files in the project directory.
+  const dir = projectDir(projectId);
+  const fs = await import('fs/promises');
+  const entries = await fs.readdir(dir).catch(() => [] as string[]);
+  const scaleFiles = entries.filter((f: string) => /^scale-\d+\.json$/.test(f)).sort();
+  const scales: ScaleCalibration[] = [];
+  for (const file of scaleFiles) {
+    const s = await readJson<ScaleCalibration | null>(path.join(dir, file), null);
+    if (s) scales.push(s);
+  }
+  return scales;
 }
 
 // ── Assemblies CRUD ─────────────────────────────────────────────────
