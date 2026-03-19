@@ -190,6 +190,21 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     () => allPolygons.filter((p) => p.pageNumber === currentPage),
     [allPolygons, currentPage]
   );
+  const classificationById = useMemo(() => {
+    const byId = new Map<string, (typeof classifications)[number]>();
+    for (const classification of classifications) {
+      byId.set(classification.id, classification);
+    }
+    return byId;
+  }, [classifications]);
+  const polygonCountByClassification = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const polygon of polygons) {
+      counts.set(polygon.classificationId, (counts.get(polygon.classificationId) ?? 0) + 1);
+    }
+    return counts;
+  }, [polygons]);
+  const polygonIds = useMemo(() => new Set(allPolygons.map((polygon) => polygon.id)), [allPolygons]);
   const annotations = useMemo(
     () => (allAnnotations ?? []).filter((a) => a.page === currentPage),
     [allAnnotations, currentPage]
@@ -245,9 +260,11 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   );
 
   const handlePolygonClick = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement>, polygonId: string) => {
+    (e: React.MouseEvent<SVGPolygonElement>) => {
       e.stopPropagation();
       onCanvasPointerDown?.();
+      const polygonId = e.currentTarget.dataset.polygonId;
+      if (!polygonId) return;
       if (currentTool === 'select') {
         if (e.shiftKey) {
           togglePolygonSelection(polygonId);
@@ -260,14 +277,28 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   );
 
   const handlePolygonContextMenu = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement>, polygonId: string) => {
+    (e: React.MouseEvent<SVGPolygonElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      const polygonId = e.currentTarget.dataset.polygonId;
+      if (!polygonId) return;
       if (selectedPolygons.length > 1 && selectedPolygons.includes(polygonId)) return;
       setSelectedPolygon(polygonId);
       onPolygonContextMenu?.({ polygonId, x: e.clientX, y: e.clientY });
     },
     [selectedPolygons, setSelectedPolygon, onPolygonContextMenu]
+  );
+
+  const handleVertexMouseDown = useCallback(
+    (e: React.MouseEvent<SVGCircleElement>) => {
+      const polygonId = e.currentTarget.dataset.polygonId;
+      const vertexIndexRaw = e.currentTarget.dataset.vertexIndex;
+      if (!polygonId || !vertexIndexRaw) return;
+      const vertexIndex = Number(vertexIndexRaw);
+      if (!Number.isFinite(vertexIndex)) return;
+      handleVertexPointerDown(e, polygonId, vertexIndex);
+    },
+    [handleVertexPointerDown]
   );
 
   const handleSvgMouseDown = useCallback(
@@ -289,14 +320,35 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const handleBatchReclassify = useCallback(
     (classificationId: string) => {
       selectedPolygons.forEach((polygonId) => {
-        if (allPolygons.some((p) => p.id === polygonId)) {
+        if (polygonIds.has(polygonId)) {
           updatePolygon(polygonId, { classificationId });
         }
       });
       setShowBatchClassificationPicker(false);
     },
-    [selectedPolygons, allPolygons, updatePolygon]
+    [selectedPolygons, polygonIds, updatePolygon]
   );
+
+  const handleBatchReclassifyClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const classificationId = e.currentTarget.dataset.classificationId;
+      if (!classificationId) return;
+      handleBatchReclassify(classificationId);
+    },
+    [handleBatchReclassify]
+  );
+
+  const handleWrapperMouseDownCapture = useCallback(() => {
+    wrapperRef.current?.focus();
+  }, []);
+
+  const handleBatchMenuClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+  }, []);
+
+  const handleToggleBatchClassificationPicker = useCallback(() => {
+    setShowBatchClassificationPicker((prev) => !prev);
+  }, []);
 
   // Disable pointer events when measure/cut/merge/split tools are active.
   // Draw mode keeps pointer events enabled so the DrawingTool overlay (z-20)
@@ -312,7 +364,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     <div
       ref={wrapperRef}
       tabIndex={0}
-      onMouseDownCapture={() => wrapperRef.current?.focus()}
+      onMouseDownCapture={handleWrapperMouseDownCapture}
       style={{
         position: 'absolute',
         inset: 0,
@@ -335,7 +387,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         </style>
         {/* Polygons */}
         {polygons.map((poly) => {
-          const cls = classifications.find((c) => c.id === poly.classificationId);
+          const cls = classificationById.get(poly.classificationId);
           if (cls && !cls.visible) return null;
           const color = cls?.color || '#93c5fd';
           const isSelected = selectedPolygons.includes(poly.id) || selectedPolygon === poly.id;
@@ -361,8 +413,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     ? 'drop-shadow(0 0 6px rgba(0,255,136,0.6))'
                     : 'drop-shadow(0 0 4px rgba(0,212,255,0.25))',
                 }}
-                onClick={(e) => handlePolygonClick(e, poly.id)}
-                onContextMenu={(e) => handlePolygonContextMenu(e, poly.id)}
+                data-polygon-id={poly.id}
+                onClick={handlePolygonClick}
+                onContextMenu={handlePolygonContextMenu}
                 aria-label={cls?.name ?? 'Unknown classification'}
               >
                 <title>{cls?.name ?? 'Polygon'}</title>
@@ -392,7 +445,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     strokeWidth={1.5}
                     vectorEffect="non-scaling-stroke"
                     style={{ cursor: 'grab' }}
-                    onMouseDown={(e) => handleVertexPointerDown(e, poly.id, i)}
+                    data-polygon-id={poly.id}
+                    data-vertex-index={i}
+                    onMouseDown={handleVertexMouseDown}
                   />
                 ))}
               {/* Polygon label: measurement annotation (area/length/count) */}
@@ -406,7 +461,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 const ppu = scale?.pixelsPerUnit || 1;
                 // For count: show number of polygons in this classification on this page
                 const countForClass = clsType === 'count'
-                  ? polygons.filter((p) => p.classificationId === poly.classificationId).length
+                  ? (polygonCountByClassification.get(poly.classificationId) ?? 0)
                   : 0;
                 const areaReal = poly.area / (ppu * ppu);
                 const measureStr =
@@ -519,7 +574,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
             boxShadow: '0 12px 24px rgba(0,0,0,0.35)',
             color: '#f8fafc',
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={handleBatchMenuClick}
         >
           <button
             type="button"
@@ -548,7 +603,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               background: 'rgba(56,189,248,0.14)',
               color: '#bae6fd',
             }}
-            onClick={() => setShowBatchClassificationPicker((prev) => !prev)}
+            onClick={handleToggleBatchClassificationPicker}
           >
             Change classification
           </button>
@@ -569,7 +624,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     borderRadius: 6,
                     color: '#e2e8f0',
                   }}
-                  onClick={() => handleBatchReclassify(cls.id)}
+                  data-classification-id={cls.id}
+                  onClick={handleBatchReclassifyClick}
                 >
                   <span
                     style={{
