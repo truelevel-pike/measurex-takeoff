@@ -66,10 +66,16 @@ export default function TopNavBar({
   const showQuantitiesDrawer = useStore((s) => s.showQuantitiesDrawer);
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
 
+  // Prefer the auto-detected sheet name (e.g. "A1.00 — FLOOR PLAN") over generic "Page X of Y"
+  const hasRealSheetName = sheetName && !sheetName.startsWith('Page ') && sheetName !== 'Sheet 1';
   const badge = typeof pageIndex === 'number' && typeof totalPages === 'number'
-    ? isMobile
-      ? `${pageIndex + 1}/${totalPages}`
-      : `Page ${pageIndex + 1} of ${totalPages}`
+    ? hasRealSheetName
+      ? isMobile
+        ? `${sheetName} (${pageIndex + 1}/${totalPages})`
+        : `${sheetName} · ${pageIndex + 1}/${totalPages}`
+      : isMobile
+        ? `${pageIndex + 1}/${totalPages}`
+        : `Page ${pageIndex + 1} of ${totalPages}`
     : sheetName;
 
   // Close mobile menu on Escape
