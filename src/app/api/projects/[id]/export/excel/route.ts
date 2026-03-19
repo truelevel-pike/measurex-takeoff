@@ -87,7 +87,9 @@ type QuantityFormula = 'area' | 'linear' | 'count';
 
 function normalizeFormula(formula: string): QuantityFormula | null {
   const value = formula.trim().toLowerCase();
-  if (value === 'area' || value === 'linear' || value === 'count') return value;
+  if (value === 'area') return 'area';
+  if (value === 'linear' || value === 'perimeter') return 'linear';
+  if (value === 'count') return 'count';
   return null;
 }
 

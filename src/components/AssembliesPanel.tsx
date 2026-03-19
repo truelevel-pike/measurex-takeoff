@@ -262,7 +262,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
       const q = quantitiesByClass[cls.id];
       if (!q) continue;
       if (formula === 'area' && cls.type === 'area') total += q.areaReal;
-      else if (formula === 'linear' && cls.type === 'linear') total += q.lengthReal;
+      else if ((formula === 'linear' || formula === 'perimeter') && cls.type === 'linear') total += q.lengthReal;
       else if (formula === 'count' && cls.type === 'count') total += q.count;
     }
     return total;
