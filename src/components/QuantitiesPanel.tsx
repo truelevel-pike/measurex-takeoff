@@ -119,6 +119,21 @@ export default function QuantitiesPanel() {
     return byClass;
   }, [polygons]);
 
+  // For count classifications: group polygon counts by page number
+  const countsByPage = useMemo(() => {
+    const result = new Map<string, Map<number, number>>();
+    for (const c of classifications) {
+      if (c.type !== 'count') continue;
+      const items = polygonsByClassification.get(c.id) ?? [];
+      const pageMap = new Map<number, number>();
+      for (const p of items) {
+        pageMap.set(p.pageNumber, (pageMap.get(p.pageNumber) ?? 0) + 1);
+      }
+      result.set(c.id, pageMap);
+    }
+    return result;
+  }, [classifications, polygonsByClassification]);
+
   const totalsByClassification = useMemo(() => {
     const totals = new Map<string, ClassTotals>();
     for (const c of classifications) {
@@ -519,7 +534,7 @@ export default function QuantitiesPanel() {
                     toggleExpanded(classification.id);
                   }}
                 >
-                  {totals.count > 0 ? (
+                  {totals.count > 0 || classification.type === 'count' ? (
                     isExpanded ? (
                       <ChevronDown size={12} className="text-gray-300" />
                     ) : (
@@ -530,19 +545,26 @@ export default function QuantitiesPanel() {
                   )}
 
                   <div
-                    className="w-3 h-3 rounded-sm border border-[#00d4ff]/30 flex-shrink-0"
+                    className={`w-3 h-3 rounded-sm border border-[#00d4ff]/30 flex-shrink-0${classification.type === 'count' && totals.count === 0 ? ' opacity-40' : ''}`}
                     style={{ backgroundColor: classification.color, boxShadow: `0 0 6px ${classification.color}55` }}
                   />
 
-                  <span className="flex-1 font-medium truncate text-[12px] text-[#e5e7eb]">{classification.name}</span>
+                  <span className={`flex-1 font-medium truncate text-[12px] ${classification.type === 'count' && totals.count === 0 ? 'text-gray-500' : 'text-[#e5e7eb]'}`}>{classification.name}</span>
 
-                  <span className="text-[10px] font-mono text-[#8892a0] flex-shrink-0">
-                    {classification.type === 'area' ? 'SF' : classification.type === 'linear' ? 'FT' : 'EA'}
-                  </span>
-
-                  <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
-                    {formatClassificationTotal(classification, totals)}
-                  </span>
+                  {classification.type === 'count' ? (
+                    <span className={`text-[14px] font-bold font-mono px-1.5 py-0.5 rounded ${totals.count === 0 ? 'text-gray-500 bg-[#0e1016]/50' : 'text-[#00d4ff] bg-[#0e1016]'}`}>
+                      {totals.count} EA
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-mono text-[#8892a0] flex-shrink-0">
+                        {classification.type === 'area' ? 'SF' : 'FT'}
+                      </span>
+                      <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
+                        {formatClassificationTotal(classification, totals)}
+                      </span>
+                    </>
+                  )}
 
                   <button
                     type="button"
@@ -613,26 +635,47 @@ export default function QuantitiesPanel() {
                 </div>
               )}
 
-              {isExpanded && totals.count > 0 && !isEditing && (
+              {isExpanded && !isEditing && (classification.type === 'count' || totals.count > 0) && (
                 <div className="ml-6 border-l border-[#00d4ff]/20 pl-2 mb-1">
-                  <div className="text-[10px] py-0.5 text-gray-300 font-mono">
-                    Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq ft - {totals.lengthReal.toFixed(1)} ft
-                  </div>
-                  {polygonsForClassification.map((polygon, index) => {
-                    const areaReal = polygon.area / (ppu * ppu);
-                    const lengthReal = polygon.linearFeet || 0;
-
-                    return (
-                      <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
-                        <span className="truncate">
-                          {classification.name} #{index + 1}
-                        </span>
-                        <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
-                          A {areaReal.toFixed(1)} sq ft | L {lengthReal.toFixed(1)} ft
-                        </span>
+                  {classification.type === 'count' ? (
+                    <>
+                      {totals.count === 0 ? (
+                        <div className="text-[10px] py-0.5 text-gray-500 font-mono">No items placed</div>
+                      ) : (
+                        <>
+                          {Array.from(countsByPage.get(classification.id) ?? [])
+                            .sort(([a], [b]) => a - b)
+                            .map(([page, count]) => (
+                              <div key={page} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
+                                <span>Page {page}</span>
+                                <span className="font-mono text-[#e5e7eb]">{count}</span>
+                              </div>
+                            ))}
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[10px] py-0.5 text-gray-300 font-mono">
+                        Total: {totals.count} items - {totals.areaReal.toFixed(1)} sq ft - {totals.lengthReal.toFixed(1)} ft
                       </div>
-                    );
-                  })}
+                      {polygonsForClassification.map((polygon, index) => {
+                        const areaReal = polygon.area / (ppu * ppu);
+                        const lengthReal = polygon.linearFeet || 0;
+
+                        return (
+                          <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">
+                            <span className="truncate">
+                              {classification.name} #{index + 1}
+                            </span>
+                            <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
+                              A {areaReal.toFixed(1)} sq ft | L {lengthReal.toFixed(1)} ft
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
             </div>

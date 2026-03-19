@@ -73,6 +73,23 @@ export default function DrawingTool() {
     return classifications.find((c) => c.id === selectedClassification) ?? null;
   }, [classifications, selectedClassification]);
 
+  const placeCountItem = useCallback((pt: Point) => {
+    const cls = getSelectedClassification();
+    if (!cls) {
+      addToast('Please create or select a classification first', 'warning');
+      return;
+    }
+    addPolygon({
+      points: [pt],
+      classificationId: cls.id,
+      pageNumber: drawingPage,
+      area: 0,
+      linearFeet: 0,
+      isComplete: true,
+      label: undefined,
+    });
+  }, [getSelectedClassification, addPolygon, drawingPage, addToast]);
+
   const commitPolygon = useCallback(() => {
     const cls = getSelectedClassification();
     const linear = cls?.type === 'linear';
@@ -103,16 +120,20 @@ export default function DrawingTool() {
       const pt = getCoords(e);
 
       // Guard: require a selected classification before first point
-      if (points.length === 0) {
-        const cls = getSelectedClassification();
-        if (!cls) {
-          addToast('Please create or select a classification first', 'warning');
-          return;
-        }
+      const cls = getSelectedClassification();
+      if (!cls) {
+        addToast('Please create or select a classification first', 'warning');
+        return;
+      }
+
+      // Count mode: single click = place one count marker, stay in draw mode
+      if (cls.type === 'count') {
+        placeCountItem(pt);
+        return;
       }
 
       // Close polygon if clicking near the first point (area mode only)
-      const clickCls = getSelectedClassification();
+      const clickCls = cls;
       if (clickCls?.type !== 'linear' && points.length >= 3) {
         const rect = containerRef.current?.getBoundingClientRect();
         const screenX = rect ? (points[0].x / baseDims.width) * rect.width + rect.left : 0;
@@ -138,7 +159,7 @@ export default function DrawingTool() {
         setPoints((prev) => [...prev, pt]);
       }, 250);
     },
-    [points, getCoords, getSelectedClassification, commitPolygon, addToast, baseDims]
+    [points, getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims]
   );
 
   const handleDoubleClick = useCallback(
@@ -249,17 +270,19 @@ export default function DrawingTool() {
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-        {isLinear
-          ? points.length === 0
-            ? 'Click to draw line — double-click or Enter to finish'
-            : points.length < 2
-              ? `${points.length} point — need 1 more`
-              : 'Click to add points · double-click or Enter to finish · Esc to cancel'
-          : points.length === 0
-            ? 'Click to start drawing polygon'
-            : points.length < 3
-              ? `${points.length} points — need ${3 - points.length} more to close`
-              : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
+        {cls?.type === 'count'
+          ? 'Click to place count marker · Esc to finish'
+          : isLinear
+            ? points.length === 0
+              ? 'Click to draw line — double-click or Enter to finish'
+              : points.length < 2
+                ? `${points.length} point — need 1 more`
+                : 'Click to add points · double-click or Enter to finish · Esc to cancel'
+            : points.length === 0
+              ? 'Click to start drawing polygon'
+              : points.length < 3
+                ? `${points.length} points — need ${3 - points.length} more to close`
+                : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
       </div>
     </div>
   );

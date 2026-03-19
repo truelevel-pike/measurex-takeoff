@@ -8,7 +8,7 @@ interface ReTogalProps {
   currentPage: number;
   hasScale: boolean;
   hasRunTakeoff: boolean;
-  onRunTakeoff: () => void;
+  onRunTakeoff: () => void | Promise<void>;
 }
 
 export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTakeoff }: ReTogalProps) {
@@ -17,9 +17,6 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  const addClassification = useStore((s) => s.addClassification);
-  const addPolygon = useStore((s) => s.addPolygon);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -50,47 +47,47 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
     return () => clearTimeout(t);
   }, [toast]);
 
+  // GAP-012: Re-Takeoff handler.
+  // 1. Clears existing polygons on the current page (all, or only AI-generated ones
+  //    when "preserve manual reclassifications" is checked).
+  // 2. Delegates to onRunTakeoff which calls the AI takeoff endpoint with the
+  //    current page's classifications as context (see handleAITakeoff in page.tsx).
+  // 3. The AI pipeline reads existing classifications from the store, so they are
+  //    automatically passed as context for the re-run.
   const handleConfirm = useCallback(async () => {
     setOpen(false);
     setRunning(true);
 
-    // Clear existing polygons for this page (filter approach since no dedicated method)
+    // Clear existing polygons for this page before re-running AI.
+    // When preserveManual is true, only remove polygons whose classification
+    // was auto-generated (name starts with "AI "); keep user-reclassified ones.
     const state = useStore.getState();
-    const kept = preserveManual
-      ? state.polygons.filter((p) => p.pageNumber !== currentPage)
-      : state.polygons.filter((p) => p.pageNumber !== currentPage);
+    const toRemove = state.polygons.filter((p) => {
+      if (p.pageNumber !== currentPage) return false;
+      if (preserveManual) {
+        const cls = state.classifications.find((c) => c.id === p.classificationId);
+        // Only remove AI-generated classifications (convention: name starts with "AI ")
+        return cls?.name?.startsWith('AI ') ?? true;
+      }
+      return true;
+    });
 
-    // Remove page polygons via individual deletes to maintain undo history
-    const toRemove = state.polygons.filter((p) => p.pageNumber === currentPage);
     for (const p of toRemove) {
       useStore.getState().deletePolygon(p.id);
     }
 
-    // Stub delay simulating AI processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Add 3 stub polygons to simulate AI results
-    const stubClassId = addClassification({ name: 'AI Room', color: '#10b981', type: 'area' });
-
-    const stubs = [
-      { label: 'Room A', points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 250 }, { x: 100, y: 250 }], area: 4800 },
-      { label: 'Room B', points: [{ x: 350, y: 100 }, { x: 550, y: 100 }, { x: 550, y: 280 }, { x: 350, y: 280 }], area: 5400 },
-      { label: 'Corridor', points: [{ x: 100, y: 300 }, { x: 550, y: 300 }, { x: 550, y: 370 }, { x: 100, y: 370 }], area: 3150 },
-    ];
-
-    for (const stub of stubs) {
-      addPolygon({
-        points: stub.points,
-        classificationId: stubClassId,
-        pageNumber: currentPage,
-        area: stub.area,
-        label: stub.label,
-      });
+    // Delegate to the real AI takeoff handler which captures the current page,
+    // sends it to the AI endpoint, and loads results into the store.
+    try {
+      await onRunTakeoff();
+    } catch (err) {
+      console.error('Re-Togal AI takeoff failed:', err);
     }
 
     setRunning(false);
-    setToast(`Re-Togal complete — ${stubs.length} new items detected`);
-  }, [currentPage, preserveManual, addClassification, addPolygon]);
+    const newCount = useStore.getState().polygons.filter((p) => p.pageNumber === currentPage).length;
+    setToast(`Re-Togal complete — ${newCount} items on page`);
+  }, [currentPage, preserveManual, onRunTakeoff]);
 
   // Determine button mode
   if (!hasScale) {

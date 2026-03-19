@@ -9,17 +9,28 @@ export interface ClassificationPreset {
 
 export const PRESET_COUNT_CLASSIFICATIONS: ClassificationPreset[] = [
   // Doors
-  { name: 'Single Door', type: 'count', color: '#8B4513', keywords: ['door', 'single', 'swing', 'single swing door'] },
-  { name: 'Double Door', type: 'count', color: '#A0522D', keywords: ['double door', 'double swing', 'double swing door'] },
+  { name: 'Doors (Interior)', type: 'count', color: '#8B4513', keywords: ['door', 'interior door', 'single', 'swing', 'single swing door'] },
+  { name: 'Doors (Exterior)', type: 'count', color: '#A0522D', keywords: ['exterior door', 'entry door', 'double door', 'double swing'] },
 
-  // Windows
-  { name: 'Window', type: 'count', color: '#87CEEB', keywords: ['window', 'casement', 'awning', 'sliding window'] },
+  // Windows & Skylights
+  { name: 'Windows', type: 'count', color: '#87CEEB', keywords: ['window', 'casement', 'awning', 'sliding window'] },
+  { name: 'Skylights', type: 'count', color: '#7EC8E3', keywords: ['skylight', 'roof window', 'roof light'] },
+
+  // Electrical
+  { name: 'Fixtures (Light)', type: 'count', color: '#FFE066', keywords: ['light', 'light fixture', 'luminaire', 'recessed light', 'pendant'] },
+  { name: 'Outlets', type: 'count', color: '#FFA726', keywords: ['outlet', 'receptacle', 'plug', 'electrical outlet', 'duplex'] },
+  { name: 'Switches', type: 'count', color: '#FFB74D', keywords: ['switch', 'light switch', 'dimmer', 'toggle'] },
 
   // Plumbing Fixtures
+  { name: 'Fixtures (Plumbing)', type: 'count', color: '#B0E0E6', keywords: ['plumbing fixture', 'toilet', 'sink', 'lavatory', 'wc'] },
   { name: 'Toilet', type: 'count', color: '#E0E0E0', keywords: ['toilet', 'wc', 'water closet'] },
-  { name: 'Sink', type: 'count', color: '#B0E0E6', keywords: ['sink', 'lavatory'] },
+  { name: 'Sink', type: 'count', color: '#90CAF9', keywords: ['sink', 'lavatory'] },
   { name: 'Kitchen Sink', type: 'count', color: '#4FC3F7', keywords: ['kitchen sink'] },
   { name: 'Bathtub', type: 'count', color: '#80DEEA', keywords: ['tub', 'bath', 'bathtub'] },
+
+  // Structural
+  { name: 'Columns', type: 'count', color: '#9E9E9E', keywords: ['column', 'pillar', 'post', 'structural column'] },
+  { name: 'Stairs', type: 'count', color: '#78909C', keywords: ['stair', 'staircase', 'stairwell', 'stairway', 'steps'] },
 
   // Parking
   { name: 'Parking Space', type: 'count', color: '#FFD700', keywords: ['parking', 'stall', 'parking lot', 'parking spot'] },
