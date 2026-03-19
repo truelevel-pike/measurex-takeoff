@@ -50,7 +50,7 @@ export default function RootLayout({
         <OfflineBanner />
         {children}
         <KeyboardShortcutsPortal />
-        <DevPerfOverlay />
+        {process.env.NODE_ENV === 'development' && <DevPerfOverlay />}
         <PerfMonitor />
         <OfflineIndicator />
         <ServiceWorkerRegister />
