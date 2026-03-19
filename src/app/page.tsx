@@ -263,6 +263,12 @@ function PageInner() {
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
   const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
+  const [aiModel, setAiModel] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("measurex_ai_model") ?? "gpt-5.4";
+    }
+    return "gpt-5.4";
+  });
 
   // BUG-R6-002: Track whether the PDF viewer has reported its actual page count.
   // The store initializes totalPages to 1; we must not show "Page 1 of 1" until
@@ -611,6 +617,7 @@ function PageInner() {
           dims.height,
           projectId,
           pageNum,
+          aiModel,
         );
         totalDetected += elements.length;
 
@@ -1144,6 +1151,7 @@ function PageInner() {
           dims.height,
           projectId,
           page,
+          aiModel,
         );
         setAiStatus(`Page ${page}/${total}: Done — ${elements.length} elements persisted`);
       } catch (err) {
@@ -1268,6 +1276,8 @@ function PageInner() {
         onAiAllPagesModeChange={setAiAllPagesMode}
         aiAllPagesProgress={aiAllPagesProgress}
         onAITakeoffAllPages={handleAITakeoffAllPages}
+        aiModel={aiModel}
+        onAiModelChange={(m: string) => { setAiModel(m); localStorage.setItem("measurex_ai_model", m); }}
         onSettings={() => setShowProjectSettings(true)}
         onToggleTakeoffSearch={() => setShowTakeoffSearch((prev) => !prev)}
         isTakeoffSearchOpen={showTakeoffSearch}

@@ -46,6 +46,7 @@ async function callOpenAIVision(
   pageHeight: number,
   projectId?: string,
   pageNumber?: number,
+  model?: string,
 ): Promise<DetectedElement[]> {
   performance.mark('ai-takeoff-start');
   const res = await fetch('/api/ai-takeoff', {
@@ -58,6 +59,7 @@ async function callOpenAIVision(
       pageHeight,
       projectId,
       pageNumber,
+      model,
     }),
   });
 
@@ -95,12 +97,13 @@ export async function triggerAITakeoff(
   pageHeight: number,
   projectId?: string,
   pageNumber?: number,
+  model?: string,
 ): Promise<DetectedElement[]> {
   let lastErr: unknown = null;
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      return await callOpenAIVision(imageBase64, scale, pageWidth, pageHeight, projectId, pageNumber);
+      return await callOpenAIVision(imageBase64, scale, pageWidth, pageHeight, projectId, pageNumber, model);
     } catch (err) {
       lastErr = err;
       if (attempt < 2) {

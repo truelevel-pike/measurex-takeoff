@@ -147,6 +147,7 @@ export const AiTakeoffBodySchema = z.object({
   pageHeight: z.number().positive(),
   projectId: z.string().uuid().optional(),
   pageNumber: z.number().int().positive().optional(),
+  model: z.string().optional(),
 });
 
 // AI Takeoff options

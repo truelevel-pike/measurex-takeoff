@@ -178,11 +178,19 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = validateBody(AiTakeoffBodySchema, body);
     if ('error' in validated) return validated.error;
-    const { imageBase64, pageWidth, pageHeight, projectId, pageNumber } = validated.data;
+    const { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
 
     const guard = checkOpenAIKey();
     if (guard) return guard;
     const apiKey = getOpenAIKey()!;
+
+    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+    // If model is provided and not an openai model, route through OpenRouter
+    const useOpenRouter = model && !model.startsWith("openai/") && !model.startsWith("gpt-");
+    const resolvedModel = model ?? "gpt-5.4";
+    const resolvedApiKey = useOpenRouter ? (process.env.OPENROUTER_API_KEY ?? "") : apiKey;
+    const resolvedUrl = useOpenRouter ? OPENROUTER_URL : OPENAI_URL;
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
@@ -223,14 +231,14 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
       { type: 'image_url', image_url: { url: imageBase64, detail: 'high' } },
     ];
 
-    const resp = await fetch(OPENAI_URL, {
+    const resp = await fetch(resolvedUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${resolvedApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5.4',
+        model: resolvedModel,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content },
@@ -242,7 +250,7 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
     if (!resp.ok) {
       const text = await resp.text();
       return NextResponse.json(
-        { error: `OpenAI error ${resp.status}: ${text}` },
+        { error: `OpenAI/OpenRouter error ${resp.status}: ${text}` },
         { status: 500 },
       );
     }

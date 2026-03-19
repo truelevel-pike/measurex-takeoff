@@ -59,6 +59,8 @@ interface TopNavBarProps {
   onToggleTakeoffSearch?: () => void;
   isTakeoffSearchOpen?: boolean;
   onGoToPage?: (page: number) => void;
+  aiModel?: string;
+  onAiModelChange?: (model: string) => void;
 }
 
 export default function TopNavBar({
@@ -90,6 +92,8 @@ export default function TopNavBar({
   projectId,
   onProjectNameSaved,
   onGoToPage,
+  aiModel,
+  onAiModelChange,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -431,6 +435,27 @@ export default function TopNavBar({
                 {aiLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
                 {aiAllPagesProgress ? `Page ${aiAllPagesProgress.current}/${aiAllPagesProgress.total}` : aiLoading ? 'Analyzing…' : 'AI Takeoff'}
               </button>
+              <select
+                value={aiModel ?? "gpt-5.4"}
+                onChange={(e) => onAiModelChange?.(e.target.value)}
+                aria-label="AI Model"
+                style={{
+                  background: '#12121a',
+                  color: '#e0faff',
+                  border: '1px solid rgba(0,212,255,0.18)',
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <option value="gpt-5.4">GPT-5.4</option>
+                <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
+                <option value="anthropic/claude-opus-4.6">Claude Opus 4.6</option>
+                <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+              </select>
               <label className="flex items-center gap-1 text-xs cursor-pointer select-none" style={{ color: '#8892a0' }}>
                 <input
                   type="checkbox"
