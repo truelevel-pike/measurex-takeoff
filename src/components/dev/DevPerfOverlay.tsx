@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function DevPerfOverlay() {
   const isDev = process.env.NODE_ENV === 'development';
-  const [visible, setVisible] = useState(false);
+  // Persist toggle state in localStorage (key: measurex_show_perf). Default: hidden.
+  const [visible, setVisible] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('measurex_show_perf') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const rafRef = useRef(0);
   const framesRef = useRef(0);
@@ -15,6 +23,16 @@ export default function DevPerfOverlay() {
     aiTakeoff: null,
     polygonDraw: null,
   });
+
+  // Persist overlay visibility in localStorage
+  useEffect(() => {
+    if (!isDev) return;
+    try {
+      localStorage.setItem('measurex_show_perf', String(visible));
+    } catch {
+      // localStorage unavailable (e.g. private browsing with strict settings)
+    }
+  }, [isDev, visible]);
 
   // Toggle overlay with Ctrl+Shift+F
   useEffect(() => {
