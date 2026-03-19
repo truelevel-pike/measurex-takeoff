@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, X } from 'lucide-react';
 import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
@@ -172,6 +172,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
   const focusPolygon = useStore((s) => s.focusPolygon);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
+  const setHoveredClassificationId = useStore((s) => s.setHoveredClassificationId);
 
   const groups = useStore((s) => s.groups);
   const addGroup = useStore((s) => s.addGroup);
@@ -218,6 +219,10 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   });
   const [collapsedTrades, setCollapsedTrades] = useState<Set<TradeGroup>>(new Set());
   const [deductionsByClassification, setDeductionsByClassification] = useState<Record<string, ClassificationDeduction[]>>({});
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+  const [lastUpdatedTime] = useState(() => {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  });
 
   const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
 
@@ -880,6 +885,18 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
       <div className="px-3 py-2 border-b border-[#00d4ff]/20 font-semibold text-[#e5e7eb] text-sm flex items-center justify-between bg-[rgba(10,10,15,0.6)] relative">
         <span className="font-mono tracking-wider">QUANTITIES</span>
+        <span
+          className="relative ml-1"
+          onMouseEnter={() => setShowInfoTooltip(true)}
+          onMouseLeave={() => setShowInfoTooltip(false)}
+        >
+          <Info size={12} className="text-gray-400 hover:text-[#00d4ff] cursor-help transition-colors" />
+          {showInfoTooltip && (
+            <div className="absolute top-5 left-0 z-50 bg-[#12121a] border border-[#00d4ff]/30 rounded-lg p-2 text-[11px] text-[#e5e7eb] shadow-xl max-w-[240px] whitespace-normal">
+              These measurements are from AI takeoff using Claude Sonnet 4.6. Last updated: {lastUpdatedTime}
+            </div>
+          )}
+        </span>
         <div className="flex items-center gap-2" suppressHydrationWarning>
           <span className="text-xs text-gray-300 font-normal">
             {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
@@ -1282,6 +1299,8 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                   onClick={() => { setSelectedClassificationId(classification.id); activateClassification(classification.id, isSelected); }}
                   onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id)}
                   onFocus={() => setSelectedClassificationId(classification.id)}
+                  onMouseEnter={() => setHoveredClassificationId(classification.id)}
+                  onMouseLeave={() => setHoveredClassificationId(null)}
                   tabIndex={0}
                   data-classification-row
                   data-classification-id={classification.id}
@@ -1314,6 +1333,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                       <span className="text-[9px] px-1 rounded flex-shrink-0" style={{ backgroundColor: confColor, color: confTextColor, opacity: 0.85 }}>{confPct}%</span>
                     );
                   })()}
+
+                  {classification.type === 'area' ? (
+                    <Square size={14} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+                  ) : classification.type === 'linear' ? (
+                    <Minus size={14} className="text-gray-400 flex-shrink-0 rotate-45" aria-hidden="true" />
+                  ) : (
+                    <Hash size={14} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+                  )}
 
                   {classification.type === 'count' ? (
                     <span className={`text-[14px] font-bold font-mono px-1.5 py-0.5 rounded ${totals.count === 0 ? 'text-gray-500 bg-[#0e1016]/50' : 'text-[#00d4ff] bg-[#0e1016]'}`}>

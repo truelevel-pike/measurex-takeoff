@@ -80,6 +80,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
+  const hoveredClassificationId = useStore((s) => s.hoveredClassificationId);
   const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
   const { prefs } = useUserPrefs();
 
@@ -477,11 +478,14 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const color = getPolygonColor(polyWithDisplay, cls?.color);
           const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted);
           const isLinearPoly = cls?.type === 'linear';
+          const isClassHovered = hoveredClassificationId !== null && poly.classificationId === hoveredClassificationId;
           const sharedStyle: React.CSSProperties = {
             cursor: currentTool === 'select' ? 'pointer' : 'default',
             animation: isHighlighted ? 'mx-polygon-flash 0.33s ease-in-out 6' : undefined,
             filter: isHighlighted
               ? 'drop-shadow(0 0 10px rgba(253,224,71,0.95))'
+              : isClassHovered
+              ? 'drop-shadow(0 0 8px rgba(0,212,255,0.8))'
               : isSelected
               ? 'drop-shadow(0 0 6px rgba(0,255,136,0.6))'
               : 'drop-shadow(0 0 4px rgba(0,212,255,0.25))',
@@ -573,6 +577,30 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     vectorEffect="non-scaling-stroke"
                     pointerEvents="none"
                     data-polygon-id={poly.id}
+                  />
+                )
+              )}
+              {/* Classification hover highlight overlay */}
+              {isClassHovered && !isSelected && (
+                isLinearPoly ? (
+                  <polyline
+                    points={pointsStr}
+                    fill="none"
+                    stroke="#00d4ff"
+                    strokeWidth={4}
+                    opacity={0.6}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
+                  />
+                ) : (
+                  <polygon
+                    points={pointsStr}
+                    fill="rgba(255,255,255,0.15)"
+                    stroke="#00d4ff"
+                    strokeWidth={2}
+                    opacity={0.8}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
                   />
                 )
               )}

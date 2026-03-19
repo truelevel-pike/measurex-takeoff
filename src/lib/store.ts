@@ -71,6 +71,7 @@ export interface Store extends ProjectState {
   deleteClassification: (id: string) => void;
   setSelectedClassification: (id: string | null) => void;
   toggleClassification: (id: string) => void;
+  mergeClassifications: (survivorId: string, mergedIds: string[]) => void;
 
   // Actions — Polygons
   addPolygon: (p: { points: Point[]; classificationId: string; pageNumber: number; area?: number; linearFeet?: number; label?: string; isComplete?: boolean; color?: string }) => string;
@@ -174,6 +175,10 @@ export interface Store extends ProjectState {
   // Focus polygon (for "find on canvas")
   focusedPolygonId: string | null;
   focusPolygon: (id: string | null) => void;
+
+  // Hovered classification (for canvas highlight from QuantitiesPanel)
+  hoveredClassificationId: string | null;
+  setHoveredClassificationId: (id: string | null) => void;
 
   // Last polygon added (for Ctrl+D duplicate) — NOT persisted
   lastPolygon: Polygon | null;
@@ -740,6 +745,10 @@ export const useStore = create<Store>()(
   // ─── Focus Polygon ───
   focusedPolygonId: null,
   focusPolygon: (id) => set({ focusedPolygonId: id }),
+
+  // ─── Hovered Classification ───
+  hoveredClassificationId: null,
+  setHoveredClassificationId: (id) => set({ hoveredClassificationId: id }),
     }),
     {
       name: 'measurex-state',
