@@ -1,11 +1,52 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Package } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import type { Assembly } from '@/lib/types';
+import type { Assembly, Material } from '@/lib/types';
 import AssemblyEditor from './AssemblyEditor';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
+
+// ── Default cost assembly templates ────────────────────────────────
+interface AssemblyTemplate {
+  name: string;
+  unit: string;
+  quantityFormula: string;
+  materials: Material[];
+}
+
+const DEFAULT_TEMPLATES: AssemblyTemplate[] = [
+  {
+    name: 'Exterior Wall Assembly',
+    unit: 'LF',
+    quantityFormula: 'linear',
+    materials: [
+      { id: crypto.randomUUID(), name: 'Framing', unitCost: 8, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
+      { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 4, wasteFactor: 3, coverageRate: 0, unit: 'LF' },
+      { id: crypto.randomUUID(), name: 'Siding', unitCost: 6, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
+    ],
+  },
+  {
+    name: 'Floor Slab Assembly',
+    unit: 'SF',
+    quantityFormula: 'area',
+    materials: [
+      { id: crypto.randomUUID(), name: 'Concrete', unitCost: 12, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Rebar', unitCost: 3, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Finishing', unitCost: 2, wasteFactor: 0, coverageRate: 0, unit: 'SF' },
+    ],
+  },
+  {
+    name: 'Roof Assembly',
+    unit: 'SF',
+    quantityFormula: 'area',
+    materials: [
+      { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Felt', unitCost: 1, wasteFactor: 2, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Shingles', unitCost: 4, wasteFactor: 8, coverageRate: 0, unit: 'SF' },
+    ],
+  },
+];
 
 interface AssembliesPanelProps {
   onSwitchToQuantities: () => void;
@@ -33,6 +74,8 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
   const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Compute quantities per classification from polygons + scale (mirrors QuantitiesPanel logic)
   const quantitiesByClass = useMemo(() => {
@@ -65,12 +108,16 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetch(`/api/projects/${projectId}/assemblies`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (cancelled) return;
         if (Array.isArray(data.assemblies)) {
-          // Map flat API rows (AssemblyRow) → Assembly type expected by store
           interface AssemblyRow {
             id: string;
             name: string;
@@ -99,7 +146,13 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
         }
       })
       .catch((err) => {
-        if (!cancelled) console.error('Failed to fetch assemblies:', err);
+        if (!cancelled) {
+          console.error('Failed to fetch assemblies:', err);
+          setError('Failed to load assemblies');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
   }, [projectId, setAssemblies]);
@@ -146,6 +199,19 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     return 'EA';
   }
 
+  /** Create an assembly from a default template – opens editor pre-filled. */
+  const handleCreateFromTemplate = useCallback((template: AssemblyTemplate) => {
+    const prefilled: Assembly = {
+      id: crypto.randomUUID(),
+      name: template.name,
+      classificationId: '',
+      isLibrary: false,
+      materials: template.materials.map((m) => ({ ...m, id: crypto.randomUUID() })),
+    };
+    setEditingAssembly(prefilled);
+    setShowEditor(true);
+  }, []);
+
   function handleEdit(assembly: Assembly) {
     setEditingAssembly(assembly);
     setShowEditor(true);
@@ -173,19 +239,25 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     const cls = classifications.find((c) => c.id === assembly.classificationId);
     const formulaType = cls?.type === 'linear' ? 'linear' : cls?.type === 'count' ? 'count' : 'area';
 
-    if (editingAssembly) {
+    // Determine if this is an update to an existing server-side assembly or a new creation.
+    // editingAssembly can be set for template pre-fills (new) or real edits (existing).
+    const isExisting = editingAssembly && assemblies.some((a) => a.id === editingAssembly.id);
+
+    const apiPayload = {
+      classificationId: assembly.classificationId || undefined,
+      name: assembly.name,
+      unit: assembly.materials[0]?.unit || 'SF',
+      unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
+      quantityFormula: formulaType,
+    };
+
+    if (isExisting) {
       updateAssembly(assembly.id, assembly);
       if (projectId) {
         fetch(`/api/projects/${projectId}/assemblies/${assembly.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            classificationId: assembly.classificationId,
-            name: assembly.name,
-            unit: assembly.materials[0]?.unit || 'SF',
-            unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
-            quantityFormula: formulaType,
-          }),
+          body: JSON.stringify(apiPayload),
         })
           .then((res) => {
             if (!res.ok) console.error('API updateAssembly failed:', res.status);
@@ -194,17 +266,11 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
       }
     } else {
       addAssembly(assembly);
-      if (projectId) {
+      if (projectId && assembly.classificationId) {
         fetch(`/api/projects/${projectId}/assemblies`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            classificationId: assembly.classificationId,
-            name: assembly.name,
-            unit: assembly.materials[0]?.unit || 'SF',
-            unitCost: assembly.materials.reduce((sum, m) => sum + m.unitCost, 0),
-            quantityFormula: formulaType,
-          }),
+          body: JSON.stringify(apiPayload),
         })
           .then((res) => {
             if (!res.ok) {
@@ -217,7 +283,6 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
             if (!data) return;
             const serverId = data?.assembly?.id;
             if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
-              // Replace temp ID with server-assigned ID across the entire assembly
               setAssemblies(
                 useStore.getState().assemblies.map((a) =>
                   a.id === assembly.id ? { ...a, id: serverId } : a,
@@ -390,9 +455,43 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
           );
         })}
 
-        {assemblies.length === 0 && (
-          <div className="text-center text-xs py-8 text-[#8892a0]">
-            No assemblies yet. Click Add Assembly to create one.
+        {loading && (
+          <div className="text-center text-xs py-8 text-[#8892a0]">Loading assemblies…</div>
+        )}
+
+        {error && !loading && (
+          <div className="text-center text-xs py-8 text-red-400">{error}</div>
+        )}
+
+        {assemblies.length === 0 && !loading && !error && (
+          <div className="px-2 py-3 space-y-2">
+            <p className="text-[11px] text-[#8892a0] text-center mb-3">
+              No assemblies yet. Start from a template or create your own.
+            </p>
+            {DEFAULT_TEMPLATES.map((tpl) => {
+              const totalCostPerUnit = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
+              return (
+                <button
+                  key={tpl.name}
+                  type="button"
+                  onClick={() => handleCreateFromTemplate(tpl)}
+                  className="w-full text-left border border-[#00d4ff]/15 rounded-lg px-3 py-2 hover:bg-[#0e1016] hover:border-[#00d4ff]/30 transition-colors group"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Package size={13} className="text-[#00d4ff] opacity-60 group-hover:opacity-100" />
+                    <span className="text-[12px] font-medium text-[#e5e7eb]">{tpl.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-[#8892a0]">
+                    {tpl.materials.map((m) => (
+                      <span key={m.name}>{m.name} ${m.unitCost}/{tpl.unit}</span>
+                    ))}
+                    <span className="ml-auto font-mono text-emerald-400 font-semibold">
+                      = ${totalCostPerUnit}/{tpl.unit}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

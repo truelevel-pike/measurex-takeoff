@@ -7,6 +7,9 @@ import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 const AssemblyBodySchema = z.object({
   classificationId: z.string().uuid(),
   name: z.string().min(1),
+  unit: z.string().optional(),
+  unitCost: z.number().optional(),
+  quantityFormula: z.string().optional(),
 }).passthrough();
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
