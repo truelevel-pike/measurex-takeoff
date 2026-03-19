@@ -26,9 +26,9 @@ export const DEFAULT_MEASUREMENT_SETTINGS: MeasurementSettings = {
 };
 
 export const AREA_UNIT_LABELS: Record<AreaUnit, string> = {
-  sf: 'sq ft',
-  sy: 'sq yd',
-  sm: 'sq m',
+  sf: 'SF',
+  sy: 'SY',
+  sm: 'SM',
   sm2: 'm²',
 };
 
@@ -89,19 +89,27 @@ export function convertLinear(ft: number, toUnit: LinearUnit): number {
   return ft * LINEAR_CONVERSIONS[toUnit];
 }
 
+/** Format a number with locale-aware commas (e.g. 1412 → "1,412"). */
+function formatWithCommas(value: number, decimals: number): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 /** Format an area value according to measurement settings. */
 export function formatArea(sqFtValue: number, settings: MeasurementSettings): string {
   const converted = convertArea(sqFtValue, settings.areaUnit);
-  return `${converted.toFixed(settings.decimals)} ${AREA_UNIT_LABELS[settings.areaUnit]}`;
+  return `${formatWithCommas(converted, settings.decimals)} ${AREA_UNIT_LABELS[settings.areaUnit]}`;
 }
 
 /** Format a linear value according to measurement settings. */
 export function formatLinear(ftValue: number, settings: MeasurementSettings): string {
   const converted = convertLinear(ftValue, settings.linearUnit);
-  return `${converted.toFixed(settings.decimals)} ${LINEAR_UNIT_LABELS[settings.linearUnit]}`;
+  return `${formatWithCommas(converted, settings.decimals)} ${LINEAR_UNIT_LABELS[settings.linearUnit]}`;
 }
 
 /** Format a count value (always integer). */
 export function formatCount(count: number): string {
-  return `${count} EA`;
+  return `${count.toLocaleString('en-US')} EA`;
 }

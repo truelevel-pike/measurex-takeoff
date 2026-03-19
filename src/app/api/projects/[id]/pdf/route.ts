@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initDataDir } from '@/server/project-store';
+import { loadPDF } from '@/server/pdf-storage';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 /**
@@ -9,19 +9,12 @@ import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const filePath = path.resolve(process.cwd(), 'data', 'uploads', `${id}.pdf`);
-
-    let buf: Buffer;
-    try {
-      buf = await fs.readFile(filePath);
-    } catch {
+    const buf = await loadPDF(id);
+    if (!buf) {
       return NextResponse.json({ error: 'PDF not found' }, { status: 404 });
     }
 

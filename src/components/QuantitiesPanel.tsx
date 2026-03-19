@@ -973,7 +973,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               {totalAreaSF > 0 && totalLF > 0 && ' · '}
               {totalLF > 0 && <>{formatLinear(totalLF, measurementSettings)}</>}
               {(totalAreaSF > 0 || totalLF > 0) && totalEA > 0 && ' · '}
-              {totalEA > 0 && <>{totalEA} EA</>}
+              {totalEA > 0 && <>{totalEA.toLocaleString('en-US')} EA</>}
             </span>
           </div>
         );

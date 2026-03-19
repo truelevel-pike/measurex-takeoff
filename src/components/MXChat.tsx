@@ -28,6 +28,7 @@ const SUGGESTED_QUESTIONS = [
   'Which room is largest?',
   'What would this cost at $5/SF?',
   'Summarize my takeoff',
+  'What is my total project cost?',
 ];
 
 const QUICK_REPLY_CHIPS = [
@@ -145,6 +146,7 @@ function formatTime(date: Date): string {
 }
 
 export default function MXChat({ onClose }: MXChatProps) {
+  const projectId = useStore((s) => s.projectId);
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
@@ -239,10 +241,13 @@ export default function MXChat({ onClose }: MXChatProps) {
 
       abortRef.current = new AbortController();
 
-      const response = await fetch('/api/chat', {
+      const useProjectRoute = !!projectId;
+      const url = useProjectRoute ? `/api/projects/${projectId}/chat` : '/api/chat';
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyForApi, context }),
+        body: JSON.stringify({ messages: historyForApi, ...(useProjectRoute ? {} : { context }) }),
         signal: abortRef.current.signal,
       });
 
@@ -251,59 +256,69 @@ export default function MXChat({ onClose }: MXChatProps) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'Chat request failed');
       }
 
-      // Stream response
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response stream');
+      if (useProjectRoute) {
+        // Project route returns JSON { reply: string } — no streaming
+        const data = await response.json();
+        const replyText = data?.reply ?? '';
+        if (!replyText.trim()) throw new Error('No response from AI');
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, text: replyText } : m)),
+        );
+      } else {
+        // Stream response from /api/chat
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No response stream');
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let fullText = '';
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          const data = trimmed.slice(6);
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.content) {
-              fullText += parsed.content;
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, text: fullText } : m)),
-              );
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            const data = trimmed.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                fullText += parsed.content;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, text: fullText } : m)),
+                );
+              }
+            } catch {
+              // skip
             }
-          } catch {
-            // skip
           }
         }
-      }
 
-      // Flush any remaining buffer content
-      if (buffer.trim()) {
-        const trimmed = buffer.trim();
-        if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
-          try {
-            const parsed = JSON.parse(trimmed.slice(6));
-            if (parsed.content) {
-              fullText += parsed.content;
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, text: fullText } : m)),
-              );
-            }
-          } catch { /* skip */ }
+        // Flush any remaining buffer content
+        if (buffer.trim()) {
+          const trimmed = buffer.trim();
+          if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(trimmed.slice(6));
+              if (parsed.content) {
+                fullText += parsed.content;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, text: fullText } : m)),
+                );
+              }
+            } catch { /* skip */ }
+          }
         }
-      }
 
-      if (!fullText.trim()) {
-        throw new Error('No response from AI');
+        if (!fullText.trim()) {
+          throw new Error('No response from AI');
+        }
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;

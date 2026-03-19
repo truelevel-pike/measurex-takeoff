@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF, renderPageAsImage } from '@/server/pdf-processor';
+import { savePDF } from '@/server/pdf-storage';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { aiSheetNamer } from '@/lib/ai-sheet-namer';
 import { detectScaleFromText } from '@/lib/auto-scale';
@@ -19,14 +20,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
-    // Save file to data dir, then process
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const uploadDir = path.resolve(process.cwd(), 'data', 'uploads');
-    await fs.mkdir(uploadDir, { recursive: true });
-    const filePath = path.join(uploadDir, `${id}.pdf`);
+    // Save file to storage (local + Supabase Storage in prod), then process
     const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePath, buffer);
+    const filePath = await savePDF(id, buffer);
     const result = await processPDF(filePath, id);
 
     // GAP-001: Extract sheet names and store pages
