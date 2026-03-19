@@ -58,6 +58,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     const zoomRef = useRef(1);
     const isRenderingRef = useRef(false);
     const currentPageRef = useRef(1);
+    // Render-version counter: incremented before each render; checked at each await to abort stale renders
+    const renderVersionRef = useRef(0);
+    // Current in-flight renderTask for cancellation
+    const renderTaskRef = useRef<any>(null);
     // Keep onPageChange in a ref so goToPage always calls the latest version without needing it in deps
     const onPageChangeRef = useRef(onPageChange);
     useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
@@ -75,11 +79,45 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       };
     }, []);
 
+    // ISSUE #1: When file becomes null/undefined, clear prior viewer state
+    useEffect(() => {
+      if (file) return;
+      // Destroy any loaded doc
+      if (pdfDocRef.current) {
+        void pdfDocRef.current.destroy();
+        pdfDocRef.current = null;
+      }
+      setPdfDoc(null);
+      setTotalPages(0);
+      totalPagesRef.current = 0;
+      setCurrentPage(1);
+      currentPageRef.current = 1;
+      setLoadError(null);
+      setIsRendering(false);
+      isRenderingRef.current = false;
+      pendingRender.current = null;
+      initialFitDone.current = false;
+      // Clear the canvas
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    }, [file]);
+
     // Load PDF from file with pdfjs-dist only
+    // ISSUE #2: Destroy prior doc on file change or unmount
     useEffect(() => {
       if (!file) return;
       let cancelled = false;
       let loadedDoc: PDFDocumentProxy | null = null;
+      // Destroy the previously loaded document before loading a new one
+      if (pdfDocRef.current) {
+        void pdfDocRef.current.destroy();
+        pdfDocRef.current = null;
+      }
       setLoadError(null);
       initialFitDone.current = false;
       const loadPdf = async () => {
@@ -112,21 +150,45 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       loadPdf();
       return () => {
         cancelled = true;
-        void loadedDoc?.destroy();
+        // ISSUE #2: Destroy on unmount or file change
+        if (loadedDoc) {
+          void loadedDoc.destroy();
+          loadedDoc = null;
+        }
+        if (pdfDocRef.current) {
+          void pdfDocRef.current.destroy();
+          pdfDocRef.current = null;
+        }
       };
     }, [file, onPageChange]);
 
     // actuallyRender uses refs so it's always current — no stale closure issues
+    // ISSUE #4: render-version guard aborts stale renders after each await
+    // ISSUE #5: cancel superseded render tasks before starting a new one
     const actuallyRender = useCallback(
       async (pageNum: number) => {
         const doc = pdfDocRef.current;
         if (!doc || !canvasRef.current) return;
+
+        // Increment render version; capture ours for stale-check
+        const myVersion = ++renderVersionRef.current;
+
+        // ISSUE #5: Cancel any in-flight render task before starting a new one
+        if (renderTaskRef.current) {
+          try { renderTaskRef.current.cancel(); } catch {}
+          renderTaskRef.current = null;
+        }
+
         isRenderingRef.current = true;
         setIsRendering(true);
         try {
           const page: PDFPageProxy = await doc.getPage(pageNum);
+          // Stale check #1: abort if a newer render was requested
+          if (renderVersionRef.current !== myVersion) return;
+
           const viewport = page.getViewport({ scale: zoomRef.current * 1.5 });
           const canvas = canvasRef.current;
+          if (!canvas) return;
           const ctx = canvas.getContext('2d')!;
           const dpr = window.devicePixelRatio || 1;
 
@@ -145,18 +207,37 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           basePageSize.current = { width: baseViewport.width, height: baseViewport.height };
           useStore.getState().setPageBaseDimensions(pageNum, { width: baseViewport.width, height: baseViewport.height });
 
-          await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
+          // ISSUE #5: Store the render task so it can be cancelled if superseded
+          const renderTask = (page as any).render({ canvasContext: ctx, viewport, canvas });
+          renderTaskRef.current = renderTask;
+          try {
+            await renderTask.promise;
+          } catch (err: any) {
+            // RenderingCancelledException is expected when we cancel; swallow it
+            if (err?.name === 'RenderingCancelledException') return;
+            throw err;
+          } finally {
+            if (renderTaskRef.current === renderTask) renderTaskRef.current = null;
+          }
+
+          // Stale check #2: abort if superseded during render
+          if (renderVersionRef.current !== myVersion) return;
 
           try {
             const textContent = await page.getTextContent();
+            // Stale check #3: abort if superseded during text extraction
+            if (renderVersionRef.current !== myVersion) return;
             const fullText = (textContent.items as any[])
               .map((item) => (item.str || '').trim())
               .join('\n');
             onTextExtracted?.(fullText, pageNum);
           } catch {}
         } finally {
-          isRenderingRef.current = false;
-          setIsRendering(false);
+          // Only reset rendering flag if this is still the current render
+          if (renderVersionRef.current === myVersion || isRenderingRef.current) {
+            isRenderingRef.current = false;
+            setIsRendering(false);
+          }
           if (pendingRender.current !== null) {
             const next = pendingRender.current;
             pendingRender.current = null;
