@@ -77,7 +77,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const updatePolygon = useStore((s) => s.updatePolygon);
   const scale = useStore((s) => s.scale);
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
-  const baseDims = rawBaseDims ?? { width: 1, height: 1 };
+  const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
 
   // Vertex drag state
   const [dragging, setDragging] = useState<{
@@ -200,7 +200,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     return () => {
       wrapper.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedPolygonId, selectedPolygons, deleteSelectedPolygons, deletePolygon, projectId]);
+  }, [selectedPolygonId, selectedPolygons, clearPolygonSelection, deleteSelectedPolygons, deletePolygon, projectId]);
 
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
@@ -277,7 +277,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         return;
       }
     },
-    [onCanvasPointerDown, calibrationMode, calibrationPoints, addCalibrationPoint, baseDims]
+    [onCanvasPointerDown, currentTool, calibrationMode, calibrationPoints, addCalibrationPoint, baseDims]
   );
 
   const handlePolygonClick = useCallback(

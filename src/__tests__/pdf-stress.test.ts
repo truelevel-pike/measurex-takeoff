@@ -93,6 +93,35 @@ describe('PDF stress', () => {
       value: jest.fn(() => 'data:image/png;base64,mock-thumb'),
     });
 
+    Object.defineProperty(performance, 'mark', {
+      configurable: true,
+      value: jest.fn(
+        (name: string): PerformanceMark =>
+          ({
+            name,
+            entryType: 'mark',
+            startTime: 0,
+            duration: 0,
+            toJSON: () => ({}),
+          }) as PerformanceMark
+      ),
+    });
+
+    Object.defineProperty(performance, 'measure', {
+      configurable: true,
+      value: jest.fn(
+        (name: string): PerformanceMeasure =>
+          ({
+            name,
+            entryType: 'measure',
+            startTime: 0,
+            duration: 0,
+            detail: null,
+            toJSON: () => ({}),
+          }) as PerformanceMeasure
+      ),
+    });
+
   });
 
   beforeEach(() => {
