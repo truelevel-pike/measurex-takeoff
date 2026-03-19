@@ -6,6 +6,7 @@ import { renderPageAsImage } from '@/server/pdf-processor';
 import { analyzePageImage } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 
 export async function POST(
   req: Request,
@@ -54,7 +55,14 @@ export async function POST(
     const pageWidth = pageInfo?.width ?? 1000;
     const pageHeight = pageInfo?.height ?? 800;
 
+    broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
+
     const elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight);
+
+    broadcastToProject(id, 'ai-takeoff:complete', {
+      page: pageNum,
+      detections: elements.length,
+    });
 
     return NextResponse.json({ elements });
   } catch (err: unknown) {
