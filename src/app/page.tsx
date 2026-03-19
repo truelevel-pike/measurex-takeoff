@@ -6,7 +6,7 @@ import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
-import type { DetectedElement, PDFViewerHandle, ProjectState } from '@/lib/types';
+import type { Classification, DetectedElement, PDFViewerHandle, ProjectState } from '@/lib/types';
 import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
@@ -31,6 +31,7 @@ import BottomStatusBar from '@/components/BottomStatusBar';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
+import AnnotationTool from '@/components/AnnotationTool';
 import ScaleCalibrationPanel from '@/components/ScaleCalibrationPanel';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
@@ -42,7 +43,7 @@ import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import { ToastProvider, useToast } from '@/components/Toast';
 
-const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'ai'> = {
+const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
   h: 'pan',
   d: 'draw',
@@ -50,12 +51,14 @@ const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | '
   s: 'split',
   c: 'cut',
   m: 'measure',
+  t: 'annotate',
   a: 'ai',
 };
 
 const EMPTY_STATE: ProjectState = {
   classifications: [],
   polygons: [],
+  annotations: [],
   scale: null,
   scales: {},
   currentPage: 1,
@@ -67,6 +70,7 @@ function normalizeProjectState(raw: unknown): ProjectState {
 
   const rawClassifications = Array.isArray(candidate.classifications) ? candidate.classifications : [];
   const rawPolygons = Array.isArray(candidate.polygons) ? candidate.polygons : [];
+  const rawAnnotations = Array.isArray(candidate.annotations) ? candidate.annotations : [];
 
   // Dedup by ID to guard against any merge/hydration artifacts
   const seenClassIds = new Set<string>();
@@ -82,10 +86,17 @@ function normalizeProjectState(raw: unknown): ProjectState {
     seenPolyIds.add(p.id);
     return true;
   });
+  const seenAnnotationIds = new Set<string>();
+  const annotations = rawAnnotations.filter((a: any) => {
+    if (!a?.id || seenAnnotationIds.has(a.id)) return false;
+    seenAnnotationIds.add(a.id);
+    return true;
+  });
 
   return {
     classifications,
     polygons,
+    annotations,
     scale: candidate.scale ?? null,
     scales: (candidate.scales && typeof candidate.scales === 'object') ? candidate.scales : {},
     currentPage: typeof candidate.currentPage === 'number' && candidate.currentPage > 0 ? candidate.currentPage : 1,
@@ -113,6 +124,7 @@ function PageInner() {
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
+  const annotations = useStore((s) => s.annotations);
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
   const totalPages = useStore((s) => s.totalPages);
@@ -139,6 +151,9 @@ function PageInner() {
   );
   const knownClassificationIds = useRef<Set<string>>(
     new Set(useStore.getState().classifications.map((c) => c.id))
+  );
+  const syncedClassificationsById = useRef<Map<string, Classification>>(
+    new Map(useStore.getState().classifications.map((c) => [c.id, c]))
   );
   const [pdfDocState, setPdfDocState] = useState<PDFDocumentProxy | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -192,6 +207,7 @@ function PageInner() {
   const pendingSaveRef = useRef(false);
   const hydrateAbortRef = useRef<AbortController | null>(null);
   const isCreatingProjectRef = useRef(false);
+  const thumbnailCapturedRef = useRef(false);
 
   const persistSaveStatus = useCallback((text: string, clearMs = 2200) => {
     setSaveStatus(text);
@@ -204,6 +220,7 @@ function PageInner() {
     return {
       classifications: s.classifications,
       polygons: s.polygons,
+      annotations: s.annotations,
       scale: s.scale,
       scales: s.scales,
       currentPage: pageOverride ?? s.currentPage,
@@ -294,6 +311,7 @@ function PageInner() {
         // API-loaded data as "new" and try to re-POST it (which would 500 on Supabase PK conflict).
         knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
         knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
+        syncedClassificationsById.current = new Map(normalized.classifications.map((c) => [c.id, c]));
 
         useStore.getState().hydrateState(normalized);
         setCurrentPageNum(normalized.currentPage || 1);
@@ -343,6 +361,7 @@ function PageInner() {
       const normalized = normalizeProjectState({
         classifications: fetchedClassifications,
         polygons: fetchedPolygons,
+        annotations: [],
         scale: fetchedScale,
         scales: {},
         currentPage: 1,
@@ -350,6 +369,7 @@ function PageInner() {
       });
       knownPolygonIds.current = new Set(normalized.polygons.map((p) => p.id));
       knownClassificationIds.current = new Set(normalized.classifications.map((c) => c.id));
+      syncedClassificationsById.current = new Map(normalized.classifications.map((c) => [c.id, c]));
       useStore.getState().hydrateState(normalized);
       setCurrentPageNum(normalized.currentPage || 1);
       setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
@@ -433,6 +453,8 @@ function PageInner() {
         }
       } else if (e.key === '3') {
         toggleShow3D();
+      } else if (e.key.toLowerCase() === 't') {
+        setTool(currentTool === 'annotate' ? 'select' : 'annotate');
       } else if (e.key.toLowerCase() === 'a') {
         handleAITakeoff();
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
@@ -441,7 +463,7 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool]);
 
   // Store a PDF doc reference for texture rendering.
   useEffect(() => {
@@ -500,11 +522,12 @@ function PageInner() {
     projectId,
     classifications,
     polygons,
+    annotations,
     scale,
     scales,
     currentPage,
     totalPages,
-  }), [projectId, classifications, polygons, scale, scales, currentPage, totalPages]);
+  }), [projectId, classifications, polygons, annotations, scale, scales, currentPage, totalPages]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -532,12 +555,42 @@ function PageInner() {
     const newClassifications = classifications.filter((c) => !knownClassificationIds.current.has(c.id));
     for (const c of newClassifications) {
       knownClassificationIds.current.add(c.id);
+      syncedClassificationsById.current.set(c.id, c);
       api.createClassification(projectId, c).catch((err) => console.error('API createClassification failed:', err));
     }
     // Prune deleted IDs from tracking set
     const currentIds = new Set(classifications.map((c) => c.id));
     for (const id of knownClassificationIds.current) {
-      if (!currentIds.has(id)) knownClassificationIds.current.delete(id);
+      if (!currentIds.has(id)) {
+        knownClassificationIds.current.delete(id);
+        syncedClassificationsById.current.delete(id);
+      }
+    }
+  }, [projectId, classifications]);
+
+  // Sync updates for existing classifications (name/type/color/visibility/formula)
+  useEffect(() => {
+    if (!projectId) return;
+    for (const c of classifications) {
+      if (!knownClassificationIds.current.has(c.id)) continue;
+      const prev = syncedClassificationsById.current.get(c.id);
+      if (!prev) {
+        syncedClassificationsById.current.set(c.id, c);
+        continue;
+      }
+
+      const patch: Partial<Classification> = {};
+      if (prev.name !== c.name) patch.name = c.name;
+      if (prev.type !== c.type) patch.type = c.type;
+      if (prev.color !== c.color) patch.color = c.color;
+      if (prev.visible !== c.visible) patch.visible = c.visible;
+      if (prev.formula !== c.formula) patch.formula = c.formula;
+      if (prev.formulaUnit !== c.formulaUnit) patch.formulaUnit = c.formulaUnit;
+      if (prev.formulaSavedToLibrary !== c.formulaSavedToLibrary) patch.formulaSavedToLibrary = c.formulaSavedToLibrary;
+      if (Object.keys(patch).length === 0) continue;
+
+      syncedClassificationsById.current.set(c.id, c);
+      api.updateClassification(projectId, c.id, patch).catch((err) => console.error('API updateClassification failed:', err));
     }
   }, [projectId, classifications]);
 
@@ -565,6 +618,7 @@ function PageInner() {
       const preservedTotalPages = useStore.getState().totalPages;
       knownPolygonIds.current = new Set();
       knownClassificationIds.current = new Set();
+      syncedClassificationsById.current = new Map();
       useStore.getState().hydrateState({
         ...EMPTY_STATE,
         totalPages: preservedTotalPages > 1 ? preservedTotalPages : 1,
@@ -613,11 +667,39 @@ function PageInner() {
   // stale value left by API hydration or EMPTY_STATE initialization.
   // BUG-R6-002: Mark the page count as ready once PDFViewer reports it so we
   // don't show a misleading "Page 1 of 1" before the PDF has loaded.
+  const captureThumbnail = useCallback(async () => {
+    if (!projectId) return;
+    const pageCanvas = pdfViewerRef.current?.getPageCanvas?.();
+    if (!pageCanvas) return;
+    const MAX = 320;
+    const ratio = Math.min(1, MAX / Math.max(pageCanvas.width, pageCanvas.height));
+    const off = document.createElement('canvas');
+    off.width = Math.round(pageCanvas.width * ratio);
+    off.height = Math.round(pageCanvas.height * ratio);
+    const ctx = off.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(pageCanvas, 0, 0, off.width, off.height);
+    const dataUrl = off.toDataURL('image/jpeg', 0.7);
+    try {
+      await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnail: dataUrl }),
+      });
+    } catch (e) {
+      console.warn('Thumbnail upload failed', e);
+    }
+  }, [projectId]);
+
   const handlePDFPageChange = useCallback((page: number, total: number) => {
     setCurrentPageNum(page);
     setCurrentPage(page, total);
     setPdfPageCountReady(true);
-  }, [setCurrentPage]);
+    if (page === 1 && !thumbnailCapturedRef.current) {
+      thumbnailCapturedRef.current = true;
+      setTimeout(() => captureThumbnail(), 1000);
+    }
+  }, [setCurrentPage, captureThumbnail]);
 
   const handleTextExtracted = useCallback((text: string, pageNum: number) => {
     // QA-006 / QA-007: Image-only PDFs (no text layer) produce empty text.
@@ -960,7 +1042,7 @@ function PageInner() {
         )}
 
         <div className="flex flex-col flex-1 min-h-0 order-1">
-          <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
+          <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' || currentTool === 'annotate' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
             {pdfFile ? (
               /* ── PDF loaded — full viewer ── */
               <>
@@ -970,7 +1052,7 @@ function PageInner() {
                   onTextExtracted={handleTextExtracted}
                   onPageChange={handlePDFPageChange}
                   cursor={
-                    currentTool === 'draw' || currentTool === 'measure'
+                    currentTool === 'draw' || currentTool === 'measure' || currentTool === 'annotate'
                       ? 'crosshair'
                       : currentTool === 'pan'
                       ? 'grab'
@@ -986,6 +1068,7 @@ function PageInner() {
                   {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
                   {currentTool === 'cut' && <CutTool />}
                   {currentTool === 'measure' && <MeasurementTool />}
+                  {currentTool === 'annotate' && <AnnotationTool />}
                 </PDFViewer>
 
                 {menuState && (

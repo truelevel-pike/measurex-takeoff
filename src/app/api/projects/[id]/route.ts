@@ -29,6 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       project: {
         ...project,
+        thumbnail,
         state: {
           classifications,
           polygons,
@@ -81,6 +82,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ project: updated });
   } catch (err: any) {
     console.error("[project route]", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await initDataDir();
+    const { id } = await params;
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    }
+    const body = await req.json();
+    const patch: Record<string, unknown> = {};
+    if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
+    const updated = await updateProject(id, patch as any);
+    return NextResponse.json({ project: updated });
+  } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

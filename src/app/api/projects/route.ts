@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
-import { listProjects, createProject, initDataDir } from '@/server/project-store';
+import { listProjects, createProject, initDataDir, getThumbnail } from '@/server/project-store';
 
 export async function GET() {
   try {
     await initDataDir();
     const projects = await listProjects();
-    return NextResponse.json({ projects });
+    const withThumbnails = await Promise.all(
+      projects.map(async (p) => {
+        const thumbnail = await getThumbnail(p.id).catch(() => null);
+        return { ...p, thumbnail };
+      })
+    );
+    return NextResponse.json({ projects: withThumbnails });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

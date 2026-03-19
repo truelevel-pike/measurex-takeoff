@@ -39,6 +39,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const allPolygons = useStore((s) => s.polygons);
+  const allAnnotations = useStore((s) => s.annotations);
   const currentPage = useStore((s) => s.currentPage);
   const classifications = useStore((s) => s.classifications);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
@@ -168,6 +169,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
 
   const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
+  const annotations = (allAnnotations ?? []).filter((a) => a.page === currentPage);
 
   // Handle right-click on a polygon via SVG element data attributes
   const handleSvgClick = useCallback(
@@ -353,6 +355,21 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
             </g>
           );
         })}
+
+        {/* Text annotations */}
+        {annotations.map((annotation) => (
+          <text
+            key={annotation.id}
+            x={annotation.x}
+            y={annotation.y}
+            fill={annotation.color}
+            fontSize={annotation.fontSize}
+            fontFamily="sans-serif"
+            style={{ userSelect: 'none' }}
+          >
+            {annotation.text}
+          </text>
+        ))}
 
         {/* Snap indicator — shows when a vertex snaps during drag */}
         {snapIndicator && (

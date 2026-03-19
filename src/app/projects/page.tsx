@@ -66,6 +66,7 @@ interface ProjectRow {
   pdf_path?: string;
   pageCount?: number;
   state?: ProjectState;
+  thumbnail?: string;
 }
 
 /** Format a project date — handles camelCase and snake_case API fields */
@@ -107,10 +108,10 @@ function saveFolders(f: FolderItem[]) {
 }
 function loadOnboardingDismissed(): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem('mx-onboarding-dismissed') === 'true';
+  return localStorage.getItem('mx-onboarding-complete') === 'true';
 }
 function saveOnboardingDismissed(v: boolean) {
-  localStorage.setItem('mx-onboarding-dismissed', v ? 'true' : 'false');
+  localStorage.setItem('mx-onboarding-complete', v ? 'true' : 'false');
 }
 
 export default function ProjectsPage() {
@@ -188,6 +189,7 @@ export default function ProjectsPage() {
           state: {
             classifications: [],
             polygons: [],
+            annotations: [],
             scale: null,
             scales: {},
             currentPage: 1,
@@ -664,17 +666,26 @@ export default function ProjectsPage() {
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
                   >
                     {/* Project thumbnail */}
-                    <div
-                      className="h-28 flex items-center justify-center"
-                      style={{ backgroundColor: thumbColor(p.name) + '22' }}
-                    >
-                      <span
-                        className="text-2xl font-bold rounded-full w-14 h-14 flex items-center justify-center"
-                        style={{ backgroundColor: thumbColor(p.name), color: '#fff' }}
+                    {p.thumbnail ? (
+                      <img
+                        src={p.thumbnail}
+                        alt="Project preview"
+                        className="w-full h-28 object-cover"
+                        style={{ background: '#0a0a0f' }}
+                      />
+                    ) : (
+                      <div
+                        className="h-28 flex items-center justify-center"
+                        style={{ backgroundColor: thumbColor(p.name) + '22' }}
                       >
-                        {thumbInitials(p.name)}
-                      </span>
-                    </div>
+                        <span
+                          className="text-2xl font-bold rounded-full w-14 h-14 flex items-center justify-center"
+                          style={{ backgroundColor: thumbColor(p.name), color: '#fff' }}
+                        >
+                          {thumbInitials(p.name)}
+                        </span>
+                      </div>
+                    )}
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <span className="font-medium text-sm text-white truncate flex-1">{p.name}</span>
