@@ -24,6 +24,11 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
   // If text was extracted with a page code (e.g. A1.00), sheetNames will have that value
   const sheetLabel = sheetNames[currentPage] || `Page ${currentPage}`;
 
+  /** Format pixelsPerUnit into a human-readable px/unit string, e.g. "47.2 px/ft" */
+  const pixelsPerUnitLabel = scale
+    ? `${parseFloat(scale.pixelsPerUnit.toFixed(1))} px/${scale.unit}`
+    : null;
+
   return (
     <div
       className="flex items-center h-8 px-3 border-t text-xs gap-4 shrink-0"
@@ -51,6 +56,11 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
           <>
             <Ruler size={12} color="#00ff88" />
             <span className="font-semibold">Scale: {scaleText}</span>
+            {pixelsPerUnitLabel && (
+              <span style={{ color: '#7aebb0', opacity: 0.75, marginLeft: 4 }}>
+                ({pixelsPerUnitLabel})
+              </span>
+            )}
           </>
         ) : (
           <span className="animate-pulse inline-flex items-center gap-1">
