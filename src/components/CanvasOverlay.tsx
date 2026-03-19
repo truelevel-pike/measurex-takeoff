@@ -21,17 +21,16 @@ interface CanvasOverlayProps {
 /** Convert hex color to rgba string */
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
+  if (!clean || (clean.length !== 3 && clean.length !== 6)) return `rgba(147,197,253,${alpha})`;
   let r: number, g: number, b: number;
   if (clean.length === 3) {
     r = parseInt(clean[0] + clean[0], 16);
     g = parseInt(clean[1] + clean[1], 16);
     b = parseInt(clean[2] + clean[2], 16);
-  } else if (clean.length >= 6) {
+  } else {
     r = parseInt(clean.slice(0, 2), 16);
     g = parseInt(clean.slice(2, 4), 16);
     b = parseInt(clean.slice(4, 6), 16);
-  } else {
-    return `rgba(147,197,253,${alpha})`;
   }
   return `rgba(${r},${g},${b},${alpha})`;
 }
@@ -172,6 +171,13 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         return;
       }
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const tag = active?.tagName?.toLowerCase();
+      const isEditable =
+        tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(active?.isContentEditable);
+      if (isEditable) return;
+
       if (selectedPolygons.length > 1) {
         e.preventDefault();
         e.stopPropagation();
@@ -179,12 +185,6 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         return;
       }
       if (!selectedPolygonId) return;
-
-      const active = document.activeElement as HTMLElement | null;
-      const tag = active?.tagName?.toLowerCase();
-      const isEditable =
-        tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(active?.isContentEditable);
-      if (isEditable) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -411,6 +411,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         {polygons.map((poly) => {
           const cls = classificationById.get(poly.classificationId);
           if (cls && !cls.visible) return null;
+          if (!poly.points || poly.points.length === 0) return null;
           const isSelected = selectedPolygons.includes(poly.id) || selectedPolygon === poly.id;
           const isHighlighted = highlightedPolygonId === poly.id;
           const isDraggingThis = dragging?.polygonId === poly.id;
@@ -675,3 +676,4 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
 }
 
 export default React.memo(CanvasOverlay);
+export { hexToRgba, getPolygonColor };
