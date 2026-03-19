@@ -169,6 +169,8 @@ export default function ProjectsPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [pageDragOver, setPageDragOver] = useState(false);
+  const pageDragCounter = React.useRef(0);
 
   // Load persisted local state
   useEffect(() => {
@@ -411,6 +413,34 @@ export default function ProjectsPage() {
     saveOnboardingDismissed(true);
   };
 
+  // Page-wide drag-and-drop handlers
+  const handlePageDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setPageDragOver(true);
+    }
+  }, []);
+  const handlePageDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current--;
+    if (pageDragCounter.current === 0) {
+      setPageDragOver(false);
+    }
+  }, []);
+  const handlePageDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+  const handlePageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current = 0;
+    setPageDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      handlePdfUpload(file);
+    }
+  }, []);
+
   /** Auto-generate project name from PDF filename */
   const nameFromFile = (file: File) =>
     file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
@@ -488,7 +518,14 @@ export default function ProjectsPage() {
   }, [contextMenu]);
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white flex flex-col" onClick={() => contextMenu && setContextMenu(null)}>
+    <div
+      className="min-h-screen bg-zinc-900 text-white flex flex-col"
+      onClick={() => contextMenu && setContextMenu(null)}
+      onDragEnter={handlePageDragEnter}
+      onDragLeave={handlePageDragLeave}
+      onDragOver={handlePageDragOver}
+      onDrop={handlePageDrop}
+    >
       {/* Hero section */}
       <header className="bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 shrink-0">
         <div className="px-4 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -705,7 +742,7 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          <RecentProjectsSection />
+          <RecentProjectsSection projects={projects} />
 
           {/* Onboarding checklist */}
           {showOnboarding && (
@@ -850,8 +887,41 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          {/* Content */}
-          {loading ? (
+          {/* First-time onboarding full-screen welcome */}
+          {!loading && projects.length === 0 && showOnboarding ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-6 max-w-md text-center">
+                <div className="bg-blue-600/20 p-5 rounded-2xl">
+                  <FileSpreadsheet size={56} className="text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold tracking-tight mb-2">MeasureX</h2>
+                  <p className="text-zinc-400 text-lg">Blueprint intelligence at your fingertips</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf';
+                    input.onchange = (ev) => {
+                      const file = (ev.target as HTMLInputElement).files?.[0];
+                      if (file) handlePdfUpload(file);
+                    };
+                    input.click();
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 transition-colors shadow-lg shadow-blue-600/25"
+                >
+                  <Upload size={22} /> Upload Blueprint
+                </button>
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                >
+                  or create blank project
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden animate-pulse">
@@ -1138,6 +1208,17 @@ export default function ProjectsPage() {
           <Loader2 size={48} className="text-blue-400 animate-spin mb-4" />
           <div className="text-lg font-semibold text-white">Uploading &amp; processing PDF...</div>
           <div className="text-sm text-zinc-400 mt-1">This may take a moment</div>
+        </div>
+      )}
+
+      {/* Page-wide drag overlay */}
+      {pageDragOver && (
+        <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none">
+          <div className="border-2 border-dashed border-blue-400 rounded-3xl p-16 flex flex-col items-center gap-4">
+            <Upload size={56} className="text-blue-400" />
+            <div className="text-xl font-semibold text-blue-300">Drop PDF to create new project</div>
+            <div className="text-sm text-zinc-400">Release to upload your blueprint</div>
+          </div>
         </div>
       )}
 

@@ -5,6 +5,16 @@ import { Clock } from 'lucide-react';
 
 interface RecentEntry { id: string; name: string; accessedAt: number; }
 
+interface ProjectData {
+  id: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
+interface RecentProjectsSectionProps {
+  projects?: ProjectData[];
+}
+
 const PALETTE = ['#3B82F6','#8B5CF6','#EC4899','#F97316','#10B981','#06B6D4','#EAB308','#EF4444','#6366F1','#14B8A6'];
 function nameHash(n: string) { let h=0; for(let i=0;i<n.length;i++) h=((h<<5)-h+n.charCodeAt(i))|0; return Math.abs(h); }
 function thumbColor(n: string) { return PALETTE[nameHash(n) % PALETTE.length]; }
@@ -29,11 +39,27 @@ export function saveRecentProject(id: string, name: string) {
   localStorage.setItem('mx-recent-projects', JSON.stringify(entries.slice(0, 10)));
 }
 
-export default function RecentProjectsSection() {
+function relTimeFromISO(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return relTime(d.getTime());
+}
+
+export default function RecentProjectsSection({ projects = [] }: RecentProjectsSectionProps) {
   const router = useRouter();
   const [recents, setRecents] = React.useState<RecentEntry[]>([]);
   React.useEffect(() => { setRecents(loadRecentProjects().slice(0, 3)); }, []);
   if (recents.length === 0) return null;
+
+  // Build lookup for updatedAt from API data
+  const updatedAtMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of projects) {
+      const ts = p.updatedAt || p.updated_at;
+      if (ts) map[p.id] = ts;
+    }
+    return map;
+  }, [projects]);
   return (
     <section className="mb-6">
       <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -52,7 +78,11 @@ export default function RecentProjectsSection() {
             </span>
             <div className="overflow-hidden">
               <div className="text-sm font-medium text-white truncate">{r.name}</div>
-              <div className="text-xs text-zinc-400">{relTime(r.accessedAt)}</div>
+              <div className="text-xs text-zinc-400">
+                {updatedAtMap[r.id]
+                  ? `Updated ${relTimeFromISO(updatedAtMap[r.id])}`
+                  : `Opened ${relTime(r.accessedAt)}`}
+              </div>
             </div>
           </button>
         ))}
