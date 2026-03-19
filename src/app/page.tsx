@@ -1474,6 +1474,7 @@ function PageInner() {
         aiLoading={aiLoading}
         hasScale={!!scale}
         hasRunTakeoff={polygons.length > 0}
+        currentPagePolygonCount={polygons.filter(p => p.pageNumber === currentPageNum).length}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
         onExportPanel={() => setShowExport(true)}

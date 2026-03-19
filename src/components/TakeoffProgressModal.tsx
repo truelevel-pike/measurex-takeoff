@@ -200,23 +200,17 @@ export default function TakeoffProgressModal({
           })}
         </div>
 
-        {/* Model badge */}
-        <div className="mt-6 mb-4">
-          <span className="text-xs font-medium px-3 py-1 rounded-full"
-            style={{
-              background: 'rgba(0,212,255,0.1)',
-              color: 'rgba(0,212,255,0.7)',
-              border: '1px solid rgba(0,212,255,0.2)',
-            }}>
-            {model}
-          </span>
-        </div>
       </div>
 
       {/* Cancel button — bottom right */}
-      {onCancel && (
+      {onCancel && !cancelled && (
         <button
-          onClick={onCancel}
+          onClick={() => {
+            setCancelledDoneCount(doneCount);
+            setCancelled(true);
+            onCancel();
+            setTimeout(() => setCancelled(false), 1500);
+          }}
           className="fixed bottom-8 right-8 px-5 py-2.5 rounded-lg text-sm font-medium transition-all"
           style={{
             background: 'rgba(255,255,255,0.06)',
@@ -236,6 +230,16 @@ export default function TakeoffProgressModal({
         >
           Cancel
         </button>
+      )}
+      {cancelled && (
+        <div className="fixed bottom-8 right-8 px-5 py-2.5 rounded-lg text-sm font-medium"
+          style={{
+            background: 'rgba(239,68,68,0.12)',
+            color: '#f87171',
+            border: '1px solid rgba(239,68,68,0.3)',
+          }}>
+          Cancelled — {cancelledDoneCount} of {total} pages done
+        </div>
       )}
 
       {/* Shimmer keyframe */}
@@ -288,14 +292,17 @@ function TakeoffSummaryOverlay({
           boxShadow: '0 0 60px rgba(34,197,94,0.15), 0 0 120px rgba(0,212,255,0.1)',
         }}
       >
-        {/* Trophy icon */}
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
-          style={{
-            background: 'linear-gradient(135deg, rgba(34,197,94,0.25), rgba(250,204,21,0.2))',
-            border: '2px solid rgba(250,204,21,0.4)',
-            boxShadow: '0 0 30px rgba(250,204,21,0.2)',
-          }}>
-          <Trophy size={32} className="text-yellow-400" />
+        {/* Trophy + checkmark icons */}
+        <div className="flex items-center gap-4 mb-5">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34,197,94,0.25), rgba(250,204,21,0.2))',
+              border: '2px solid rgba(250,204,21,0.4)',
+              boxShadow: '0 0 30px rgba(250,204,21,0.2)',
+            }}>
+            <Trophy size={32} className="text-yellow-400" />
+          </div>
+          <CheckCircle size={40} className="text-emerald-400 animate-bounce" style={{ animationDuration: '1.5s' }} />
         </div>
 
         <h1 className="text-2xl font-bold text-white mb-1">Takeoff Complete!</h1>

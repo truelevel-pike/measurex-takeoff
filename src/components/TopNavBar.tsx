@@ -65,6 +65,7 @@ interface TopNavBarProps {
   aiModel?: string;
   onAiModelChange?: (model: string) => void;
   onPrintBlueprint?: () => void;
+  currentPagePolygonCount?: number;
 }
 
 export default function TopNavBar({
@@ -101,6 +102,7 @@ export default function TopNavBar({
   aiModel,
   onAiModelChange,
   onPrintBlueprint,
+  currentPagePolygonCount,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -506,7 +508,7 @@ export default function TopNavBar({
                   ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Analyzing…</>
                   : aiAllPagesMode
                     ? <><Sparkles size={14} aria-hidden="true" /> Run Full Takeoff (all {totalPages ?? '?'} pages)</>
-                    : <><Sparkles size={14} aria-hidden="true" /> Re-Takeoff</>
+                    : <><Sparkles size={14} aria-hidden="true" /> {(currentPagePolygonCount ?? 0) > 0 ? 'Re-Takeoff' : 'Run AI Takeoff'}</>
                 }
               </button>
               <select
@@ -701,7 +703,7 @@ export default function TopNavBar({
             }}
           >
             {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {aiLoading ? 'Analyzing…' : 'Re-Takeoff'}
+            {aiLoading ? 'Analyzing…' : (currentPagePolygonCount ?? 0) > 0 ? 'Re-Takeoff' : 'Run AI Takeoff'}
           </button>
           <button
             onClick={() => { onChat?.(); setShowMobileMenu(false); }}

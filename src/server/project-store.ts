@@ -1058,7 +1058,7 @@ export async function listScales(projectId: string): Promise<ScaleCalibration[]>
 export interface AssemblyRow {
   id: string;
   projectId: string;
-  classificationId: string;
+  classificationId?: string;
   name: string;
   unit: string;
   unitCost: number;
@@ -1078,7 +1078,7 @@ export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {
     return (data || []).map((row: Record<string, unknown>): AssemblyRow => ({
       id: row.id as string,
       projectId: row.project_id as string,
-      classificationId: row.classification_id as string,
+      classificationId: (row.classification_id as string | null) ?? undefined,
       name: row.name as string,
       unit: row.unit as 'ft' | 'in' | 'm' | 'mm',
       unitCost: parseFloat(String(row.unit_cost)),
@@ -1099,10 +1099,9 @@ export async function createAssembly(
 
   if (isSupabaseMode()) {
     const sb = getClient();
-    const row = {
+    const row: Record<string, unknown> = {
       id,
       project_id: projectId,
-      classification_id: data.classificationId,
       name: data.name,
       unit: data.unit,
       unit_cost: data.unitCost,
@@ -1110,6 +1109,11 @@ export async function createAssembly(
       created_at: now,
       updated_at: now,
     };
+    // Only include classification_id if provided — the column may not exist in DB
+    // or may be optional (no FK required).
+    if (data.classificationId != null && data.classificationId !== '') {
+      row.classification_id = data.classificationId;
+    }
     const { error } = await sb.from('mx_assemblies').insert(row);
     if (error) throw new Error(`createAssembly: ${error.message}`);
   } else {
@@ -1130,7 +1134,10 @@ export async function updateAssembly(
   if (isSupabaseMode()) {
     const sb = getClient();
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (patch.classificationId !== undefined) updateData.classification_id = patch.classificationId;
+    // Only set classification_id when a non-empty value is explicitly provided
+    if (patch.classificationId != null && patch.classificationId !== '') {
+      updateData.classification_id = patch.classificationId;
+    }
     if (patch.name !== undefined) updateData.name = patch.name;
     if (patch.unit !== undefined) updateData.unit = patch.unit;
     if (patch.unitCost !== undefined) updateData.unit_cost = patch.unitCost;
@@ -1148,7 +1155,7 @@ export async function updateAssembly(
     return {
       id: row.id,
       projectId: row.project_id,
-      classificationId: row.classification_id,
+      classificationId: (row.classification_id as string | null) ?? undefined,
       name: row.name,
       unit: row.unit,
       unitCost: parseFloat(row.unit_cost),

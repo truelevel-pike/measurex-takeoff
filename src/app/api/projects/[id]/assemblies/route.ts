@@ -37,7 +37,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!bodyResult.success) return validationError(bodyResult.error);
     const { classificationId, name, unit, unitCost, quantityFormula } = body;
     const assembly = await createAssembly(id, {
-      classificationId: classificationId || '',
+      // classificationId is optional — omit it when not provided so the DB
+      // insert does not attempt to reference a non-existent FK column.
+      ...(classificationId ? { classificationId } : {}),
       name,
       unit: unit || 'SF',
       unitCost: unitCost ?? 0,
