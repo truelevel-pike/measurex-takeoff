@@ -41,7 +41,10 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const currentPage = useStore((s) => s.currentPage);
   const classifications = useStore((s) => s.classifications);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
+  const selectedPolygonId = useStore((s) => s.selectedPolygonId);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
+  const deletePolygon = useStore((s) => s.deletePolygon);
+  const projectId = useStore((s) => s.projectId);
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const scale = useStore((s) => s.scale);
@@ -118,6 +121,36 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     };
   }, [dragging, toSvgCoords, updatePolygon, allPolygons, classifications, scale]);
 
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (!selectedPolygonId) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const tag = active?.tagName?.toLowerCase();
+      const isEditable =
+        tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(active?.isContentEditable);
+      if (isEditable) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      deletePolygon(selectedPolygonId);
+      if (projectId) {
+        fetch(`/api/projects/${projectId}/polygons/${selectedPolygonId}`, { method: 'DELETE' }).catch((err) =>
+          console.error('API deletePolygon failed:', err)
+        );
+      }
+    };
+
+    wrapper.addEventListener('keydown', handleKeyDown);
+    return () => {
+      wrapper.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedPolygonId, deletePolygon, projectId]);
+
   // Calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
   const calibrationPoints = useStore((s) => s.calibrationPoints);
@@ -193,6 +226,8 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   return (
     <div
       ref={wrapperRef}
+      tabIndex={0}
+      onMouseDownCapture={() => wrapperRef.current?.focus()}
       style={{
         position: 'absolute',
         inset: 0,
