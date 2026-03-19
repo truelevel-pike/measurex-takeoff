@@ -17,14 +17,17 @@ const COLOR_PRESETS = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#
 export default function UserPreferencesPanel({ open, onClose }: UserPreferencesPanelProps) {
   const { prefs, setPrefs } = useUserPrefs();
 
+  // Use conditional render instead of CSS transform — backdrop-blur creates a new
+  // stacking context that overrides translate-x-full, causing the panel to show even
+  // when "closed". Unmounting is cleaner and avoids the CSS specificity issue.
+  if (!open) return null;
+
   return (
     <>
-      {open && <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} />}
+      <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} />
 
       <aside
-        className={`fixed top-0 right-0 bottom-0 z-[70] w-[360px] max-w-[92vw] bg-[rgba(15,18,32,0.98)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col transition-transform duration-200 ease-in-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className="fixed top-0 right-0 bottom-0 z-[70] w-[360px] max-w-[92vw] bg-[rgba(15,18,32,0.98)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col"
         aria-label="User preferences"
       >
         <div className="flex items-center justify-between border-b border-[#00d4ff]/20 px-4 py-3">

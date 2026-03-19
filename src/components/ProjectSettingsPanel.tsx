@@ -136,21 +136,22 @@ export default function ProjectSettingsPanel({
     }
   };
 
+  // Use conditional render instead of CSS transform — backdrop-blur creates a new
+  // stacking context that overrides translate-x-full, so the panel shows even when
+  // "closed". Unmounting on !open eliminates the CSS override issue entirely.
+  if (!open) return null;
+
   return (
     <>
       {/* Backdrop */}
-      {open && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/30"
-          onClick={() => { setShowDeleteConfirm(false); onClose(); }}
-        />
-      )}
+      <div
+        className="fixed inset-0 z-[60] bg-black/30"
+        onClick={() => { setShowDeleteConfirm(false); onClose(); }}
+      />
 
-      {/* Slide-in panel from right */}
+      {/* Panel */}
       <aside
-        className={`fixed top-0 right-0 bottom-0 z-[70] w-[340px] max-w-[90vw] bg-[rgba(15,18,32,0.98)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col transition-transform duration-200 ease-in-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className="fixed top-0 right-0 bottom-0 z-[70] w-[340px] max-w-[90vw] bg-[rgba(15,18,32,0.98)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col"
         aria-label="Project settings"
       >
         {/* Header */}
