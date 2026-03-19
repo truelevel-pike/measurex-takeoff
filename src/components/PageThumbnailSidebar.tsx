@@ -22,6 +22,7 @@ interface PageThumbnailSidebarProps {
   currentPage: number;
   onPageSelect: (page: number) => void;
   pdfDoc?: PDFDocumentProxy | null;
+  onAITakeoffPage?: (page: number) => void;
 }
 
 function PageThumbnailSidebar({
@@ -29,6 +30,7 @@ function PageThumbnailSidebar({
   currentPage,
   onPageSelect,
   pdfDoc,
+  onAITakeoffPage,
 }: PageThumbnailSidebarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
@@ -36,6 +38,7 @@ function PageThumbnailSidebar({
   const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
   const [collapsed, setCollapsed] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ page: number; x: number; y: number } | null>(null);
   const renderQueueRef = useRef<number[]>([]);
   const queuedPagesRef = useRef<Set<number>>(new Set());
   const requestedPagesRef = useRef<Set<number>>(new Set());
@@ -198,14 +201,32 @@ function PageThumbnailSidebar({
 
   const hasAnySets = groupedPages.some(([name]) => name !== '');
 
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [contextMenu]);
+
   if (totalPages <= 0) return null;
 
   function renderPageButton(page: number) {
     const isActive = page === currentPage;
     const thumb = thumbnails[page - 1];
+    const setLabel = drawingSets[page] || '';
 
     return (
-      <div key={page} className="relative group/page" data-page-number={page}>
+      <div
+        key={page}
+        className="relative group/page"
+        data-page-number={page}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setContextMenu({ page, x: e.clientX, y: e.clientY });
+          setEditingPage(null);
+        }}
+      >
         <button
           type="button"
           onClick={() => onPageSelect(page)}
@@ -250,6 +271,11 @@ function PageThumbnailSidebar({
           >
             {page}
           </span>
+          {setLabel && (
+            <span className="text-[8px] text-gray-500 truncate max-w-[56px] leading-tight">
+              {setLabel}
+            </span>
+          )}
         </button>
         {/* Drawing set assignment dropdown trigger */}
         <button
@@ -318,6 +344,48 @@ function PageThumbnailSidebar({
         ) : (
           Array.from({ length: totalPages }, (_, i) => renderPageButton(i + 1))
         )
+      )}
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[100] bg-[#1a1a2e] border border-[#00d4ff]/25 rounded-lg shadow-xl py-1 min-w-[160px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setEditingPage(contextMenu.page);
+              setContextMenu(null);
+            }}
+            className="block w-full text-left px-3 py-1.5 text-[11px] text-gray-300 hover:bg-[#00d4ff]/10 transition-colors"
+          >
+            Assign Drawing Set
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onPageSelect(contextMenu.page);
+              setContextMenu(null);
+            }}
+            className="block w-full text-left px-3 py-1.5 text-[11px] text-gray-300 hover:bg-[#00d4ff]/10 transition-colors"
+          >
+            Go to Page
+          </button>
+          {onAITakeoffPage && (
+            <button
+              type="button"
+              onClick={() => {
+                onAITakeoffPage(contextMenu.page);
+                setContextMenu(null);
+              }}
+              className="block w-full text-left px-3 py-1.5 text-[11px] text-gray-300 hover:bg-[#00d4ff]/10 transition-colors"
+            >
+              Run AI Takeoff on this page
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

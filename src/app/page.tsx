@@ -1336,6 +1336,10 @@ function PageInner() {
               setCurrentPage(page, totalPages);
               safeGoToPage(page, 'thumbnail-sidebar');
             }}
+            onAITakeoffPage={(page) => {
+              safeGoToPage(page, 'thumbnail-context-menu:ai-takeoff');
+              handleAITakeoff();
+            }}
           />
         )}
 

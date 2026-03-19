@@ -333,6 +333,7 @@ export default function TopNavBar({
             aria-label={`Current sheet: ${badge}`}
             role="status"
             aria-live="polite"
+            title="Click to jump to page"
             onClick={() => {
               if (onGoToPage && typeof pageIndex === 'number' && typeof totalPages === 'number') {
                 setIsEditingPage(true);
