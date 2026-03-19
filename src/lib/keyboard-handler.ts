@@ -73,7 +73,12 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
 
       if (key === 'Escape') {
         event.preventDefault();
-        store.setTool('select');
+        // Clear multi-selection first; if nothing selected, switch to select tool
+        if (store.selectedPolygons && store.selectedPolygons.length > 0) {
+          store.clearPolygonSelection();
+        } else {
+          store.setTool('select');
+        }
         return;
       }
 

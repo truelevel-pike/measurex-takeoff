@@ -144,6 +144,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     if (!wrapper) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedPolygons.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        clearPolygonSelection();
+        return;
+      }
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       if (selectedPolygons.length > 1) {
         e.preventDefault();
