@@ -4,6 +4,7 @@ import "./globals.css";
 import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
 import OfflineBanner from "@/components/OfflineBanner";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { PerfMonitor } from "@/components/PerfMonitor";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 // Dev-only: loaded via a client wrapper that uses next/dynamic with ssr:false
@@ -56,6 +57,7 @@ export default function RootLayout({
         <PerfMonitor />
         <OfflineIndicator />
         <ServiceWorkerRegister />
+        <PWAInstallBanner />
       </body>
     </html>
   );

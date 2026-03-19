@@ -31,6 +31,7 @@ import {
   Loader2,
   BookOpen,
   GraduationCap,
+  Play,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { ProjectState } from '@/lib/types';
@@ -43,6 +44,7 @@ import RecentProjects from '@/components/RecentProjects';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import TagInput from '@/components/TagInput';
 import { getActiveWorkspace } from '@/lib/workspace';
+import { saveDemoProject, DEMO_PROJECT_ID } from '@/lib/demo-data';
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false });
 import { useWhatsNew } from '@/components/WhatsNewModal';
 
@@ -957,6 +959,15 @@ export default function ProjectsPage() {
                 >
                   or create blank project
                 </button>
+                <button
+                  onClick={() => {
+                    saveDemoProject();
+                    router.push(`/?project=${DEMO_PROJECT_ID}`);
+                  }}
+                  className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 hover:text-white px-6 py-3 rounded-xl font-medium text-base flex items-center gap-2 transition-colors border border-zinc-600 mt-2"
+                >
+                  <Play size={18} /> Try Demo
+                </button>
               </div>
             </div>
           ) : loading ? (
@@ -1021,6 +1032,15 @@ export default function ProjectsPage() {
                 className="mt-4 text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
               >
                 or create a blank project
+              </button>
+              <button
+                onClick={() => {
+                  saveDemoProject();
+                  router.push(`/?project=${DEMO_PROJECT_ID}`);
+                }}
+                className="mt-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors border border-zinc-600"
+              >
+                <Play size={14} /> Try Demo
               </button>
             </div>
           ) : viewMode === 'grid' ? (

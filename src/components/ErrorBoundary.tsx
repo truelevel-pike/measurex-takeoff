@@ -52,9 +52,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 p-6 bg-red-50 border border-red-200 rounded-lg text-center">
-          <p className="text-red-700 font-medium text-sm">
-            Something went wrong{this.props.name ? ` in ${this.props.name}` : ""}.
+        <div className="flex flex-col items-center justify-center gap-3 p-6 bg-[#1a1020] border border-red-500/30 rounded-lg text-center">
+          <p className="text-red-300 font-medium text-sm">
+            Something went wrong{this.props.name ? ` in ${this.props.name}` : ""}. Try refreshing this panel.
           </p>
           <button
             onClick={this.handleRetry}

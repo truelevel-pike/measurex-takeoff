@@ -58,6 +58,7 @@ import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
 import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
 import FirstRunTooltips from '@/components/FirstRunTooltips';
+import { DEMO_PROJECT_ID, isDemoProject, loadDemoProject, saveDemoProject, DEMO_PROJECT_STATE } from '@/lib/demo-data';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -481,6 +482,21 @@ function PageInner() {
 
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
   const hydrateProject = useCallback(async (pid: string) => {
+    // Demo project: load from localStorage, skip all API calls
+    if (isDemoProject(pid)) {
+      saveDemoProject(); // ensure it exists in localStorage
+      const demo = loadDemoProject();
+      const state = demo?.state ?? DEMO_PROJECT_STATE;
+      const normalized = normalizeProjectState(state);
+      useStore.getState().hydrateState(normalized);
+      setCurrentPageNum(normalized.currentPage || 1);
+      setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+      setProjectId(DEMO_PROJECT_ID);
+      setProjectName(demo?.meta?.name ?? 'Demo Project');
+      localStorage.setItem('measurex_project_id', DEMO_PROJECT_ID);
+      return;
+    }
+
     // Cancel any in-flight hydration to prevent stale data from overwriting newer requests
     hydrateAbortRef.current?.abort();
     const controller = new AbortController();
@@ -612,13 +628,13 @@ function PageInner() {
 
   // Connect SSE when project is loaded
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     connectToProject(projectId);
     return () => disconnectFromProject();
   }, [projectId]);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     const unsubscribe = subscribeToActivity((event, data) => {
       if (event === 'ai-takeoff:started') {
         const page = typeof data.page === 'number' ? data.page : '?';
@@ -952,13 +968,13 @@ function PageInner() {
   }), [projectId, classifications, polygons, annotations, scale, scales, currentPage, totalPages]);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     requestAutoSave();
   }, [autosaveFingerprint, projectId, requestAutoSave]);
 
   // Sync new polygons to API individually
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     const newPolygons = polygons.filter((p) => !knownPolygonIds.current.has(p.id));
     for (const p of newPolygons) {
       knownPolygonIds.current.add(p.id);
@@ -973,7 +989,7 @@ function PageInner() {
 
   // Sync new classifications to API individually
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     const newClassifications = classifications.filter((c) => !knownClassificationIds.current.has(c.id));
     for (const c of newClassifications) {
       knownClassificationIds.current.add(c.id);
@@ -992,7 +1008,7 @@ function PageInner() {
 
   // Sync updates for existing classifications (name/type/color/visibility/formula)
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || isDemoProject(projectId)) return;
     for (const c of classifications) {
       if (!knownClassificationIds.current.has(c.id)) continue;
       const prev = syncedClassificationsById.current.get(c.id);
@@ -1532,6 +1548,24 @@ function PageInner() {
           }}
         >
           MeasureX works best on desktop. Use a tablet or computer for full functionality.
+        </div>
+      )}
+      {isDemoProject(projectId) && (
+        <div
+          className="w-full px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-3 flex-shrink-0"
+          style={{
+            background: 'linear-gradient(90deg, rgba(251,191,36,0.18) 0%, rgba(251,191,36,0.08) 100%)',
+            borderBottom: '1px solid rgba(251,191,36,0.3)',
+            color: '#fbbf24',
+          }}
+        >
+          <span>This is a demo project. Upload your own PDF to get started.</span>
+          <button
+            onClick={() => window.location.href = '/projects'}
+            className="bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-200 px-3 py-0.5 rounded text-xs font-semibold transition-colors border border-yellow-600/40"
+          >
+            Go to Projects
+          </button>
         </div>
       )}
       <TopNavBar
