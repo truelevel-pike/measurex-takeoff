@@ -18,7 +18,7 @@ export default function PageThumbnailSidebar({
 }: PageThumbnailSidebarProps) {
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
 
-  // Render thumbnails from PDF document at low DPI
+  // Render thumbnails from PDF document at low DPI — parallel with progressive reveal
   useEffect(() => {
     if (!pdfDoc || totalPages <= 0) {
       setThumbnails([]);
@@ -28,28 +28,38 @@ export default function PageThumbnailSidebar({
     let cancelled = false;
     const thumbScale = 0.2;
 
-    (async () => {
-      const renderPage = async (pageNumber: number): Promise<string | null> => {
-        if (cancelled) return null;
-        try {
-          const page = await pdfDoc.getPage(pageNumber);
-          const viewport = page.getViewport({ scale: thumbScale });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return null;
-          await (page as any).render({ canvasContext: ctx, viewport }).promise;
-          return canvas.toDataURL('image/png');
-        } catch {
-          return null;
-        }
-      };
+    // Pre-fill with nulls so page buttons render immediately (showing page numbers)
+    setThumbnails(Array(totalPages).fill(null));
 
-      const thumbPromises = Array.from({ length: totalPages }, (_, i) => renderPage(i + 1));
-      const results = await Promise.all(thumbPromises);
-      if (!cancelled) setThumbnails(results);
-    })();
+    const renderPage = async (pageNumber: number): Promise<string | null> => {
+      if (cancelled) return null;
+      try {
+        const page = await pdfDoc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: thumbScale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        await (page as any).render({ canvasContext: ctx, viewport }).promise;
+        return canvas.toDataURL('image/png');
+      } catch {
+        return null;
+      }
+    };
+
+    // Launch all renders in parallel; update state progressively as each finishes
+    Array.from({ length: totalPages }, (_, i) => {
+      const pageNumber = i + 1;
+      renderPage(pageNumber).then((dataUrl) => {
+        if (cancelled) return;
+        setThumbnails((prev) => {
+          const next = [...prev];
+          next[i] = dataUrl;
+          return next;
+        });
+      });
+    });
 
     return () => { cancelled = true; };
   }, [pdfDoc, totalPages]);
