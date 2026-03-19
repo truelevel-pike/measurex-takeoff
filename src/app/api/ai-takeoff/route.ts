@@ -186,7 +186,7 @@ export async function POST(req: Request) {
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
-COUNT items (type: "count") — return a single center point for each instance detected:
+COUNT items (type: "count") — return a single center point for each instance detected (a small position marker is correct for count elements):
 - "Single Swing Door": a door with one leaf that swings on hinges (shown as an arc on blueprints)
 - "Double Swing Door": a door with two leaves that swing open from the center
 - "Window": all window types (casement, sliding, awning, fixed, double-hung) — shown as parallel lines in walls
@@ -196,16 +196,27 @@ COUNT items (type: "count") — return a single center point for each instance d
 - "Parking Space": each individual parking stall (shown as lined rectangles in parking areas)
 - Other furniture: "Chair", "Table", "Desk" if visible
 
-AREA items (type: "area") — return polygon points tracing the boundary:
-- Rooms, spaces (living room, bedroom, bathroom, kitchen, etc.)
-- Slabs, foundations, roof areas
+AREA items (type: "area") — return polygon points that FULLY trace the COMPLETE boundary of the element:
+CRITICAL: Do NOT place a tiny marker box. You MUST trace the actual walls/outlines of the element.
+- Follow the wall lines precisely — the polygon must cover the full extents of the room or slab.
+- Use at least 4 points, typically 4–12 points depending on the shape complexity.
+- For a rectangular room, the 4 corners must be at the actual room corners (e.g., spanning ~0.10–0.30 of the page, not a tiny 0.01×0.01 box).
+- For L-shaped or irregular rooms, add intermediate vertices to follow each wall turn.
+- The polygon area should realistically represent the element's true size relative to the page.
+- Examples of what to AVOID: a "room" polygon only 20×20 pixels wide, or 4 points all clustered near one corner.
+- Rooms, spaces (living room, bedroom, bathroom, kitchen, office, corridor, etc.)
+- Slabs, foundations, floor areas, roof areas, concrete pads, site areas
 
 LINEAR items (type: "linear") — return two endpoints:
 - Walls, beams, fences, roads
 
 For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as NORMALIZED coordinates where x and y are between 0 and 1 relative to the image dimensions (0,0 = top-left, 1,1 = bottom-right), color: string (hex) }. No prose, no markdown fences.`;
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex) }. No prose, no markdown fences.
+
+COORDINATE FORMAT: All x and y values MUST be NORMALIZED — floating-point numbers between 0.0 and 1.0, relative to the full image dimensions (0,0 = top-left corner, 1,1 = bottom-right corner). Do NOT return pixel values.
+
+AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.`;
 
     const content = [
       { type: 'text', text: 'Analyze this blueprint and return JSON array only. No prose.' },
