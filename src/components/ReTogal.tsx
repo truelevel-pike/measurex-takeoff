@@ -76,6 +76,16 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
       useStore.getState().deletePolygon(p.id);
     }
 
+    // Delete polygons for this page on the server to avoid duplicate key errors on re-insert.
+    const projectId = useStore.getState().projectId;
+    if (projectId) {
+      try {
+        await fetch(`/api/projects/${projectId}/polygons?page=${currentPage}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Re-Togal: failed to clear server polygons:', err);
+      }
+    }
+
     // Delegate to the real AI takeoff handler which captures the current page,
     // sends it to the AI endpoint, and loads results into the store.
     try {

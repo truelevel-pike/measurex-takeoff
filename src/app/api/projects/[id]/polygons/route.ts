@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, createPolygon, initDataDir } from '@/server/project-store';
+import { getPolygons, createPolygon, deletePolygonsByPage, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
@@ -15,6 +15,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { id } = paramsResult.data;
     const polygons = await getPolygons(id);
     return NextResponse.json({ polygons });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await initDataDir();
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+    const url = new URL(req.url);
+    const page = url.searchParams.get('page');
+    if (!page) return NextResponse.json({ error: 'Missing ?page query param' }, { status: 400 });
+    const pageNumber = parseInt(page, 10);
+    if (isNaN(pageNumber) || pageNumber < 1) return NextResponse.json({ error: 'Invalid page number' }, { status: 400 });
+    await deletePolygonsByPage(id, pageNumber);
+    return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

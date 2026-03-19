@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { subscribeToActivity } from '@/lib/ws-client';
 
@@ -43,25 +43,45 @@ function eventToLogEntry(event: string, data: Record<string, unknown>): LogEntry
 
 const MAX_ENTRIES = 50;
 
+// Module-level persistent store so entries survive component unmount/remount cycles.
+let persistedEntries: LogEntry[] = [];
+let persistedListeners: Set<() => void> = new Set();
+let sseSubscribed = false;
+
+function addPersistentEntry(entry: LogEntry) {
+  persistedEntries = [entry, ...persistedEntries].slice(0, MAX_ENTRIES);
+  persistedListeners.forEach((fn) => fn());
+}
+
+function clearPersistentEntries() {
+  persistedEntries = [];
+  persistedListeners.forEach((fn) => fn());
+}
+
+// Subscribe to SSE once at module level so events are captured even when the component is unmounted.
+function ensureSSESubscription() {
+  if (sseSubscribed) return;
+  sseSubscribed = true;
+  subscribeToActivity((event, data) => {
+    const entry = eventToLogEntry(event, data);
+    if (entry) addPersistentEntry(entry);
+  });
+}
+
 export default function AIActivityLog() {
-  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>(persistedEntries);
   const [collapsed, setCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const addEntry = useCallback((entry: LogEntry) => {
-    setEntries((prev) => [entry, ...prev].slice(0, MAX_ENTRIES));
-  }, []);
-
-  // Listen to SSE-derived activity events via the ws-client pub-sub bus.
-  // subscribeToActivity returns an unsubscribe function, so cleanup is clean
-  // even when the EventSource reconnects (no stale listener references).
+  // Start the module-level SSE listener and sync persistent entries into component state.
   useEffect(() => {
-    const unsubscribe = subscribeToActivity((event, data) => {
-      const entry = eventToLogEntry(event, data);
-      if (entry) addEntry(entry);
-    });
-    return unsubscribe;
-  }, [addEntry]);
+    ensureSSESubscription();
+    const sync = () => setEntries([...persistedEntries]);
+    persistedListeners.add(sync);
+    // Sync on mount in case entries were added while unmounted.
+    sync();
+    return () => { persistedListeners.delete(sync); };
+  }, []);
 
   // Auto-scroll to top (newest first)
   useEffect(() => {
@@ -87,7 +107,7 @@ export default function AIActivityLog() {
               className="text-neutral-500 hover:text-red-400 p-0.5"
               onClick={(e) => {
                 e.stopPropagation();
-                setEntries([]);
+                clearPersistentEntries();
               }}
               title="Clear log"
             >
