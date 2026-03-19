@@ -3,26 +3,21 @@
 import { useEffect, useState } from 'react';
 
 export default function OfflineBanner() {
-  // Start as false (online) on server + initial client render to avoid hydration mismatch
-  const [offline, setOffline] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    setMounted(true);
-    setOffline(!navigator.onLine);
-
-    const goOffline = () => setOffline(true);
-    const goOnline = () => setOffline(false);
-
-    window.addEventListener('offline', goOffline);
-    window.addEventListener('online', goOnline);
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
-      window.removeEventListener('offline', goOffline);
-      window.removeEventListener('online', goOnline);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  if (!mounted || !offline) return null;
+  if (isOnline) return null;
 
   return (
     <div
@@ -41,7 +36,7 @@ export default function OfflineBanner() {
       }}
       role="alert"
     >
-      ⚠️ You are offline. Changes may not be saved.
+      You are offline. Changes may not be saved.
     </div>
   );
 }
