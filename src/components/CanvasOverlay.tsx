@@ -554,7 +554,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
             cy={snapIndicator.y}
             r={10}
             fill="none"
-            stroke="#fbbf24"
+            stroke="#06b6d4"
             strokeWidth={2.5}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"

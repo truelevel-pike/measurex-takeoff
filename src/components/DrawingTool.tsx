@@ -251,7 +251,7 @@ export default function DrawingTool() {
         ))}
         {/* Snap indicator — yellow ring when cursor is snapped */}
         {snapIndicator && cursor && (
-          <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#fbbf24" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#06b6d4" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         )}
         {/* Crosshair cursor indicator */}
         {cursor && (
