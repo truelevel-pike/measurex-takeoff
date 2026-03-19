@@ -15,6 +15,7 @@ import {
   Grid3X3,
   GitCompare,
   Download,
+  FileSpreadsheet,
   Layers,
   Layers3,
   Search,
@@ -41,6 +42,7 @@ interface TopNavBarProps {
   hasRunTakeoff?: boolean;
   onExportExcel?: () => void;
   onExportJson?: () => void;
+  onExportPanel?: () => void;
   onSave?: () => void;
   saving?: boolean;
   projectName?: string;
@@ -71,6 +73,7 @@ export default function TopNavBar({
   hasRunTakeoff,
   onExportExcel,
   onExportJson,
+  onExportPanel,
   onSave,
   saving,
   projectName,
@@ -403,8 +406,8 @@ export default function TopNavBar({
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
-              <NavIconButton ariaLabel="Export JSON" srLabel="Export JSON" icon={<Download size={17} aria-hidden="true" />} tooltip="Export JSON" onClick={onExportJson} />
-              <NavIconButton ariaLabel="Export to Excel" srLabel="Export to Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Export to Excel" onClick={onExportExcel} />
+              <NavIconButton ariaLabel="Export" srLabel="Export" icon={<FileSpreadsheet size={17} aria-hidden="true" />} tooltip="Export" onClick={onExportPanel} />
+              <NavIconButton ariaLabel="Quick Export Excel" srLabel="Quick Export Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Quick Export Excel" onClick={onExportExcel} />
             </>
           )}
           {isTablet && (
@@ -494,18 +497,18 @@ export default function TopNavBar({
             <Settings size={16} /> Settings
           </button>
           <button
-            onClick={() => { onExportJson?.(); setShowMobileMenu(false); }}
+            onClick={() => { onExportPanel?.(); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
           >
-            <Download size={16} /> Export JSON
+            <FileSpreadsheet size={16} /> Export
           </button>
           <button
             onClick={() => { onExportExcel?.(); setShowMobileMenu(false); }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
           >
-            <Download size={16} /> Export Excel
+            <Download size={16} /> Quick Export Excel
           </button>
           {is3DEnabled && (
           <button

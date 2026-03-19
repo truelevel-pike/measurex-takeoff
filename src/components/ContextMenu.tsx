@@ -90,7 +90,11 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         setFocusIndex((i) => (i + 1) % menuItems.length);
       } else if (e.key === 'ArrowUp') {
@@ -108,7 +112,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focusIndex, menuItems, handleOpenProperties, handleCopy, handleDelete, handleSnapshot]);
+  }, [focusIndex, menuItems, handleOpenProperties, handleCopy, handleDelete, handleSnapshot, onClose]);
 
   // Scroll to close
   useEffect(() => {

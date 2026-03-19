@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Assembly, Material } from '@/lib/types';
@@ -32,6 +32,15 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
     assembly?.materials.length ? assembly.materials.map((m) => ({ ...m })) : [emptyMaterial()]
   );
   const [formula, setFormula] = useState('');
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   function updateMaterial(index: number, patch: Partial<Material>) {
     setMaterials((prev) => prev.map((m, i) => (i === index ? { ...m, ...patch } : m)));

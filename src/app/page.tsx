@@ -43,6 +43,7 @@ import MXChat from '@/components/MXChat';
 import AIImageSearch from '@/components/AIImageSearch';
 import CropOverlay from '@/components/CropOverlay';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
+const ExportPanel = dynamic(() => import('@/components/ExportPanel'), { ssr: false });
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
@@ -248,6 +249,7 @@ function PageInner() {
   const [cropMode, setCropMode] = useState(false);
   const [croppedImageBase64, setCroppedImageBase64] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -1248,6 +1250,7 @@ function PageInner() {
         hasRunTakeoff={polygons.length > 0}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
+        onExportPanel={() => setShowExport(true)}
         onSave={handleSave}
         saving={saving}
         projectName={projectName || undefined}
@@ -1580,6 +1583,11 @@ function PageInner() {
           }}
           croppedImageBase64={croppedImageBase64}
         />
+      )}
+
+      {/* Export panel */}
+      {showExport && (
+        <ExportPanel onClose={() => setShowExport(false)} />
       )}
 
       {/* Compare panel */}
