@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS mx_pages (
   width FLOAT NOT NULL,
   height FLOAT NOT NULL,
   pdf_url TEXT,
+  text TEXT DEFAULT '',
   name TEXT,
   drawing_set TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

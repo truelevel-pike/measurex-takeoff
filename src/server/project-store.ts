@@ -393,7 +393,7 @@ export async function createPage(projectId: string, page: PageInfo): Promise<Pag
         page_number: page.pageNum,
         width: page.width,
         height: page.height,
-        pdf_url: page.text ?? null,
+        text: page.text ?? '',
         name: page.name ?? null,
         drawing_set: page.drawingSet ?? null,
       },
@@ -425,7 +425,7 @@ export async function getPages(projectId: string): Promise<PageInfo[]> {
       pageNum: row.page_number as number,
       width: row.width as number,
       height: row.height as number,
-      text: (row.pdf_url as string | null) ?? '',
+      text: (row.text as string | null) ?? '',
       name: (row.name as string | null) ?? undefined,
       drawingSet: (row.drawing_set as string | null) ?? undefined,
     }));
@@ -445,7 +445,7 @@ export async function updatePage(
   const updateData: Record<string, unknown> = {};
   if (patch.width !== undefined) updateData.width = patch.width;
   if (patch.height !== undefined) updateData.height = patch.height;
-  if (patch.text !== undefined) updateData.pdf_url = patch.text;
+  if (patch.text !== undefined) updateData.text = patch.text;
   if (patch.name !== undefined) updateData.name = patch.name;
   if (patch.drawingSet !== undefined) updateData.drawing_set = patch.drawingSet;
 
@@ -467,7 +467,7 @@ export async function updatePage(
       pageNum: data.page_number,
       width: data.width,
       height: data.height,
-      text: data.pdf_url ?? '',
+      text: data.text ?? '',
       name: data.name ?? undefined,
       drawingSet: data.drawing_set ?? undefined,
     };
