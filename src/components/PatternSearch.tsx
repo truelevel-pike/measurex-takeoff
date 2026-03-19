@@ -45,6 +45,39 @@ interface PatternSearchProps {
   currentPage?: number;
 }
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+/** Crop a region from a full-page data URL using an offscreen canvas. Returns a base64 data URL. */
+function cropImage(
+  fullPageDataUrl: string,
+  selBox: { left: number; top: number; width: number; height: number },
+  containerWidth: number,
+  containerHeight: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // selBox is in container-pixel coords; convert to image-pixel coords
+      const scaleX = img.naturalWidth / containerWidth;
+      const scaleY = img.naturalHeight / containerHeight;
+      const sx = selBox.left * scaleX;
+      const sy = selBox.top * scaleY;
+      const sw = selBox.width * scaleX;
+      const sh = selBox.height * scaleY;
+
+      const offscreen = document.createElement('canvas');
+      offscreen.width = Math.max(1, Math.round(sw));
+      offscreen.height = Math.max(1, Math.round(sh));
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return reject(new Error('Could not get canvas context'));
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, offscreen.width, offscreen.height);
+      resolve(offscreen.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('Failed to load image for cropping'));
+    img.src = fullPageDataUrl;
+  });
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageData, currentPage = 1 }: PatternSearchProps) {
@@ -99,12 +132,28 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
     }
 
     try {
+      // If a selection box was drawn, crop that region as the reference symbol
+      let selectionImageData: string | undefined;
+      if (selection && canvasRef.current) {
+        const sb = {
+          left:   Math.min(selection.startX, selection.endX),
+          top:    Math.min(selection.startY, selection.endY),
+          width:  Math.abs(selection.endX - selection.startX),
+          height: Math.abs(selection.endY - selection.startY),
+        };
+        if (sb.width > 4 && sb.height > 4) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          selectionImageData = await cropImage(pdfPageImageData, sb, rect.width, rect.height);
+        }
+      }
+
       const res = await fetch('/api/vision-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: query.trim(),
           image: pdfPageImageData,
+          ...(selectionImageData ? { selectionImage: selectionImageData } : {}),
         }),
       });
 
@@ -165,7 +214,7 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
     } finally {
       setIsSearching(false);
     }
-  }, [query, pdfPageImageData, currentPage]);
+  }, [query, pdfPageImageData, currentPage, selection]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -249,7 +298,7 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
             <div className="px-5 pt-1 pb-1">
               <p className="text-gray-500 text-xs flex items-center gap-1">
                 <ChevronRight size={12} />
-                Optionally draw a region to narrow the search area
+                Draw a box around a symbol to find all matching instances
               </p>
             </div>
             <div

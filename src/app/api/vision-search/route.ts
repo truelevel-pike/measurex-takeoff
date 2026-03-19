@@ -16,6 +16,7 @@ interface VisionResult {
 interface VisionSearchBody {
   image?: unknown;
   query?: unknown;
+  selectionImage?: unknown;
 }
 
 function asString(input: unknown): string {
@@ -29,6 +30,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as VisionSearchBody;
     const image = asString(body?.image);
     const query = asString(body?.query);
+    const selectionImage = asString(body?.selectionImage);
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required.' }, { status: 400 });
@@ -41,8 +43,35 @@ export async function POST(req: Request) {
     if (guard) return guard;
     const apiKey = getOpenAIKey()!;
 
-    // Ensure the image is a proper data URL
+    // Ensure images are proper data URLs
     const imageUrl = image.startsWith('data:') ? image : `data:image/png;base64,${image}`;
+    const selectionUrl = selectionImage
+      ? (selectionImage.startsWith('data:') ? selectionImage : `data:image/png;base64,${selectionImage}`)
+      : null;
+
+    // Build the user message content — two-image flow when selectionImage is provided
+    const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [];
+
+    if (selectionUrl) {
+      userContent.push({
+        type: 'text',
+        text: `Here is a reference symbol (first image) from a construction blueprint. Find ALL instances of this same symbol on the full blueprint page (second image). The user describes it as: "${query}". Return their bounding boxes as percentage coordinates (0-100).`,
+      });
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: selectionUrl, detail: 'high' },
+      });
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: imageUrl, detail: 'high' },
+      });
+    } else {
+      userContent.push({ type: 'text', text: query });
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: imageUrl, detail: 'high' },
+      });
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -54,16 +83,7 @@ export async function POST(req: Request) {
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: query },
-              {
-                type: 'image_url',
-                image_url: { url: imageUrl, detail: 'high' },
-              },
-            ],
-          },
+          { role: 'user', content: userContent },
         ],
         max_tokens: 2048,
         response_format: { type: 'json_object' },

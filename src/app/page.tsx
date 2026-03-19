@@ -41,6 +41,7 @@ import ScaleCalibration from '@/components/ScaleCalibration';
 const ThreeDScene = dynamic(() => import('@/components/ThreeDScene'), { ssr: false });
 import MXChat from '@/components/MXChat';
 import AIImageSearch from '@/components/AIImageSearch';
+import PatternSearch from '@/components/PatternSearch';
 import CropOverlay from '@/components/CropOverlay';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
 const ExportPanel = dynamic(() => import('@/components/ExportPanel'), { ssr: false });
@@ -248,6 +249,8 @@ function PageInner() {
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [cropMode, setCropMode] = useState(false);
   const [croppedImageBase64, setCroppedImageBase64] = useState<string | null>(null);
+  const [showPatternSearch, setShowPatternSearch] = useState(false);
+  const [patternSearchPageImage, setPatternSearchPageImage] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
@@ -714,6 +717,11 @@ function PageInner() {
         setTool(currentTool === 'annotate' ? 'select' : 'annotate');
       } else if (e.key.toLowerCase() === 'a') {
         handleAITakeoff();
+      } else if (e.key === 'P' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const canvas = pdfViewerRef.current?.getPageCanvas?.();
+        setPatternSearchPageImage(canvas ? canvas.toDataURL('image/png') : null);
+        setShowPatternSearch(v => !v);
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
       }
@@ -721,6 +729,55 @@ function PageInner() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId]);
+
+  // Listen for custom event from SmartTools pattern search button
+  useEffect(() => {
+    const handler = () => {
+      const canvas = pdfViewerRef.current?.getPageCanvas?.();
+      setPatternSearchPageImage(canvas ? canvas.toDataURL('image/png') : null);
+      setShowPatternSearch(true);
+    };
+    window.addEventListener('open-pattern-search', handler);
+    return () => window.removeEventListener('open-pattern-search', handler);
+  }, []);
+
+  // Pattern search: add matched polygons to takeoff
+  const handlePatternSearchAdd = useCallback((matches: { id: string; label: string; confidence: number; pageNumber: number; x: number; y: number; width: number; height: number }[]) => {
+    const state = useStore.getState();
+    const classificationId = state.selectedClassification ?? state.classifications[0]?.id;
+    if (!classificationId) {
+      addToast('No classification selected — create one first', 'error');
+      return;
+    }
+
+    let added = 0;
+    for (const match of matches) {
+      if (match.width > 0 && match.height > 0) {
+        const x = match.x;
+        const y = match.y;
+        const w = match.width;
+        const h = match.height;
+        const polyId = state.addPolygon({
+          points: [
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+          ],
+          classificationId,
+          pageNumber: match.pageNumber,
+          area: 0,
+          linearFeet: 0,
+          isComplete: true,
+          label: match.label,
+        });
+        // Set AI confidence on the created polygon
+        state.updatePolygon(polyId, { confidence: match.confidence / 100 });
+        added++;
+      }
+    }
+    addToast(`Added ${added} patterns to takeoff`, 'success');
+  }, [addToast]);
 
   useEffect(() => {
     if (!pdfFile) return;
@@ -1619,6 +1676,16 @@ function PageInner() {
             setTool('crop');
           }}
           croppedImageBase64={croppedImageBase64}
+        />
+      )}
+
+      {/* Pattern Search (E26) */}
+      {showPatternSearch && (
+        <PatternSearch
+          onClose={() => setShowPatternSearch(false)}
+          onAddToTakeoff={handlePatternSearchAdd}
+          pdfPageImageData={patternSearchPageImage}
+          currentPage={currentPageNum}
         />
       )}
 

@@ -8,6 +8,7 @@ import {
   Axis3D,
   ClipboardPaste,
   Repeat,
+  Boxes,
 } from 'lucide-react';
 
 // Configurable standard widths (in feet)
@@ -288,6 +289,15 @@ export default function SmartTools() {
         tooltip="Paste classifications from clipboard, auto-adjusting to current page"
         disabled={false}
         onClick={handleSmartPaste}
+      />
+
+      <SmartToolBtn
+        icon={Boxes}
+        label="Pattern Search"
+        tooltip="Find all instances of a symbol using AI vision"
+        disabled={false}
+        onClick={() => window.dispatchEvent(new CustomEvent('open-pattern-search'))}
+        shortcut="Shift+P"
       />
 
       <SmartToolBtn
