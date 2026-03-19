@@ -4,6 +4,7 @@ import { getPolygons, getClassifications, getScale, getProject, getAssemblies, i
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
+import type { UnitCostMap } from '@/types/estimates';
 
 type ClassificationType = Classification['type'];
 
@@ -126,6 +127,31 @@ function buildAssembliesSheet(
   return ws;
 }
 
+function buildEstimatesSheet(
+  rows: QuantityRow[],
+  unitCosts: UnitCostMap,
+): XLSX.WorkSheet {
+  const dataRows: Array<Array<string | number>> = [];
+  let grandTotal = 0;
+
+  for (const row of rows) {
+    const cost = unitCosts[row.classificationId]?.costPerUnit ?? 0;
+    const subtotal = round2(row.quantity * cost);
+    grandTotal += subtotal;
+    dataRows.push([row.name, row.quantity, row.unit, round2(cost), round2(subtotal)]);
+  }
+
+  const aoa: Array<Array<string | number>> = [
+    ['Classification', 'Quantity', 'Unit', 'Unit Cost ($/unit)', 'Subtotal ($)'],
+    ...dataRows,
+    ['', '', '', 'GRAND TOTAL', round2(grandTotal)],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 16 }];
+  return ws;
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
@@ -147,6 +173,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
     const scaleConfig: ScaleConfig = { pixelsPerFoot: ppu, unit };
     const projectName = project.name || id;
+    const url = new URL(_req.url);
+    const unitCostsParam = url.searchParams.get('unitCosts');
+    let unitCosts: UnitCostMap = {};
+    if (unitCostsParam) {
+      try {
+        unitCosts = JSON.parse(Buffer.from(unitCostsParam, 'base64').toString('utf-8')) as UnitCostMap;
+      } catch {
+        // Invalid base64/JSON — use empty costs
+      }
+    }
     const rows = buildQuantityRows(classifications, polygons, scaleConfig);
     const quantityByClassificationId = new Map(rows.map((row) => [row.classificationId, row]));
 
@@ -179,6 +215,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Sheet 3: Assemblies
     const assembliesSheet = buildAssembliesSheet(assemblyRows);
     XLSX.utils.book_append_sheet(wb, assembliesSheet, 'Assemblies');
+
+    // Sheet 4: Estimates
+    const estimatesSheet = buildEstimatesSheet(rows, unitCosts);
+    XLSX.utils.book_append_sheet(wb, estimatesSheet, 'Estimates');
 
     // Write to buffer — use 'buffer' type, then extract a proper ArrayBuffer slice.
     // ArrayBuffer satisfies BodyInit; Buffer does not in strict Next.js TS configs.
