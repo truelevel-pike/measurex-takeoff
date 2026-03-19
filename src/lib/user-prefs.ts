@@ -22,6 +22,7 @@ export interface UserPrefs {
   defaultClassificationColor: string;
   toastDurationMs: ToastDurationMs;
   autoSaveInterval: AutoSaveInterval;
+  polygonFillOpacity: number;
 }
 
 export const DEFAULT_PREFS: UserPrefs = {
@@ -34,6 +35,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   defaultClassificationColor: '#3b82f6',
   toastDurationMs: 4000,
   autoSaveInterval: 60,
+  polygonFillOpacity: 0.3,
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -75,6 +77,11 @@ function toHexColor(value: unknown): string | undefined {
   return undefined;
 }
 
+function toPolygonFillOpacity(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.min(1, value));
+}
+
 function sanitizeUserPrefs(raw: unknown): UserPrefs {
   if (!isObject(raw)) return DEFAULT_PREFS;
 
@@ -92,6 +99,7 @@ function sanitizeUserPrefs(raw: unknown): UserPrefs {
       toHexColor(raw.defaultClassificationColor) ?? DEFAULT_PREFS.defaultClassificationColor,
     toastDurationMs: toToastDurationMs(raw.toastDurationMs) ?? DEFAULT_PREFS.toastDurationMs,
     autoSaveInterval: toAutoSaveInterval(raw.autoSaveInterval) ?? DEFAULT_PREFS.autoSaveInterval,
+    polygonFillOpacity: toPolygonFillOpacity(raw.polygonFillOpacity) ?? DEFAULT_PREFS.polygonFillOpacity,
   };
 }
 

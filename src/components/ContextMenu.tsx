@@ -213,7 +213,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
         onMouseEnter={() => setFocusIndex(3)}
         onClick={handleGoToClassification}
       >
-        <Tag size={14} className="text-slate-400" /> Go to Classification
+        <Tag size={14} className="text-slate-400" /> Jump to Classification
       </button>
 
       <div className="my-1 border-t border-slate-700/50" />

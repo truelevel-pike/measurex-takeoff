@@ -85,6 +85,25 @@ export default function UserPreferencesPanel({ open, onClose }: UserPreferencesP
                   {prefs.showPolygonLabels ? 'Shown' : 'Hidden'}
                 </button>
               </label>
+              <label className="flex items-center justify-between text-sm text-white">
+                <span>Transparency</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(prefs.polygonFillOpacity * 100)}
+                    onChange={(e) =>
+                      setPrefs((prev) => ({
+                        ...prev,
+                        polygonFillOpacity: Number(e.target.value) / 100,
+                      }))
+                    }
+                    className="w-24 accent-[#00d4ff]"
+                  />
+                  <span className="text-xs text-gray-400 w-8 text-right">{Math.round(prefs.polygonFillOpacity * 100)}%</span>
+                </div>
+              </label>
             </div>
           </section>
 

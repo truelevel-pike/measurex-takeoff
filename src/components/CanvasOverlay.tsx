@@ -48,12 +48,13 @@ function getPolygonColor(
 function getPolygonFillOpacity(
   polygon: { fillOpacity?: number },
   isSelected: boolean,
-  isHighlighted: boolean
+  isHighlighted: boolean,
+  baseFillOpacity: number = 0.3
 ): number {
-  if (isSelected) return 0.5;
-  if (isHighlighted) return 0.45;
+  if (isSelected) return Math.min(1, baseFillOpacity + 0.2);
+  if (isHighlighted) return Math.min(1, baseFillOpacity + 0.15);
   const opacity = polygon.fillOpacity;
-  if (typeof opacity !== 'number' || opacity <= 0) return 0.3;
+  if (typeof opacity !== 'number' || opacity <= 0) return baseFillOpacity;
   return opacity;
 }
 
@@ -476,7 +477,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const pointsStr = displayPoints.map((p: Point) => `${p.x},${p.y}`).join(' ');
           const polyWithDisplay = poly as typeof poly & { color?: string; fillOpacity?: number };
           const color = getPolygonColor(polyWithDisplay, cls?.color);
-          const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted);
+          const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted, prefs.polygonFillOpacity);
           const isLinearPoly = cls?.type === 'linear';
           const isClassHovered = hoveredClassificationId !== null && poly.classificationId === hoveredClassificationId;
           const sharedStyle: React.CSSProperties = {
@@ -542,7 +543,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   points={pointsStr}
                   fill={hexToRgba(color, fillOpacity)}
                   stroke={color}
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                   vectorEffect="non-scaling-stroke"
                   style={sharedStyle}
                   data-polygon-id={poly.id}
@@ -571,7 +572,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     points={pointsStr}
                     fill="none"
                     stroke="#ffffff"
-                    strokeWidth={2}
+                    strokeWidth={3}
                     strokeDasharray="8 6"
                     opacity={0.75}
                     vectorEffect="non-scaling-stroke"

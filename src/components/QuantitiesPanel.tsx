@@ -311,6 +311,15 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setShowPreferences(false);
   }, [projectId]);
 
+  // Scroll to classification row when "Jump to Classification" is used
+  useEffect(() => {
+    if (!selectedClassification) return;
+    const el = document.querySelector<HTMLElement>(`[data-classification-id="${selectedClassification}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedClassification]);
+
   // Focus first element in drawer when opened on mobile
   useEffect(() => {
     if (showQuantitiesDrawer && drawerRef.current) {
