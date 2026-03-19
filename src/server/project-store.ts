@@ -286,6 +286,102 @@ export async function deleteProject(projectId: string): Promise<boolean> {
   }
 }
 
+// ── Share Tokens ────────────────────────────────────────────────────────
+
+export async function generateShareToken(projectId: string): Promise<string> {
+  const token = crypto.randomUUID();
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb
+      .from('mx_projects')
+      .update({ share_token: token })
+      .eq('id', projectId);
+    if (error) throw new Error(`generateShareToken: ${error.message}`);
+  } else {
+    const filePath = path.join(projectDir(projectId), 'project.json');
+    const existing = await readJson<ProjectMeta & { shareToken?: string } | null>(filePath, null);
+    if (!existing) throw new Error('Project not found');
+    await writeJson(filePath, { ...existing, shareToken: token });
+  }
+
+  return token;
+}
+
+export async function getShareToken(projectId: string): Promise<string | null> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_projects')
+      .select('share_token')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (error) throw new Error(`getShareToken: ${error.message}`);
+    return data?.share_token ?? null;
+  }
+
+  const meta = await readJson<ProjectMeta & { shareToken?: string } | null>(
+    path.join(projectDir(projectId), 'project.json'),
+    null,
+  );
+  return meta?.shareToken ?? null;
+}
+
+export async function revokeShareToken(projectId: string): Promise<void> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { error } = await sb
+      .from('mx_projects')
+      .update({ share_token: null })
+      .eq('id', projectId);
+    if (error) throw new Error(`revokeShareToken: ${error.message}`);
+  } else {
+    const filePath = path.join(projectDir(projectId), 'project.json');
+    const existing = await readJson<ProjectMeta & { shareToken?: string } | null>(filePath, null);
+    if (!existing) return;
+    delete existing.shareToken;
+    await writeJson(filePath, existing);
+  }
+}
+
+export async function getProjectByShareToken(token: string): Promise<ProjectMeta | null> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_projects')
+      .select('*')
+      .eq('share_token', token)
+      .maybeSingle();
+    if (error) throw new Error(`getProjectByShareToken: ${error.message}`);
+    if (!data) return null;
+    let totalPages: number | undefined;
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      totalPages,
+    };
+  }
+
+  // File mode: scan all projects for the matching share token
+  let entries: string[];
+  try {
+    entries = await fs.readdir(PROJECTS_DIR);
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    const meta = await readJson<ProjectMeta & { shareToken?: string } | null>(
+      path.join(PROJECTS_DIR, entry, 'project.json'),
+      null,
+    );
+    if (meta?.shareToken === token) return meta;
+  }
+  return null;
+}
+
 // ── Pages CRUD ─────────────────────────────────────────────────────────
 
 export async function createPage(projectId: string, page: PageInfo): Promise<PageInfo> {

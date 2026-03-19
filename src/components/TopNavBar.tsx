@@ -95,17 +95,29 @@ export default function TopNavBar({
   const currentPage = useStore((s) => s.currentPage);
   const { addToast } = useToast();
 
+  const [shareLoading, setShareLoading] = React.useState(false);
+
   const handleCopyLink = React.useCallback(async () => {
     try {
       const url = new URL(window.location.href);
       const pid = url.searchParams.get('project') || localStorage.getItem('measurex_project_id');
-      if (pid) url.searchParams.set('project', pid);
-      const text = url.toString();
+      if (!pid) {
+        addToast('No project loaded', 'error');
+        return;
+      }
+
+      setShareLoading(true);
+      // Generate (or retrieve) a share token via the API
+      const res = await fetch(`/api/projects/${pid}/share`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to generate share link');
+      const { token } = await res.json();
+
+      const shareUrl = `${window.location.origin}/share/${token}`;
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(shareUrl);
       } else {
         const ta = document.createElement('textarea');
-        ta.value = text;
+        ta.value = shareUrl;
         ta.setAttribute('readonly', '');
         ta.style.position = 'fixed';
         ta.style.opacity = '0';
@@ -115,10 +127,12 @@ export default function TopNavBar({
         document.body.removeChild(ta);
         if (!copied) throw new Error('Clipboard unavailable');
       }
-      addToast('Link copied to clipboard', 'success');
+      addToast('Share link copied to clipboard', 'success');
     } catch (error) {
-      console.error('Failed to copy link:', error);
-      addToast('Failed to copy link', 'error');
+      console.error('Failed to copy share link:', error);
+      addToast('Failed to copy share link', 'error');
+    } finally {
+      setShareLoading(false);
     }
   }, [addToast]);
 
@@ -330,32 +344,35 @@ export default function TopNavBar({
                 Image Search
               </button>
               <button
-                aria-label="Share project link"
+                aria-label={shareLoading ? 'Generating share link…' : 'Share project link'}
                 onClick={handleCopyLink}
+                disabled={shareLoading}
                 style={{
                   background: '#12121a',
-                  color: '#a1a1aa',
+                  color: shareLoading ? '#8892a0' : '#a1a1aa',
                   border: '1px solid rgba(0,212,255,0.2)',
                   borderRadius: 8,
                   padding: '6px 14px',
                   fontSize: 13,
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: shareLoading ? 'default' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
-                  e.currentTarget.style.color = '#ffffff';
+                  if (!shareLoading) {
+                    e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)';
-                  e.currentTarget.style.color = '#a1a1aa';
+                  e.currentTarget.style.color = shareLoading ? '#8892a0' : '#a1a1aa';
                 }}
               >
-                <Share2 size={14} aria-hidden="true" />
-                Share
+                {shareLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Share2 size={14} aria-hidden="true" />}
+                {shareLoading ? 'Sharing…' : 'Share'}
               </button>
               <NavIconButton
                 ariaLabel={isTakeoffSearchOpen ? 'Hide takeoff search' : 'Show takeoff search'}
