@@ -56,7 +56,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import QuickTakeoffMode from '@/components/QuickTakeoffMode';
 import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
-import type { PageStatus } from '@/components/TakeoffProgressModal';
+import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -280,6 +280,8 @@ function PageInner() {
     }
     return "gpt-5.4";
   });
+  const [takeoffSummary, setTakeoffSummary] = useState<TakeoffSummary | null>(null);
+  const aiCancelRef = useRef(false);
 
   // BUG-R6-002: Track whether the PDF viewer has reported its actual page count.
   // The store initializes totalPages to 1; we must not show "Page 1 of 1" until
@@ -1232,7 +1234,10 @@ function PageInner() {
 
     const total = useStore.getState().totalPages;
     const originalPage = useStore.getState().currentPage || 1;
+    const startTime = Date.now();
+    aiCancelRef.current = false;
     setAiLoading(true);
+    setTakeoffSummary(null);
     setAiAllPagesProgress({ current: 1, total });
 
     // Initialize per-page statuses
@@ -1246,6 +1251,8 @@ function PageInner() {
     let totalPagesCompleted = 0;
 
     for (let page = 1; page <= total; page++) {
+      if (aiCancelRef.current) break;
+
       setAiAllPagesProgress({ current: page, total });
       setAiStatus(`Page ${page}/${total}: Capturing...`);
 
@@ -1258,6 +1265,8 @@ function PageInner() {
         setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'failed' as const, errorMsg: 'Could not capture page' } : ps));
         continue;
       }
+
+      if (aiCancelRef.current) break;
 
       setAiStatus(`Page ${page}/${total}: AI analyzing...`);
       try {
@@ -1286,11 +1295,32 @@ function PageInner() {
 
     safeGoToPage(originalPage, 'ai-takeoff-all-pages:return');
     await reloadProjectPolygonsAndClassifications(projectId);
-    addToast(`Takeoff complete — ${totalPolygons} polygons across ${totalPagesCompleted} pages`, 'success');
+
+    const elapsedMs = Date.now() - startTime;
+    // Gather unique classifications from the reloaded store
+    const currentClassifications = useStore.getState().classifications || [];
+    const classificationNames = currentClassifications.map((c: Classification) => c.name);
+
     setAiAllPagesProgress(null);
-    setAiPageStatuses([]);
     setAiLoading(false);
+
+    if (!aiCancelRef.current) {
+      // Show celebratory summary
+      setTakeoffSummary({
+        totalPolygons,
+        totalPages: totalPagesCompleted,
+        classifications: classificationNames,
+        elapsedMs,
+      });
+    } else {
+      setAiPageStatuses([]);
+      addToast(`Takeoff cancelled after ${totalPagesCompleted} pages — ${totalPolygons} polygons found`, 'success');
+    }
   }, [projectId, reloadProjectPolygonsAndClassifications, safeGoToPage, addToast]);
+
+  const handleCancelTakeoff = useCallback(() => {
+    aiCancelRef.current = true;
+  }, []);
 
   // Crop & Search: when user completes a bounding box, crop the canvas region and send for AI analysis
   const handleCropComplete = useCallback((cropRect: { x: number; y: number; width: number; height: number }) => {
@@ -1774,13 +1804,30 @@ function PageInner() {
       )}
       <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
-      {aiLoading && aiAllPagesProgress ? (
+      {takeoffSummary ? (
+        <TakeoffProgressModal
+          open={false}
+          pageStatuses={[]}
+          total={0}
+          currentPage={0}
+          model={aiModel}
+          summary={takeoffSummary}
+          onDismissSummary={() => {
+            setTakeoffSummary(null);
+            setAiPageStatuses([]);
+            // Zoom to page 1
+            safeGoToPage(1, 'takeoff-summary:view-results');
+          }}
+        />
+      ) : aiLoading && aiAllPagesProgress ? (
         <TakeoffProgressModal
           open={true}
           pageStatuses={aiPageStatuses}
           total={aiAllPagesProgress.total}
           currentPage={aiAllPagesProgress.current}
           model={aiModel}
+          sheetNames={sheetNames}
+          onCancel={handleCancelTakeoff}
         />
       ) : aiLoading ? (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

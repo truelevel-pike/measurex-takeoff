@@ -452,18 +452,43 @@ export default function TopNavBar({
         <nav aria-label="Actions" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {!isMobile && (
             <>
-              {/* AI Takeoff — clean single button like Togal */}
+              {/* All Pages toggle + AI Takeoff button */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  background: aiAllPagesMode ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: aiAllPagesMode ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                  transition: 'all 150ms ease',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: aiAllPagesMode ? '#4ade80' : '#8892a0',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={aiAllPagesMode ?? false}
+                  onChange={(e) => onAiAllPagesModeChange?.(e.target.checked)}
+                  style={{ accentColor: '#22c55e', width: 14, height: 14 }}
+                />
+                All Pages
+              </label>
               <button
-                aria-label={aiLoading ? 'AI Takeoff running…' : 'Run AI Takeoff on current page'}
+                aria-label={aiLoading ? 'AI Takeoff running…' : aiAllPagesMode ? `Run Full Takeoff (all ${totalPages ?? '?'} pages)` : 'Run AI Takeoff on current page'}
                 aria-busy={aiLoading}
-                onClick={onAITakeoff}
+                onClick={aiAllPagesMode ? onAITakeoffAllPages : onAITakeoff}
                 disabled={aiLoading}
                 style={{
                   background: aiLoading ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
                   color: '#fff',
                   border: '1px solid rgba(34,197,94,0.5)',
                   borderRadius: 8,
-                  padding: '6px 16px',
+                  padding: aiAllPagesMode ? '6px 20px' : '6px 16px',
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: aiLoading ? 'default' : 'pointer',
@@ -471,15 +496,17 @@ export default function TopNavBar({
                   alignItems: 'center',
                   gap: 6,
                   letterSpacing: 0.2,
-                  boxShadow: aiLoading ? 'none' : '0 0 12px rgba(34,197,94,0.25)',
+                  boxShadow: aiLoading ? 'none' : aiAllPagesMode ? '0 0 16px rgba(34,197,94,0.4)' : '0 0 12px rgba(34,197,94,0.25)',
                   transition: 'all 150ms ease',
                 }}
                 onMouseEnter={(e) => { if (!aiLoading) e.currentTarget.style.boxShadow = '0 0 20px rgba(34,197,94,0.5)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = aiLoading ? 'none' : '0 0 12px rgba(34,197,94,0.25)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = aiLoading ? 'none' : aiAllPagesMode ? '0 0 16px rgba(34,197,94,0.4)' : '0 0 12px rgba(34,197,94,0.25)'; }}
               >
                 {aiLoading
                   ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Analyzing…</>
-                  : <><Sparkles size={14} aria-hidden="true" /> Re-Takeoff</>
+                  : aiAllPagesMode
+                    ? <><Sparkles size={14} aria-hidden="true" /> Run Full Takeoff (all {totalPages ?? '?'} pages)</>
+                    : <><Sparkles size={14} aria-hidden="true" /> Re-Takeoff</>
                 }
               </button>
               <select
