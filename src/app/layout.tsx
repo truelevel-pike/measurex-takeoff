@@ -1,12 +1,17 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
-import DevPerfOverlay from "@/components/dev/DevPerfOverlay";
 import OfflineBanner from "@/components/OfflineBanner";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { PerfMonitor } from "@/components/PerfMonitor";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+
+const DevPerfOverlay =
+  process.env.NODE_ENV === "development"
+    ? dynamic(() => import("@/components/dev/DevPerfOverlay"), { ssr: false })
+    : (() => null);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +55,7 @@ export default function RootLayout({
         <OfflineBanner />
         {children}
         <KeyboardShortcutsPortal />
-        {process.env.NODE_ENV === 'development' && <DevPerfOverlay />}
+        <DevPerfOverlay />
         <PerfMonitor />
         <OfflineIndicator />
         <ServiceWorkerRegister />

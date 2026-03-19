@@ -41,9 +41,14 @@ function PageThumbnailSidebar({
   const requestedPagesRef = useRef<Set<number>>(new Set());
   const activeRenderCountRef = useRef(0);
   const renderSessionRef = useRef(0);
+  const currentPageRef = useRef(currentPage);
 
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
   const processThumbnailQueue = useCallback(() => {
     const activeSession = renderSessionRef.current;
@@ -112,7 +117,7 @@ function PageThumbnailSidebar({
     const root = scrollContainerRef.current;
     if (!root || collapsed) return;
 
-    const marginPx = Math.max(root.clientHeight * 2, 200);
+    const marginPx = Math.max(root.clientHeight * 2, 600);
     const observer = new IntersectionObserver(
       (entries) => {
         setVisiblePages((prev) => {
@@ -124,7 +129,7 @@ function PageThumbnailSidebar({
             if (entry.isIntersecting) next.add(pageNumber);
             else next.delete(pageNumber);
           }
-          next.add(currentPage);
+          next.add(currentPageRef.current);
           return next;
         });
       },
@@ -137,7 +142,7 @@ function PageThumbnailSidebar({
 
     root.querySelectorAll<HTMLElement>('[data-page-number]').forEach((node) => observer.observe(node));
     return () => observer.disconnect();
-  }, [collapsed, drawingSets, totalPages, currentPage]);
+  }, [collapsed, drawingSets, totalPages]);
 
   // Queue only near-viewport pages and render thumbnails with max concurrency 2.
   useEffect(() => {
