@@ -1004,3 +1004,158 @@ export async function deleteAssembly(projectId: string, assemblyId: string): Pro
   await writeJson(filePath, filtered);
   return true;
 }
+
+// ── Snapshots CRUD ──────────────────────────────────────────────────────
+
+export interface SnapshotMeta {
+  id: string;
+  projectId: string;
+  description: string;
+  createdAt: string;
+  polygonCount: number;
+  classificationCount: number;
+  assemblyCount: number;
+  pageCount: number;
+}
+
+export interface SnapshotData extends SnapshotMeta {
+  classifications: Classification[];
+  polygons: Polygon[];
+  scales: ScaleCalibration[];
+  assemblies: AssemblyRow[];
+  pages: PageInfo[];
+}
+
+function snapshotsDir(projectId: string): string {
+  return path.join(projectDir(projectId), 'snapshots');
+}
+
+export async function createSnapshot(
+  projectId: string,
+  description: string,
+): Promise<SnapshotMeta> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  // Gather all project data
+  const [classifications, polygons, scales, assemblies, pages] = await Promise.all([
+    getClassifications(projectId),
+    getPolygons(projectId),
+    listScales(projectId),
+    getAssemblies(projectId),
+    getPages(projectId),
+  ]);
+
+  const snapshot: SnapshotData = {
+    id,
+    projectId,
+    description,
+    createdAt: now,
+    polygonCount: polygons.length,
+    classificationCount: classifications.length,
+    assemblyCount: assemblies.length,
+    pageCount: pages.length,
+    classifications,
+    polygons,
+    scales,
+    assemblies,
+    pages,
+  };
+
+  // File-based storage (works for both modes — snapshots are always file-based)
+  const dir = snapshotsDir(projectId);
+  await fs.mkdir(dir, { recursive: true });
+  await writeJson(path.join(dir, `${id}.json`), snapshot);
+
+  const { classifications: _c, polygons: _p, scales: _s, assemblies: _a, pages: _pg, ...meta } = snapshot;
+  return meta;
+}
+
+export async function listSnapshots(projectId: string): Promise<SnapshotMeta[]> {
+  const dir = snapshotsDir(projectId);
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+
+  const snapshots: SnapshotMeta[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const data = await readJson<SnapshotData | null>(path.join(dir, entry), null);
+    if (!data) continue;
+    const { classifications: _c, polygons: _p, scales: _s, assemblies: _a, pages: _pg, ...meta } = data;
+    snapshots.push(meta);
+  }
+
+  snapshots.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return snapshots;
+}
+
+export async function getSnapshot(projectId: string, snapshotId: string): Promise<SnapshotData | null> {
+  const filePath = path.join(snapshotsDir(projectId), `${snapshotId}.json`);
+  return readJson<SnapshotData | null>(filePath, null);
+}
+
+export async function deleteSnapshot(projectId: string, snapshotId: string): Promise<boolean> {
+  const filePath = path.join(snapshotsDir(projectId), `${snapshotId}.json`);
+  try {
+    await fs.unlink(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function restoreSnapshot(projectId: string, snapshotId: string): Promise<{
+  restored: boolean;
+  polygonCount: number;
+  classificationCount: number;
+}> {
+  const snapshot = await getSnapshot(projectId, snapshotId);
+  if (!snapshot) throw new Error('Snapshot not found');
+
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    // Clear existing data
+    await sb.from('mx_polygons').delete().eq('project_id', projectId);
+    await sb.from('mx_classifications').delete().eq('project_id', projectId);
+    await sb.from('mx_scales').delete().eq('project_id', projectId);
+    await sb.from('mx_assemblies').delete().eq('project_id', projectId);
+
+    // Recreate classifications
+    for (const cls of snapshot.classifications) {
+      await createClassification(projectId, cls);
+    }
+    // Recreate polygons
+    for (const poly of snapshot.polygons) {
+      await createPolygon(projectId, poly);
+    }
+    // Recreate scales
+    for (const scale of snapshot.scales) {
+      await setScale(projectId, scale);
+    }
+    // Recreate assemblies
+    for (const asm of snapshot.assemblies) {
+      const { id: _id, projectId: _pid, createdAt: _ca, ...data } = asm;
+      await createAssembly(projectId, data);
+    }
+  } else {
+    // File mode: overwrite JSON files directly
+    const dir = projectDir(projectId);
+    await Promise.all([
+      writeJson(path.join(dir, 'classifications.json'), snapshot.classifications),
+      writeJson(path.join(dir, 'polygons.json'), snapshot.polygons),
+      writeJson(path.join(dir, 'assemblies.json'), snapshot.assemblies),
+      writeJson(path.join(dir, 'pages.json'), snapshot.pages),
+      writeJson(path.join(dir, 'scale.json'), snapshot.scales[0] ?? null),
+    ]);
+  }
+
+  return {
+    restored: true,
+    polygonCount: snapshot.polygons.length,
+    classificationCount: snapshot.classifications.length,
+  };
+}

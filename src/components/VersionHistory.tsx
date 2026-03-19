@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Clock, CheckCircle, RotateCcw, X, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { History, Camera, Clock, CheckCircle, RotateCcw, X, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
+import SnapshotPanel from '@/components/SnapshotPanel';
 
 interface VersionHistoryProps {
   onClose: () => void;
@@ -83,6 +84,7 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
   const undo = useStore((s) => s.undo);
   const { addToast } = useToast();
 
+  const [activeTab, setActiveTab] = useState<'history' | 'snapshots'>('history');
   const [loading, setLoading] = useState(true);
   const [apiEntries, setApiEntries] = useState<ApiHistoryEntry[] | null>(null);
   const [restoringEntryId, setRestoringEntryId] = useState<string | null>(null);
@@ -160,12 +162,7 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History size={18} className="text-emerald-400" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-100">Version History</h2>
-            <p className="text-[11px] text-gray-400">
-              {hasRealData ? `${apiEntries.length} entries` : 'Last saved: 2 min ago'}
-            </p>
-          </div>
+          <h2 className="text-sm font-semibold text-gray-100">Version History</h2>
         </div>
         <button
           type="button"
@@ -177,7 +174,39 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
         </button>
       </div>
 
-      {/* Entries */}
+      {/* Tabs */}
+      <div className="flex border-b border-gray-700">
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'history'
+              ? 'text-emerald-400 border-b-2 border-emerald-400'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <History size={12} />
+          History
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('snapshots')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'snapshots'
+              ? 'text-emerald-400 border-b-2 border-emerald-400'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Camera size={12} />
+          Snapshots
+        </button>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'snapshots' && projectId ? (
+        <SnapshotPanel projectId={projectId} />
+      ) : (
+
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -267,6 +296,8 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
           )
         )}
       </div>
+
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-700 flex items-center gap-2">

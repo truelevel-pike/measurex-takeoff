@@ -134,6 +134,12 @@ export const AiTakeoffOptionsSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
 }).optional();
 
+// Snapshot
+export const SnapshotIdSchema = z.object({ id: z.string().uuid(), sid: z.string().uuid() });
+export const SnapshotCreateSchema = z.object({
+  description: z.string().max(500).optional().default('Manual snapshot'),
+});
+
 // Helper: parse route params
 export function parseParams<T extends z.ZodTypeAny>(
   schema: T,
