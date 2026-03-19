@@ -280,11 +280,18 @@ export default function VersionHistory({ onClose }: VersionHistoryProps) {
 
       if (res.ok) {
         addToast('Version restored.', 'success');
+        // Reload history after restore
+        const refreshRes = await fetch(`/api/projects/${projectId}/history?limit=50`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          if (data?.history) setApiEntries(data.history);
+        }
       } else {
-        addToast('Restore is not yet implemented for this history entry.', 'info');
+        const body = await res.json().catch(() => null);
+        addToast(body?.error || 'Restore failed.', 'error');
       }
     } catch {
-      addToast('Restore is not yet implemented for this history entry.', 'info');
+      addToast('Restore failed — network error.', 'error');
     } finally {
       setRestoringEntryId(null);
     }
