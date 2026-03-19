@@ -19,6 +19,7 @@ export interface ProjectMeta {
   createdAt: string;
   updatedAt: string;
   totalPages?: number;
+  thumbnail?: string;
 }
 
 export interface PageInfo {
@@ -184,11 +185,32 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   return projects;
 }
 
+export async function getThumbnail(projectId: string): Promise<string | null> {
+  const thumbPath = path.join(projectDir(projectId), 'thumbnail.txt');
+  try {
+    return await fs.readFile(thumbPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+export async function saveThumbnail(projectId: string, dataUrl: string): Promise<void> {
+  const dir = projectDir(projectId);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, 'thumbnail.txt'), dataUrl, 'utf-8');
+}
+
 export async function updateProject(
   projectId: string,
-  patch: Partial<Pick<ProjectMeta, 'name' | 'totalPages'>>,
+  patch: Partial<Pick<ProjectMeta, 'name' | 'totalPages' | 'thumbnail'>>,
 ): Promise<ProjectMeta | null> {
   const now = new Date().toISOString();
+
+  // Thumbnails are always stored as local files (both modes)
+  if (patch.thumbnail !== undefined) {
+    await saveThumbnail(projectId, patch.thumbnail);
+    delete patch.thumbnail;
+  }
 
   if (isSupabaseMode()) {
     const sb = getClient();
@@ -220,7 +242,8 @@ export async function updateProject(
   const filePath = path.join(projectDir(projectId), 'project.json');
   const existing = await readJson<ProjectMeta | null>(filePath, null);
   if (!existing) return null;
-  const updated = { ...existing, ...patch, updatedAt: now };
+  const { thumbnail: _thumb, ...safePatch } = patch;
+  const updated = { ...existing, ...safePatch, updatedAt: now };
   await writeJson(filePath, updated);
   return updated;
 }

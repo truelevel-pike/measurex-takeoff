@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages } from '@/server/project-store';
+import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,11 +13,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     // Bundle full state so the client can hydrate in a single round-trip
-    const [classifications, polygons, scale, pages] = await Promise.all([
+    const [classifications, polygons, scale, pages, thumbnail] = await Promise.all([
       getClassifications(id).catch(() => [] as any[]),
       getPolygons(id).catch(() => [] as any[]),
       getScale(id).catch(() => null),
       getPages(id).catch((e) => { console.error('getPages error:', e); return [] as any[]; }),
+      getThumbnail(id).catch(() => null),
     ]);
 
     // totalPages: prefer stored value (project.totalPages), fall back to mx_pages count

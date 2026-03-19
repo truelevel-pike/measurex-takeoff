@@ -24,6 +24,16 @@ export interface Classification {
   formulaSavedToLibrary?: boolean;
 }
 
+export interface Annotation {
+  id: string;
+  page: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  fontSize: number;
+}
+
 export interface ScaleCalibration {
   pixelsPerUnit: number;
   unit: 'ft' | 'in' | 'm' | 'mm';
@@ -36,6 +46,7 @@ export interface ScaleCalibration {
 export interface ProjectState {
   classifications: Classification[];
   polygons: Polygon[];
+  annotations: Annotation[];
   scale: ScaleCalibration | null;
   scales: Record<number, ScaleCalibration>; // per-page scales
   currentPage: number;
