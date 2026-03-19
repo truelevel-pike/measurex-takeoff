@@ -539,18 +539,27 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       if (initialFitDone.current) return;
       let attempts = 0;
       let rafId: number;
+      let timeoutId: ReturnType<typeof setTimeout>;
       const tryFit = () => {
         const container = containerRef.current;
-        if (container && container.clientWidth > 0 && basePageSize.current.width > 0) {
+        if (container && container.clientWidth > 50 && basePageSize.current.width > 0) {
           initialFitDone.current = true;
           fitToPage();
-        } else if (attempts < 15) {
+        } else if (attempts < 40) {
           attempts++;
           rafId = requestAnimationFrame(tryFit);
         }
       };
+      // RAF loop for fast layout
       rafId = requestAnimationFrame(tryFit);
-      return () => cancelAnimationFrame(rafId);
+      // Fallback: force fit after 500ms regardless
+      timeoutId = setTimeout(() => {
+        if (!initialFitDone.current) {
+          initialFitDone.current = true;
+          fitToPage();
+        }
+      }, 500);
+      return () => { cancelAnimationFrame(rafId); clearTimeout(timeoutId); };
     }, [pageDimensions, fitToPage]);
 
     // Keyboard navigation
