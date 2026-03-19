@@ -101,7 +101,7 @@ export default function ManualCalibration({
 
   const isEnterNumberValid = (() => {
     const pTotal = (parseFloat(paperFt) || 0) * 12 + (parseFloat(paperIn) || 0);
-    const rTotal = (parseFloat(realFt) || 0) * 12 + (parseFloat(realIn) || 0);
+    const rTotal = (parseFloat(realFt) || 0) + (parseFloat(realIn) || 0) / 12;
     return pTotal > 0 && rTotal > 0;
   })();
 
