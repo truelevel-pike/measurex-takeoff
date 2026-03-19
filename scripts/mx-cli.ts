@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Make this file a module to avoid TS2393 duplicate declaration errors across scripts
+export {};
 /**
  * MeasureX CLI — interact with the MeasureX API from the command line.
  * Usage: npm run mx -- <command> [args]
