@@ -44,7 +44,9 @@ export function calculatePolygonArea(
   }
   const pixelArea = Math.abs(sum) / 2;
   const rawArea = pixelArea / (scale.pixelsPerFoot * scale.pixelsPerFoot);
-  return scale.unit === 'imperial' ? rawArea * 3.28084 * 3.28084 : rawArea;
+  // pixelsPerFoot is already in the correct unit (pixels per foot for imperial, pixels per meter for metric).
+  // For metric, convert m² to ft² (1 m² = 10.7639 ft²). Imperial is already in ft².
+  return scale.unit === 'metric' ? rawArea * 3.28084 * 3.28084 : rawArea;
 }
 
 /**
@@ -69,7 +71,8 @@ export function calculateLinearLength(
     total += Math.hypot(first.x - last.x, first.y - last.y);
   }
   const rawLength = total / scale.pixelsPerFoot;
-  return scale.unit === 'imperial' ? rawLength * 3.28084 : rawLength;
+  // For metric, convert meters to feet (1 m = 3.28084 ft). Imperial is already in ft.
+  return scale.unit === 'metric' ? rawLength * 3.28084 : rawLength;
 }
 
 /**
