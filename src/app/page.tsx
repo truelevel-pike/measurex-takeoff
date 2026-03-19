@@ -1741,7 +1741,7 @@ function PageInner() {
                   {isDefiningGroup && <RepeatingGroupTool />}
                 </PDFViewer>
                 </ErrorBoundary>
-                <ZoomControls />
+                <ZoomControls onFitToPage={() => pdfViewerRef.current?.fitToPage()} />
 
                 {menuState && (
                   <ContextMenu

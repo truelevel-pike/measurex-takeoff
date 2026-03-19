@@ -7,7 +7,12 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const STEP = 0.25;
 
-export default function ZoomControls() {
+interface ZoomControlsProps {
+  /** Called when the user clicks "Fit" — should invoke PDFViewer's fitToPage(). */
+  onFitToPage?: () => void;
+}
+
+export default function ZoomControls({ onFitToPage }: ZoomControlsProps) {
   const zoomLevel = useStore((s) => s.zoomLevel);
   const setZoomLevel = useStore((s) => s.setZoomLevel);
 
@@ -20,7 +25,15 @@ export default function ZoomControls() {
   };
 
   const handleFit = () => {
-    setZoomLevel(1);
+    if (onFitToPage) {
+      // Delegate to the real PDFViewer fitToPage which computes the correct zoom
+      // to fill the viewport. Without this, "Fit" just snapped to 100% regardless
+      // of the actual page/viewport ratio.
+      onFitToPage();
+    } else {
+      // Fallback: reset to 100% if no handler provided
+      setZoomLevel(1);
+    }
   };
 
   return (
