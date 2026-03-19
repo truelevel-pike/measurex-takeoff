@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
+import { AiTakeoffBodySchema } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-
-const AiTakeoffBodySchema = z.object({
-  imageBase64: z.string().min(1),
-  pageWidth: z.number().positive(),
-  pageHeight: z.number().positive(),
-});
 
 /**
  * Generate a deterministic hex color from a string.
@@ -32,14 +27,9 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const parsed = AiTakeoffBodySchema.safeParse(body);
-    if (!parsed.success) {
-      return Response.json(
-        { error: 'Validation failed', details: parsed.error.flatten() },
-        { status: 422 },
-      );
-    }
-    const { imageBase64, pageWidth, pageHeight } = parsed.data;
+    const validated = validateBody(AiTakeoffBodySchema, body);
+    if ('error' in validated) return validated.error;
+    const { imageBase64, pageWidth, pageHeight } = validated.data;
 
     const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
     if (!apiKey) {

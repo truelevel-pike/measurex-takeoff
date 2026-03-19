@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
 import type { Classification, Polygon } from '@/lib/types';
 import type { PageInfo } from '@/server/project-store';
-import { ProjectIdSchema, ProjectUpdateSchema, validationError } from '@/lib/api-schemas';
+import { ProjectIdSchema, ProjectPutSchema, validationError } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,7 +64,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
-    const body = await req.json();
+    const raw = await req.json();
+    const validated = validateBody(ProjectPutSchema, raw);
+    if ('error' in validated) return validated.error;
+    const body = validated.data;
 
     // If the body contains a `state` payload (autosave from client), persist
     // the scale from that state. Polygons/classifications are synced individually
@@ -73,9 +77,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const s = state.scale;
       await setScale(id, {
         pixelsPerUnit: s.pixelsPerUnit,
-        unit: s.unit,
+        unit: s.unit as 'm' | 'ft' | 'in' | 'mm',
         label: s.label || 'Custom',
-        source: s.source || 'manual',
+        source: (s.source || 'manual') as 'auto' | 'manual' | 'ai',
         pageNumber: s.pageNumber || 1,
         confidence: s.confidence,
       }).catch(() => null); // non-fatal
@@ -83,8 +87,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Update project metadata (name, totalPages) if provided — extract only safe fields
     const metaPatch: { name?: string; totalPages?: number } = {};
-    if (typeof body.name === 'string') metaPatch.name = body.name;
-    if (typeof state?.totalPages === 'number' && state.totalPages > 0) {
+    if (body.name) metaPatch.name = body.name;
+    if (state?.totalPages && state.totalPages > 0) {
       metaPatch.totalPages = state.totalPages;
     }
     const updated = await updateProject(id, metaPatch);

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { updateAssembly, deleteAssembly, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
-import { AssemblyIdSchema, validationError } from '@/lib/api-schemas';
+import { AssemblyIdSchema, AssemblyPutSchema, validationError } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
@@ -9,8 +10,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const paramsResult = AssemblyIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id, aid } = paramsResult.data;
-    const body = await req.json();
-    const updated = await updateAssembly(id, aid, body);
+    const raw = await req.json();
+    const validated = validateBody(AssemblyPutSchema, raw);
+    if ('error' in validated) return validated.error;
+    const updated = await updateAssembly(id, aid, validated.data);
     if (!updated) {
       return NextResponse.json({ error: 'Assembly not found' }, { status: 404 });
     }

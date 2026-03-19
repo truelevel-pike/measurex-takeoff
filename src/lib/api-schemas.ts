@@ -58,6 +58,75 @@ export const AssemblyCreateSchema = z.object({
 
 export const AssemblyUpdateSchema = AssemblyCreateSchema.partial();
 
+// Polygon update (partial)
+export const PolygonUpdateSchema = z.object({
+  points: z.array(PointSchema).min(1).optional(),
+  classificationId: z.string().uuid().optional(),
+  pageNumber: z.number().int().positive().optional(),
+  label: z.string().optional(),
+  area: z.number().optional(),
+  linearFeet: z.number().optional(),
+  isComplete: z.boolean().optional(),
+});
+
+// Project PUT body (autosave from client)
+export const ProjectPutSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  state: z.object({
+    scale: z.object({
+      pixelsPerUnit: z.number().positive(),
+      unit: z.string(),
+      label: z.string().optional(),
+      source: z.string().optional(),
+      pageNumber: z.number().int().positive().optional(),
+      confidence: z.number().optional(),
+    }).optional(),
+    totalPages: z.number().int().positive().optional(),
+  }).optional(),
+});
+
+// Assembly body for PUT updates
+export const AssemblyPutSchema = z.object({
+  classificationId: z.string().uuid().optional(),
+  name: z.string().min(1).optional(),
+  unit: z.string().optional(),
+  unitCost: z.number().optional(),
+  quantityFormula: z.string().optional(),
+});
+
+// Chat
+const ChatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1),
+});
+
+export const ChatBodySchema = z.object({
+  message: z.string().min(1).optional(),
+  messages: z.array(ChatMessageSchema).min(1).optional(),
+  context: z.object({
+    classificationCount: z.number().optional(),
+    totalArea: z.number().optional(),
+    unit: z.string().optional(),
+    classifications: z.array(z.string()).optional(),
+  }).optional(),
+}).refine(
+  (d) => d.message !== undefined || d.messages !== undefined,
+  { message: 'Either message or messages is required' },
+);
+
+// Drawings placeholder
+export const DrawingBodySchema = z.object({
+  name: z.string().min(1).optional(),
+  url: z.string().optional(),
+}).passthrough();
+
+// AI Takeoff body
+export const AiTakeoffBodySchema = z.object({
+  imageBase64: z.string().min(1),
+  pageWidth: z.number().positive(),
+  pageHeight: z.number().positive(),
+});
+
 // AI Takeoff options
 export const AiTakeoffOptionsSchema = z.object({
   pageNumber: z.number().int().positive().optional(),

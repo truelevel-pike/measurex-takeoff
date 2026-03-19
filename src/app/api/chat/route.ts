@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { ChatBodySchema } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -7,26 +9,12 @@ interface ChatApiMessage {
   content: string;
 }
 
-interface ChatContext {
-  classificationCount?: number;
-  totalArea?: number;
-  unit?: string;
-  classifications?: string[];
-}
-
-// Supports both:
-//   { message: string, context?: ChatContext }         — single message format
-//   { messages: ChatApiMessage[], context?: ChatContext } — conversation history format
-interface ChatRequest {
-  message?: string;
-  messages?: ChatApiMessage[];
-  context?: ChatContext;
-}
-
 export async function POST(req: Request) {
   try {
-    const body: ChatRequest = await req.json();
-    const { message, messages, context } = body;
+    const raw = await req.json();
+    const validated = validateBody(ChatBodySchema, raw);
+    if ('error' in validated) return validated.error;
+    const { message, messages, context } = validated.data;
 
     // Normalise to messages array
     let history: ChatApiMessage[] = [];

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { DrawingBodySchema } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 
 export async function GET() {
   // Placeholder for drawings listing if needed
@@ -7,10 +9,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    // TODO: Add Zod validation when drawing upload schema is finalized
-    // Placeholder for drawing uploads (would use storage service)
-    const body = await req.json();
-    return NextResponse.json({ ok: true, body });
+    const raw = await req.json();
+    const validated = validateBody(DrawingBodySchema, raw);
+    if ('error' in validated) return validated.error;
+    return NextResponse.json({ ok: true, body: validated.data });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : 'Upload failed') }, { status: 500 });
   }

@@ -2,6 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
+import DevPerfOverlay from "@/components/dev/DevPerfOverlay";
+import OfflineBanner from "@/components/OfflineBanner";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { PerfMonitor } from "@/components/PerfMonitor";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +21,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MeasureX Takeoff",
   description: "Internal construction takeoff platform",
+  manifest: "/manifest.json",
 };
 
 export function generateViewport(): Viewport {
@@ -41,8 +47,13 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
+        <OfflineBanner />
         {children}
         <KeyboardShortcutsPortal />
+        <DevPerfOverlay />
+        <PerfMonitor />
+        <OfflineIndicator />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
