@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface EstimatesTabProps {
   projectId: string;
@@ -40,6 +40,9 @@ export default function EstimatesTab({
 }: EstimatesTabProps) {
   const [assemblies, setAssemblies] = useState<AssemblyRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftCost, setDraftCost] = useState<string>("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -66,6 +69,61 @@ export default function EstimatesTab({
     return () => { cancelled = true; };
   }, [projectId]);
 
+  const startEdit = useCallback((assembly: AssemblyRow) => {
+    setEditingId(assembly.id);
+    setDraftCost(String(assembly.unitCost));
+  }, []);
+
+  const commitEdit = useCallback(async (assembly: AssemblyRow) => {
+    const parsed = parseFloat(draftCost);
+    const newCost = isNaN(parsed) ? assembly.unitCost : Math.max(0, parsed);
+
+    setEditingId(null);
+    setDraftCost("");
+
+    if (newCost === assembly.unitCost) return;
+
+    setSavingId(assembly.id);
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/assemblies/${assembly.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ unitCost: newCost }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setAssemblies((prev) =>
+          prev.map((a) =>
+            a.id === assembly.id
+              ? { ...a, unitCost: data.assembly?.unitCost ?? newCost }
+              : a
+          )
+        );
+      } else {
+        console.error("Failed to update unit cost:", await res.text());
+      }
+    } catch (err) {
+      console.error("Error patching unit cost:", err);
+    } finally {
+      setSavingId(null);
+    }
+  }, [draftCost, projectId]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>, assembly: AssemblyRow) => {
+      if (e.key === "Enter") {
+        e.currentTarget.blur();
+      } else if (e.key === "Escape") {
+        setEditingId(null);
+        setDraftCost("");
+      }
+    },
+    []
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
@@ -82,7 +140,6 @@ export default function EstimatesTab({
     );
   }
 
-  // Build a map: classification type → first matching assembly
   const assemblyByType: Record<string, AssemblyRow | undefined> = {};
   for (const a of assemblies) {
     if (!assemblyByType[a.quantityFormula]) {
@@ -96,7 +153,7 @@ export default function EstimatesTab({
     const matchedAssembly = assemblyByType[c.type];
     const costPerUnit = matchedAssembly?.unitCost ?? 0;
     const subtotal = qty * costPerUnit;
-    return { ...c, qty, unit, assemblyName: matchedAssembly?.name, costPerUnit, subtotal };
+    return { ...c, qty, unit, assembly: matchedAssembly, costPerUnit, subtotal };
   });
   const grandTotal = rows.reduce((sum, r) => sum + r.subtotal, 0);
 
@@ -128,10 +185,35 @@ export default function EstimatesTab({
               </td>
               <td className="py-2 px-3 text-gray-400">{row.unit}</td>
               <td className="py-2 px-3 text-gray-400 text-xs">
-                {row.assemblyName ?? "—"}
+                {row.assembly?.name ?? "—"}
               </td>
-              <td className="py-2 px-3 text-right text-gray-300 tabular-nums">
-                {currencyFmt.format(row.costPerUnit)}
+              <td className="py-2 px-3 text-right tabular-nums">
+                {row.assembly ? (
+                  editingId === row.assembly.id ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-24 text-right bg-gray-900 border border-[#00d4ff]/40 rounded px-1 py-0.5 text-gray-100 text-sm tabular-nums focus:outline-none focus:border-[#00d4ff]"
+                      value={draftCost}
+                      autoFocus
+                      onChange={(e) => setDraftCost(e.target.value)}
+                      onBlur={() => commitEdit(row.assembly!)}
+                      onKeyDown={(e) => handleKeyDown(e, row.assembly!)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      title="Click to edit unit cost"
+                      onClick={() => startEdit(row.assembly!)}
+                      className={`text-gray-300 hover:text-white hover:underline decoration-dotted cursor-pointer tabular-nums transition-opacity ${savingId === row.assembly.id ? "opacity-50" : ""}`}
+                    >
+                      {savingId === row.assembly.id ? "saving…" : currencyFmt.format(row.costPerUnit)}
+                    </button>
+                  )
+                ) : (
+                  <span className="text-gray-600">—</span>
+                )}
               </td>
               <td className="py-2 px-3 text-right text-gray-200 tabular-nums">
                 {currencyFmt.format(row.subtotal)}
