@@ -26,20 +26,9 @@ export default function OfflineBanner() {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 99998,
-        background: '#f59e0b',
-        color: '#1a1a2e',
-        textAlign: 'center',
-        fontWeight: 600,
-        fontSize: 14,
-        padding: '8px 16px',
-      }}
+      className="fixed top-0 left-0 right-0 z-[99998] bg-amber-400 text-[#1a1a2e] text-center font-semibold text-sm px-4 py-2"
       role="alert"
+      suppressHydrationWarning
     >
       ⚠️ You are offline. Changes may not be saved.
     </div>
