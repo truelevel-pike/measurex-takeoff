@@ -13,7 +13,8 @@
     "test:e2e": "node --experimental-strip-types scripts/e2e-api-test.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true next build",
+    "migrate": "node --experimental-strip-types scripts/run-migrations.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
