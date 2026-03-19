@@ -77,6 +77,60 @@ const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
 const MAX_CLASSIFICATIONS = 20;
 
+/**
+ * Merge all pairs of classifications with similar names regardless of total count.
+ * Runs after every AI takeoff to prevent the panel from filling up with near-duplicate
+ * entries like "Room", "Room/Space", "Rooms" that the AI generates for the same concept.
+ */
+function deduplicateSimilarClassifications(
+  classifications: Classification[],
+  mergeClassificationsFn: (survivorId: string, ids: string[]) => void,
+) {
+  const normalize = (name: string) =>
+    name.trim().toLowerCase().replace(/[\/\-]+/g, ' ').replace(/\s+/g, ' ');
+  const splitWords = (name: string) =>
+    normalize(name).split(' ').filter((w) => w.length > 2);
+  const isSimilar = (a: string, b: string) => {
+    const na = normalize(a), nb = normalize(b);
+    if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+    const wa = splitWords(a), wb = splitWords(b);
+    if (!wa.length || !wb.length) return false;
+    const overlap = wa.filter((w) => wb.includes(w));
+    return overlap.length >= Math.min(wa.length, wb.length);
+  };
+
+  // Group by type so we only merge within the same measurement type
+  const byType = new Map<string, Classification[]>();
+  for (const c of classifications) {
+    const t = c.type || 'area';
+    if (!byType.has(t)) byType.set(t, []);
+    byType.get(t)!.push(c);
+  }
+
+  for (const group of byType.values()) {
+    let remaining = [...group];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      outer: for (let i = 0; i < remaining.length; i++) {
+        for (let j = i + 1; j < remaining.length; j++) {
+          if (isSimilar(remaining[i].name, remaining[j].name)) {
+            const a = remaining[i];
+            const b = remaining[j];
+            // Keep the shorter (simpler) name as survivor
+            const survivor = a.name.trim().length <= b.name.trim().length ? a : b;
+            const loser = survivor === a ? b : a;
+            mergeClassificationsFn(survivor.id, [survivor.id, loser.id]);
+            remaining = remaining.filter((c) => c.id !== loser.id);
+            changed = true;
+            break outer;
+          }
+        }
+      }
+    }
+  }
+}
+
 function autoMergeToLimit(
   classifications: Classification[],
   mergeClassificationsFn: (survivorId: string, ids: string[]) => void,
@@ -730,10 +784,14 @@ function PageInner() {
       safeGoToPage(originalPage, 'ai-takeoff:return');
       await reloadProjectPolygonsAndClassifications(projectId);
 
-      // Auto-merge similar classifications if over limit
+      // Deduplicate similar classifications unconditionally (e.g. "Room" + "Room/Space" → "Room")
       const currentClassifications = useStore.getState().classifications;
-      if (currentClassifications.length > MAX_CLASSIFICATIONS) {
-        autoMergeToLimit(currentClassifications, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
+      deduplicateSimilarClassifications(currentClassifications, useStore.getState().mergeClassifications);
+
+      // Additionally enforce hard cap if still over limit after dedup
+      const afterDedup = useStore.getState().classifications;
+      if (afterDedup.length > MAX_CLASSIFICATIONS) {
+        autoMergeToLimit(afterDedup, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
       }
 
       localStorage.setItem('mx-onboarding-takeoff-run', 'true');
@@ -1373,10 +1431,14 @@ function PageInner() {
     safeGoToPage(originalPage, 'ai-takeoff-all-pages:return');
     await reloadProjectPolygonsAndClassifications(projectId);
 
-    // Auto-merge similar classifications if over limit
+    // Deduplicate similar classifications unconditionally (e.g. "Room" + "Room/Space" → "Room")
     const premergeClassifications = useStore.getState().classifications || [];
-    if (premergeClassifications.length > MAX_CLASSIFICATIONS) {
-      autoMergeToLimit(premergeClassifications, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
+    deduplicateSimilarClassifications(premergeClassifications, useStore.getState().mergeClassifications);
+
+    // Additionally enforce hard cap if still over limit after dedup
+    const afterDedupClassifications = useStore.getState().classifications || [];
+    if (afterDedupClassifications.length > MAX_CLASSIFICATIONS) {
+      autoMergeToLimit(afterDedupClassifications, useStore.getState().mergeClassifications, MAX_CLASSIFICATIONS);
     }
 
     const elapsedMs = Date.now() - startTime;

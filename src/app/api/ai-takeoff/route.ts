@@ -456,6 +456,9 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
             throw new Error(`Classification create response missing id for "${el.classification}"`);
           }
           classMap.set(clsKey, classificationId);
+          // Also register in existingClassifications so later elements in this same
+          // batch can fuzzy-match against it and avoid creating near-duplicate entries.
+          existingClassifications.push({ id: classificationId, name: el.classification, type: el.type });
         }
 
         const persistPoints = toPersistablePoints(el);
