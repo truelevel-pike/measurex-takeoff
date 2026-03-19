@@ -550,6 +550,11 @@ function PageInner() {
           if (projectId) {
             api.deletePolygon(projectId, selectedPolygon).catch((err) => console.error('API deletePolygon failed:', err));
           }
+          import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
+            if (getNotificationPrefs().polygonDeleted) {
+              addToast('Polygon deleted', 'info');
+            }
+          });
         }
       } else if (e.key === '3') {
         toggleShow3D();
@@ -911,7 +916,9 @@ function PageInner() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      addToast('Excel export downloaded', 'success');
+      import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
+        if (getNotificationPrefs().exportReady) addToast('Excel export downloaded', 'success');
+      });
     } catch (error) {
       console.error(error);
       addToast('Failed to export Excel', 'error');
@@ -930,7 +937,9 @@ function PageInner() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      addToast('JSON export downloaded', 'success');
+      import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
+        if (getNotificationPrefs().exportReady) addToast('JSON export downloaded', 'success');
+      });
       return;
     }
 
@@ -945,7 +954,9 @@ function PageInner() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      addToast('JSON export downloaded', 'success');
+      import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
+        if (getNotificationPrefs().exportReady) addToast('JSON export downloaded', 'success');
+      });
     } catch (error) {
       console.error(error);
       addToast('Failed to export JSON', 'error');
@@ -1010,10 +1021,14 @@ function PageInner() {
       // Return to the original page
       viewer.goToPage(originalPage);
 
-      setAiStatus(
-        `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`,
-      );
+      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`;
+      setAiStatus(doneMsg);
       setTimeout(() => setAiStatus(null), 5000);
+
+      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+      if (getNotificationPrefs().aiTakeoffComplete) {
+        addToast(doneMsg, 'success');
+      }
     } catch (error) {
       console.error(error);
       setAiStatus(`Error: ${error instanceof Error ? error.message : 'AI failed'}`);
@@ -1021,7 +1036,7 @@ function PageInner() {
     } finally {
       setAiLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   const handleAITakeoffAllPages = useCallback(async () => {
     const total = useStore.getState().totalPages;
@@ -1467,7 +1482,11 @@ function PageInner() {
                 label: uploadDetectedScale.description,
                 source: 'auto',
               });
-              addToast('Scale applied: ' + uploadDetectedScale.description, 'success');
+              import('@/components/NotificationSettings').then(({ getNotificationPrefs }) => {
+                if (getNotificationPrefs().scaleChanged) {
+                  addToast('Scale applied: ' + uploadDetectedScale.description, 'success');
+                }
+              });
               setUploadDetectedScale(null);
             }}
             className="rounded px-3 py-1 text-xs font-semibold"

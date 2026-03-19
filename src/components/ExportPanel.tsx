@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
+import { getNotificationPrefs } from '@/components/NotificationSettings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -372,7 +373,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     }
-    showToast('Screen view exported!');
+    if (getNotificationPrefs().exportReady) showToast('Screen view exported!');
   }, [previewRows, columns, showToast]);
 
   // ── Export: Full Export (flat dump, all columns, no grouping) ──
@@ -421,7 +422,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     }
-    showToast('Full export completed!');
+    if (getNotificationPrefs().exportReady) showToast('Full export completed!');
   }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
 
   // ── Export: Print / PDF ──
@@ -431,7 +432,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
     const name = derivedName && derivedName.trim().length > 0 ? derivedName : 'Untitled Project';
     const printUrl = `/print?projectId=${projectId}&name=${encodeURIComponent(name)}&page=${currentPage}`;
     window.open(printUrl, '_blank');
-    showToast('Print view opened in new tab');
+    if (getNotificationPrefs().exportReady) showToast('Print view opened in new tab');
   }, [projectId, currentPage, showToast]);
 
   // ── Export: Contractor Report ──
@@ -515,7 +516,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       w.document.write(htmlString);
       w.document.close();
     }
-    showToast('Contractor report opened!');
+    if (getNotificationPrefs().exportReady) showToast('Contractor report opened!');
   }, [filteredPolygons, previewRows, showToast]);
 
   // ── Export: JSON ──
@@ -553,8 +554,132 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
     a.click();
     URL.revokeObjectURL(url);
 
-    showToast('JSON export completed!');
+    if (getNotificationPrefs().exportReady) showToast('JSON export completed!');
   }, [projectId, scale, classifications, polygons, showToast]);
+
+  // ── Export: IFC Stub (JSON) ──
+  const handleIfcStubExport = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const projectName = params.get('name')?.trim() || 'Untitled Project';
+
+    const ifcSpaces = filteredPolygons.map((poly) => {
+      const cls = classifications.find((c) => c.id === poly.classificationId);
+      const pageScale = pickScaleForPage(poly.pageNumber, scales, scale);
+      const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
+      const area = cls?.type === 'area' ? round2(poly.area / (ppu * ppu)) : 0;
+      return {
+        GlobalId: crypto.randomUUID(),
+        Name: poly.label || cls?.name || `Polygon ${poly.id.slice(0, 6)}`,
+        area,
+        classification: cls?.name || 'Unclassified',
+      };
+    });
+
+    const data = {
+      IFCPROJECT: { GlobalId: crypto.randomUUID(), Name: projectName },
+      IFCSITE: { GlobalId: crypto.randomUUID(), Name: 'Site' },
+      IFCBUILDING: { GlobalId: crypto.randomUUID(), Name: 'Building' },
+      IFCBUILDINGSTOREY: { GlobalId: crypto.randomUUID(), Name: 'Level 1' },
+      IFCSPACE: ifcSpaces,
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'export-ifc-stub.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (getNotificationPrefs().exportReady) showToast('IFC stub exported!');
+  }, [filteredPolygons, classifications, scale, scales, showToast]);
+
+  // ── Export: CSV (coordinates) ──
+  const handleCsvCoordinatesExport = useCallback(() => {
+    const lines = ['polygon_id,polygon_name,classification,point_index,x,y'];
+
+    for (const poly of filteredPolygons) {
+      const cls = classifications.find((c) => c.id === poly.classificationId);
+      const name = (poly.label || cls?.name || '').replace(/,/g, ' ');
+      const classification = (cls?.name || 'Unclassified').replace(/,/g, ' ');
+      for (let i = 0; i < poly.points.length; i++) {
+        const pt = poly.points[i];
+        lines.push(`${poly.id},${name},${classification},${i},${pt.x},${pt.y}`);
+      }
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'export-coordinates.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (getNotificationPrefs().exportReady) showToast('CSV coordinates exported!');
+  }, [filteredPolygons, classifications, showToast]);
+
+  // ── Export: Markdown Report ──
+  const handleMarkdownExport = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const projectName = params.get('name')?.trim() || 'Untitled Project';
+    const date = new Date().toLocaleDateString();
+
+    const summaryRows = previewRows.filter((r) => !r.isGroupHeader);
+    const totalPolygons = filteredPolygons.length;
+    const totalArea = summaryRows.reduce((sum, r) => sum + r.area, 0);
+
+    // Classification table
+    const classTable = summaryRows.map(
+      (r) => `| ${r.name} | ${r.count || summaryRows.filter((s) => s.name === r.name).length} | ${r.total} ${r.unit} |`,
+    );
+
+    // Polygon list
+    const polyList = filteredPolygons.map((poly) => {
+      const cls = classifications.find((c) => c.id === poly.classificationId);
+      const pageScale = pickScaleForPage(poly.pageNumber, scales, scale);
+      const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
+      const area = cls?.type === 'area' ? round2(poly.area / (ppu * ppu)) : 0;
+      const name = poly.label || cls?.name || `Polygon ${poly.id.slice(0, 6)}`;
+      return `- **${name}** — Classification: ${cls?.name || 'Unclassified'}, Area: ${area}`;
+    });
+
+    const md = [
+      `# MeasureX Takeoff Report`,
+      ``,
+      `**Project:** ${projectName}`,
+      `**Date Generated:** ${date}`,
+      ``,
+      `## Project Summary`,
+      ``,
+      `- Total Polygons: ${totalPolygons}`,
+      `- Total Area: ${round2(totalArea)}`,
+      ``,
+      `## Classification Breakdown`,
+      ``,
+      `| Classification | Count | Total Area |`,
+      `| --- | --- | --- |`,
+      ...classTable,
+      ``,
+      `## All Polygons`,
+      ``,
+      ...polyList,
+      ``,
+    ].join('\n');
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'export-report.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (getNotificationPrefs().exportReady) showToast('Markdown report exported!');
+  }, [filteredPolygons, classifications, previewRows, scale, scales, showToast]);
 
   // ── Visible columns for preview ──
   const visibleColumns = useMemo(() => {
@@ -896,6 +1021,30 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Export JSON
+          </button>
+          <button
+            onClick={handleIfcStubExport}
+            aria-label="Export IFC stub JSON"
+            className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            IFC Stub (JSON)
+          </button>
+          <button
+            onClick={handleCsvCoordinatesExport}
+            aria-label="Export CSV with coordinates"
+            className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            CSV (coordinates)
+          </button>
+          <button
+            onClick={handleMarkdownExport}
+            aria-label="Export Markdown report"
+            className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500"
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            Markdown Report
           </button>
         </div>
 
