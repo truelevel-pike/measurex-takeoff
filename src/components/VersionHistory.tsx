@@ -19,6 +19,7 @@ export interface TakeoffRun {
 interface VersionHistoryProps {
   onClose: () => void;
   onRestoreRun?: (run: TakeoffRun) => void;
+  onRerunWithModel?: (run: TakeoffRun, model: string) => void;
 }
 
 interface ApiHistoryEntry {
@@ -240,12 +241,24 @@ function getModelBadgeColor(model: string): string {
 function getModelLabel(model: string): string {
   const map: Record<string, string> = {
     'claude-sonnet-4-6': 'Sonnet 4.6',
+    'anthropic/claude-sonnet-4-6': 'Sonnet 4.6',
     'claude-opus-4-6': 'Opus 4.6',
+    'anthropic/claude-opus-4-6': 'Opus 4.6',
     'gpt-5.4': 'GPT-5.4',
+    'gpt-5.2-codex': 'GPT-5.2 Codex',
     'gemini-3.1': 'Gemini 3.1',
+    'google/gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
+    'google/gemini-3.1-flash-lite-preview': 'Gemini Flash',
   };
   return map[model] || model;
 }
+
+const AVAILABLE_MODELS = [
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { id: 'gpt-5.4', label: 'GPT-5.4' },
+  { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
+  { id: 'google/gemini-3.1-flash-lite-preview', label: 'Gemini Flash' },
+];
 
 function loadTakeoffRuns(): TakeoffRun[] {
   if (typeof window === 'undefined') return [];
@@ -290,7 +303,7 @@ function loadTakeoffRuns(): TakeoffRun[] {
   return mocks;
 }
 
-export default function VersionHistory({ onClose, onRestoreRun }: VersionHistoryProps) {
+export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel }: VersionHistoryProps) {
   const undoStack = useStore((s) => s.undoStack);
   const undo = useStore((s) => s.undo);
   const { addToast } = useToast();
@@ -301,6 +314,7 @@ export default function VersionHistory({ onClose, onRestoreRun }: VersionHistory
   const [apiEntries, setApiEntries] = useState<ApiHistoryEntry[] | null>(null);
   const [restoringEntryId, setRestoringEntryId] = useState<string | null>(null);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [rerunPickerRunId, setRerunPickerRunId] = useState<string | null>(null);
 
   // Get projectId from localStorage (same pattern as page.tsx)
   const [projectId, setProjectId] = useState<string | null>(null);

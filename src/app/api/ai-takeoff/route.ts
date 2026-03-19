@@ -208,6 +208,16 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
         ? el.color
         : nameToColor(name);
       const confidence = typeof el.confidence === 'number' ? el.confidence : 0.85;
+      if (type === 'area' && points.length >= 2) {
+        const xs = points.map((p) => p.x / pageWidth);
+        const ys = points.map((p) => p.y / pageHeight);
+        const bboxW = Math.max(...xs) - Math.min(...xs);
+        const bboxH = Math.max(...ys) - Math.min(...ys);
+        if (bboxW < 0.05 && bboxH < 0.05) {
+          console.warn(`[AI Takeoff] TINY polygon for "${name}" (area): bounding box may be too small. Points:`, points);
+        }
+      }
+
       return {
         name,
         type,
@@ -337,7 +347,9 @@ Please include a confidence field (0.0-1.0) for each element you detect. This re
 
 Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex), confidence: number (0.0-1.0) }. No prose, no markdown fences.
 
-AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.`;
+AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.
+
+FINAL CHECK before returning JSON: For each area element, verify that max(x) - min(x) > 0.05 AND max(y) - min(y) > 0.05. If not, you have returned a marker dot instead of a real polygon — go back and trace the actual room boundary.`;
 
     const content = [
       { type: 'text', text: 'Analyze this blueprint and return JSON array only. No prose.' },
@@ -370,6 +382,7 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
 
     const data = await resp.json();
     const raw = extractOpenAIText(data?.choices?.[0]?.message?.content);
+    console.log("[AI Takeoff] Raw AI response (first 2000 chars):", raw.slice(0, 2000));
     if (!raw) throw new Error('No content in OpenAI response');
 
     // Filter out any elements with empty points arrays before returning; the client schema

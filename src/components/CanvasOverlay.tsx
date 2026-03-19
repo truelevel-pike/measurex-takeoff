@@ -19,6 +19,23 @@ interface CanvasOverlayProps {
   highlightedPolygonId?: string | null;
 }
 
+function getModelDisplayName(model: string): string {
+  const map: Record<string, string> = {
+    "gpt-5.4": "GPT-5.4",
+    "gpt-5.2-codex": "GPT-5.2 Codex",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "anthropic/claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-opus-4-6": "Claude Opus 4.6",
+    "anthropic/claude-opus-4-6": "Claude Opus 4.6",
+    "gemini-3.1": "Gemini 3.1",
+    "google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+    "google/gemini-3.1-flash-lite-preview": "Gemini Flash",
+  };
+  if (map[model]) return map[model];
+  const parts = model.split("/");
+  return parts[parts.length - 1] || model;
+}
+
 /** Convert hex color to rgba string */
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
@@ -794,8 +811,11 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           lines.push(`${cls?.name ?? 'Item'} ${idx} of ${countPolys.length}`);
         }
         lines.push(`Page ${poly.pageNumber}`);
-        if (poly.confidence !== undefined) {
-          lines.push(`${Math.round(poly.confidence * 100)}% confidence`);
+        if (poly.detectedByModel || poly.confidence !== undefined) {
+          const parts: string[] = [];
+          if (poly.detectedByModel) parts.push(`Detected by: ${getModelDisplayName(poly.detectedByModel)}`);
+          if (poly.confidence !== undefined) parts.push(`Confidence: ${Math.round(poly.confidence * 100)}%`);
+          lines.push(parts.join(" | "));
         }
 
         return (
