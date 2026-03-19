@@ -1080,9 +1080,9 @@ export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {
       projectId: row.project_id as string,
       classificationId: (row.classification_id as string | null) ?? undefined,
       name: row.name as string,
-      unit: row.unit as 'ft' | 'in' | 'm' | 'mm',
-      unitCost: parseFloat(String(row.unit_cost)),
-      quantityFormula: row.quantity_formula as string,
+      unit: (row.unit as string | null) ?? 'SF',
+      unitCost: parseFloat(String(row.unit_cost ?? 0)),
+      quantityFormula: (row.quantity_formula as string | null) ?? 'area',
       createdAt: row.created_at as string,
     }));
   }
@@ -1099,22 +1099,46 @@ export async function createAssembly(
 
   if (isSupabaseMode()) {
     const sb = getClient();
-    const row: Record<string, unknown> = {
+    // Build payload incrementally — start with the absolute minimum and add
+    // optional columns one group at a time, falling back on schema-cache errors.
+    // This handles production DBs where not all migrations have been applied.
+    const baseRow: Record<string, unknown> = {
       id,
       project_id: projectId,
       name: data.name,
+    };
+
+    // Full payload with all known columns
+    const fullRow: Record<string, unknown> = {
+      ...baseRow,
       unit: data.unit,
       unit_cost: data.unitCost,
       quantity_formula: data.quantityFormula,
       created_at: now,
       updated_at: now,
     };
-    // Only include classification_id if provided — the column may not exist in DB
-    // or may be optional (no FK required).
+    // Only include classification_id when a valid value is provided
     if (data.classificationId != null && data.classificationId !== '') {
-      row.classification_id = data.classificationId;
+      fullRow.classification_id = data.classificationId;
     }
-    const { error } = await sb.from('mx_assemblies').insert(row);
+
+    let { error } = await sb.from('mx_assemblies').insert(fullRow);
+
+    // If schema cache error, progressively strip columns until the insert succeeds
+    if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+      // Try without classification_id + timestamps
+      const midRow: Record<string, unknown> = {
+        ...baseRow,
+        unit: data.unit,
+        unit_cost: data.unitCost,
+        quantity_formula: data.quantityFormula,
+      };
+      ({ error } = await sb.from('mx_assemblies').insert(midRow));
+    }
+    if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+      // Last resort: only mandatory columns
+      ({ error } = await sb.from('mx_assemblies').insert(baseRow));
+    }
     if (error) throw new Error(`createAssembly: ${error.message}`);
   } else {
     const filePath = path.join(projectDir(projectId), 'assemblies.json');
