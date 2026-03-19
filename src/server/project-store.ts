@@ -527,18 +527,24 @@ export async function createClassification(
 
   if (isSupabaseMode()) {
     const sb = getClient();
-    const row = {
+    const baseRow = {
       id,
       project_id: projectId,
       name: data.name,
       color: data.color,
       type: data.type,
       visible: data.visible ?? true,
+    };
+    const formulaFields = {
       formula: data.formula ?? null,
       formula_unit: data.formulaUnit ?? null,
       formula_saved_to_library: data.formulaSavedToLibrary ?? false,
     };
-    const { error } = await sb.from('mx_classifications').insert(row);
+    // Try full insert first; if formula columns don't exist in DB, retry without them
+    let { error } = await sb.from('mx_classifications').insert({ ...baseRow, ...formulaFields });
+    if (error && /formula/.test(error.message)) {
+      ({ error } = await sb.from('mx_classifications').insert(baseRow));
+    }
     if (error) throw new Error(`createClassification: ${error.message}`);
     // Build return object explicitly — spreading `data` (which may have id?: undefined)
     // over { id } would overwrite id with undefined.
@@ -597,17 +603,29 @@ export async function updateClassification(
     if (patch.color !== undefined) updateData.color = patch.color;
     if (patch.type !== undefined) updateData.type = patch.type;
     if (patch.visible !== undefined) updateData.visible = patch.visible;
-    if (patch.formula !== undefined) updateData.formula = patch.formula;
-    if (patch.formulaUnit !== undefined) updateData.formula_unit = patch.formulaUnit;
-    if (patch.formulaSavedToLibrary !== undefined) updateData.formula_saved_to_library = patch.formulaSavedToLibrary;
+    const formulaKeys: (keyof typeof updateData)[] = [];
+    if (patch.formula !== undefined) { updateData.formula = patch.formula; formulaKeys.push('formula'); }
+    if (patch.formulaUnit !== undefined) { updateData.formula_unit = patch.formulaUnit; formulaKeys.push('formula_unit'); }
+    if (patch.formulaSavedToLibrary !== undefined) { updateData.formula_saved_to_library = patch.formulaSavedToLibrary; formulaKeys.push('formula_saved_to_library'); }
 
-    const { data: row, error } = await sb
+    let { data: row, error } = await sb
       .from('mx_classifications')
       .update(updateData)
       .eq('id', classificationId)
       .eq('project_id', projectId)
       .select('*')
       .maybeSingle();
+    // If formula columns don't exist in DB, retry without them
+    if (error && /formula/.test(error.message) && formulaKeys.length > 0) {
+      for (const k of formulaKeys) delete updateData[k];
+      ({ data: row, error } = await sb
+        .from('mx_classifications')
+        .update(updateData)
+        .eq('id', classificationId)
+        .eq('project_id', projectId)
+        .select('*')
+        .maybeSingle());
+    }
     if (error) throw new Error(`updateClassification: ${error.message}`);
     if (!row) return null;
     return {
