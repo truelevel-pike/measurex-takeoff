@@ -1,0 +1,31 @@
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key"
+  },
+  "functions": {
+    "src/app/api/ws/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/projects/[id]/upload/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/ai-takeoff/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/projects/[id]/ai-takeoff/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/chat/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/vision-search/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
