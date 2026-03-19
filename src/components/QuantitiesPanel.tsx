@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { useIsMobile, useIsTablet } from '@/lib/utils';

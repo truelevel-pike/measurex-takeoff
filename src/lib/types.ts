@@ -25,6 +25,8 @@ export interface Classification {
   formula?: string;
   formulaUnit?: string;
   formulaSavedToLibrary?: boolean;
+  /** Trade group assignment used for smart grouping in the quantities panel. */
+  tradeGroup?: 'STRUCTURAL' | 'MECHANICAL' | 'ARCHITECTURAL' | 'SITEWORK' | 'OTHER';
 }
 
 export interface Annotation {

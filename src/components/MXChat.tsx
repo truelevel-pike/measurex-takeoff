@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageSquare, Send, X } from 'lucide-react';
+import { Check, Copy, MessageSquare, Send, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 interface Message {
@@ -30,6 +30,112 @@ const SUGGESTED_QUESTIONS = [
   'Summarize my takeoff',
 ];
 
+const QUICK_REPLY_CHIPS = [
+  'What pages have the most elements?',
+  'Show me the cost estimate',
+  'Which pages still need takeoff?',
+  'How does this compare to industry averages?',
+];
+
+/** Parse markdown table lines into structured rows */
+function parseMarkdownTable(text: string): { headers: string[]; rows: string[][] } | null {
+  const lines = text.split('\n');
+  const tableLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      tableLines.push(trimmed);
+    }
+  }
+  if (tableLines.length < 2) return null;
+
+  const parseLine = (line: string) =>
+    line.split('|').slice(1, -1).map((cell) => cell.trim());
+
+  const headers = parseLine(tableLines[0]);
+  // Skip separator row (row with dashes)
+  const startIdx = tableLines[1].replace(/[|\s-:]/g, '') === '' ? 2 : 1;
+  const rows = tableLines.slice(startIdx).map(parseLine);
+
+  if (rows.length === 0) return null;
+  return { headers, rows };
+}
+
+/** Render message text, converting markdown tables to React tables */
+function renderMessageContent(text: string): React.ReactNode {
+  const table = parseMarkdownTable(text);
+  if (!table) return text;
+
+  // Split into parts before/after the table
+  const lines = text.split('\n');
+  const beforeLines: string[] = [];
+  const afterLines: string[] = [];
+  let inTable = false;
+  let pastTable = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isTableLine = trimmed.startsWith('|') && trimmed.endsWith('|');
+    if (isTableLine && !pastTable) {
+      inTable = true;
+    } else if (inTable && !isTableLine) {
+      inTable = false;
+      pastTable = true;
+      afterLines.push(line);
+    } else if (!inTable && !pastTable) {
+      beforeLines.push(line);
+    } else {
+      afterLines.push(line);
+    }
+  }
+
+  const tableStyle: React.CSSProperties = {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: 12,
+    margin: '8px 0',
+  };
+  const thStyle: React.CSSProperties = {
+    padding: '6px 8px',
+    borderBottom: '1px solid rgba(0,212,255,0.3)',
+    textAlign: 'left',
+    color: '#00d4ff',
+    fontWeight: 600,
+    fontSize: 11,
+    whiteSpace: 'nowrap',
+  };
+  const tdStyle: React.CSSProperties = {
+    padding: '5px 8px',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    color: '#d0d8e4',
+  };
+
+  return (
+    <>
+      {beforeLines.join('\n').trim() && <>{beforeLines.join('\n').trim()}{'\n'}</>}
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            {table.headers.map((h, i) => (
+              <th key={i} style={thStyle}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={tdStyle}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {afterLines.join('\n').trim() && <>{afterLines.join('\n').trim()}</>}
+    </>
+  );
+}
+
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -52,6 +158,8 @@ export default function MXChat({ onClose }: MXChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showChips, setShowChips] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -118,6 +226,7 @@ export default function MXChat({ onClose }: MXChatProps) {
     setError(null);
     setIsLoading(true);
     setShowSuggestions(false);
+    setShowChips(false);
 
     // Create a placeholder for the assistant response
     const assistantId = generateId();
@@ -359,6 +468,7 @@ export default function MXChat({ onClose }: MXChatProps) {
             <div
               style={{
                 maxWidth: '85%',
+                position: 'relative',
                 padding: '10px 14px',
                 borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 fontSize: 13,
@@ -379,9 +489,49 @@ export default function MXChat({ onClose }: MXChatProps) {
                     }),
               }}
             >
-              {msg.text}
+              {msg.role === 'assistant' && msg.text ? renderMessageContent(msg.text) : msg.text}
               {msg.role === 'assistant' && isLoading && msg.text && msg.id !== 'welcome' && (
                 <span style={{ color: '#00d4ff', opacity: 0.7, marginLeft: 2 }}>&#x258C;</span>
+              )}
+              {/* Copy button for assistant messages */}
+              {msg.role === 'assistant' && msg.text && !isLoading && (
+                <button
+                  aria-label="Copy message"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(msg.text);
+                    setCopiedId(msg.id);
+                    setTimeout(() => setCopiedId((prev) => (prev === msg.id ? null : prev)), 2000);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
+                    background: copiedId === msg.id ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6,
+                    padding: 4,
+                    cursor: 'pointer',
+                    color: copiedId === msg.id ? '#00d4ff' : '#6b7280',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (copiedId !== msg.id) {
+                      e.currentTarget.style.color = '#e0faff';
+                      e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (copiedId !== msg.id) {
+                      e.currentTarget.style.color = '#6b7280';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                  }}
+                >
+                  {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
+                </button>
               )}
             </div>
             <span style={{ fontSize: 10, color: '#4a5568', marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
@@ -452,6 +602,49 @@ export default function MXChat({ onClose }: MXChatProps) {
           }}
         >
           {SUGGESTED_QUESTIONS.map((q) => (
+            <button
+              key={q}
+              onClick={() => void sendMessage(q)}
+              style={{
+                background: 'rgba(0,212,255,0.08)',
+                border: '1px solid rgba(0,212,255,0.25)',
+                borderRadius: 20,
+                padding: '5px 12px',
+                fontSize: 11,
+                color: '#a0d8e8',
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
+                e.currentTarget.style.color = '#e0faff';
+                e.currentTarget.style.background = 'rgba(0,212,255,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(0,212,255,0.25)';
+                e.currentTarget.style.color = '#a0d8e8';
+                e.currentTarget.style.background = 'rgba(0,212,255,0.08)';
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Quick-reply chips */}
+      {showChips && messages.length > 0 && (
+        <div
+          style={{
+            padding: '0 12px 6px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            flexShrink: 0,
+          }}
+        >
+          {QUICK_REPLY_CHIPS.map((q) => (
             <button
               key={q}
               onClick={() => void sendMessage(q)}

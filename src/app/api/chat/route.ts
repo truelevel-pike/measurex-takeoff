@@ -65,13 +65,40 @@ export async function POST(req: Request) {
       contextBlock = `\n\nCurrent project takeoff data:\n${parts.join('\n')}`;
     }
 
+    // Detect cost-at-rate queries (e.g. "cost at $12/SF") and compute breakdown
+    const lastUserMsg = history.filter((m) => m.role === 'user').pop()?.content ?? '';
+    const costMatch = lastUserMsg.match(/\$\s*([\d,.]+)\s*\/\s*(?:SF|sq\s*ft|sqft)/i);
+    let costBreakdown = '';
+    if (costMatch && context?.quantities) {
+      const rate = parseFloat(costMatch[1].replace(/,/g, ''));
+      if (!isNaN(rate) && rate > 0) {
+        const areaQuantities = (context.quantities as Array<{ name: string; type: string; value: number; unit: string }>)
+          .filter((q) => q.type === 'area');
+        if (areaQuantities.length > 0) {
+          const tableRows = areaQuantities.map((q) => {
+            const total = q.value * rate;
+            return `| ${q.name} | ${q.value.toFixed(1)} | $${rate.toFixed(2)} | $${total.toFixed(2)} |`;
+          });
+          const grandTotal = areaQuantities.reduce((sum, q) => sum + q.value * rate, 0);
+          costBreakdown =
+            '\n\nThe user asked about cost at a $/SF rate. Here is the pre-computed breakdown — return it as a markdown table:\n' +
+            '| Classification | Area (SF) | Rate ($/SF) | Total Cost |\n' +
+            '| --- | --- | --- | --- |\n' +
+            tableRows.join('\n') +
+            `\n| **Total** | **${areaQuantities.reduce((s, q) => s + q.value, 0).toFixed(1)}** | **$${rate.toFixed(2)}** | **$${grandTotal.toFixed(2)}** |` +
+            '\n\nReturn this table verbatim in your response, with a brief intro line.';
+        }
+      }
+    }
+
     const systemPrompt =
       'You are MeasureX AI, an expert construction takeoff assistant embedded in a professional estimating tool. ' +
       'You help users understand their takeoff data — areas, counts, classifications, and quantities. ' +
       'Be concise, practical, and speak like a seasoned estimator. ' +
       'When the user asks about their project, refer to the provided context. ' +
       'Format numbers cleanly. Use bullet points for lists. Keep answers under 200 words unless detail is needed.' +
-      contextBlock;
+      contextBlock +
+      costBreakdown;
 
     const openaiMessages = [
       { role: 'system' as const, content: systemPrompt },

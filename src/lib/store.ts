@@ -12,6 +12,7 @@ import type {
   Annotation,
 } from './types';
 import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea } from './polygon-utils';
+import { assignTradeGroup } from './trade-groups';
 
 // Helpers
 const isHex = (c: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.trim());
@@ -235,7 +236,8 @@ export const useStore = create<Store>()(
       return existing.id;
     }
     const id = crypto.randomUUID();
-    const next: Classification = { id, name: name.trim(), color: color.trim(), type, visible };
+    const tradeGroup = assignTradeGroup(name.trim());
+    const next: Classification = { id, name: name.trim(), color: color.trim(), type, visible, tradeGroup };
     const before = snapshot(s);
     set({ classifications: [...s.classifications, next], undoStack: [...s.undoStack, before], redoStack: [] });
     return id;
