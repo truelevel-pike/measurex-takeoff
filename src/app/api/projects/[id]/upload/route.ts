@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF } from '@/server/pdf-processor';
 import { extractSheetName } from '@/lib/sheet-namer';
+import { detectScaleFromText } from '@/lib/auto-scale';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,19 +25,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // GAP-001: Extract sheet names and store pages
     for (const page of result.pages) {
       const sheetName = extractSheetName(page.text ?? '');
-      if (sheetName) {
-        page.name = sheetName;
-      }
-      await createPage(id, page);
+      await createPage(id, { ...page, name: sheetName ?? undefined });
     }
 
     // Persist totalPages on the project so GET /api/projects/:id returns it correctly
     await updateProject(id, { totalPages: result.pages.length }).catch(() => null);
 
-    return NextResponse.json({
+    // GAP-006: Auto-scale detection on page 1 text
+    const page1 = result.pages.find((p) => p.pageNum === 1);
+    const scaleResult = page1?.text ? detectScaleFromText(page1.text) : null;
+
+    const response: Record<string, unknown> = {
       pages: result.pages.length,
       dimensions: result.pages.map((p) => ({ page: p.pageNum, width: p.width, height: p.height })),
-    });
+    };
+
+    if (scaleResult) {
+      response.detectedScale = {
+        pixelsPerUnit: scaleResult.scale.pixelsPerUnit,
+        unit: scaleResult.scale.unit,
+        description: scaleResult.scale.label,
+      };
+    }
+
+    return NextResponse.json(response);
   } catch (err: any) {
     console.error("[upload route]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
