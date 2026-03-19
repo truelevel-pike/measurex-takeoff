@@ -124,6 +124,9 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     (e: React.MouseEvent<SVGSVGElement>) => {
       onCanvasPointerDown?.();
 
+      // Draw mode: let DrawingTool (z-20) handle clicks, don't intercept here
+      if (currentTool === 'draw') return;
+
       // Calibration mode: capture left clicks as calibration points (in base coordinate space)
       if (calibrationMode && calibrationPoints.length < 2) {
         const rect = wrapperRef.current?.getBoundingClientRect();
@@ -171,10 +174,11 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     [currentTool, setSelectedPolygon]
   );
 
-  // Disable pointer events when draw/measure/cut/merge/split tools are active
+  // Disable pointer events when measure/cut/merge/split tools are active.
+  // Draw mode keeps pointer events enabled so the DrawingTool overlay (z-20)
+  // can reliably receive clicks through the stacking context.
   const disablePointerEvents =
     currentTool === 'pan' ||
-    currentTool === 'draw' ||
     currentTool === 'measure' ||
     currentTool === 'cut' ||
     currentTool === 'merge' ||
