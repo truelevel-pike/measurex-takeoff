@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import ScalePanel from '@/components/ScalePanel';
 import ManualCalibration from '@/components/ManualCalibration';
@@ -19,9 +19,6 @@ function labelToPixelsPerUnit(label: string): number {
   const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
   if (ratioMatch) {
     const ratio = parseInt(ratioMatch[1], 10);
-    // 1:ratio means 1 unit on paper = ratio units real. At 72 DPI, 1 inch = 72 px.
-    // pixelsPerUnit (inches): 72 / ratio  → but we store per-foot so multiply by 12?
-    // Actually for ratio scales we treat "unit" as dimensionless; store as px per real-inch.
     return DPI / ratio;
   }
 
@@ -29,7 +26,6 @@ function labelToPixelsPerUnit(label: string): number {
   const civilMatch = label.match(/^1"\s*=\s*(\d+)'\s*0?"?$/);
   if (civilMatch) {
     const feet = parseInt(civilMatch[1], 10);
-    // 1 inch on paper = feet real feet → pixelsPerUnit (per foot) = DPI / feet
     return DPI / feet;
   }
 
@@ -37,7 +33,6 @@ function labelToPixelsPerUnit(label: string): number {
   const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
   if (archMatch) {
     const frac = parseFraction(archMatch[1].trim());
-    // frac inches on paper = 1 foot real → pixelsPerUnit = frac * DPI per foot
     return frac * DPI;
   }
 
@@ -46,18 +41,51 @@ function labelToPixelsPerUnit(label: string): number {
 
 /** Parse fraction strings like "3/64", "1 1/2", "1", "3" */
 function parseFraction(s: string): number {
-  // "1 1/2" → mixed number
   const mixedMatch = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixedMatch) {
     return parseInt(mixedMatch[1], 10) + parseInt(mixedMatch[2], 10) / parseInt(mixedMatch[3], 10);
   }
-  // "3/64"
   const fracMatch = s.match(/^(\d+)\/(\d+)$/);
   if (fracMatch) {
     return parseInt(fracMatch[1], 10) / parseInt(fracMatch[2], 10);
   }
-  // whole number "1", "3"
   return parseFloat(s) || 0;
+}
+
+/**
+ * Build a human-readable preview string for a given scale.
+ * E.g. "1 inch = 8 feet" or "1 ft = 57.6 px"
+ */
+function buildScalePreview(label: string, ppu: number, unit: string): string {
+  // Architectural: "1/8" = 1' 0"" → "1 inch on paper = 8 feet"
+  const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
+  if (archMatch) {
+    const frac = parseFraction(archMatch[1].trim());
+    if (frac > 0) {
+      const feetPerInch = 1 / frac;
+      return `1 inch on paper = ${feetPerInch % 1 === 0 ? feetPerInch.toFixed(0) : feetPerInch.toFixed(1)} feet`;
+    }
+  }
+
+  // Civil: "1" = X' 0"" → already readable
+  const civilMatch = label.match(/^1"\s*=\s*(\d+)'\s*0?"?$/);
+  if (civilMatch) {
+    return `1 inch on paper = ${civilMatch[1]} feet`;
+  }
+
+  // Ratio: "1 : 500"
+  const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
+  if (ratioMatch) {
+    return `1 unit on paper = ${ratioMatch[1]} units real`;
+  }
+
+  // Manual / fallback
+  if (ppu > 0 && unit) {
+    const unitsPerInch = DPI / ppu;
+    return `1 inch on paper = ${unitsPerInch.toFixed(1)} ${unit}`;
+  }
+
+  return label;
 }
 
 type View = 'presets' | 'manual';
@@ -79,6 +107,12 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   const selectedLabel = scale?.label ?? null;
   const isAutoDetected = scale?.source === 'auto' || scale?.source === 'ai';
 
+  // Compute scale preview string
+  const scalePreview = useMemo(() => {
+    if (!scale) return null;
+    return buildScalePreview(scale.label, scale.pixelsPerUnit, scale.unit);
+  }, [scale]);
+
   const handleClose = useCallback(() => {
     setTool('select');
     onClose?.();
@@ -87,7 +121,6 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   const handleSelectScale = useCallback(
     (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
-      // Determine unit type based on label pattern
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
       let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
       if (ratioMatch) {
@@ -116,9 +149,13 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     setView('manual');
   }, []);
 
+  const handleStartCalibrate = useCallback(() => {
+    // Jump directly to manual mode with draw-line active
+    setView('manual');
+  }, []);
+
   const handleManualSave = useCallback(
     (label: string) => {
-      // Parse the label to compute pixelsPerUnit
       const ppu = labelToPixelsPerUnit(label);
       const cal = {
         pixelsPerUnit: ppu,
@@ -150,8 +187,10 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
             currentPage={currentPage}
             selectedScale={selectedLabel}
             autoDetected={isAutoDetected}
+            scalePreview={scalePreview}
             onSelectScale={handleSelectScale}
             onOpenManual={handleOpenManual}
+            onStartCalibrate={handleStartCalibrate}
             onClose={handleClose}
           />
         ) : (

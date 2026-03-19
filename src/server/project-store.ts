@@ -27,6 +27,7 @@ export interface PageInfo {
   height: number;
   text: string;
   name?: string;
+  drawingSet?: string;
 }
 
 // ── Mode detection ────────────────────────────────────────────────────
@@ -275,6 +276,7 @@ export async function createPage(projectId: string, page: PageInfo): Promise<Pag
         height: page.height,
         pdf_url: page.text ?? null,
         name: page.name ?? null,
+        drawing_set: page.drawingSet ?? null,
       },
       { onConflict: 'project_id,page_number' },
     );
@@ -306,6 +308,7 @@ export async function getPages(projectId: string): Promise<PageInfo[]> {
       height: row.height,
       text: row.pdf_url ?? '',
       name: row.name ?? undefined,
+      drawingSet: row.drawing_set ?? undefined,
     }));
   }
 
@@ -324,6 +327,8 @@ export async function updatePage(
   if (patch.width !== undefined) updateData.width = patch.width;
   if (patch.height !== undefined) updateData.height = patch.height;
   if (patch.text !== undefined) updateData.pdf_url = patch.text;
+  if (patch.name !== undefined) updateData.name = patch.name;
+  if (patch.drawingSet !== undefined) updateData.drawing_set = patch.drawingSet;
 
   if (Object.keys(updateData).length === 0) return null;
 
@@ -344,6 +349,8 @@ export async function updatePage(
       width: data.width,
       height: data.height,
       text: data.pdf_url ?? '',
+      name: data.name ?? undefined,
+      drawingSet: data.drawing_set ?? undefined,
     };
   }
 

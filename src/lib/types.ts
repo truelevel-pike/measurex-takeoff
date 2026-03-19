@@ -120,4 +120,6 @@ export interface PDFViewerHandle {
   setZoom: (zoom: number) => void;
   fitToPage: () => void;
   getPageCanvas: () => HTMLCanvasElement | null;
+  /** Navigate to a page, render it, and resolve when the canvas is ready for capture. */
+  renderPageForCapture: (page: number) => Promise<HTMLCanvasElement | null>;
 }

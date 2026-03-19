@@ -63,6 +63,8 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     // Current in-flight renderTask for cancellation
     const renderTaskRef = useRef<any>(null);
     const retryCancelRef = useRef<(() => void) | null>(null);
+    // Resolve callback for renderPageForCapture — called when a render completes
+    const renderCompleteResolveRef = useRef<((canvas: HTMLCanvasElement | null) => void) | null>(null);
     // Keep onPageChange in a ref so load/goToPage always call the latest version without needing it in deps
     const onPageChangeRef = useRef(onPageChange);
     useEffect(() => { onPageChangeRef.current = onPageChange; }, [onPageChange]);
@@ -247,6 +249,11 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             const next = pendingRender.current;
             pendingRender.current = null;
             void actuallyRender(next);
+          } else if (renderCompleteResolveRef.current && renderVersionRef.current === myVersion) {
+            // No pending render and this is the latest version — resolve the capture promise
+            const resolve = renderCompleteResolveRef.current;
+            renderCompleteResolveRef.current = null;
+            resolve(canvasRef.current);
           }
         }
       },
@@ -450,6 +457,18 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       return () => window.removeEventListener('keydown', handler);
     }, [nextPage, prevPage, zoom, setZoom, fitToPage]);
 
+    // renderPageForCapture: navigate to a page, wait for render, return canvas
+    const renderPageForCapture = useCallback(
+      (page: number): Promise<HTMLCanvasElement | null> => {
+        return new Promise((resolve) => {
+          // Store the resolve callback — actuallyRender's finally block will call it
+          renderCompleteResolveRef.current = resolve;
+          goToPage(page);
+        });
+      },
+      [goToPage]
+    );
+
     // Expose methods to parent
     useImperativeHandle(
       ref,
@@ -462,8 +481,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         setZoom,
         fitToPage,
         getPageCanvas: () => canvasRef.current,
+        renderPageForCapture,
       }),
-      [zoom, pan, pageDimensions, goToPage, setZoom, fitToPage]
+      [zoom, pan, pageDimensions, goToPage, setZoom, fitToPage, renderPageForCapture]
     );
 
     // Touch handlers for mobile: pan (one finger) and pinch-to-zoom (two fingers)

@@ -119,6 +119,12 @@ export default function QuantitiesPanel() {
     return byClass;
   }, [polygons]);
 
+  // Count of classifications that have at least one polygon
+  const activeClassificationCount = useMemo(
+    () => classifications.filter((c) => polygonsByClassification.has(c.id)).length,
+    [classifications, polygonsByClassification]
+  );
+
   // For count classifications: group polygon counts by page number
   const countsByPage = useMemo(() => {
     const result = new Map<string, Map<number, number>>();
@@ -292,7 +298,7 @@ export default function QuantitiesPanel() {
         <span className="font-mono tracking-wider">QUANTITIES</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-300 font-normal">
-            {classifications.length} {classifications.length === 1 ? 'item' : 'items'}
+            {activeClassificationCount} {activeClassificationCount === 1 ? 'item' : 'items'}
           </span>
           <button
             type="button"

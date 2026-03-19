@@ -89,23 +89,17 @@ export default function LeftToolbar() {
       <nav
         aria-label="Tool bar"
         style={{
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          bottom: 40,
           background: '#0a0a0f',
-          borderTop: '1px solid rgba(0,212,255,0.2)',
-          padding: '6px 8px',
+          padding: '8px 8px 10px',
           display: 'flex',
           gap: 8,
           overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
-          zIndex: 40,
-          boxShadow: '0 0 20px rgba(0,212,255,0.15)',
         }}
       >
         {GROUPS.flat().map((b) => {
           const active = 'tool' in b && currentTool === (b as { tool: string }).tool;
+          const mobileLabel = b.label === 'Draw Area' ? 'Draw' : b.label;
           return (
             <button
               key={b.label}
@@ -114,22 +108,34 @@ export default function LeftToolbar() {
               title={`${b.label} (${b.shortcut})`}
               onClick={() => onClick(b as (typeof GROUPS)[number][number])}
               style={{
-                minWidth: 44,
-                height: 44,
-                background: '#12121a',
-                color: active ? '#00d4ff' : '#b9bedc',
-                border: `1px solid ${active ? 'rgba(0,212,255,0.5)' : 'rgba(0,212,255,0.15)'}`,
-                borderRadius: 10,
+                minWidth: 62,
+                height: 54,
+                background: active ? 'rgba(0,212,255,0.14)' : '#12121a',
+                color: active ? '#4ce6ff' : '#b9bedc',
+                border: `1px solid ${active ? 'rgba(0,212,255,0.6)' : 'rgba(0,212,255,0.15)'}`,
+                borderRadius: 11,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: 2,
                 flex: '0 0 auto',
-                boxShadow: active ? '0 0 10px rgba(0,212,255,0.25) inset' : 'none',
+                boxShadow: active ? '0 0 12px rgba(0,212,255,0.32) inset, 0 0 10px rgba(0,212,255,0.2)' : 'none',
                 touchAction: 'manipulation',
               }}
             >
-              <b.icon size={20} aria-hidden="true" />
-              <span className="sr-only">{b.label}</span>
+              <b.icon size={18} aria-hidden="true" />
+              <span
+                style={{
+                  fontSize: 10,
+                  lineHeight: '10px',
+                  fontWeight: 600,
+                  color: active ? '#7defff' : '#9ea6c7',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mobileLabel}
+              </span>
             </button>
           );
         })}

@@ -122,6 +122,10 @@ export interface Store extends ProjectState {
   sheetNames: Record<number, string>;
   setSheetName: (page: number, name: string) => void;
 
+  // Drawing sets (GAP-005) — maps page number to drawing set name
+  drawingSets: Record<number, string>;
+  setDrawingSet: (page: number, setName: string) => void;
+
   // Classification Groups
   groups: ClassificationGroup[];
   addGroup: (name: string, color: string) => void;
@@ -493,6 +497,10 @@ export const useStore = create<Store>()(
   sheetNames: {},
   setSheetName: (page, name) => set((s) => ({ sheetNames: { ...s.sheetNames, [page]: name } })),
 
+  // ─── Drawing Sets (GAP-005) ───
+  drawingSets: {},
+  setDrawingSet: (page, setName) => set((s) => ({ drawingSets: { ...s.drawingSets, [page]: setName } })),
+
   // ─── Classification Groups ───
   groups: [
     { id: 'grp-drywall', name: 'Drywall', color: '#f59e0b', classificationIds: [], breakdowns: [] },
@@ -587,6 +595,7 @@ export const useStore = create<Store>()(
         currentPage: state.currentPage,
         totalPages: state.totalPages,
         sheetNames: state.sheetNames,
+        drawingSets: state.drawingSets,
         groups: state.groups,
         assemblies: state.assemblies,
         snappingEnabled: state.snappingEnabled,

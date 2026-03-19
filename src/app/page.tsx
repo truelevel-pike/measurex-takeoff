@@ -759,34 +759,67 @@ function PageInner() {
     }
   }, [projectId, classifications, polygons, scale, scales, addToast]);
 
-  // AI Takeoff flow
+  // AI Takeoff flow — processes ALL pages in the PDF
   const handleAITakeoff = useCallback(async () => {
-    const pageCanvas = pdfViewerRef.current?.getPageCanvas?.();
-    if (!pageCanvas) return;
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+
+    const pages = useStore.getState().totalPages || 1;
+    const originalPage = useStore.getState().currentPage || 1;
+
     setAiLoading(true);
-    setAiStatus('Capturing blueprint...');
+    const totalStats = { areas: 0, lines: 0, counts: 0 };
+
     try {
-      const imageBase64 = capturePageScreenshot(pageCanvas);
-      const dims = pdfViewerRef.current?.pageDimensions || { width: pageCanvas.width, height: pageCanvas.height };
-      setAiStatus('AI analyzing blueprint... (10-30 seconds)');
-      const elements: DetectedElement[] = await triggerAITakeoff(imageBase64, useStore.getState().scale, dims.width, dims.height);
-      setAiStatus(`Found ${elements.length} elements. Loading...`);
-      const stats = loadAIResults(elements, {
-        addClassification: useStore.getState().addClassification,
-        addPolygon: useStore.getState().addPolygon,
-        classifications: useStore.getState().classifications,
-        scale: useStore.getState().scale,
-        currentPage: useStore.getState().currentPage,
-        getState: () => {
-          const s = useStore.getState();
-          return {
-            classifications: s.classifications,
-            scale: s.scale,
-            currentPage: s.currentPage,
-          };
-        },
-      });
-      setAiStatus(`Done! ${stats.areas} rooms, ${stats.lines} walls, ${stats.counts} fixtures`);
+      for (let pageNum = 1; pageNum <= pages; pageNum++) {
+        setAiStatus(`Processing page ${pageNum} of ${pages}...`);
+
+        // Navigate to the page and wait for the canvas to render
+        const canvas = await viewer.renderPageForCapture(pageNum);
+        if (!canvas) {
+          console.warn(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
+          continue;
+        }
+
+        const imageBase64 = capturePageScreenshot(canvas);
+        const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
+
+        setAiStatus(`AI analyzing page ${pageNum} of ${pages}... (10-30s per page)`);
+        const elements: DetectedElement[] = await triggerAITakeoff(
+          imageBase64,
+          useStore.getState().scale,
+          dims.width,
+          dims.height,
+        );
+
+        setAiStatus(`Page ${pageNum}: found ${elements.length} elements. Loading...`);
+        const stats = loadAIResults(elements, {
+          addClassification: useStore.getState().addClassification,
+          addPolygon: useStore.getState().addPolygon,
+          classifications: useStore.getState().classifications,
+          scale: useStore.getState().scale,
+          currentPage: pageNum,
+          getState: () => {
+            const s = useStore.getState();
+            return {
+              classifications: s.classifications,
+              scale: s.scale,
+              currentPage: pageNum,
+            };
+          },
+        }, { pageNumber: pageNum });
+
+        totalStats.areas += stats.areas;
+        totalStats.lines += stats.lines;
+        totalStats.counts += stats.counts;
+      }
+
+      // Return to the original page
+      viewer.goToPage(originalPage);
+
+      setAiStatus(
+        `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`,
+      );
       setTimeout(() => setAiStatus(null), 5000);
     } catch (error) {
       console.error(error);
@@ -804,6 +837,8 @@ function PageInner() {
       <TopNavBar
         onAITakeoff={handleAITakeoff}
         aiLoading={aiLoading}
+        hasScale={!!scale}
+        hasRunTakeoff={polygons.length > 0}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
         onSave={handleSave}
@@ -854,11 +889,11 @@ function PageInner() {
         </button>
       </div>
 
-      <div className={show3D ? 'flex-1 min-h-0' : 'hidden'}>
+      <div className={show3D ? 'flex-1 min-h-0 pb-16 lg:pb-0' : 'hidden'}>
         <ThreeDScene className="h-full w-full" walls={threeData.walls} areas={threeData.areas} labels={threeData.labels} pdfTextureUrl={pdfTextureUrl} />
       </div>
 
-      <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row'}>
+      <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row pb-16 lg:pb-0'}>
         <div className="hidden lg:block"><LeftToolbar /></div>
 
         {/* Thumbnail sidebar: show when PDF is loaded OR when project has data (shows page count from store) */}

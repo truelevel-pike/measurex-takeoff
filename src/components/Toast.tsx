@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType, duration?: number) => {
     const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, type, message, duration: duration ?? 5000 }]);
+    setToasts((prev) => [...prev, { id, type, message, duration: duration ?? 4000 }]);
   }, []);
 
   return (
@@ -76,7 +76,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   }, []);
 
   useEffect(() => {
-    const duration = toast.duration ?? 5000;
+    const duration = toast.duration ?? 4000;
     const timer = setTimeout(() => onRemove(toast.id), duration);
     return () => clearTimeout(timer);
   }, [toast.id, toast.duration, onRemove]);
