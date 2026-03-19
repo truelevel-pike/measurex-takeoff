@@ -83,7 +83,7 @@ export const ProjectPutSchema = z.object({
       source: z.string().optional(),
       pageNumber: z.number().int().positive().optional(),
       confidence: z.number().optional(),
-    }).optional(),
+    }).nullable().optional(),
     totalPages: z.number().int().positive().optional(),
   }).optional(),
 });

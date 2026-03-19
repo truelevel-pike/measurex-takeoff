@@ -398,6 +398,14 @@ function PageInner() {
     setMenuState({ polygonId: payload.polygonId, x: clamped.x, y: clamped.y });
   }, [clampContextMenuPosition]);
 
+  const safeGoToPage = useCallback((page: number, source: string) => {
+    try {
+      pdfViewerRef.current?.goToPage(page);
+    } catch (error) {
+      console.error(`[page navigation] Failed to go to page ${page} from ${source}:`, error);
+    }
+  }, []);
+
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
   const hydrateProject = useCallback(async (pid: string) => {
     // Cancel any in-flight hydration to prevent stale data from overwriting newer requests
@@ -564,14 +572,6 @@ function PageInner() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [menuState, closeContextMenu]);
-
-  const safeGoToPage = useCallback((page: number, source: string) => {
-    try {
-      pdfViewerRef.current?.goToPage(page);
-    } catch (error) {
-      console.error(`[page navigation] Failed to go to page ${page} from ${source}:`, error);
-    }
-  }, []);
 
   // AI Takeoff flow — processes ALL pages in the PDF
   const handleAITakeoff = useCallback(async () => {
