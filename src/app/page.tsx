@@ -167,6 +167,9 @@ function PageInner() {
   // PDFViewer fires onPageChange. Reset to false whenever a new PDF is loaded.
   const [pdfPageCountReady, setPdfPageCountReady] = useState(false);
 
+  // BUG-R5-002: Track whether the auto-fetched PDF is loading during hydration.
+  const [pdfFetching, setPdfFetching] = useState(false);
+
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -292,7 +295,8 @@ function PageInner() {
         setProjectName(data.project.name || 'Untitled');
         localStorage.setItem('measurex_project_id', data.project.id);
 
-        // Auto-fetch stored PDF so the viewer loads without re-upload
+        // Auto-fetch stored PDF so the viewer loads without re-upload (BUG-R5-002)
+        setPdfFetching(true);
         fetch(`/api/projects/${pid}/pdf`, { signal: controller.signal })
           .then(async (pdfRes) => {
             if (controller.signal.aborted) return;
@@ -304,7 +308,10 @@ function PageInner() {
             setPdfPageCountReady(false);
             setPdfFile(file);
           })
-          .catch(() => null); // non-fatal — user can still upload manually
+          .catch(() => null) // non-fatal — user can still upload manually
+          .finally(() => {
+            if (!controller.signal.aborted) setPdfFetching(false);
+          });
 
         return;
       }
@@ -825,9 +832,9 @@ function PageInner() {
                 )}
               </>
             ) : hasProjectData ? (
-              /* ── Project loaded but no PDF file — show re-upload prompt ── */
-              /* PDF files aren't stored server-side; user must re-upload on each session. */
-              /* The viewer shell (sidebars, quantities, scale bar) remains visible. */
+              /* ── Project loaded but no PDF file — show spinner or re-upload prompt ── */
+              /* BUG-R5-002: show loading spinner while auto-fetching the saved PDF.      */
+              /* The viewer shell (sidebars, quantities, scale bar) remains visible.      */
               <div
                 className="flex-1 flex items-center justify-center p-4 bg-[#0a0a0f]"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -838,18 +845,29 @@ function PageInner() {
                   if (f && f.type === 'application/pdf') setPdfFile(f);
                 }}
               >
-                <label className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]">
-                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
-                  <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
-                    {projectName || 'Project loaded'}
+                {pdfFetching ? (
+                  /* BUG-R5-002: spinner while auto-fetching saved PDF */
+                  <div className="flex flex-col items-center gap-4 text-[rgba(0,212,255,0.7)]">
+                    <svg className="animate-spin h-10 w-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span className="text-sm font-medium">Loading PDF…</span>
                   </div>
-                  <div className="text-sm text-zinc-400 mb-3">
-                    {classifications.length} classification{classifications.length !== 1 ? 's' : ''} · {polygons.length} polygon{polygons.length !== 1 ? 's' : ''} · {totalPages} page{totalPages !== 1 ? 's' : ''}
-                  </div>
-                  <div className="text-sm text-zinc-500">Re-upload the PDF to view the blueprint</div>
-                  <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
-                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
-                </label>
+                ) : (
+                  <label className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]">
+                    <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
+                    <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
+                      {projectName || 'Project loaded'}
+                    </div>
+                    <div className="text-sm text-zinc-400 mb-3">
+                      {classifications.length} classification{classifications.length !== 1 ? 's' : ''} · {polygons.length} polygon{polygons.length !== 1 ? 's' : ''} · {totalPages} page{totalPages !== 1 ? 's' : ''}
+                    </div>
+                    <div className="text-sm text-zinc-500">Re-upload the PDF to view the blueprint</div>
+                    <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
+                    <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
+                  </label>
+                )}
               </div>
             ) : (
               /* ── No project, no PDF — fresh upload screen ── */
