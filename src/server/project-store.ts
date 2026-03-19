@@ -30,8 +30,21 @@ export interface PageInfo {
 
 // ── Mode detection ────────────────────────────────────────────────────
 
+function isValidUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 function isSupabaseMode(): boolean {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return (
+    Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) &&
+    isValidUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  );
 }
 
 // ── Supabase Client (lazy, only created in Supabase mode) ─────────────
@@ -213,9 +226,30 @@ export async function updateProject(
 export async function deleteProject(projectId: string): Promise<boolean> {
   if (isSupabaseMode()) {
     const sb = getClient();
-    // Child tables use ON DELETE CASCADE — only delete the project row.
+    // Explicitly delete child rows first so any failure surfaces before we
+    // remove the parent.  If any child delete fails we throw immediately and
+    // mx_projects is left intact (consistent state).
+    const childTables = [
+      'mx_scales',
+      'mx_polygons',
+      'mx_classifications',
+      'mx_assemblies',
+      'mx_pages',
+      'mx_history',
+    ] as const;
+    for (const table of childTables) {
+      try {
+        const { error } = await sb.from(table).delete().eq('project_id', projectId);
+        if (error) throw error;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        console.error(`[deleteProject] failed deleting ${table} for project ${projectId}:`, msg);
+        throw new Error(`deleteProject: failed to delete from ${table}: ${msg}`);
+      }
+    }
+    // All child rows gone — safe to delete the project itself.
     const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
-    if (error) throw new Error(`deleteProject: ${error.message}`);
+    if (error) throw new Error(`deleteProject: failed to delete mx_projects: ${error.message}`);
     return true;
   }
 
@@ -280,6 +314,9 @@ export async function updatePage(
   pageNum: number,
   patch: Partial<PageInfo>,
 ): Promise<PageInfo | null> {
+  // Guard: if patch is empty, return early to avoid sending a no-op .update({}) to Supabase.
+  if (Object.keys(patch).length === 0) return null;
+
   const updateData: Record<string, unknown> = {};
   if (patch.width !== undefined) updateData.width = patch.width;
   if (patch.height !== undefined) updateData.height = patch.height;
@@ -770,6 +807,34 @@ export async function getScale(projectId: string, pageNumber: number = 1): Promi
   }
 
   return readJson<ScaleCalibration | null>(path.join(projectDir(projectId), 'scale.json'), null);
+}
+
+export async function listScales(projectId: string): Promise<ScaleCalibration[]> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const { data, error } = await sb
+      .from('mx_scales')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('page_number', { ascending: true });
+    if (error) throw new Error(`listScales: ${error.message}`);
+    return (data || []).map((row: any) => ({
+      pixelsPerUnit: row.pixels_per_unit,
+      unit: row.unit,
+      label: row.label,
+      source: row.source,
+      confidence: row.confidence ?? undefined,
+      pageNumber: row.page_number,
+    }));
+  }
+
+  // File mode: single scale.json stores one scale (not page-keyed).
+  // Return it as a single-element array if present.
+  const scale = await readJson<ScaleCalibration | null>(
+    path.join(projectDir(projectId), 'scale.json'),
+    null,
+  );
+  return scale ? [scale] : [];
 }
 
 // ── Assemblies CRUD ─────────────────────────────────────────────────
