@@ -760,13 +760,6 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           </div>
         ) : (
           <>
-            {/* HUD: zoom/pan pill */}
-            <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 20 }}>
-              <div className="font-mono text-xs px-3 py-1 rounded-full backdrop-blur-sm border border-[#00d4ff]/30 text-[#00d4ff] bg-[rgba(10,10,15,0.6)] shadow-[0_0_12px_rgba(0,212,255,0.15)]">
-                {Math.round(zoom * 100)}% · x{Math.round(pan.x)} y{Math.round(pan.y)}
-              </div>
-            </div>
-
             {/* Zoom controls widget — bottom-right corner */}
             <div
               style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 20 }}
