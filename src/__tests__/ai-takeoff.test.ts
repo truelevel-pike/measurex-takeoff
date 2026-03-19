@@ -8,7 +8,7 @@ jest.mock('@/lib/rate-limit', () => ({
   rateLimitResponse: jest.fn(() => null),
 }));
 
-jest.mock('@/app/api/ws/route', () => ({
+jest.mock('@/lib/sse-broadcast', () => ({
   broadcastToProject: jest.fn(),
 }));
 

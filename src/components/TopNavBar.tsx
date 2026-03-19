@@ -100,7 +100,21 @@ export default function TopNavBar({
       const url = new URL(window.location.href);
       const pid = url.searchParams.get('project') || localStorage.getItem('measurex_project_id');
       if (pid) url.searchParams.set('project', pid);
-      await navigator.clipboard.writeText(url.toString());
+      const text = url.toString();
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (!copied) throw new Error('Clipboard unavailable');
+      }
       addToast('Link copied to clipboard', 'success');
     } catch (error) {
       console.error('Failed to copy link:', error);

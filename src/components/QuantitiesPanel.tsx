@@ -7,6 +7,7 @@ import type { Classification, Polygon } from '@/lib/types';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useMeasurementSettings } from '@/lib/use-measurement-settings';
 import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
+import { calculateLinearFeet } from '@/lib/polygon-utils';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
 import EstimateSummary from './EstimateSummary';
@@ -171,6 +172,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
   const selectedClassification = useStore((s) => s.selectedClassification);
 
   const addClassification = useStore((s) => s.addClassification);
@@ -234,7 +236,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const drawerRef = useRef<HTMLDivElement>(null);
   const newClassNameRef = useRef<HTMLInputElement>(null);
 
-  const ppu = scale?.pixelsPerUnit || 1;
+  const getPixelsPerUnitForPage = useCallback((pageNumber: number) => {
+    return scales[pageNumber]?.pixelsPerUnit || scale?.pixelsPerUnit || 1;
+  }, [scales, scale]);
 
 
   // Focus first element in drawer when opened on mobile
@@ -415,14 +419,21 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     const totals = new Map<string, ClassTotals>();
     for (const c of classifications) {
       const items = polygonsByClassification.get(c.id) ?? [];
+      let areaReal = 0;
+      let lengthReal = 0;
+      for (const polygon of items) {
+        const ppu = getPixelsPerUnitForPage(polygon.pageNumber);
+        areaReal += polygon.area / (ppu * ppu);
+        lengthReal += calculateLinearFeet(polygon.points, ppu, false);
+      }
       totals.set(c.id, {
         count: items.length,
-        areaReal: items.reduce((sum, polygon) => sum + polygon.area, 0) / (ppu * ppu),
-        lengthReal: items.reduce((sum, polygon) => sum + (polygon.linearFeet || 0), 0),
+        areaReal,
+        lengthReal,
       });
     }
     return totals;
-  }, [classifications, polygonsByClassification, ppu]);
+  }, [classifications, polygonsByClassification, getPixelsPerUnitForPage]);
 
   function getDeductions(classification: Classification): ClassificationDeduction[] {
     return deductionsByClassification[classification.id] ?? classification.deductions ?? [];
@@ -784,8 +795,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         const classPolygons = polygons.filter((p) => p.classificationId === cid);
         const totals: ClassTotals = { count: classPolygons.length, areaReal: 0, lengthReal: 0 };
         for (const p of classPolygons) {
+          const ppu = getPixelsPerUnitForPage(p.pageNumber);
           totals.areaReal += p.area / (ppu * ppu);
-          totals.lengthReal += p.linearFeet || 0;
+          totals.lengthReal += calculateLinearFeet(p.points, ppu, false);
         }
         classificationTotals[cid] = totals;
         combined.count += totals.count;
@@ -795,7 +807,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       result[group.id] = { classificationTotals, combined };
     }
     return result;
-  }, [groups, polygons, ppu]);
+  }, [groups, polygons, getPixelsPerUnitForPage]);
 
   const panel = (
     <>
@@ -1305,8 +1317,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                           : `Total: ${totals.count} items - ${formatArea(totals.areaReal, measurementSettings)} - ${formatLinear(totals.lengthReal, measurementSettings)}`}
                       </div>
                       {polygonsForClassification.map((polygon, index) => {
-                        const areaReal = polygon.area / (ppu * ppu);
-                        const lengthReal = polygon.linearFeet || 0;
+                        const polygonPpu = getPixelsPerUnitForPage(polygon.pageNumber);
+                        const areaReal = polygon.area / (polygonPpu * polygonPpu);
+                        const lengthReal = calculateLinearFeet(polygon.points, polygonPpu, false);
 
                         return (
                           <div key={polygon.id} className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-2">

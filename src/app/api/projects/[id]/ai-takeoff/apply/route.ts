@@ -6,7 +6,7 @@ import {
   createClassification,
   createPolygon,
 } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
 import type { AIDetectedElement } from '@/server/ai-engine';

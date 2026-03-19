@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAssemblies, createAssembly, initDataDir } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 const AssemblyBodySchema = z.object({

@@ -275,7 +275,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             // Stale check #3: abort if superseded during text extraction
             if (renderVersionRef.current !== myVersion) return;
             const fullText = textContent.items
-              .map((item: any) => ('str' in item ? item.str : '').trim())
+              .map((item: Record<string, unknown>) => ('str' in item ? String(item.str) : '').trim())
               .join('\n');
             onTextExtracted?.(fullText, pageNum);
           } catch {}

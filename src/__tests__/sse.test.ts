@@ -185,7 +185,7 @@ describe('Activity pub-sub', () => {
 // Test C: broadcastToProject dispatches to registered clients
 // ---------------------------------------------------------------------------
 describe('broadcastToProject', () => {
-  let broadcastToProject: typeof import('@/app/api/ws/route').broadcastToProject;
+  let broadcastToProject: typeof import('@/lib/sse-broadcast').broadcastToProject;
 
   beforeEach(async () => {
     // Reset globals
@@ -202,7 +202,7 @@ describe('broadcastToProject', () => {
       NextResponse: class {},
     }));
 
-    const route = await import('@/app/api/ws/route');
+    const route = await import('@/lib/sse-broadcast');
     broadcastToProject = route.broadcastToProject;
   });
 

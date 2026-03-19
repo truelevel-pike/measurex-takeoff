@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getScale, setScale, initDataDir } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, ScaleSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
 

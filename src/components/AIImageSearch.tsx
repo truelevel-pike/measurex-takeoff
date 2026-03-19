@@ -63,7 +63,6 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onS
     if (croppedImageBase64) {
       handleCroppedSearch(croppedImageBase64);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [croppedImageBase64]);
 
   async function handleCroppedSearch(croppedImage: string) {

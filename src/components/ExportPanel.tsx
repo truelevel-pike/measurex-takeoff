@@ -511,12 +511,16 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 </body>
 </html>`;
 
-    const w = window.open('', '_blank');
-    if (w) {
-      w.document.write(htmlString);
-      w.document.close();
-    }
-    if (getNotificationPrefs().exportReady) showToast('Contractor report opened!');
+    const blob = new Blob([htmlString], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'project'}-contractor-report.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (getNotificationPrefs().exportReady) showToast('Contractor report downloaded!');
   }, [filteredPolygons, previewRows, showToast]);
 
   // ── Export: JSON ──

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateAssembly, deleteAssembly, initDataDir } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { AssemblyIdSchema, AssemblyPutSchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 

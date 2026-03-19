@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { deleteClassification, updateClassification, initDataDir } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ClassificationIdSchema, ClassificationUpdateSchema, validationError } from '@/lib/api-schemas';
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { Camera, ChevronRight, Copy, Info, Trash } from 'lucide-react';
 
@@ -27,11 +27,10 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const [showClassifications, setShowClassifications] = useState(false);
   const [snapshotStatus, setSnapshotStatus] = useState<'idle' | 'saving' | 'done'>('idle');
 
-  if (!polygonId) return null;
   const polygon = polygons.find((p) => p.id === polygonId);
 
-  // Build menu items list for keyboard navigation
-  const menuItems: string[] = ['properties', 'duplicate', 'reclassify', 'delete', 'snapshot'];
+  // Menu items list for keyboard navigation (stable reference)
+  const menuItems = useMemo(() => ['properties', 'duplicate', 'reclassify', 'delete', 'snapshot'], []);
 
   const handleDelete = useCallback(() => {
     if (!confirmDelete) {
@@ -109,7 +108,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focusIndex, menuItems.length, handleOpenProperties, handleCopy, handleDelete, handleSnapshot]);
+  }, [focusIndex, menuItems, handleOpenProperties, handleCopy, handleDelete, handleSnapshot]);
 
   // Scroll to close
   useEffect(() => {
@@ -122,6 +121,8 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   useEffect(() => {
     menuRef.current?.focus();
   }, []);
+
+  if (!polygonId) return null;
 
   const itemClass = (idx: number, extra?: string) =>
     `flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors ${

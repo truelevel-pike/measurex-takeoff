@@ -258,7 +258,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="contractor-report.pdf"',
+        'Content-Disposition': 'attachment; filename="contractor-report.html"',
         'Cache-Control': 'no-store',
         'Content-Length': String(new TextEncoder().encode(html).byteLength),
       },

@@ -11,7 +11,6 @@ import type { Classification, DetectedElement, PDFViewerHandle, Polygon, Project
 import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
-import { loadAIResults } from '@/lib/ai-results-loader';
 import { useIsMobile } from '@/lib/utils';
 // downloadExcel dynamically imported to avoid bundling XLSX (~300KB) at load time
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';

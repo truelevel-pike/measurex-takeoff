@@ -31,7 +31,7 @@ jest.mock('@/lib/polygon-utils', () => ({
   calculateLinearFeet: jest.fn(() => 400),
 }));
 
-jest.mock('@/app/api/ws/route', () => ({
+jest.mock('@/lib/sse-broadcast', () => ({
   broadcastToProject: jest.fn(),
 }));
 

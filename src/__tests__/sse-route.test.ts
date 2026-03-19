@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 
 describe('broadcastToProject', () => {
   it('does not throw when no clients are registered', () => {

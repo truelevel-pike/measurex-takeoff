@@ -8,7 +8,7 @@ import {
   deletePolygon,
   initDataDir,
 } from '@/server/project-store';
-import { broadcastToProject } from '@/app/api/ws/route';
+import { broadcastToProject } from '@/lib/sse-broadcast';
 
 const ParamsSchema = z.object({
   id: z.string().uuid(),

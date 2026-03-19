@@ -32,8 +32,13 @@ export default function ContractorReportButton({
       const html = await response.text();
       const blob = new Blob([html], { type: 'text/html' });
       const objectUrl = URL.createObjectURL(blob);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `contractor-report-${projectId}.html`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch (error) {
       console.error(error);
     } finally {
