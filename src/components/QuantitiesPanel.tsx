@@ -485,11 +485,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       .slice(0, 30);
   }, [takeoffSearchQuery, polygons, classificationById, polygonCountsByClassificationPage]);
 
-  // Count of classifications that have at least one polygon
-  const activeClassificationCount = useMemo(
-    () => classifications.filter((c) => polygonsByClassification.has(c.id)).length,
-    [classifications, polygonsByClassification]
-  );
+  // Count of classifications shown in the panel (total, not just those with polygons)
+  // Previously this only counted classifications that had at least one polygon, which
+  // caused the header to show "0 items" right after creating classifications before
+  // drawing any polygons. (BUG-R6-003)
+  const activeClassificationCount = classifications.length;
 
   // For count classifications: group polygon counts by page number
   const countsByPage = useMemo(() => {
