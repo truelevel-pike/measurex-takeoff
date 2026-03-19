@@ -52,6 +52,8 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import QuickTakeoffMode from '@/components/QuickTakeoffMode';
 import { useQuickTakeoff } from '@/lib/quick-takeoff';
+import TakeoffProgressModal from '@/components/TakeoffProgressModal';
+import type { PageStatus } from '@/components/TakeoffProgressModal';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -266,6 +268,7 @@ function PageInner() {
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
   const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
+  const [aiPageStatuses, setAiPageStatuses] = useState<PageStatus[]>([]);
   const [aiModel, setAiModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("measurex_ai_model") ?? "gpt-5.4";
@@ -1186,13 +1189,27 @@ function PageInner() {
     setAiLoading(true);
     setAiAllPagesProgress({ current: 1, total });
 
+    // Initialize per-page statuses
+    const initialStatuses: PageStatus[] = Array.from({ length: total }, (_, i) => ({
+      page: i + 1,
+      status: 'queued' as const,
+    }));
+    setAiPageStatuses(initialStatuses);
+
+    let totalPolygons = 0;
+    let totalPagesCompleted = 0;
+
     for (let page = 1; page <= total; page++) {
       setAiAllPagesProgress({ current: page, total });
       setAiStatus(`Page ${page}/${total}: Capturing...`);
 
+      // Mark page as running
+      setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'running' as const } : ps));
+
       const canvas = await viewer.renderPageForCapture(page);
       if (!canvas) {
         setAiStatus(`Page ${page}/${total}: Could not capture, skipping`);
+        setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'failed' as const, errorMsg: 'Could not capture page' } : ps));
         continue;
       }
 
@@ -1210,19 +1227,24 @@ function PageInner() {
           page,
           aiModel,
         );
+        totalPolygons += elements.length;
+        totalPagesCompleted++;
+        setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'done' as const, polygonCount: elements.length } : ps));
         setAiStatus(`Page ${page}/${total}: Done — ${elements.length} elements persisted`);
       } catch (err) {
-        setAiStatus(`Page ${page}/${total}: Error — ${err instanceof Error ? err.message : 'failed'}`);
+        const errorMsg = err instanceof Error ? err.message : 'failed';
+        setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'failed' as const, errorMsg } : ps));
+        setAiStatus(`Page ${page}/${total}: Error — ${errorMsg}`);
       }
     }
 
     safeGoToPage(originalPage, 'ai-takeoff-all-pages:return');
     await reloadProjectPolygonsAndClassifications(projectId);
+    addToast(`Takeoff complete — ${totalPolygons} polygons across ${totalPagesCompleted} pages`, 'success');
     setAiAllPagesProgress(null);
-    setAiStatus('All pages complete!');
-    setTimeout(() => setAiStatus(null), 5000);
+    setAiPageStatuses([]);
     setAiLoading(false);
-  }, [projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
+  }, [projectId, reloadProjectPolygonsAndClassifications, safeGoToPage, addToast]);
 
   // Crop & Search: when user completes a bounding box, crop the canvas region and send for AI analysis
   const handleCropComplete = useCallback((cropRect: { x: number; y: number; width: number; height: number }) => {
@@ -1632,7 +1654,15 @@ function PageInner() {
       )}
       <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
-      {aiLoading && (
+      {aiLoading && aiAllPagesProgress ? (
+        <TakeoffProgressModal
+          open={true}
+          pageStatuses={aiPageStatuses}
+          total={aiAllPagesProgress.total}
+          currentPage={aiAllPagesProgress.current}
+          model={aiModel}
+        />
+      ) : aiLoading ? (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl p-8 shadow-2xl text-center max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
@@ -1640,7 +1670,7 @@ function PageInner() {
             <div className="text-sm text-neutral-500 mt-2">{aiStatus}</div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {saveStatus && (
         <div className="fixed top-14 right-4 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium">
