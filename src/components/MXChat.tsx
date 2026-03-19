@@ -21,6 +21,8 @@ interface QuantityEntry {
 
 interface MXChatProps {
   onClose: () => void;
+  /** When false, the panel is hidden via CSS but remains mounted so conversation history persists */
+  visible?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -145,7 +147,7 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function MXChat({ onClose }: MXChatProps) {
+export default function MXChat({ onClose, visible = true }: MXChatProps) {
   const projectId = useStore((s) => s.projectId);
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
@@ -341,13 +343,14 @@ export default function MXChat({ onClose }: MXChatProps) {
   return (
     <div
       aria-label="MX Chat panel"
+      aria-hidden={!visible}
       style={{
         position: 'fixed',
         top: 0,
         right: 0,
         width: 380,
         height: '100dvh',
-        display: 'flex',
+        display: visible ? 'flex' : 'none',
         flexDirection: 'column',
         background: 'rgba(10,10,15,0.97)',
         borderLeft: '1px solid rgba(0,212,255,0.25)',

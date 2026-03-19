@@ -1859,7 +1859,7 @@ function PageInner() {
         </div>
       )}
 
-      {showChat && <MXChat onClose={() => setShowChat(false)} />}
+      <MXChat visible={showChat} onClose={() => setShowChat(false)} />
       {showImageSearch && (
         <AIImageSearch
           onClose={() => {

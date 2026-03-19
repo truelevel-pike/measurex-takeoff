@@ -68,6 +68,17 @@ export async function POST(
 
     const totalArea = polygons.reduce((sum, p) => sum + p.area, 0) / (ppu * ppu);
 
+    // Build per-page element counts so AI can answer "which page has the most elements"
+    const pageCountMap: Record<number, number> = {};
+    for (const p of polygons) {
+      const rawPg = (p as unknown as Record<string, unknown>).pageNumber;
+      const pg: number = typeof rawPg === 'number' ? rawPg : 1;
+      pageCountMap[pg] = (pageCountMap[pg] || 0) + 1;
+    }
+    const pageBreakdownLines = Object.entries(pageCountMap)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([pg, count]) => `  - Page ${pg}: ${count} polygons`);
+
     // Detect model used for takeoff
     const modelCounts: Record<string, number> = {};
     for (const p of polygons) {
@@ -114,6 +125,9 @@ ${detectedModel ? `This takeoff was processed by ${detectedModel}.` : ''}
 
 Quantities by classification:
 ${quantities.join('\n')}
+${pageBreakdownLines.length > 0 ? `
+Polygons per page:
+${pageBreakdownLines.join('\n')}` : ''}
 ${assemblyContext.length > 0 ? `
 Assemblies:
 ${assemblyContext.map((a) => `  - ${a.assemblyName}: $${a.unitCost.toFixed(2)}/unit × ${a.quantity} = $${a.projectedTotal.toFixed(2)}`).join('\n')}` : ''}${costTableBlock}`;
