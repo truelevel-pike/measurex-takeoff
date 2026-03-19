@@ -10,6 +10,7 @@ import type {
   ClassificationGroup,
   Markup,
   Annotation,
+  RepeatingGroup,
 } from './types';
 import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea } from './polygon-utils';
 import { assignTradeGroup } from './trade-groups';
@@ -29,6 +30,7 @@ interface HistorySnapshot {
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
   selectedPolygons: string[];
+  repeatingGroups: RepeatingGroup[];
 }
 
 export type Tool =
@@ -182,6 +184,14 @@ export interface Store extends ProjectState {
 
   // Last polygon added (for Ctrl+D duplicate) — NOT persisted
   lastPolygon: Polygon | null;
+
+  // Repeating Groups
+  repeatingGroups: RepeatingGroup[];
+  addRepeatingGroup: (g: Omit<RepeatingGroup, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateRepeatingGroup: (id: string, patch: Partial<RepeatingGroup>) => void;
+  deleteRepeatingGroup: (id: string) => void;
+  isDefiningGroup: boolean;
+  setIsDefiningGroup: (v: boolean) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -195,6 +205,7 @@ function snapshot(state: Store): HistorySnapshot {
     selectedPolygon: state.selectedPolygon,
     selectedPolygonId: state.selectedPolygonId,
     selectedPolygons: structuredClone(state.selectedPolygons),
+    repeatingGroups: structuredClone(state.repeatingGroups),
   };
 }
 
@@ -608,6 +619,7 @@ export const useStore = create<Store>()(
       selectedPolygon: prev.selectedPolygon,
       selectedPolygonId: prev.selectedPolygonId,
       selectedPolygons: prev.selectedPolygons,
+      repeatingGroups: prev.repeatingGroups,
       undoStack: rest,
       redoStack: [...s.redoStack, now],
     });
@@ -628,6 +640,7 @@ export const useStore = create<Store>()(
       selectedPolygon: next.selectedPolygon,
       selectedPolygonId: next.selectedPolygonId,
       selectedPolygons: next.selectedPolygons,
+      repeatingGroups: next.repeatingGroups,
       redoStack: rest,
       undoStack: [...s.undoStack, now],
     });
@@ -770,6 +783,41 @@ export const useStore = create<Store>()(
   // ─── Last Polygon (for Ctrl+D duplicate) ───
   lastPolygon: null,
 
+  // ─── Repeating Groups ───
+  repeatingGroups: [],
+  isDefiningGroup: false,
+  setIsDefiningGroup: (v) => set({ isDefiningGroup: v }),
+
+  addRepeatingGroup: (g) => {
+    const s = get();
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const group: RepeatingGroup = { ...g, id, createdAt: now, updatedAt: now };
+    const before = snapshot(s);
+    set({ repeatingGroups: [...s.repeatingGroups, group], undoStack: [...s.undoStack, before], redoStack: [] });
+    return id;
+  },
+
+  updateRepeatingGroup: (id, patch) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
+      repeatingGroups: s.repeatingGroups.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: new Date().toISOString() } : g)),
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+  },
+
+  deleteRepeatingGroup: (id) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
+      repeatingGroups: s.repeatingGroups.filter((g) => g.id !== id),
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+  },
+
   // ─── Focus Polygon ───
   focusedPolygonId: null,
   focusPolygon: (id) => set({ focusedPolygonId: id }),
@@ -809,6 +857,7 @@ export const useStore = create<Store>()(
         gridEnabled: state.gridEnabled,
         gridSize: state.gridSize,
         pageBaseDimensions: state.pageBaseDimensions,
+        repeatingGroups: state.repeatingGroups,
       }),
     }
   )

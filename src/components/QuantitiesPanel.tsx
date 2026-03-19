@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, GitMerge, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, Wand2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronRight, Copy, Crosshair, Download, Eye, EyeOff, GitMerge, Hash, History, Info, Layers, Minus, Pencil, Plus, Printer, Search, Settings, SlidersHorizontal, Square, Trash2, Wand2, X } from 'lucide-react';
 import { assignTradeGroup, TRADE_GROUP_ORDER, TRADE_GROUP_LABELS, type TradeGroup } from '@/lib/trade-groups';
 import { useStore } from '@/lib/store';
-import type { Classification, Polygon } from '@/lib/types';
+import type { Classification, Polygon, RepeatingGroup } from '@/lib/types';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useMeasurementSettings } from '@/lib/use-measurement-settings';
 import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
@@ -238,6 +238,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const updateGroup = useStore((s) => s.updateGroup);
   const deleteGroup = useStore((s) => s.deleteGroup);
   const moveClassificationToGroup = useStore((s) => s.moveClassificationToGroup);
+
+  const repeatingGroups = useStore((s) => s.repeatingGroups);
+  const deleteRepeatingGroup = useStore((s) => s.deleteRepeatingGroup);
+  const setIsDefiningGroup = useStore((s) => s.setIsDefiningGroup);
+  const currentPage = useStore((s) => s.currentPage);
 
   const [search, setSearch] = useState('');
   const [takeoffSearchQuery, setTakeoffSearchQuery] = useState('');
@@ -1312,6 +1317,76 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         );
       })()}
 
+      {/* ─── Repeating Groups ─── */}
+      {repeatingGroups.length > 0 && (
+        <div className="border-b border-[#00d4ff]/20">
+          <div className="px-3 py-1.5 bg-[rgba(0,212,255,0.05)]">
+            <span className="text-[10px] font-mono text-[#00d4ff]/70 tracking-wider">REPEATING GROUPS</span>
+          </div>
+          {repeatingGroups.map((rg) => {
+            // Find polygons on this group's page whose any point falls within the bounding box
+            const containedPolygons = polygons.filter((p) => {
+              if (p.pageNumber !== rg.pageNumber) return false;
+              return p.points.some(
+                (pt) =>
+                  pt.x >= rg.boundingBox.x &&
+                  pt.x <= rg.boundingBox.x + rg.boundingBox.width &&
+                  pt.y >= rg.boundingBox.y &&
+                  pt.y <= rg.boundingBox.y + rg.boundingBox.height
+              );
+            });
+            // Sum area for contained polygons
+            let unitArea = 0;
+            let unitLinear = 0;
+            for (const p of containedPolygons) {
+              const ppu = scales[p.pageNumber]?.pixelsPerUnit || scale?.pixelsPerUnit || 1;
+              unitArea += p.area / (ppu * ppu);
+              unitLinear += calculateLinearFeet(p.points, ppu, false);
+            }
+            const totalArea = unitArea * rg.repeatCount;
+            const totalLinear = unitLinear * rg.repeatCount;
+            return (
+              <div
+                key={rg.id}
+                className="px-3 py-2 border-t border-[#00d4ff]/10 flex items-start justify-between gap-2 hover:bg-[#00d4ff]/5"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 text-xs text-[#e5e7eb]">
+                    <Copy size={12} className="text-[#00d4ff] flex-shrink-0" />
+                    <span className="font-medium truncate">{rg.name}</span>
+                    <span className="text-gray-500 text-[10px]">p.{rg.pageNumber}</span>
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-0.5 font-mono">
+                    {unitArea > 0 && (
+                      <>
+                        {formatArea(unitArea, measurementSettings)} &times; {rg.repeatCount} = {formatArea(totalArea, measurementSettings)} total
+                      </>
+                    )}
+                    {unitArea > 0 && unitLinear > 0 && ' · '}
+                    {unitLinear > 0 && (
+                      <>
+                        {formatLinear(unitLinear, measurementSettings)} &times; {rg.repeatCount} = {formatLinear(totalLinear, measurementSettings)} total
+                      </>
+                    )}
+                    {unitArea === 0 && unitLinear === 0 && (
+                      <span className="text-gray-500">{containedPolygons.length} polygon{containedPolygons.length !== 1 ? 's' : ''} &times; {rg.repeatCount} units</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => deleteRepeatingGroup(rg.id)}
+                  className="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0"
+                  title="Delete repeating group"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {mergeMode && (
         <div className="px-3 py-2 border-b border-amber-500/30 bg-amber-500/10">
           <div className="flex items-center justify-between mb-1">
@@ -1410,15 +1485,25 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         </div>
       </div>
 
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-2 flex gap-2">
         <button
           type="button"
           onClick={handleToggleNewClassification}
-          className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
+          className="flex-1 border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           aria-label="New Classification"
         >
           <Plus size={13} aria-hidden="true" />
           New Classification
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsDefiningGroup(true)}
+          className="flex-1 border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
+          aria-label="Repeating Group"
+          title="Stamp a unit measurement across N identical units"
+        >
+          <Copy size={13} aria-hidden="true" />
+          Repeating Group
         </button>
       </div>
 

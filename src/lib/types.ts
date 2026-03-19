@@ -127,6 +127,18 @@ export interface Drawing {
   sheetNumber?: string;
 }
 
+export interface RepeatingGroup {
+  id: string;
+  name: string;
+  projectId?: string;
+  pageNumber: number;
+  boundingBox: { x: number; y: number; width: number; height: number };
+  repeatCount: number;
+  classificationIds: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PDFViewerHandle {
   containerEl: HTMLDivElement | null;
   zoom: number;

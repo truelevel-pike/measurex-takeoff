@@ -44,6 +44,7 @@ import MXChat from '@/components/MXChat';
 import AIImageSearch from '@/components/AIImageSearch';
 import PatternSearch from '@/components/PatternSearch';
 import CropOverlay from '@/components/CropOverlay';
+import RepeatingGroupTool from '@/components/RepeatingGroupTool';
 const ComparePanel = dynamic(() => import('@/components/ComparePanel'), { ssr: false });
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false });
 import { useWhatsNew } from '@/components/WhatsNewModal';
@@ -236,6 +237,7 @@ function PageInner() {
   // Store bindings
   const setTool = useStore((s) => s.setTool);
   const currentTool = useStore((s) => s.currentTool);
+  const isDefiningGroup = useStore((s) => s.isDefiningGroup);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
@@ -1736,6 +1738,7 @@ function PageInner() {
                       }}
                     />
                   )}
+                  {isDefiningGroup && <RepeatingGroupTool />}
                 </PDFViewer>
                 </ErrorBoundary>
                 <ZoomControls />
