@@ -1344,6 +1344,57 @@ function PageInner() {
 
   }, [pageBaseDimensions, setCurrentPage, setSelectedPolygon, setZoomLevel, safeGoToPage]);
 
+  const handleClassificationZoom = useCallback((classificationId: string) => {
+    const state = useStore.getState();
+    const page = state.currentPage;
+    const classPolygons = state.polygons.filter(
+      (p) => p.classificationId === classificationId && p.pageNumber === page && p.points.length > 0
+    );
+    if (classPolygons.length === 0) return;
+
+    // Compute bounding box of all matching polygons
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const poly of classPolygons) {
+      for (const pt of poly.points) {
+        if (pt.x < minX) minX = pt.x;
+        if (pt.y < minY) minY = pt.y;
+        if (pt.x > maxX) maxX = pt.x;
+        if (pt.y > maxY) maxY = pt.y;
+      }
+    }
+
+    const dims = pageBaseDimensions[page] ?? { width: 1, height: 1 };
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Check if points are normalized (0-1)
+    const isNormalized = minX >= 0 && maxX <= 1 && minY >= 0 && maxY <= 1;
+    const normalizedCenter = isNormalized
+      ? { x: centerX, y: centerY }
+      : { x: centerX / Math.max(1, dims.width), y: centerY / Math.max(1, dims.height) };
+    normalizedCenter.x = Math.max(0, Math.min(1, normalizedCenter.x));
+    normalizedCenter.y = Math.max(0, Math.min(1, normalizedCenter.y));
+
+    // Compute zoom to fit bounding box with padding
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+    const container = viewer.containerEl;
+    if (!container) return;
+
+    const bboxW = isNormalized ? (maxX - minX) * dims.width : (maxX - minX);
+    const bboxH = isNormalized ? (maxY - minY) * dims.height : (maxY - minY);
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+
+    const fitZoom = Math.min(
+      containerW / (Math.max(bboxW, 1) * 1.3),
+      containerH / (Math.max(bboxH, 1) * 1.3)
+    );
+    const clampedZoom = Math.max(0.5, Math.min(5, fitZoom));
+
+    viewer.focusOnNormalizedPoint(normalizedCenter, clampedZoom);
+  }, [pageBaseDimensions]);
+
   const isMobileViewport = useIsMobile();
 
   return (
@@ -1626,6 +1677,7 @@ function PageInner() {
               showTakeoffSearch={showTakeoffSearch}
               onTakeoffSearchSelect={handleTakeoffSearchSelect}
               isLoading={aiLoading}
+              onClassificationZoom={handleClassificationZoom}
             />
           </ErrorBoundary>
         </div>

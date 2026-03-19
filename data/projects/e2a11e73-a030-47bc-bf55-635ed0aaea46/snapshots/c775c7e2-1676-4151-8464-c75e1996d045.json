@@ -1,0 +1,75 @@
+{
+  "id": "c775c7e2-1676-4151-8464-c75e1996d045",
+  "projectId": "e2a11e73-a030-47bc-bf55-635ed0aaea46",
+  "description": "Demo snapshot",
+  "createdAt": "2026-03-19T18:43:21.354Z",
+  "polygonCount": 0,
+  "classificationCount": 1,
+  "assemblyCount": 0,
+  "pageCount": 7,
+  "classifications": [
+    {
+      "id": "8916a817-c791-48ac-96fd-0ed42901f623",
+      "name": "Roofing",
+      "color": "#FF5733",
+      "type": "area",
+      "visible": true,
+      "formulaSavedToLibrary": false
+    }
+  ],
+  "polygons": [],
+  "scales": [
+    {
+      "pixelsPerUnit": 10,
+      "unit": "ft",
+      "label": "1/4\" = 1ft",
+      "source": "manual",
+      "pageNumber": 1
+    }
+  ],
+  "assemblies": [],
+  "pages": [
+    {
+      "pageNum": 1,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 2,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 3,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 4,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 5,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 6,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    },
+    {
+      "pageNum": 7,
+      "width": 1224,
+      "height": 792,
+      "text": ""
+    }
+  ]
+}

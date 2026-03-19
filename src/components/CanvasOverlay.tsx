@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { snapToNearestVertex, type SnapPoint } from '@/lib/snap-utils';
+import { useUserPrefs } from '@/lib/user-prefs';
 
 export interface PolygonContextMenuPayload {
   polygonId: string;
@@ -80,6 +81,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const scales = useStore((s) => s.scales);
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
   const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
+  const { prefs } = useUserPrefs();
 
   // Vertex drag state
   const [dragging, setDragging] = useState<{
@@ -90,6 +92,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
   const [showBatchClassificationPicker, setShowBatchClassificationPicker] = useState(false);
   const [showFloatingReclassify, setShowFloatingReclassify] = useState(false);
+  const [hoveredPoly, setHoveredPoly] = useState<{ id: string; clientX: number; clientY: number } | null>(null);
 
   const toSvgCoords = useCallback(
     (e: React.MouseEvent | MouseEvent): Point => {
@@ -485,7 +488,18 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           };
 
           return (
-            <g key={poly.id}>
+            <g
+              key={poly.id}
+              onPointerEnter={(currentTool === 'select' || currentTool === 'pan') ? (e) => {
+                setHoveredPoly({ id: poly.id, clientX: e.clientX, clientY: e.clientY });
+              } : undefined}
+              onPointerMove={(currentTool === 'select' || currentTool === 'pan') ? (e) => {
+                setHoveredPoly((prev) => prev?.id === poly.id ? { id: poly.id, clientX: e.clientX, clientY: e.clientY } : prev);
+              } : undefined}
+              onPointerLeave={(currentTool === 'select' || currentTool === 'pan') ? () => {
+                setHoveredPoly((prev) => prev?.id === poly.id ? null : prev);
+              } : undefined}
+            >
               {isLinearPoly ? (
                 <>
                   <polyline
@@ -603,7 +617,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 );
               })()}
               {/* Polygon label: measurement annotation (area/length/count) */}
-              {(() => {
+              {prefs.showPolygonLabels && (() => {
                 const pts = displayPoints;
                 const clsType = cls?.type ?? 'area';
                 // Count markers have 1 point, linear can have 2 — allow labels for those
@@ -723,6 +737,67 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           />
         )}
       </svg>
+      {/* Hover tooltip for polygon measurements */}
+      {hoveredPoly && (() => {
+        const poly = polygons.find((p) => p.id === hoveredPoly.id);
+        if (!poly) return null;
+        const cls = classificationById.get(poly.classificationId);
+        const clsType = cls?.type ?? 'area';
+        const pageScale = scales[poly.pageNumber] ?? scale;
+        const ppu = pageScale?.pixelsPerUnit || 1;
+        const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+        if (!wrapperRect) return null;
+        const tipX = hoveredPoly.clientX - wrapperRect.left + 14;
+        const tipY = hoveredPoly.clientY - wrapperRect.top - 10;
+        const labelColor = cls?.color ?? '#00d4ff';
+
+        const lines: string[] = [];
+        if (cls?.name) lines.push(cls.name);
+        if (clsType === 'area') {
+          const areaReal = poly.area / (ppu * ppu);
+          lines.push(`${areaReal.toFixed(1)} SF`);
+        } else if (clsType === 'linear') {
+          const linearReal = calculateLinearFeet(poly.points, ppu, false);
+          lines.push(`${linearReal.toFixed(1)} LF`);
+        } else if (clsType === 'count') {
+          const countPolys = polygons.filter((p) => p.classificationId === poly.classificationId);
+          const idx = countPolys.findIndex((p) => p.id === poly.id) + 1;
+          lines.push(`${cls?.name ?? 'Item'} ${idx} of ${countPolys.length}`);
+        }
+        lines.push(`Page ${poly.pageNumber}`);
+        if (poly.confidence !== undefined) {
+          lines.push(`${Math.round(poly.confidence * 100)}% confidence`);
+        }
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: tipX,
+              top: tipY,
+              transform: 'translateY(-100%)',
+              pointerEvents: 'none',
+              zIndex: 50,
+              background: 'rgba(15,18,32,0.95)',
+              border: `1px solid ${labelColor}`,
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontFamily: 'monospace',
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: '#e2e8f0',
+              whiteSpace: 'nowrap',
+              boxShadow: `0 4px 16px rgba(0,0,0,0.5), 0 0 8px ${labelColor}33`,
+            }}
+          >
+            {lines.map((line, i) => (
+              <div key={i} style={i === 0 ? { color: labelColor, fontWeight: 600 } : undefined}>
+                {line}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       {showBatchMenu && batchMenuPosition && (
         <div
           style={{

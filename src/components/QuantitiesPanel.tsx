@@ -148,9 +148,10 @@ interface QuantitiesPanelProps {
   showTakeoffSearch?: boolean;
   onTakeoffSearchSelect?: (result: TakeoffSearchResult) => void;
   isLoading?: boolean;
+  onClassificationZoom?: (classificationId: string) => void;
 }
 
-export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading }: QuantitiesPanelProps) {
+export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading, onClassificationZoom }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies' | 'estimate'>('quantities');
@@ -505,6 +506,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   function activateClassification(classificationId: string, isSelected: boolean) {
     setSelectedClassification(isSelected ? null : classificationId);
     toggleExpanded(classificationId);
+    if (!isSelected) {
+      onClassificationZoom?.(classificationId);
+    }
   }
 
   function handleClassificationRowKeyDown(

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useStore } from '@/lib/store';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Ruler } from 'lucide-react';
 import { useIsMobile } from '@/lib/utils';
 
 interface BottomStatusBarProps {
@@ -48,11 +48,14 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
         }}
       >
         {scaleText ? (
-          <span>Scale: {scaleText}</span>
-        ) : (
           <>
-            <AlertTriangle size={12} color="#ff6b35" /> <span>No scale — tap to set</span>
+            <Ruler size={12} color="#00ff88" />
+            <span className="font-semibold">Scale: {scaleText}</span>
           </>
+        ) : (
+          <span className="animate-pulse inline-flex items-center gap-1">
+            <AlertTriangle size={12} color="#ff6b35" /> <span>No scale — tap to set</span>
+          </span>
         )}
       </button>
 
