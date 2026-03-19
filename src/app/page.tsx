@@ -33,7 +33,7 @@ import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import MergeSplitTool from '@/components/MergeSplitTool';
 import CutTool from '@/components/CutTool';
-// ScalePopup removed — AutoScalePopup is the sole confirmation dialog (GAP-006)
+import ScalePopup from '@/components/ScalePopup';
 import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
@@ -538,7 +538,10 @@ function PageInner() {
   }, []);
 
   // Auto-create a project when a PDF is loaded and no project exists yet
-  const ensureProject = useCallback(async (fileName: string) => {
+  // GAP-006: State for server-detected scale banner (from upload response)
+  const [uploadDetectedScale, setUploadDetectedScale] = useState<{ pixelsPerUnit: number; unit: string; description: string } | null>(null);
+
+  const ensureProject = useCallback(async (fileName: string, file?: File) => {
     if (projectId) return;
     // Prevent duplicate project creation from rapid uploads
     if (isCreatingProjectRef.current) return;
@@ -562,6 +565,18 @@ function PageInner() {
       setProjectName(project.name || name);
       localStorage.setItem('measurex_project_id', project.id);
       window.history.replaceState({}, '', `/?project=${project.id}`);
+
+      // GAP-006: Upload PDF to server and check for auto-detected scale
+      if (file) {
+        try {
+          const uploadResult = await api.uploadPDF(project.id, file);
+          if (uploadResult.detectedScale) {
+            setUploadDetectedScale(uploadResult.detectedScale);
+          }
+        } catch (uploadErr) {
+          console.error('PDF upload failed:', uploadErr);
+        }
+      }
     } catch (err) {
       console.error('Failed to auto-create project:', err);
     } finally {
@@ -576,7 +591,7 @@ function PageInner() {
       // until PDFViewer fires onPageChange with the real total.
       setPdfPageCountReady(false);
       setPdfFile(f);
-      void ensureProject(f.name);
+      void ensureProject(f.name, f);
     }
   };
 
@@ -874,7 +889,7 @@ function PageInner() {
                   const f = e.dataTransfer.files?.[0];
                   if (f && f.type === 'application/pdf') {
                     setPdfFile(f);
-                    void ensureProject(f.name);
+                    void ensureProject(f.name, f);
                   }
                 }}
               >

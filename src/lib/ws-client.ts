@@ -69,14 +69,14 @@ function handleSSEMessage(raw: MessageEvent) {
       reconnectAttempt = 0;
       break;
     case 'polygon:created': {
-      const poly = parsed.data;
+      const poly = parsed.data as Polygon;
       if (store.polygons.some((p) => p.id === poly.id)) break;
       useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
       emitActivity('polygon:created', parsed.data as unknown as Record<string, unknown>);
       break;
     }
     case 'polygon:updated': {
-      const poly = parsed.data;
+      const poly = parsed.data as Polygon;
       if (store.polygons.some((p) => p.id === poly.id)) {
         store.updatePolygon(poly.id, poly);
       } else {
@@ -87,20 +87,23 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'polygon:deleted': {
-      const { id } = parsed.data;
+      const { id } = parsed.data as { id: string };
       store.deletePolygon(id);
       emitActivity('polygon:deleted', parsed.data as unknown as Record<string, unknown>);
       break;
     }
     case 'classification:created': {
-      const cls = parsed.data;
-      if (store.classifications.some((c) => c.id === cls.id)) break;
-      useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
+      const cls = parsed.data as Classification;
+      // BUG-R6-001: Always emit activity so the AI Activity Log shows the event,
+      // even if the classification already exists locally (optimistic add).
       emitActivity('classification:created', parsed.data as unknown as Record<string, unknown>);
+      if (!store.classifications.some((c) => c.id === cls.id)) {
+        useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
+      }
       break;
     }
     case 'classification:updated': {
-      const cls = parsed.data;
+      const cls = parsed.data as Classification;
       if (store.classifications.some((c) => c.id === cls.id)) {
         store.updateClassification(cls.id, cls);
       } else {
@@ -111,7 +114,7 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'classification:deleted': {
-      const { id } = parsed.data;
+      const { id } = parsed.data as { id: string };
       useStore.setState((s) => ({
         classifications: s.classifications.filter((c) => c.id !== id),
         polygons: s.polygons.filter((p) => p.classificationId !== id),
@@ -120,12 +123,12 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'scale:updated': {
-      store.setScale(parsed.data);
+      store.setScale(parsed.data as ScaleCalibration);
       emitActivity('scale:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
     case 'assembly:created': {
-      const assembly = parsed.data;
+      const assembly = parsed.data as Assembly;
       const { assemblies, addAssembly } = useStore.getState();
       if (!assemblies.some((a) => a.id === assembly.id)) {
         addAssembly(assembly);
@@ -134,13 +137,13 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'assembly:updated': {
-      const assembly = parsed.data;
+      const assembly = parsed.data as Assembly;
       useStore.getState().updateAssembly(assembly.id, assembly);
       emitActivity('assembly:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
     case 'assembly:deleted': {
-      const { id } = parsed.data;
+      const { id } = parsed.data as { id: string };
       useStore.getState().deleteAssembly(id);
       emitActivity('assembly:deleted', parsed.data as unknown as Record<string, unknown>);
       break;

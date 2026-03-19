@@ -68,13 +68,19 @@ export async function getProject(id: string): Promise<Project> {
 
 // ─── PDF Upload ───
 
+export interface UploadPDFResponse {
+  pages: number;
+  dimensions?: Array<{ page: number; width: number; height: number }>;
+  detectedScale?: { pixelsPerUnit: number; unit: string; description: string };
+}
+
 export async function uploadPDF(
   projectId: string,
   file: File
-): Promise<{ pages: number }> {
+): Promise<UploadPDFResponse> {
   const formData = new FormData();
   formData.append('file', file);
-  return request<{ pages: number }>(
+  return request<UploadPDFResponse>(
     `/api/projects/${projectId}/upload`,
     { method: 'POST', body: formData }
   );

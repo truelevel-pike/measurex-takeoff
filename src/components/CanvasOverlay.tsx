@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
+import { snapToNearestVertex, type SnapPoint } from '@/lib/snap-utils';
 
 export interface PolygonContextMenuPayload {
   polygonId: string;
@@ -57,6 +58,7 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     vertexIndex: number;
   } | null>(null);
   const [dragPoints, setDragPoints] = useState<Point[] | null>(null);
+  const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
 
   const toSvgCoords = useCallback(
     (e: React.MouseEvent | MouseEvent): Point => {
@@ -88,16 +90,25 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     const handleMove = (e: MouseEvent) => {
       e.preventDefault();
       const pt = toSvgCoords(e);
+      // Snap dragged vertex to nearby vertices on other polygons
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      const screenToBase = rect ? baseDims.width / rect.width : 1;
+      const snapThreshold = 10 * screenToBase;
+      const otherPolygons = polygons.filter((p) => p.id !== dragging.polygonId);
+      const snap = snapToNearestVertex(pt, otherPolygons, snapThreshold);
+      const snappedPt = snap ? { x: snap.x, y: snap.y } : pt;
+      setSnapIndicator(snap);
       setDragPoints((prev) => {
         if (!prev) return prev;
         const updated = [...prev];
-        updated[dragging.vertexIndex] = pt;
+        updated[dragging.vertexIndex] = snappedPt;
         return updated;
       });
     };
 
     const handleUp = (e: MouseEvent) => {
       e.preventDefault();
+      setSnapIndicator(null);
       setDragPoints((prev) => {
         if (prev) {
           const polygon = allPolygons.find((p) => p.id === dragging.polygonId);
@@ -342,6 +353,20 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
             </g>
           );
         })}
+
+        {/* Snap indicator — shows when a vertex snaps during drag */}
+        {snapIndicator && (
+          <circle
+            cx={snapIndicator.x}
+            cy={snapIndicator.y}
+            r={10}
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth={2.5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
 
         {/* Calibration overlays */}
         {calibrationPoints.map((pt: Point, i: number) => (

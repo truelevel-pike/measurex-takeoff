@@ -124,6 +124,31 @@ export function getPolygonSnapPoints(
 }
 
 /**
+ * Snap cursor to the nearest polygon vertex within a threshold distance.
+ * Returns the snapped position if within threshold, otherwise null.
+ */
+export function snapToNearestVertex(
+  cursor: { x: number; y: number },
+  polygons: Polygon[],
+  threshold: number = 10,
+): SnapPoint | null {
+  let best: SnapPoint | null = null;
+  let bestDist = threshold;
+
+  for (const poly of polygons) {
+    for (const pt of poly.points) {
+      const d = Math.hypot(pt.x - cursor.x, pt.y - cursor.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { x: pt.x, y: pt.y, type: 'vertex', polygonId: poly.id };
+      }
+    }
+  }
+
+  return best;
+}
+
+/**
  * Project point (px, py) onto line segment (ax, ay)-(bx, by).
  * Returns the closest point on the segment.
  */
