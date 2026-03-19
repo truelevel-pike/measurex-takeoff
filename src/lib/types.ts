@@ -45,6 +45,7 @@ export interface ProjectState {
 export interface DetectedElement {
   name: string;
   type: 'area' | 'linear' | 'count';
+  classification?: string;
   points: Point[];
   color?: string;
   confidence?: number;

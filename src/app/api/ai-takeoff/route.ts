@@ -1,18 +1,37 @@
 import { NextResponse } from 'next/server';
-import type { DetectedElement } from '@/lib/types';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+
+/**
+ * Generate a deterministic hex color from a string.
+ */
+function nameToColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const r = (hash >> 0) & 0xff;
+  const g = (hash >> 8) & 0xff;
+  const b = (hash >> 16) & 0xff;
+  const clamp = (v: number) => Math.max(40, Math.min(220, v));
+  return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { imageBase64, scale, pageWidth, pageHeight } = body || {};
+    const { imageBase64, pageWidth, pageHeight } = body || {};
     if (!imageBase64 || !pageWidth || !pageHeight) {
-      return NextResponse.json({ error: 'imageBase64, pageWidth, pageHeight required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'imageBase64, pageWidth, pageHeight required' },
+        { status: 400 },
+      );
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
+    }
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements.
 
@@ -40,7 +59,7 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
     const resp = await fetch(OPENAI_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -55,11 +74,16 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
 
     if (!resp.ok) {
       const text = await resp.text();
-      return NextResponse.json({ error: `OpenAI error ${resp.status}: ${text}` }, { status: 500 });
+      return NextResponse.json(
+        { error: `OpenAI error ${resp.status}: ${text}` },
+        { status: 500 },
+      );
     }
 
     const data = await resp.json();
-    const raw = data?.choices?.[0]?.message?.content;
+    const raw: string | undefined = data?.choices?.[0]?.message?.content;
+    if (!raw) throw new Error('No content in OpenAI response');
+
     // Attempt to extract JSON
     const jsonStart = raw.indexOf('[');
     const jsonEnd = raw.lastIndexOf(']');
@@ -67,10 +91,34 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
     const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
     if (!Array.isArray(parsed)) throw new Error('Parsed response is not an array');
 
-    // Minimal validation
-    const results: DetectedElement[] = parsed.filter((el: any) => Array.isArray(el?.points) && el?.type);
+    // Map and validate each element to match client DetectedElement schema
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = parsed
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((el: any) => Array.isArray(el?.points) && el?.type)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((el: any) => {
+        const name = String(el.name || el.classification || 'Unknown');
+        return {
+          name,
+          type: el.type as 'area' | 'linear' | 'count',
+          classification: String(el.classification || el.name || name),
+          points: (el.points as Array<{ x: number; y: number }>).map(
+            (p: { x: number; y: number }) => ({
+              x: Number(p.x) || 0,
+              y: Number(p.y) || 0,
+            }),
+          ),
+          color:
+            typeof el.color === 'string' && el.color.startsWith('#')
+              ? el.color
+              : nameToColor(name),
+        };
+      });
+
     return NextResponse.json({ results });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'AI takeoff failed' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'AI takeoff failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
