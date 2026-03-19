@@ -295,6 +295,29 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     });
   }, []);
 
+  // Build a flat ordered list with trade headers interleaved when grouping is active
+  type TradeHeader = { kind: 'header'; trade: string; count: number };
+  type ClassRow = { kind: 'row'; classification: Classification; classIndex: number };
+  type ListItem = TradeHeader | ClassRow;
+
+  const orderedListItems = useMemo<ListItem[]>(() => {
+    if (!groupByTrade || filtered.length < 3) {
+      return filtered.map((classification, classIndex) => ({ kind: 'row' as const, classification, classIndex }));
+    }
+    const items: ListItem[] = [];
+    for (const [trade, tradeClassifications] of Object.entries(tradeGrouped)) {
+      if (tradeClassifications.length === 0) continue;
+      items.push({ kind: 'header' as const, trade, count: tradeClassifications.length });
+      if (!collapsedTrades.has(trade)) {
+        for (const cls of tradeClassifications) {
+          const classIndex = filtered.indexOf(cls);
+          items.push({ kind: 'row' as const, classification: cls, classIndex });
+        }
+      }
+    }
+    return items;
+  }, [groupByTrade, filtered, tradeGrouped, collapsedTrades]);
+
   const classificationById = useMemo(() => {
     const byId = new Map<string, Classification>();
     for (const classification of classifications) {
@@ -409,9 +432,34 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return getDeductions(classification).reduce((sum, deduction) => sum + (Number(deduction.quantity) || 0), 0);
   }
 
+  // Auto-deductions: door/window openings subtracted from linear walls
+  const autoDeductionsByClass = useMemo(() => {
+    if (!scale?.pixelsPerUnit) return new Map<string, { total: number; items: AutoDeduction[] }>();
+    const scaleConfig = {
+      pixelsPerFoot: scale.pixelsPerUnit,
+      unit: (scale.unit === 'ft' || scale.unit === 'in' ? 'imperial' : 'metric') as 'imperial' | 'metric',
+    };
+    const raw = computeDeductions(polygons, classifications, scaleConfig);
+    return aggregateDeductions(raw);
+  }, [polygons, classifications, scale]);
+
+  function getAutoDeductionTotal(classificationId: string): number {
+    return autoDeductionsByClass.get(classificationId)?.total ?? 0;
+  }
+
+  function getAutoDeductionItems(classificationId: string): AutoDeduction[] {
+    return autoDeductionsByClass.get(classificationId)?.items ?? [];
+  }
+
+  function getTotalDeductions(classification: Classification): number {
+    const manual = getDeductionTotal(classification);
+    const auto = getAutoDeductionTotal(classification.id);
+    return manual + auto;
+  }
+
   function formatClassificationTotal(classification: Classification, totals: ClassTotals): string {
     if (classification.type === 'area') return formatArea(totals.areaReal, measurementSettings);
-    if (classification.type === 'linear') return formatLinear(totals.lengthReal - getDeductionTotal(classification), measurementSettings);
+    if (classification.type === 'linear') return formatLinear(totals.lengthReal - getTotalDeductions(classification), measurementSettings);
     return formatCount(totals.count);
   }
 
@@ -1017,7 +1065,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           const polygonsForClassification = polygonsByClassification.get(classification.id) ?? [];
           const deductions = getDeductions(classification);
           const deductionTotal = getDeductionTotal(classification);
-          const netLinear = totals.lengthReal - deductionTotal;
+          const autoDeductions = getAutoDeductionItems(classification.id);
+          const autoDeductTotal = getAutoDeductionTotal(classification.id);
+          const netLinear = totals.lengthReal - deductionTotal - autoDeductTotal;
           const isExpanded = expanded.has(classification.id);
           const isSelected = selectedClassification === classification.id;
           const isEditing = editingId === classification.id;
@@ -1289,8 +1339,48 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                               ))}
                             </div>
                           )}
+                          <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-[10px] text-gray-300 font-mono uppercase">Auto-Backout (Openings)</span>
+                              <button type="button" onClick={() => addAutoBackout(classification)} className="text-[10px] text-[#00d4ff] hover:text-[#9eeeff]">+Add</button>
+                            </div>
+                            {autoDeductions.length === 0 ? (
+                              <div className="text-[10px] text-gray-500">No auto-backouts.</div>
+                            ) : (
+                              autoDeductions.map((ab, idx) => (
+                                <div key={idx} className="flex items-center gap-1 mb-0.5">
+                                  <select
+                                    value={ab.countClassificationId}
+                                    onChange={e => updateAutoBackout(classification, idx, { countClassificationId: e.target.value })}
+                                    className="flex-1 border border-[#00d4ff]/20 rounded px-1 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none"
+                                    aria-label="Count classification to backout"
+                                  >
+                                    <option value="">Select count class…</option>
+                                    {classifications.filter(c => c.type === 'count').map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={ab.openingWidthFt}
+                                    onChange={e => updateAutoBackout(classification, idx, { openingWidthFt: parseFloat(e.target.value) || 0 })}
+                                    placeholder="3.0"
+                                    className="w-16 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[10px] bg-[#0a0a0f] text-[#e5e7eb] outline-none"
+                                    aria-label="Opening width in feet"
+                                  />
+                                  <span className="text-[9px] text-gray-500">ft</span>
+                                  <button type="button" onClick={() => deleteAutoBackout(classification, idx)} className="w-5 h-5 rounded border border-[#00d4ff]/20 text-[11px] text-gray-300 hover:text-white" aria-label="Remove auto-backout">×</button>
+                                </div>
+                              ))
+                            )}
+                            {autoDeductions.length > 0 && (
+                              <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
+                                Auto-backout: -{autoDeductTotal.toFixed(1)} ft ({autoDeductions.map(ab => { const c = classifications.find(cl => cl.id === ab.countClassificationId); return c ? `${polygonsByClassification.get(c.id)?.length ?? 0}×${ab.openingWidthFt}ft` : ''; }).filter(Boolean).join(' + ')})
+                              </div>
+                            )}
+                          </div>
                           <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
-                            Net LF = {formatLinear(totals.lengthReal, measurementSettings)} - {formatLinear(deductionTotal, measurementSettings)} = {formatLinear(netLinear, measurementSettings)}
+                            Net LF = {formatLinear(totals.lengthReal, measurementSettings)} - {formatLinear(deductionTotal, measurementSettings)} - {formatLinear(autoDeductTotal, measurementSettings)} = {formatLinear(netLinear, measurementSettings)}
                           </div>
                         </div>
                       )}
