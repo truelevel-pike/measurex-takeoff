@@ -1,7 +1,7 @@
 // skills/togal-takeoff/src/components/ThreeDViewer.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -175,6 +175,7 @@ export default function ThreeDViewer({
   const [cameraMode, setCameraMode] = useState<CameraMode>('perspective');
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(false);
+  const controlsRef = useRef<any>(null);
   const { addToast } = useToast();
 
   return (
@@ -229,6 +230,12 @@ export default function ThreeDViewer({
             }`}
           >
             Orthographic
+          </button>
+          <button
+            onClick={() => controlsRef.current?.reset()}
+            className="h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white hover:border-[#00d4ff]/35"
+          >
+            Reset
           </button>
         </div>
       )}
@@ -296,6 +303,7 @@ export default function ThreeDViewer({
         {children}
 
         <OrbitControls
+          ref={controlsRef}
           makeDefault
           enablePan
           enableZoom

@@ -9,6 +9,9 @@ type CacheOptions = {
  * withCache — wraps a route handler and injects Cache-Control headers.
  * Usage: export const GET = withCache({ maxAge: 30, sMaxAge: 60 }, handler);
  */
+// VERIFIED (E36): withCache is working correctly. The quantities API uses maxAge=30, sMaxAge=30,
+// meaning browsers cache the response for 30 seconds and CDNs for 30 seconds before re-fetching.
+// This reduces unnecessary API calls when users switch between pages without changing takeoff data.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withCache<C = any>(
   options: CacheOptions,

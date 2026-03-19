@@ -147,9 +147,10 @@ function ClassificationShape({ index, color, size = 10 }: { index: number; color
 interface QuantitiesPanelProps {
   showTakeoffSearch?: boolean;
   onTakeoffSearchSelect?: (result: TakeoffSearchResult) => void;
+  isLoading?: boolean;
 }
 
-export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: QuantitiesPanelProps) {
+export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies' | 'estimate'>('quantities');
@@ -1137,7 +1138,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       )}
 
       <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list>
-        {orderedListItems.length === 0 && polygons.length === 0 && !search && (
+        {isLoading && (
+          <div className="py-2 px-1.5 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between py-2 px-2 rounded animate-pulse">
+                <div className="w-3/4 h-3 bg-gray-700 rounded" />
+                <div className="w-12 h-3 bg-gray-700 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+        {!isLoading && orderedListItems.length === 0 && polygons.length === 0 && !search && (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <Layers size={28} className="text-gray-600 mb-3" aria-hidden="true" />
             <p className="text-[13px] text-gray-400 leading-relaxed">

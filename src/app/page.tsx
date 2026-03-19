@@ -1624,6 +1624,7 @@ function PageInner() {
             <QuantitiesPanel
               showTakeoffSearch={showTakeoffSearch}
               onTakeoffSearchSelect={handleTakeoffSearchSelect}
+              isLoading={aiLoading}
             />
           </ErrorBoundary>
         </div>

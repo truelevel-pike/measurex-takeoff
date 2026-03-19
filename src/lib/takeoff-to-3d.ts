@@ -72,6 +72,15 @@ export function generateSampleGeometry(): { walls: WallSegment[]; areas: FloorAr
  */
 export const generateSampleRoom = generateSampleGeometry;
 
+/** Determine wall extrusion height based on classification name. */
+export function getExtrusionHeight(classificationName: string): number {
+  const name = classificationName.toLowerCase();
+  if (name.includes('slab') || name.includes('floor')) return 0.15;
+  if (name.includes('column') || name.includes('post')) return 12;
+  // wall, roof, ceiling, and default all get 9
+  return 9;
+}
+
 export function convertTakeoffTo3D(polygons: Polygon[], classifications: Classification[]) {
   const walls: WallSegment[] = [];
   const areas: FloorAreaItem[] = [];
@@ -96,7 +105,7 @@ export function convertTakeoffTo3D(polygons: Polygon[], classifications: Classif
         walls.push({
           start: { x: a.x / 100, y: a.y / 100 },
           end:   { x: b.x / 100, y: b.y / 100 },
-          height: 8,
+          height: getExtrusionHeight(cls.name),
           thickness: 0.5,
           color,
         });
