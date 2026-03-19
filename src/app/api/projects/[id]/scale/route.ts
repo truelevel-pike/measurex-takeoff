@@ -2,21 +2,24 @@ import { NextResponse } from 'next/server';
 import { getScale, setScale, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
 import { ProjectIdSchema, ScaleSchema, validationError } from '@/lib/api-schemas';
+import { withCache } from '@/lib/with-cache';
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
-    const scale = await getScale(id);
+    const url = new URL(req.url);
+    const pageNumber = parseInt(url.searchParams.get('pageNumber') || '1', 10) || 1;
+    const scale = await getScale(id, pageNumber);
     return NextResponse.json({ scale });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -33,4 +36,4 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
-}
+});

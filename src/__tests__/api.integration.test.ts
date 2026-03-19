@@ -75,6 +75,7 @@ describe('API integration: project/classification/polygon CRUD', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name }),
       }),
+      {} as any,
     );
 
     expect(res.status).toBe(200);

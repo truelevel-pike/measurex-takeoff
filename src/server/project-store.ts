@@ -440,7 +440,7 @@ export async function createClassification(
       visible: data.visible ?? true,
       formula: data.formula ?? null,
       formula_unit: data.formulaUnit ?? null,
-      formula_saved_to_library: data.formulaSavedToLibrary ?? null,
+      formula_saved_to_library: data.formulaSavedToLibrary ?? false,
     };
     const { error } = await sb.from('mx_classifications').insert(row);
     if (error) throw new Error(`createClassification: ${error.message}`);
