@@ -11,13 +11,13 @@ import type { Classification, DetectedElement, PDFViewerHandle, Polygon, Project
 import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
-import { useIsMobile } from '@/lib/utils';
 import { loadAIResults } from '@/lib/ai-results-loader';
+import { useIsMobile } from '@/lib/utils';
 // downloadExcel dynamically imported to avoid bundling XLSX (~300KB) at load time
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
 import { installMeasurexAPI } from '@/lib/measurex-api';
 
-import { connectToProject, disconnectFromProject } from '@/lib/ws-client';
+import { connectToProject, disconnectFromProject, subscribeToActivity } from '@/lib/ws-client';
 import * as api from '@/lib/api-client';
 import AIActivityLog from '@/components/AIActivityLog';
 import AutoScalePopup from '@/components/AutoScalePopup';
@@ -288,6 +288,33 @@ function PageInner() {
   const isCreatingProjectRef = useRef(false);
   const thumbnailCapturedRef = useRef(false);
 
+  const reloadProjectPolygonsAndClassifications = useCallback(async (pid: string) => {
+    const [classRes, polyRes] = await Promise.all([
+      fetch(`/api/projects/${pid}/classifications`).catch(() => null),
+      fetch(`/api/projects/${pid}/polygons`).catch(() => null),
+    ]);
+
+    if (!classRes?.ok || !polyRes?.ok) {
+      throw new Error('Failed to refresh AI takeoff results from server');
+    }
+
+    const classData = await classRes.json();
+    const polyData = await polyRes.json();
+    const fetchedClassifications = Array.isArray(classData.classifications) ? classData.classifications : [];
+    const fetchedPolygons = Array.isArray(polyData.polygons) ? polyData.polygons : [];
+
+    knownClassificationIds.current = new Set(fetchedClassifications.map((c: { id: string }) => c.id));
+    knownPolygonIds.current = new Set(fetchedPolygons.map((p: { id: string }) => p.id));
+    syncedClassificationsById.current = new Map(
+      fetchedClassifications.map((c: Classification) => [c.id, c]),
+    );
+
+    useStore.setState({
+      classifications: fetchedClassifications,
+      polygons: fetchedPolygons,
+    });
+  }, []);
+
   const persistSaveStatus = useCallback((text: string, clearMs = 2200) => {
     setSaveStatus(text);
     if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current);
@@ -491,6 +518,31 @@ function PageInner() {
     return () => disconnectFromProject();
   }, [projectId]);
 
+  useEffect(() => {
+    if (!projectId) return;
+    const unsubscribe = subscribeToActivity((event, data) => {
+      if (event === 'ai-takeoff:started') {
+        const page = typeof data.page === 'number' ? data.page : '?';
+        setAiStatus(`AI takeoff started for page ${page}...`);
+        return;
+      }
+
+      if (event === 'ai-takeoff:complete') {
+        const page = typeof data.page === 'number' ? data.page : '?';
+        const persisted = typeof data.persistedPolygons === 'number' ? data.persistedPolygons : null;
+        setAiStatus(
+          persisted !== null
+            ? `AI takeoff complete on page ${page} (${persisted} polygons persisted)`
+            : `AI takeoff complete on page ${page}`,
+        );
+        void reloadProjectPolygonsAndClassifications(projectId).catch((err) => {
+          console.error('Failed to reload AI takeoff results:', err);
+        });
+      }
+    });
+    return unsubscribe;
+  }, [projectId, reloadProjectPolygonsAndClassifications]);
+
   // Sync projectId into Zustand store so sub-components (e.g. AssembliesPanel) can access it
   const storeSetProjectId = useStore((s) => s.setProjectId);
   useEffect(() => {
@@ -515,13 +567,17 @@ function PageInner() {
   // AI Takeoff flow — processes ALL pages in the PDF
   const handleAITakeoff = useCallback(async () => {
     const viewer = pdfViewerRef.current;
-    if (!viewer) return;
+    if (!viewer || !projectId) {
+      setAiStatus('AI takeoff requires a saved project');
+      setTimeout(() => setAiStatus(null), 4000);
+      return;
+    }
 
     const pages = useStore.getState().totalPages || 1;
     const originalPage = useStore.getState().currentPage || 1;
 
     setAiLoading(true);
-    const totalStats = { areas: 0, lines: 0, counts: 0 };
+    let totalDetected = 0;
 
     try {
       for (let pageNum = 1; pageNum <= pages; pageNum++) {
@@ -536,41 +592,27 @@ function PageInner() {
 
         const imageBase64 = capturePageScreenshot(canvas);
         const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
+        const pageScale = useStore.getState().scales?.[pageNum] ?? useStore.getState().scale;
 
         setAiStatus(`AI analyzing page ${pageNum} of ${pages}... (10-30s per page)`);
         const elements: DetectedElement[] = await triggerAITakeoff(
           imageBase64,
-          useStore.getState().scale,
+          pageScale,
           dims.width,
           dims.height,
+          projectId,
+          pageNum,
         );
+        totalDetected += elements.length;
 
-        setAiStatus(`Page ${pageNum}: found ${elements.length} elements. Loading...`);
-        const stats = loadAIResults(elements, {
-          addClassification: useStore.getState().addClassification,
-          addPolygon: useStore.getState().addPolygon,
-          classifications: useStore.getState().classifications,
-          scale: useStore.getState().scale,
-          currentPage: pageNum,
-          getState: () => {
-            const s = useStore.getState();
-            return {
-              classifications: s.classifications,
-              scale: s.scale,
-              currentPage: pageNum,
-            };
-          },
-        }, { pageNumber: pageNum });
-
-        totalStats.areas += stats.areas;
-        totalStats.lines += stats.lines;
-        totalStats.counts += stats.counts;
+        setAiStatus(`Page ${pageNum}: detected ${elements.length} elements, persisted to project`);
       }
 
       // Return to the original page
       viewer.goToPage(originalPage);
+      await reloadProjectPolygonsAndClassifications(projectId);
 
-      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalStats.areas} rooms, ${totalStats.lines} walls, ${totalStats.counts} fixtures`;
+      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
       setAiStatus(doneMsg);
       setTimeout(() => setAiStatus(null), 5000);
 
@@ -585,7 +627,7 @@ function PageInner() {
     } finally {
       setAiLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, projectId, reloadProjectPolygonsAndClassifications]);
 
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
@@ -1059,7 +1101,11 @@ function PageInner() {
 
   const handleAITakeoffAllPages = useCallback(async () => {
     const viewer = pdfViewerRef.current;
-    if (!viewer) return;
+    if (!viewer || !projectId) {
+      setAiStatus('AI takeoff requires a saved project');
+      setTimeout(() => setAiStatus(null), 4000);
+      return;
+    }
 
     const total = useStore.getState().totalPages;
     const originalPage = useStore.getState().currentPage || 1;
@@ -1081,30 +1127,27 @@ function PageInner() {
         const imageBase64 = capturePageScreenshot(canvas);
         const dims = viewer.pageDimensions || { width: canvas.width, height: canvas.height };
         const pageScale = useStore.getState().scales?.[page] ?? useStore.getState().scale;
-        const elements: DetectedElement[] = await triggerAITakeoff(imageBase64, pageScale, dims.width, dims.height);
-        loadAIResults(elements, {
-          addClassification: useStore.getState().addClassification,
-          addPolygon: useStore.getState().addPolygon,
-          classifications: useStore.getState().classifications,
-          scale: pageScale,
-          currentPage: page,
-          getState: () => {
-            const s = useStore.getState();
-            return { classifications: s.classifications, scale: s.scale, currentPage: page };
-          },
-        }, { pageNumber: page });
-        setAiStatus(`Page ${page}/${total}: Done — ${elements.length} elements`);
+        const elements: DetectedElement[] = await triggerAITakeoff(
+          imageBase64,
+          pageScale,
+          dims.width,
+          dims.height,
+          projectId,
+          page,
+        );
+        setAiStatus(`Page ${page}/${total}: Done — ${elements.length} elements persisted`);
       } catch (err) {
         setAiStatus(`Page ${page}/${total}: Error — ${err instanceof Error ? err.message : 'failed'}`);
       }
     }
 
     viewer.goToPage(originalPage);
+    await reloadProjectPolygonsAndClassifications(projectId);
     setAiAllPagesProgress(null);
     setAiStatus('All pages complete!');
     setTimeout(() => setAiStatus(null), 5000);
     setAiLoading(false);
-  }, []);
+  }, [projectId, reloadProjectPolygonsAndClassifications]);
 
   // Crop & Search: when user completes a bounding box, crop the canvas region and send for AI analysis
   const handleCropComplete = useCallback((cropRect: { x: number; y: number; width: number; height: number }) => {
