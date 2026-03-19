@@ -29,8 +29,11 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     const bodyResult = ScaleSchema.passthrough().safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
-    const { pixelsPerUnit, unit, label, source, pageNumber } = body;
-    const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual', pageNumber: pageNumber || 1 });
+    const validated = bodyResult.data;
+    const unitVal = validated.unit as 'ft' | 'in' | 'm' | 'mm';
+    const label = typeof body.label === 'string' ? body.label : 'Custom';
+    const source = (typeof body.source === 'string' ? body.source : 'manual') as 'manual' | 'auto' | 'ai';
+    const scale = await setScale(id, { pixelsPerUnit: validated.pixelsPerUnit, unit: unitVal, label, source, pageNumber: validated.pageNumber || 1 });
     broadcastToProject(id, 'scale:updated', scale);
     return NextResponse.json({ scale });
   } catch (err: unknown) {
