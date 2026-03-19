@@ -147,7 +147,8 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
     });
   }
 
-  return expanded;
+  // Filter out any elements with empty points arrays — the client schema requires points.length >= 1.
+  return expanded.filter((el) => el.points.length > 0);
 }
 
 function toPersistablePoints(el: DetectedElement): Array<{ x: number; y: number }> | null {
@@ -238,7 +239,10 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
     const raw = extractOpenAIText(data?.choices?.[0]?.message?.content);
     if (!raw) throw new Error('No content in OpenAI response');
 
-    const results = parseDetectedElements(raw, pageWidth, pageHeight);
+    // Filter out any elements with empty points arrays before returning; the client schema
+    // (DetectedElementSchema) requires points.length >= 1 and would reject the entire response
+    // if any element has an empty points array.
+    const results = parseDetectedElements(raw, pageWidth, pageHeight).filter((el) => el.points.length > 0);
 
     let persistedPolygons = 0;
     if (projectId) {
