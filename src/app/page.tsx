@@ -899,11 +899,7 @@ function PageInner() {
         }
       } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
+        pdfViewerRef.current?.fitToPage();
       } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
       }

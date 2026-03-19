@@ -29,7 +29,7 @@ const shortcuts: ShortcutEntry[] = [
   { keyCombo: 'Ctrl+Y / Ctrl+Shift+Z', action: 'Redo' },
   { keyCombo: 'Ctrl+D', action: 'Duplicate last polygon' },
   { keyCombo: '1–7', action: 'Jump to page 1–7' },
-  { keyCombo: 'F', action: 'Toggle fullscreen' },
+  { keyCombo: 'F', action: 'Fit PDF to page' },
   { keyCombo: '?', action: 'Show this help' },
   { keyCombo: '+ / -', action: 'Zoom in/out' },
   { keyCombo: '0', action: 'Reset zoom' },
