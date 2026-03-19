@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { X, Download, FileSpreadsheet, FileText, Eye, Printer } from 'lucide-react';
+import { useFocusTrap } from '@/lib/use-focus-trap';
 import * as XLSX from 'xlsx';
 import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
@@ -180,7 +181,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   const totalPages = useStore((s) => s.totalPages);
   const currentPage = useStore((s) => s.currentPage);
 
-  const panelRef = useRef<HTMLDivElement>(null);
+  const focusTrapRef = useFocusTrap(true);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Focus close button when panel mounts
@@ -507,7 +508,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       onKeyDown={handleKeyDown}
     >
       <div
-        ref={panelRef}
+        ref={focusTrapRef}
         className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl border border-gray-700 bg-gray-900 text-gray-100 shadow-2xl"
       >
         {/* Header */}

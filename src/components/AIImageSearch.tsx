@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, X, Loader, Eye, MapPin } from 'lucide-react';
+import { useFocusTrap } from '@/lib/use-focus-trap';
 
 interface BoundingBox {
   x: number;
@@ -44,6 +45,15 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: A
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VisionResult | null>(null);
+  const focusTrapRef = useFocusTrap(true);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   async function handleVisionSearch(q: string) {
     if (!q.trim()) return;
@@ -125,6 +135,7 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight }: A
 
       {/* Modal */}
       <div
+        ref={focusTrapRef}
         role="dialog"
         aria-modal="true"
         aria-label="AI Image Search"

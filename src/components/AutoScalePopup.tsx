@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, AlertTriangle, Check, Sparkles, X } from 'lucide-react';
+import { useFocusTrap } from '@/lib/use-focus-trap';
 
 const AUTO_DISMISS_MS = 10_000;
 
@@ -23,6 +24,7 @@ export default function AutoScalePopup({
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [remaining, setRemaining] = useState(AUTO_DISMISS_MS);
   const startRef = useRef(Date.now());
+  const focusTrapRef = useFocusTrap(true);
 
   const handleIgnore = useCallback(() => {
     if (dontShowAgain) {
@@ -87,7 +89,13 @@ export default function AutoScalePopup({
   const progressPct = (remaining / AUTO_DISMISS_MS) * 100;
 
   return (
-    <div className="fixed top-20 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 w-80 shadow-2xl text-gray-100 overflow-hidden">
+    <div
+      ref={focusTrapRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Scale auto-detected"
+      className="fixed top-20 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 w-80 shadow-2xl text-gray-100 overflow-hidden"
+    >
       {/* Countdown timer bar */}
       <div className="absolute top-0 left-0 h-1 bg-cyan-500/30 w-full">
         <div

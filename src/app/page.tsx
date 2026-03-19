@@ -30,7 +30,7 @@ import ZoomControls from '@/components/ZoomControls';
 import ContextMenu from '@/components/ContextMenu';
 import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
-import QuantitiesPanel, { type TakeoffSearchResult } from '@/components/QuantitiesPanel';
+import QuantitiesPanel from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import AnnotationTool from '@/components/AnnotationTool';
@@ -46,6 +46,7 @@ import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
 import { ToastProvider, useToast } from '@/components/Toast';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -61,6 +62,15 @@ const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | '
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
+
+interface TakeoffSearchResult {
+  id: string;
+  classificationId: string;
+  classificationName: string;
+  pageNumber: number;
+  polygonCount: number;
+  polygonId: string;
+}
 
 const EMPTY_STATE: ProjectState = {
   classifications: [],
@@ -1049,6 +1059,49 @@ function PageInner() {
     setAiLoading(false);
   }, []);
 
+  const handleTakeoffSearchSelect = useCallback((result: TakeoffSearchResult) => {
+    const polygon = useStore.getState().polygons.find((p) => p.id === result.polygonId);
+    if (!polygon) return;
+
+    const page = result.pageNumber;
+    setCurrentPageNum(page);
+    setCurrentPage(page, useStore.getState().totalPages);
+    setSelectedPolygon(polygon.id);
+    setHighlightedPolygonId(polygon.id);
+    setZoomLevel(2);
+
+    window.setTimeout(() => {
+      setHighlightedPolygonId((current) => (current === polygon.id ? null : current));
+    }, 2000);
+
+    const dims = pageBaseDimensions[page] ?? { width: 1, height: 1 };
+    const centroid = polygon.points.reduce(
+      (acc, pt) => ({ x: acc.x + pt.x, y: acc.y + pt.y }),
+      { x: 0, y: 0 }
+    );
+    const count = Math.max(1, polygon.points.length);
+    const avgX = centroid.x / count;
+    const avgY = centroid.y / count;
+    const isNormalized = polygon.points.every((pt) => pt.x >= 0 && pt.x <= 1 && pt.y >= 0 && pt.y <= 1);
+    const normalizedPoint = isNormalized
+      ? { x: avgX, y: avgY }
+      : {
+          x: avgX / Math.max(1, dims.width),
+          y: avgY / Math.max(1, dims.height),
+        };
+    normalizedPoint.x = Math.max(0, Math.min(1, normalizedPoint.x));
+    normalizedPoint.y = Math.max(0, Math.min(1, normalizedPoint.y));
+
+    const viewer = pdfViewerRef.current;
+    if (viewer) {
+      viewer.goToPage(page);
+      void viewer.renderPageForCapture(page).then(() => {
+        viewer.focusOnNormalizedPoint(normalizedPoint, 2);
+      });
+    }
+
+  }, [pageBaseDimensions, setCurrentPage, setSelectedPolygon, setZoomLevel]);
+
   useIsMobile();
 
   return (
@@ -1076,6 +1129,8 @@ function PageInner() {
         aiAllPagesProgress={aiAllPagesProgress}
         onAITakeoffAllPages={handleAITakeoffAllPages}
         onSettings={() => setShowProjectSettings(true)}
+        onToggleTakeoffSearch={() => setShowTakeoffSearch((prev) => !prev)}
+        isTakeoffSearchOpen={showTakeoffSearch}
         onPrev={() => {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);
@@ -1135,11 +1190,12 @@ function PageInner() {
           />
         )}
 
-        <div className="flex flex-col flex-1 min-h-0 order-1">
+        <div id="main-content" className="flex flex-col flex-1 min-h-0 order-1">
           <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' || currentTool === 'annotate' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
             {pdfFile ? (
               /* ── PDF loaded — full viewer ── */
               <>
+                <ErrorBoundary name="PDFViewer">
                 <PDFViewer
                   ref={pdfViewerRef}
                   file={pdfFile}
@@ -1154,10 +1210,13 @@ function PageInner() {
                   }
                 >
                   {/* All overlay tools live inside the PDF pan/zoom transform so coords align */}
+                  <ErrorBoundary name="CanvasOverlay">
                   <CanvasOverlay
                     onPolygonContextMenu={handlePolygonContextMenu}
                     onCanvasPointerDown={closeContextMenu}
+                    highlightedPolygonId={highlightedPolygonId}
                   />
+                  </ErrorBoundary>
                   {/* Compare diff overlay */}
                   {compareOverlay && <CompareOverlaySVG data={compareOverlay} />}
                   {currentTool === 'draw' && <DrawingTool />}
@@ -1166,6 +1225,7 @@ function PageInner() {
                   {currentTool === 'measure' && <MeasurementTool />}
                   {currentTool === 'annotate' && <AnnotationTool />}
                 </PDFViewer>
+                </ErrorBoundary>
                 <ZoomControls />
 
                 {menuState && (
@@ -1255,7 +1315,12 @@ function PageInner() {
           <BottomStatusBar onScaleClick={() => setShowScaleCalibPanel(true)} />
         </div>
 
-        <QuantitiesPanel />
+        <ErrorBoundary name="QuantitiesPanel">
+        <QuantitiesPanel
+          showTakeoffSearch={showTakeoffSearch}
+          onTakeoffSearchSelect={handleTakeoffSearchSelect}
+        />
+        </ErrorBoundary>
       </div>
 
       {/* Mobile/Tablet bottom toolbar */}

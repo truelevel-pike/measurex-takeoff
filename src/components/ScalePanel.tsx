@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { X, Check, Sparkles, ChevronRight, Crosshair, CheckCircle2 } from 'lucide-react';
+import { useFocusTrap } from '@/lib/use-focus-trap';
 
 // ── Preset data (verbatim from Togal spec) ──────────────────────────────────
 
@@ -99,7 +100,7 @@ export default function ScalePanel({
   onStartCalibrate,
   onClose,
 }: ScalePanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const focusTrapRef = useFocusTrap(true);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const columns: { title: string; presets: string[] }[] = [
@@ -125,7 +126,7 @@ export default function ScalePanel({
 
   return (
     <div
-      ref={panelRef}
+      ref={focusTrapRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="scale-panel-heading"

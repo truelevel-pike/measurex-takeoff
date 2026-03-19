@@ -124,7 +124,7 @@ interface QuantitiesPanelProps {
   onTakeoffSearchSelect?: (result: TakeoffSearchResult) => void;
 }
 
-function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: QuantitiesPanelProps) {
+export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
@@ -1047,5 +1047,3 @@ function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: Q
     </aside>
   );
 }
-
-export default QuantitiesPanel;

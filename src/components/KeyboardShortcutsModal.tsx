@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Keyboard, X } from 'lucide-react';
+import { useFocusTrap } from '@/lib/use-focus-trap';
 
 interface KeyboardShortcutsModalProps {
   open: boolean;
@@ -30,6 +31,8 @@ const shortcuts: ShortcutEntry[] = [
 ];
 
 export default function KeyboardShortcutsModal({ open, onClose }: KeyboardShortcutsModalProps) {
+  const focusTrapRef = useFocusTrap(open);
+
   useEffect(() => {
     if (!open) return;
 
@@ -52,6 +55,7 @@ export default function KeyboardShortcutsModal({ open, onClose }: KeyboardShortc
       aria-label="Keyboard Shortcuts"
     >
       <div
+        ref={focusTrapRef}
         className="w-full max-w-2xl overflow-hidden rounded-xl border border-[rgba(0,212,255,0.35)] bg-[#10131d] shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
