@@ -545,7 +545,27 @@ export async function createClassification(
     if (error && /formula/.test(error.message)) {
       ({ error } = await sb.from('mx_classifications').insert(baseRow));
     }
-    if (error) throw new Error(`createClassification: ${error.message}`);
+    if (error) {
+      if (error.code === '23505' || error.message?.includes('duplicate key')) {
+        const { data: existing, error: fetchError } = await sb
+          .from('mx_classifications')
+          .select()
+          .eq('id', id)
+          .single();
+        if (fetchError) throw new Error(`createClassification: ${fetchError.message}`);
+        return {
+          id: existing.id,
+          name: existing.name,
+          color: existing.color,
+          type: existing.type,
+          visible: existing.visible ?? true,
+          formula: existing.formula ?? undefined,
+          formulaUnit: existing.formula_unit ?? undefined,
+          formulaSavedToLibrary: existing.formula_saved_to_library ?? false,
+        };
+      }
+      throw new Error(`createClassification: ${error.message}`);
+    }
     // Build return object explicitly — spreading `data` (which may have id?: undefined)
     // over { id } would overwrite id with undefined.
     return {
