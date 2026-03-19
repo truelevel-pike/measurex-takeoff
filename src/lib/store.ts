@@ -27,6 +27,7 @@ interface HistorySnapshot {
   selectedClassification: string | null;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
+  selectedPolygons: string[];
 }
 
 export type Tool =
@@ -50,6 +51,7 @@ export interface Store extends ProjectState {
   selectedClassification: string | null;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
+  selectedPolygons: string[];
   // Mobile UI state
   showQuantitiesDrawer: boolean;
   setShowQuantitiesDrawer: (show: boolean) => void;
@@ -72,6 +74,10 @@ export interface Store extends ProjectState {
   updatePolygon: (id: string, patch: Partial<Polygon>) => void;
   deletePolygon: (id: string) => void;
   setSelectedPolygon: (id: string | null) => void;
+  setSelectedPolygons: (ids: string[]) => void;
+  togglePolygonSelection: (id: string) => void;
+  clearPolygonSelection: () => void;
+  deleteSelectedPolygons: () => void;
 
   // Actions — Annotations
   addAnnotation: (a: Omit<Annotation, 'id'>) => string;
@@ -156,6 +162,17 @@ export interface Store extends ProjectState {
   // Page base dimensions (PDF page at scale=1, used for zoom-independent polygon coordinates)
   pageBaseDimensions: Record<number, { width: number; height: number }>;
   setPageBaseDimensions: (page: number, dims: { width: number; height: number }) => void;
+
+  // Multi-select polygons
+  selectedPolygons: string[];
+  selectPolygon: (id: string) => void;
+  deselectPolygon: (id: string) => void;
+  clearSelectedPolygons: () => void;
+  setSelectedPolygons: (ids: string[]) => void;
+
+  // Focus polygon (for "find on canvas")
+  focusedPolygonId: string | null;
+  focusPolygon: (id: string | null) => void;
 }
 
 function snapshot(state: Store): HistorySnapshot {
@@ -168,6 +185,7 @@ function snapshot(state: Store): HistorySnapshot {
     selectedClassification: state.selectedClassification,
     selectedPolygon: state.selectedPolygon,
     selectedPolygonId: state.selectedPolygonId,
+    selectedPolygons: structuredClone(state.selectedPolygons),
   };
 }
 
@@ -192,6 +210,7 @@ export const useStore = create<Store>()(
   selectedClassification: null,
   selectedPolygon: null,
   selectedPolygonId: null,
+  selectedPolygons: [],
   showQuantitiesDrawer: false,
   setShowQuantitiesDrawer: (show) => set({ showQuantitiesDrawer: show }),
   showMobileMenu: false,
@@ -240,12 +259,14 @@ export const useStore = create<Store>()(
   deleteClassification: (id) => {
     const s = get();
     const before = snapshot(s);
+    const deletedPolygonIds = new Set(s.polygons.filter((p) => p.classificationId === id).map((p) => p.id));
     set({
       classifications: s.classifications.filter((c) => c.id !== id),
       polygons: s.polygons.filter((p) => p.classificationId !== id),
       selectedClassification: s.selectedClassification === id ? null : s.selectedClassification,
       selectedPolygon: s.selectedPolygon && s.polygons.find((p) => p.id === s.selectedPolygon && p.classificationId === id) ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId && s.polygons.find((p) => p.id === s.selectedPolygonId && p.classificationId === id) ? null : s.selectedPolygonId,
+      selectedPolygons: s.selectedPolygons.filter((polygonId) => !deletedPolygonIds.has(polygonId)),
       groups: s.groups.map((g) => ({
         ...g,
         classificationIds: g.classificationIds.filter((cid) => cid !== id),
@@ -308,12 +329,67 @@ export const useStore = create<Store>()(
       polygons: s.polygons.filter((p) => p.id !== id),
       selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
       selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
+      selectedPolygons: s.selectedPolygons.filter((polygonId) => polygonId !== id),
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
   },
 
-  setSelectedPolygon: (id) => set({ selectedPolygon: id, selectedPolygonId: id }),
+  setSelectedPolygon: (id) => set({
+    selectedPolygon: id,
+    selectedPolygonId: id,
+    selectedPolygons: id ? [id] : [],
+  }),
+
+  setSelectedPolygons: (ids) => {
+    const uniqueIds = Array.from(new Set(ids));
+    const lastId = uniqueIds.length > 0 ? uniqueIds[uniqueIds.length - 1] : null;
+    set({
+      selectedPolygons: uniqueIds,
+      selectedPolygon: lastId,
+      selectedPolygonId: lastId,
+    });
+  },
+
+  togglePolygonSelection: (id) => {
+    const s = get();
+    const isSelected = s.selectedPolygons.includes(id);
+    const next = isSelected ? s.selectedPolygons.filter((polygonId) => polygonId !== id) : [...s.selectedPolygons, id];
+    const lastId = next.length > 0 ? next[next.length - 1] : null;
+    set({
+      selectedPolygons: next,
+      selectedPolygon: lastId,
+      selectedPolygonId: lastId,
+    });
+  },
+
+  clearPolygonSelection: () => set({
+    selectedPolygons: [],
+    selectedPolygon: null,
+    selectedPolygonId: null,
+  }),
+
+  deleteSelectedPolygons: () => {
+    const s = get();
+    const idsToDelete = s.selectedPolygons;
+    if (idsToDelete.length === 0) return;
+    const idSet = new Set(idsToDelete);
+    const before = snapshot(s);
+    set({
+      polygons: s.polygons.filter((p) => !idSet.has(p.id)),
+      selectedPolygons: [],
+      selectedPolygon: null,
+      selectedPolygonId: null,
+      undoStack: [...s.undoStack, before],
+      redoStack: [],
+    });
+    if (!s.projectId) return;
+    idsToDelete.forEach((polygonId) => {
+      fetch(`/api/projects/${s.projectId}/polygons/${polygonId}`, { method: 'DELETE' }).catch((err) =>
+        console.error(`API deletePolygon failed for ${polygonId}:`, err)
+      );
+    });
+  },
 
   addAnnotation: (a) => {
     const s = get();
@@ -370,6 +446,7 @@ export const useStore = create<Store>()(
       polygons: s.polygons.filter((p) => p.id !== id1 && p.id !== id2).concat(merged),
       selectedPolygon: merged.id,
       selectedPolygonId: merged.id,
+      selectedPolygons: [merged.id],
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -393,6 +470,7 @@ export const useStore = create<Store>()(
       polygons: s.polygons.filter((p) => p.id !== id).concat(results),
       selectedPolygon: results[0].id,
       selectedPolygonId: results[0].id,
+      selectedPolygons: [results[0].id],
       undoStack: [...s.undoStack, before],
       redoStack: [],
     });
@@ -403,6 +481,7 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({
       polygons: s.polygons.filter((p) => p.id !== id),
+      selectedPolygons: [],
       selectedPolygon: null,
       selectedPolygonId: null,
       undoStack: [...s.undoStack, before],
@@ -469,6 +548,7 @@ export const useStore = create<Store>()(
       selectedClassification: null,
       selectedPolygon: null,
       selectedPolygonId: null,
+      selectedPolygons: [],
     });
   },
 
@@ -488,6 +568,7 @@ export const useStore = create<Store>()(
       selectedClassification: prev.selectedClassification,
       selectedPolygon: prev.selectedPolygon,
       selectedPolygonId: prev.selectedPolygonId,
+      selectedPolygons: prev.selectedPolygons,
       undoStack: rest,
       redoStack: [...s.redoStack, now],
     });
@@ -507,6 +588,7 @@ export const useStore = create<Store>()(
       selectedClassification: next.selectedClassification,
       selectedPolygon: next.selectedPolygon,
       selectedPolygonId: next.selectedPolygonId,
+      selectedPolygons: next.selectedPolygons,
       redoStack: rest,
       undoStack: [...s.undoStack, now],
     });
@@ -632,6 +714,21 @@ export const useStore = create<Store>()(
   // Page base dimensions (per-page map)
   pageBaseDimensions: {},
   setPageBaseDimensions: (page, dims) => set((s) => ({ pageBaseDimensions: { ...s.pageBaseDimensions, [page]: dims } })),
+
+  // ─── Multi-select Polygons ───
+  selectedPolygons: [],
+  selectPolygon: (id) => set((s) => ({
+    selectedPolygons: s.selectedPolygons.includes(id) ? s.selectedPolygons : [...s.selectedPolygons, id],
+  })),
+  deselectPolygon: (id) => set((s) => ({
+    selectedPolygons: s.selectedPolygons.filter((pid) => pid !== id),
+  })),
+  clearSelectedPolygons: () => set({ selectedPolygons: [] }),
+  setSelectedPolygons: (ids) => set({ selectedPolygons: ids }),
+
+  // ─── Focus Polygon ───
+  focusedPolygonId: null,
+  focusPolygon: (id) => set({ focusedPolygonId: id }),
     }),
     {
       name: 'measurex-state',

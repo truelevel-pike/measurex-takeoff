@@ -114,10 +114,13 @@ export default function QuantitiesPanel() {
 
   const showQuantitiesDrawer = useStore((s) => s.showQuantitiesDrawer);
   const setShowQuantitiesDrawer = useStore((s) => s.setShowQuantitiesDrawer);
+  const focusPolygon = useStore((s) => s.focusPolygon);
+  const setCurrentPage = useStore((s) => s.setCurrentPage);
 
   const [search, setSearch] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -179,10 +182,35 @@ export default function QuantitiesPanel() {
     [setShowQuantitiesDrawer]
   );
 
+  const searchLower = search.toLowerCase().trim();
+
   const filtered = useMemo(
-    () => classifications.filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim())),
-    [classifications, search]
+    () => {
+      if (!searchLower) return classifications;
+      return classifications.filter((c) => c.name.toLowerCase().includes(searchLower));
+    },
+    [classifications, searchLower]
   );
+
+  // Polygons matching search by label (shown as extra search results)
+  const matchingPolygons = useMemo(() => {
+    if (!searchLower) return [];
+    return polygons.filter((p) => p.label && p.label.toLowerCase().includes(searchLower));
+  }, [polygons, searchLower]);
+
+  function loadTemplateSet(templateSetName: string) {
+    const templateSet = CLASSIFICATION_LIBRARY.find((ts) => ts.name === templateSetName);
+    if (!templateSet) return;
+    for (const t of templateSet.templates) {
+      addClassification({ name: t.name, color: t.color, type: t.type as Classification['type'], visible: true });
+    }
+    setShowTemplateDropdown(false);
+  }
+
+  function handleFocusPolygon(polygon: Polygon) {
+    setCurrentPage(polygon.pageNumber);
+    focusPolygon(polygon.id);
+  }
 
   const polygonsByClassification = useMemo(() => {
     const byClass = new Map<string, Polygon[]>();

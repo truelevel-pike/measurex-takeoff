@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
@@ -35,7 +35,7 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown }: CanvasOverlayProps = {}) {
+function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown }: CanvasOverlayProps = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const allPolygons = useStore((s) => s.polygons);
@@ -168,8 +168,14 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
   const calibrationPoints = useStore((s) => s.calibrationPoints);
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
 
-  const polygons = allPolygons.filter((p) => p.pageNumber === currentPage);
-  const annotations = (allAnnotations ?? []).filter((a) => a.page === currentPage);
+  const polygons = useMemo(
+    () => allPolygons.filter((p) => p.pageNumber === currentPage),
+    [allPolygons, currentPage]
+  );
+  const annotations = useMemo(
+    () => (allAnnotations ?? []).filter((a) => a.page === currentPage),
+    [allAnnotations, currentPage]
+  );
 
   // Handle right-click on a polygon via SVG element data attributes
   const handleSvgClick = useCallback(
@@ -284,7 +290,10 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
                 }}
                 onClick={(e) => handlePolygonClick(e, poly.id)}
                 onContextMenu={(e) => handlePolygonContextMenu(e, poly.id)}
-              />
+                aria-label={cls?.name ?? 'Unknown classification'}
+              >
+                <title>{cls?.name ?? 'Polygon'}</title>
+              </polygon>
               {/* Corner handles when selected */}
               {isSelected &&
                 displayPoints.map((pt: Point, i: number) => (
@@ -412,3 +421,5 @@ export default function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDow
     </div>
   );
 }
+
+export default React.memo(CanvasOverlay);

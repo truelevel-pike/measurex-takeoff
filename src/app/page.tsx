@@ -2,11 +2,11 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { File as FileIcon, GitCompare, Layers3, Settings } from 'lucide-react';
+import { File as FileIcon, GitCompare, Layers3 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
-import type { Classification, DetectedElement, PDFViewerHandle, ProjectState } from '@/lib/types';
+import type { Classification, DetectedElement, PDFViewerHandle, Polygon, ProjectState } from '@/lib/types';
 import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
@@ -41,6 +41,7 @@ import ScaleCalibration from '@/components/ScaleCalibration';
 import ThreeDScene from '@/components/ThreeDScene';
 import TogalChat from '@/components/TogalChat';
 import AIImageSearch from '@/components/AIImageSearch';
+import ComparePanel from '@/components/ComparePanel';
 import PageThumbnailSidebar from '@/components/PageThumbnailSidebar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
@@ -108,6 +109,53 @@ function normalizeProjectState(raw: unknown): ProjectState {
     currentPage: typeof candidate.currentPage === 'number' && candidate.currentPage > 0 ? candidate.currentPage : 1,
     totalPages: typeof candidate.totalPages === 'number' && candidate.totalPages > 0 ? candidate.totalPages : 1,
   };
+}
+
+/** Renders compare diff polygons as a transparent SVG overlay aligned with the canvas. */
+function CompareOverlaySVG({ data }: { data: { added: Polygon[]; removed: Polygon[]; unchanged: Polygon[] } }) {
+  const currentPage = useStore((s) => s.currentPage);
+  const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
+  const baseDims = rawBaseDims ?? { width: 1, height: 1 };
+
+  const renderPolygons = (polys: Polygon[], fill: string, stroke: string) =>
+    polys
+      .filter((p) => p.pageNumber === currentPage)
+      .map((p) => {
+        const pointsStr = p.points.map((pt) => `${pt.x},${pt.y}`).join(' ');
+        return (
+          <polygon
+            key={p.id}
+            points={pointsStr}
+            fill={fill}
+            stroke={stroke}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      });
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 15,
+      }}
+    >
+      <svg
+        viewBox={`0 0 ${baseDims.width} ${baseDims.height}`}
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
+      >
+        {renderPolygons(data.unchanged, 'rgba(156,163,175,0.3)', '#9ca3af')}
+        {renderPolygons(data.added, 'rgba(34,197,94,0.3)', '#22c55e')}
+        {renderPolygons(data.removed, 'rgba(239,68,68,0.3)', '#ef4444')}
+      </svg>
+    </div>
+  );
 }
 
 function PageInner() {
@@ -186,6 +234,9 @@ function PageInner() {
   const [showCompare, setShowCompare] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
+
+  // Compare overlay state
+  const [compareOverlay, setCompareOverlay] = useState<{ added: Polygon[]; removed: Polygon[]; unchanged: Polygon[] } | null>(null);
 
   // AI takeoff UI state
   const [aiLoading, setAiLoading] = useState(false);
@@ -1021,6 +1072,7 @@ function PageInner() {
         onAiAllPagesModeChange={setAiAllPagesMode}
         aiAllPagesProgress={aiAllPagesProgress}
         onAITakeoffAllPages={handleAITakeoffAllPages}
+        onSettings={() => setShowProjectSettings(true)}
         onPrev={() => {
           const prev = Math.max(1, currentPageNum - 1);
           setCurrentPageNum(prev);
@@ -1034,15 +1086,6 @@ function PageInner() {
           pdfViewerRef.current?.goToPage(next);
         }}
       />
-      <button
-        onClick={() => setShowProjectSettings(true)}
-        aria-label="Open project settings"
-        title="Project Settings"
-        className="absolute right-3 top-2 z-50 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[rgba(0,212,255,0.25)] bg-[#12121a] text-[#b0dff0] hover:border-[rgba(0,212,255,0.5)] hover:text-[#e0faff]"
-      >
-        <Settings size={15} />
-      </button>
-
       {/* Floating 2D/3D toggle — always visible */}
       <div className="absolute top-14 left-3 z-50 flex items-center gap-1 bg-[rgba(18,18,26,0.92)] backdrop-blur-sm border border-[#00d4ff]/20 rounded-lg p-1 shadow-[0_0_20px_rgba(0,212,255,0.15)]">
         <button
@@ -1112,6 +1155,8 @@ function PageInner() {
                     onPolygonContextMenu={handlePolygonContextMenu}
                     onCanvasPointerDown={closeContextMenu}
                   />
+                  {/* Compare diff overlay */}
+                  {compareOverlay && <CompareOverlaySVG data={compareOverlay} />}
                   {currentTool === 'draw' && <DrawingTool />}
                   {(currentTool === 'merge' || currentTool === 'split') && <MergeSplitTool />}
                   {currentTool === 'cut' && <CutTool />}
@@ -1300,23 +1345,24 @@ function PageInner() {
       )}
 
       {showChat && <TogalChat onClose={() => setShowChat(false)} />}
-      {showImageSearch && <AIImageSearch onClose={() => setShowImageSearch(false)} />}
+      {showImageSearch && (
+        <AIImageSearch
+          onClose={() => setShowImageSearch(false)}
+          hasPdf={!!pdfFile}
+          getPageCanvas={() => pdfViewerRef.current?.getPageCanvas?.() ?? null}
+        />
+      )}
 
-      {/* Compare modal stub */}
-      {showCompare && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCompare(false)}>
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <GitCompare size={40} className="text-[#00d4ff] mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-white mb-2">Compare Projects</h2>
-            <p className="text-sm text-gray-400 mb-6">Select two projects to compare takeoff quantities side-by-side.</p>
-            <button
-              onClick={() => setShowCompare(false)}
-              className="bg-[rgba(0,212,255,0.15)] border border-[rgba(0,212,255,0.4)] text-[#00d4ff] px-5 py-2 rounded-lg font-medium text-sm hover:bg-[rgba(0,212,255,0.25)] transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {/* Compare panel */}
+      {showCompare && projectId && (
+        <ComparePanel
+          currentProjectId={projectId}
+          onOverlay={setCompareOverlay}
+          onClose={() => {
+            setShowCompare(false);
+            setCompareOverlay(null);
+          }}
+        />
       )}
 
       {/* GAP-006: Server-detected scale banner from upload response */}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { X, Download, FileSpreadsheet, FileText, Eye } from 'lucide-react';
+import { X, Download, FileSpreadsheet, FileText, Eye, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
@@ -178,6 +178,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   const scales = useStore((s) => s.scales);
   const groups = useStore((s) => s.groups);
   const totalPages = useStore((s) => s.totalPages);
+  const currentPage = useStore((s) => s.currentPage);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -423,27 +424,14 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
 
   // ── Export: Print / PDF ──
-  const currentPage = useStore((s) => s.currentPage);
-  const handlePdfExport = useCallback(() => {
-    // Derive project name from URL params (same as JSON export)
+  const handlePrintExport = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const derivedName = params.get('name');
     const name = derivedName && derivedName.trim().length > 0 ? derivedName : 'Untitled Project';
-
-    // Populate hidden print header
-    const header = document.getElementById('print-header');
-    if (header) {
-      header.innerHTML = `<strong>${name}</strong> &mdash; Page ${currentPage} &mdash; ${new Date().toLocaleDateString()}`;
-    }
-
-    // Close the export panel so it doesn't appear in print
-    onClose();
-
-    // Give the DOM a tick to update, then trigger print
-    requestAnimationFrame(() => {
-      window.print();
-    });
-  }, [currentPage, onClose]);
+    const printUrl = `/print?projectId=${projectId}&name=${encodeURIComponent(name)}&page=${currentPage}`;
+    window.open(printUrl, '_blank');
+    showToast('Print view opened in new tab');
+  }, [projectId, currentPage, showToast]);
 
   // ── Export: JSON ──
   const handleJsonExport = useCallback(() => {
@@ -801,12 +789,12 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             Full Export
           </button>
           <button
-            onClick={handlePdfExport}
+            onClick={handlePrintExport}
             aria-label="Print page with overlays"
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
           >
-            <FileText className="h-4 w-4" aria-hidden="true" />
-            Print / PDF
+            <Printer className="h-4 w-4" aria-hidden="true" />
+            Print
           </button>
           <button
             onClick={handleJsonExport}

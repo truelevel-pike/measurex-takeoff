@@ -23,6 +23,8 @@ import {
   Ellipsis,
   Menu,
   PanelRightOpen,
+  Settings,
+  Share2,
 } from 'lucide-react';
 import ReTogal from './ReTogal';
 import { useToast } from './Toast';
@@ -51,6 +53,7 @@ interface TopNavBarProps {
   onAiAllPagesModeChange?: (v: boolean) => void;
   aiAllPagesProgress?: { current: number; total: number } | null;
   onAITakeoffAllPages?: () => void | Promise<void>;
+  onSettings?: () => void;
 }
 
 export default function TopNavBar({
@@ -77,6 +80,7 @@ export default function TopNavBar({
   onAiAllPagesModeChange,
   aiAllPagesProgress,
   onAITakeoffAllPages,
+  onSettings,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -308,7 +312,7 @@ export default function TopNavBar({
                 Image Search
               </button>
               <button
-                aria-label="Copy project link"
+                aria-label="Share project link"
                 onClick={handleCopyLink}
                 style={{
                   background: '#12121a',
@@ -332,9 +336,16 @@ export default function TopNavBar({
                   e.currentTarget.style.color = '#a1a1aa';
                 }}
               >
-                <Link size={14} aria-hidden="true" />
-                Copy Link
+                <Share2 size={14} aria-hidden="true" />
+                Share
               </button>
+              <NavIconButton
+                ariaLabel="Project settings"
+                srLabel="Project settings"
+                icon={<Settings size={17} aria-hidden="true" />}
+                tooltip="Settings"
+                onClick={onSettings}
+              />
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
               <NavIconButton
                 ariaLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
@@ -421,7 +432,14 @@ export default function TopNavBar({
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-white bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
           >
-            <Link size={16} /> Copy Link
+            <Share2 size={16} /> Share
+          </button>
+          <button
+            onClick={() => { onSettings?.(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Settings size={16} /> Settings
           </button>
           <button
             onClick={() => { onExportJson?.(); setShowMobileMenu(false); }}

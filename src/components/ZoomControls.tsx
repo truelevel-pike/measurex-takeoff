@@ -51,6 +51,7 @@ export default function ZoomControls() {
         type="button"
         onClick={handleFit}
         className="h-8 rounded-md border border-[#00d4ff]/45 px-3 text-xs font-semibold uppercase tracking-wide text-[#00d4ff] transition hover:bg-[#00d4ff]/15"
+        aria-label="Fit to page"
       >
         Fit
       </button>
