@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
+import { CheckCircle2 } from 'lucide-react';
+
+const DPI = 72;
 
 type Mode = 'draw-line' | 'enter-number';
 
@@ -40,6 +43,13 @@ export default function ManualCalibration({
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const setScale = useStore((s) => s.setScale);
 
+  // Auto-start calibration mode when component mounts in draw-line mode
+  useEffect(() => {
+    if (mode === 'draw-line' && !calibrationMode && calibrationPoints.length === 0) {
+      setCalibrationMode(true);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Clean up calibration mode on unmount or mode switch
   useEffect(() => {
     return () => {
@@ -62,11 +72,32 @@ export default function ManualCalibration({
 
   const hasBothPoints = calibrationPoints.length >= 2;
 
+  // Computed real-world distance for draw-line
+  const drawRealFeet = useMemo(() => {
+    const ft = parseFloat(drawFt) || 0;
+    const inches = parseFloat(drawIn) || 0;
+    return ft + inches / 12;
+  }, [drawFt, drawIn]);
+
+  // Live scale preview for draw-line mode
+  const drawLinePreview = useMemo(() => {
+    if (!hasBothPoints || pixelDistance <= 0 || drawRealFeet <= 0) return null;
+    const ppu = pixelDistance / drawRealFeet;
+    const feetPerInch = DPI / ppu;
+    return `1 inch on paper = ${feetPerInch.toFixed(1)} feet`;
+  }, [hasBothPoints, pixelDistance, drawRealFeet]);
+
+  // Live scale preview for enter-number mode
+  const enterNumberPreview = useMemo(() => {
+    const pTotal = (parseFloat(paperFt) || 0) * 12 + (parseFloat(paperIn) || 0);
+    const rTotal = (parseFloat(realFt) || 0) + (parseFloat(realIn) || 0) / 12;
+    if (pTotal <= 0 || rTotal <= 0) return null;
+    const feetPerInch = rTotal / pTotal;
+    return `1 inch on paper = ${feetPerInch.toFixed(1)} feet`;
+  }, [paperFt, paperIn, realFt, realIn]);
+
   // Validation
-  const isDrawLineValid =
-    hasBothPoints &&
-    pixelDistance > 0 &&
-    ((parseFloat(drawFt) || 0) > 0 || (parseFloat(drawIn) || 0) > 0);
+  const isDrawLineValid = hasBothPoints && pixelDistance > 0 && drawRealFeet > 0;
 
   const isEnterNumberValid = (() => {
     const pTotal = (parseFloat(paperFt) || 0) * 12 + (parseFloat(paperIn) || 0);
@@ -80,10 +111,7 @@ export default function ManualCalibration({
     if (!canSave) return;
 
     if (mode === 'draw-line') {
-      const ft = parseFloat(drawFt) || 0;
-      const inches = parseFloat(drawIn) || 0;
-      const realWorldFeet = ft + inches / 12;
-      const pixelsPerUnit = pixelDistance / realWorldFeet;
+      const pixelsPerUnit = pixelDistance / drawRealFeet;
       const cal = {
         pixelsPerUnit,
         unit: 'ft' as const,
@@ -95,7 +123,7 @@ export default function ManualCalibration({
         setScaleForPage(currentPage, cal);
       }
       clearCalibrationPoints();
-      onSave(`${realWorldFeet.toFixed(2)} ft (drawn)`);
+      onSave(`${drawRealFeet.toFixed(2)} ft (drawn)`);
     } else {
       const pft = parseFloat(paperFt) || 0;
       const pin = parseFloat(paperIn) || 0;
@@ -125,13 +153,15 @@ export default function ManualCalibration({
   const drawLineStatus = () => {
     if (!calibrationMode && !hasBothPoints) return null;
     if (calibrationMode && calibrationPoints.length === 0)
-      return { text: 'Click point 1 on the drawing', color: 'text-amber-600' };
+      return { text: 'Click point 1 on the drawing', color: 'text-amber-600', icon: '1' };
     if (calibrationMode && calibrationPoints.length === 1)
-      return { text: 'Click point 2 on the drawing', color: 'text-amber-600' };
+      return { text: 'Click point 2 on the drawing', color: 'text-amber-600', icon: '2' };
     if (hasBothPoints)
-      return { text: `Pixel distance: ${pixelDistance.toFixed(1)} px`, color: 'text-green-600' };
+      return { text: `Line drawn — ${pixelDistance.toFixed(1)} px`, color: 'text-green-600', icon: null };
     return null;
   };
+
+  const activePreview = mode === 'draw-line' ? drawLinePreview : enterNumberPreview;
 
   const inputClass =
     'w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white';
@@ -175,7 +205,7 @@ export default function ManualCalibration({
           <>
             {/* Instruction + Start Drawing button */}
             <p className="text-sm text-zinc-600">
-              Click on canvas to place two points defining a known distance.
+              Click two points on the drawing along a known distance, then enter the real measurement.
             </p>
 
             {!calibrationMode && !hasBothPoints && (
@@ -192,7 +222,12 @@ export default function ManualCalibration({
               const status = drawLineStatus();
               if (!status) return null;
               return (
-                <div className={`text-sm font-medium ${status.color} bg-zinc-50 rounded-lg px-3 py-2`}>
+                <div className={`text-sm font-medium ${status.color} bg-zinc-50 rounded-lg px-3 py-2 flex items-center gap-2`}>
+                  {status.icon && (
+                    <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {status.icon}
+                    </span>
+                  )}
                   {status.text}
                 </div>
               );
@@ -224,6 +259,7 @@ export default function ManualCalibration({
                         onChange={(e) => setDrawFt(e.target.value)}
                         placeholder="0"
                         className={inputClass}
+                        autoFocus
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
                         ft
@@ -348,6 +384,14 @@ export default function ManualCalibration({
               </div>
             </div>
           </>
+        )}
+
+        {/* Live scale preview — shown when inputs are valid */}
+        {activePreview && (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 rounded-lg border border-green-100">
+            <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
+            <span className="text-sm text-green-800 font-medium">{activePreview}</span>
+          </div>
         )}
       </div>
 

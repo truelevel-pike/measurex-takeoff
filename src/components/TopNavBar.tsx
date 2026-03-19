@@ -45,6 +45,10 @@ interface TopNavBarProps {
   onChat?: () => void;
   onToggleImageSearch?: () => void;
   onCompare?: () => void;
+  aiAllPagesMode?: boolean;
+  onAiAllPagesModeChange?: (v: boolean) => void;
+  aiAllPagesProgress?: { current: number; total: number } | null;
+  onAITakeoffAllPages?: () => void | Promise<void>;
 }
 
 export default function TopNavBar({
@@ -67,6 +71,10 @@ export default function TopNavBar({
   onSave,
   saving,
   projectName,
+  aiAllPagesMode,
+  onAiAllPagesModeChange,
+  aiAllPagesProgress,
+  onAITakeoffAllPages,
 }: TopNavBarProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -199,7 +207,7 @@ export default function TopNavBar({
               <button
                 aria-label={aiLoading ? 'AI Takeoff running, please wait' : 'Run AI Takeoff'}
                 aria-busy={aiLoading}
-                onClick={onAITakeoff}
+                onClick={aiAllPagesMode ? onAITakeoffAllPages : onAITakeoff}
                 disabled={aiLoading}
                 style={{
                   background: aiLoading ? 'rgba(136,146,160,0.3)' : '#12121a',
@@ -220,8 +228,17 @@ export default function TopNavBar({
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)')}
               >
                 {aiLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-                {aiLoading ? 'Analyzing…' : 'AI Takeoff'}
+                {aiAllPagesProgress ? `Page ${aiAllPagesProgress.current}/${aiAllPagesProgress.total}` : aiLoading ? 'Analyzing…' : 'AI Takeoff'}
               </button>
+              <label className="flex items-center gap-1 text-xs cursor-pointer select-none" style={{ color: '#8892a0' }}>
+                <input
+                  type="checkbox"
+                  checked={aiAllPagesMode ?? false}
+                  onChange={(e) => onAiAllPagesModeChange?.(e.target.checked)}
+                  className="accent-cyan-400"
+                />
+                All Pages
+              </label>
               {hasRunTakeoff && onAITakeoff && (
                 <ReTogal
                   currentPage={currentPage}
