@@ -437,91 +437,9 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
   // ── Export: Contractor Report ──
   const handleContractorReport = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
-    const projectName = params.get('name')?.trim() || 'Untitled Project';
-    const date = new Date().toLocaleDateString();
-
-    // Polygon count per page
-    const pagePolyCounts = new Map<number, number>();
-    for (const poly of filteredPolygons) {
-      pagePolyCounts.set(poly.pageNumber, (pagePolyCounts.get(poly.pageNumber) ?? 0) + 1);
-    }
-
-    // Summary rows from previewRows (non-header rows only)
-    const summaryRows = previewRows.filter(r => !r.isGroupHeader);
-
-    const tableRows = summaryRows.map(r => `
-      <tr>
-        <td>${r.name}</td>
-        <td>${r.type}</td>
-        <td>${round2(r.total)}</td>
-        <td>${r.unit}</td>
-      </tr>`).join('');
-
-    const pageRows = Array.from(pagePolyCounts.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([pg, cnt]) => `
-      <tr>
-        <td>Page ${pg}</td>
-        <td>${cnt}</td>
-      </tr>`).join('');
-
-    const htmlString = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>Contractor Report – ${projectName}</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 40px; color: #111; background: #fff; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  .meta { font-size: 13px; color: #555; margin-bottom: 24px; }
-  h2 { font-size: 16px; margin-bottom: 8px; border-bottom: 2px solid #ddd; padding-bottom: 4px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 32px; font-size: 13px; }
-  th { background: #f0f0f0; text-align: left; padding: 8px 12px; border: 1px solid #ccc; }
-  td { padding: 7px 12px; border: 1px solid #ddd; }
-  tr:nth-child(even) td { background: #fafafa; }
-  .print-btn { display: inline-block; margin-bottom: 24px; padding: 10px 22px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-  @media print { .print-btn { display: none; } }
-</style>
-</head>
-<body>
-<button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
-<h1>${projectName}</h1>
-<div class="meta">Generated: ${date}</div>
-
-<h2>Quantity Summary</h2>
-<table>
-  <thead>
-    <tr><th>Name</th><th>Type</th><th>Quantity</th><th>Unit</th></tr>
-  </thead>
-  <tbody>
-    ${tableRows || '<tr><td colspan="4" style="text-align:center;color:#999;">No data</td></tr>'}
-  </tbody>
-</table>
-
-<h2>Polygons Per Page</h2>
-<table>
-  <thead>
-    <tr><th>Page</th><th>Polygon Count</th></tr>
-  </thead>
-  <tbody>
-    ${pageRows || '<tr><td colspan="2" style="text-align:center;color:#999;">No polygons</td></tr>'}
-  </tbody>
-</table>
-</body>
-</html>`;
-
-    const blob = new Blob([htmlString], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'project'}-contractor-report.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    if (getNotificationPrefs().exportReady) showToast('Contractor report downloaded!');
-  }, [filteredPolygons, previewRows, showToast]);
+    window.open(`/api/projects/${projectId}/export/contractor`, '_blank');
+    if (getNotificationPrefs().exportReady) showToast('Contractor report opened in new tab');
+  }, [projectId, showToast]);
 
   // ── Export: JSON ──
   const handleJsonExport = useCallback(() => {
@@ -1016,7 +934,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
-            Contractor Report
+            Open Contractor Report
           </button>
           <button
             onClick={handleJsonExport}
