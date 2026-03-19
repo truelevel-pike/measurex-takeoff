@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getScale, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const [polygons, classifications, scale] = await Promise.all([
       getPolygons(id),
       getClassifications(id),

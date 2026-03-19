@@ -48,6 +48,8 @@ import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import QuickTakeoffMode from '@/components/QuickTakeoffMode';
+import { useQuickTakeoff } from '@/lib/quick-takeoff';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
   v: 'select',
@@ -201,7 +203,7 @@ function PageInner() {
 
   const { addToast } = useToast();
 
-
+  const quickTakeoff = useQuickTakeoff();
 
   const show3D = useStore((s) => s.show3D);
   const setShow3D = useStore((s) => s.setShow3D);
@@ -1176,7 +1178,9 @@ function PageInner() {
       </div>
 
       <div className={show3D ? 'hidden' : 'flex flex-1 min-h-0 flex-col lg:flex-row pb-16 lg:pb-0'}>
-        <div className="hidden lg:block"><LeftToolbar /></div>
+        <div className={`hidden lg:block transition-all duration-200 ease-in-out ${quickTakeoff.isActive ? 'lg:w-0 lg:overflow-hidden lg:opacity-0' : ''}`}>
+          <LeftToolbar />
+        </div>
 
         {/* Thumbnail sidebar: show when PDF is loaded OR when project has data (shows page count from store) */}
         {(pdfFile || hasProjectData) && (
@@ -1317,13 +1321,18 @@ function PageInner() {
           <BottomStatusBar onScaleClick={() => setShowScaleCalibPanel(true)} />
         </div>
 
-        <ErrorBoundary name="QuantitiesPanel">
-        <QuantitiesPanel
-          showTakeoffSearch={showTakeoffSearch}
-          onTakeoffSearchSelect={handleTakeoffSearchSelect}
-        />
-        </ErrorBoundary>
+        <div className={`transition-all duration-200 ease-in-out ${quickTakeoff.isActive ? 'lg:w-0 lg:overflow-hidden lg:opacity-0' : ''}`}>
+          <ErrorBoundary name="QuantitiesPanel">
+            <QuantitiesPanel
+              showTakeoffSearch={showTakeoffSearch}
+              onTakeoffSearchSelect={handleTakeoffSearchSelect}
+            />
+          </ErrorBoundary>
+        </div>
       </div>
+
+      {/* Quick Takeoff Mode HUD */}
+      <QuickTakeoffMode />
 
       {/* Mobile/Tablet bottom toolbar */}
       <MobileToolbar />

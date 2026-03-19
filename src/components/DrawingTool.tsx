@@ -99,6 +99,7 @@ export default function DrawingTool() {
       addToast('Please create or select a classification first', 'warning');
       return;
     }
+    performance.mark('polygon-draw-start');
     const areaPx = linear ? 0 : calculatePolygonArea(points);
     const ppu = scale?.pixelsPerUnit || 1;
     const linearFeet = linear ? calculateLinearFeet(points, ppu, false) : 0;
@@ -111,6 +112,12 @@ export default function DrawingTool() {
       isComplete: true,
       label: undefined,
     });
+    performance.mark('polygon-draw-end');
+    const polyMeasure = performance.measure('polygon-draw', 'polygon-draw-start', 'polygon-draw-end');
+    if (typeof window !== 'undefined') {
+      if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
+      window.__perfMarks.polygonDraw = polyMeasure.duration;
+    }
     setPoints([]);
     setTool('select');
   }, [points, getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale]);

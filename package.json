@@ -10,12 +10,14 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "jest --testPathPattern=tests/api.integration",
     "test:e2e": "node --experimental-strip-types scripts/e2e-api-test.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "analyze": "ANALYZE=true next build",
     "migrate": "npx tsx scripts/migrate.ts",
-    "migrate:dry": "npx tsx scripts/migrate.ts --dry-run"
+    "migrate:dry": "npx tsx scripts/migrate.ts --dry-run",
+    "mx": "node --experimental-strip-types scripts/mx-cli.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

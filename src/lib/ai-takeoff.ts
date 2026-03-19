@@ -45,6 +45,7 @@ async function callOpenAIVision(
   pageWidth: number,
   pageHeight: number
 ): Promise<DetectedElement[]> {
+  performance.mark('ai-takeoff-start');
   const res = await fetch('/api/ai-takeoff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -67,6 +68,13 @@ async function callOpenAIVision(
   const parsed = AiTakeoffResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw new Error(`Invalid AI takeoff response: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+  }
+
+  performance.mark('ai-takeoff-end');
+  const aiMeasure = performance.measure('ai-takeoff', 'ai-takeoff-start', 'ai-takeoff-end');
+  if (typeof window !== 'undefined') {
+    if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
+    window.__perfMarks.aiTakeoff = aiMeasure.duration;
   }
 
   return parsed.data.results;

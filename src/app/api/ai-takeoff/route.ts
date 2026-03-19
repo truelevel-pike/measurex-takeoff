@@ -101,8 +101,8 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
     const jsonStart = raw.indexOf('[');
     const jsonEnd = raw.lastIndexOf(']');
     if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON array in response');
-    const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-    if (!Array.isArray(parsed)) throw new Error('Parsed response is not an array');
+    const parsedJson = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+    if (!Array.isArray(parsedJson)) throw new Error('Parsed response is not an array');
 
     // Map and validate each element to match client DetectedElement schema
     interface RawElement {
@@ -113,7 +113,7 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
       color?: string;
     }
 
-    const results = (parsed as RawElement[])
+    const results = (parsedJson as RawElement[])
       .filter((el) => Array.isArray(el?.points) && el?.type)
       .map((el) => {
         const name = String(el.name || el.classification || 'Unknown');

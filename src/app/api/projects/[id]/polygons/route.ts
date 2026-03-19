@@ -3,6 +3,7 @@ import { getPolygons, createPolygon, initDataDir } from '@/server/project-store'
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { broadcastToProject } from '@/app/api/ws/route';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
+import { fireWebhook } from '@/lib/webhooks';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       label: body.label,
     });
     broadcastToProject(id, 'polygon:created', polygon);
+    fireWebhook(id, 'polygon.created', polygon);
     return NextResponse.json({ polygon });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

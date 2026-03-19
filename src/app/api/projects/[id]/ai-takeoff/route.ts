@@ -4,13 +4,16 @@ import fs from 'fs';
 import { getProject, getPages } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { analyzePageImage } from '@/server/ai-engine';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const body = await req.json();
     const pageNum: number = body?.page;
 

@@ -1115,7 +1115,175 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           </div>
         )}
       </div>
+      {/* ── Groups Section ── */}
+      <div className="border-t border-[#00d4ff]/20 px-3 py-2">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-mono tracking-wider text-xs text-[#8892a0] uppercase">Groups</span>
+          <button
+            type="button"
+            onClick={() => handleOpenGroupModal()}
+            className="flex items-center gap-1 text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
+            title="Create group"
+          >
+            <Layers size={12} aria-hidden="true" />
+            <span>Group</span>
+          </button>
+        </div>
+        {groups.filter((g) => g.classificationIds.length > 0).length === 0 ? (
+          <div className="text-[11px] text-gray-500 py-2">No groups with classifications. Click Group to create one.</div>
+        ) : (
+          <div className="space-y-1.5">
+            {groups.filter((g) => g.classificationIds.length > 0).map((group) => {
+              const totals = groupTotals[group.id];
+              if (!totals) return null;
+              return (
+                <div key={group.id} className="rounded border border-[#00d4ff]/15 bg-[#0e1016] overflow-hidden">
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: group.color }} />
+                    <span className="flex-1 text-[12px] text-white font-medium truncate">{group.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenGroupModal(group.id)}
+                      className="text-gray-400 hover:text-[#00d4ff] transition-colors"
+                      aria-label={`Edit group ${group.name}`}
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGroup(group.id)}
+                      className="text-gray-400 hover:text-red-400 transition-colors"
+                      aria-label={`Delete group ${group.name}`}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                  <div className="border-t border-[#00d4ff]/10 px-2 py-1">
+                    {group.classificationIds.map((cid) => {
+                      const cls = classifications.find((c) => c.id === cid);
+                      const ct = totals.classificationTotals[cid];
+                      if (!cls || !ct) return null;
+                      return (
+                        <div key={cid} className="flex items-center justify-between text-[10px] py-0.5 text-gray-300">
+                          <span className="truncate">{cls.name}</span>
+                          <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
+                            {cls.type === 'count' ? formatCount(ct.count) : `${formatArea(ct.areaReal, measurementSettings)}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between text-[11px] pt-1 mt-1 border-t border-[#00d4ff]/10 text-[#00d4ff] font-medium">
+                      <span>Total ({totals.combined.count} items)</span>
+                      <span className="font-mono">{formatArea(totals.combined.areaReal, measurementSettings)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <ClassificationLibrary open={showTemplateLibrary} onClose={handleCloseTemplateLibrary} />
+      <UserPreferencesPanel open={showPreferences} onClose={() => setShowPreferences(false)} />
+
+      {/* ── Group Create/Edit Modal ── */}
+      {showGroupModal && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowGroupModal(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-md bg-[rgba(15,18,32,0.98)] border border-[#00d4ff]/20 rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#00d4ff]/20">
+                <span className="font-mono tracking-wider text-sm text-[#00d4ff]">
+                  {editingGroupId ? 'EDIT GROUP' : 'CREATE GROUP'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowGroupModal(false)}
+                  className="text-gray-400 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="px-4 py-4 space-y-4">
+                <div>
+                  <label className="block text-xs text-[#8892a0] uppercase tracking-wider mb-1 font-mono">Group Name</label>
+                  <input
+                    type="text"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="w-full px-3 py-2 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-white text-sm outline-none focus:border-[#00d4ff]/50"
+                    placeholder="e.g. Room Finishes"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[#8892a0] uppercase tracking-wider mb-1 font-mono">Color</label>
+                  <div className="flex gap-1.5">
+                    {(['#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#14b8a6', '#d97706'] as const).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setGroupColor(c)}
+                        className={`w-6 h-6 rounded border ${groupColor === c ? 'border-white ring-1 ring-[#00d4ff]/80' : 'border-[#00d4ff]/30'}`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-[#8892a0] uppercase tracking-wider mb-1 font-mono">
+                    Classifications ({groupSelectedClassificationIds.size} selected)
+                  </label>
+                  <div className="max-h-48 overflow-y-auto border border-[#00d4ff]/15 rounded bg-[#0a0a0f]">
+                    {classifications.length === 0 ? (
+                      <div className="text-[11px] text-gray-500 px-3 py-4 text-center">No classifications available</div>
+                    ) : (
+                      classifications.map((cls) => (
+                        <label
+                          key={cls.id}
+                          className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#00d4ff]/5 cursor-pointer border-b border-[#00d4ff]/10 last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={groupSelectedClassificationIds.has(cls.id)}
+                            onChange={() => handleToggleGroupClassification(cls.id)}
+                            className="accent-[#00d4ff]"
+                          />
+                          <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: cls.color }} />
+                          <span className="text-sm text-white truncate">{cls.name}</span>
+                          <span className="text-[10px] text-gray-500 ml-auto">{cls.type}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#00d4ff]/20">
+                <button
+                  type="button"
+                  onClick={() => setShowGroupModal(false)}
+                  className="px-3 py-1.5 text-sm rounded border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveGroup}
+                  disabled={!groupName.trim()}
+                  className="px-3 py-1.5 text-sm rounded bg-[#00d4ff]/20 border border-[#00d4ff]/50 text-[#9eeeff] hover:bg-[#00d4ff]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {editingGroupId ? 'Update Group' : 'Create Group'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       </>
       )}
     </>

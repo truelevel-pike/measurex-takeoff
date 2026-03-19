@@ -217,6 +217,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           useStore.getState().setPageBaseDimensions(pageNum, { width: baseViewport.width, height: baseViewport.height });
 
           // ISSUE #5: Store the render task so it can be cancelled if superseded
+          performance.mark('pdf-render-start');
           const renderTask = (page as any).render({ canvasContext: ctx, viewport, canvas });
           renderTaskRef.current = renderTask;
           try {
@@ -227,6 +228,12 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             throw err;
           } finally {
             if (renderTaskRef.current === renderTask) renderTaskRef.current = null;
+          }
+          performance.mark('pdf-render-end');
+          const pdfMeasure = performance.measure('pdf-render', 'pdf-render-start', 'pdf-render-end');
+          if (typeof window !== 'undefined') {
+            if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
+            window.__perfMarks.pdfRender = pdfMeasure.duration;
           }
 
           // Stale check #2: abort if superseded during render

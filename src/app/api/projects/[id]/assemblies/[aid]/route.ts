@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { updateAssembly, deleteAssembly, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
+import { AssemblyIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
     await initDataDir();
-    const { id, aid } = await params;
+    const paramsResult = AssemblyIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id, aid } = paramsResult.data;
     const body = await req.json();
     const updated = await updateAssembly(id, aid, body);
     if (!updated) {
@@ -21,7 +24,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
     await initDataDir();
-    const { id, aid } = await params;
+    const paramsResult = AssemblyIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id, aid } = paramsResult.data;
     const ok = await deleteAssembly(id, aid);
     if (!ok) {
       return NextResponse.json({ error: 'Assembly not found' }, { status: 404 });

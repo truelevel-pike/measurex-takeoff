@@ -3,11 +3,17 @@ import { createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF } from '@/server/pdf-processor';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { detectScaleFromText } from '@/lib/auto-scale';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+    // Filename sanitization is not needed — the uploaded file's original name is
+    // never used in the file path. We save as `${id}.pdf` where `id` is validated
+    // as a UUID by ProjectIdSchema above, preventing path traversal.
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });

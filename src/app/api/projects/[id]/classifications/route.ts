@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
 import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
+import { fireWebhook } from '@/lib/webhooks';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
