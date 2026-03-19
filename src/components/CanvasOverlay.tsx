@@ -372,10 +372,10 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     setShowBatchClassificationPicker((prev) => !prev);
   }, []);
 
-  // Disable pointer events when measure/cut/merge/split tools are active.
-  // Draw mode keeps pointer events enabled so the DrawingTool overlay (z-20)
-  // can reliably receive clicks through the stacking context.
+  // Disable pointer events so tool-specific overlays (z-20) receive clicks
+  // directly without the CanvasOverlay wrapper (z-10) intercepting them.
   const disablePointerEvents =
+    currentTool === 'draw' ||
     currentTool === 'pan' ||
     currentTool === 'measure' ||
     currentTool === 'cut' ||
