@@ -116,6 +116,62 @@ function buildPageSheet(
   return ws;
 }
 
+function buildSummarySheet(
+  classifications: Classification[],
+  polygons: Polygon[],
+  scale: ScaleCalibration | null,
+  scales?: Record<number, ScaleCalibration>
+): XLSX.WorkSheet {
+  const headers = ['Name', 'Type', 'Area', 'Length', 'Count', 'Unit'];
+  const aoa: Array<Array<string | number>> = [headers];
+
+  for (const cls of classifications) {
+    const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
+    if (clsPolygons.length === 0) continue;
+
+    let totalArea = 0;
+    let totalLinear = 0;
+    let totalCount = 0;
+
+    for (const poly of clsPolygons) {
+      const pageScale = pickScaleForPage(poly.pageNumber ?? 1, scales, scale);
+      const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
+
+      if (cls.type === 'area') {
+        totalArea += poly.area / (ppu * ppu);
+      } else if (cls.type === 'linear') {
+        totalLinear += calculateLinearFeet(poly.points, ppu, false);
+      } else {
+        totalCount += 1;
+      }
+    }
+
+    const pageScale = pickScaleForPage(clsPolygons[0].pageNumber ?? 1, scales, scale);
+    const baseUnit = pageScale?.unit ?? 'px';
+    const unit = cls.type === 'area' ? `sq ${baseUnit}` : cls.type === 'linear' ? baseUnit : 'ea';
+
+    aoa.push([
+      cls.name,
+      cls.type.toUpperCase(),
+      round2(totalArea),
+      round2(totalLinear),
+      totalCount,
+      unit,
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [
+    { wch: 28 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 12 },
+  ];
+  return ws;
+}
+
 export function exportToExcel(
   classifications: Classification[],
   polygons: Polygon[],
@@ -131,6 +187,10 @@ export function exportToExcel(
     XLSX.utils.book_append_sheet(wb, ws, 'Summary');
     return wb;
   }
+
+  // Summary sheet with all classifications (Name, Type, Area, Length, Count, Unit)
+  const summaryWs = buildSummarySheet(classifications, polygons, scale, scales);
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
 
   for (const pageNumber of pageNumbers) {
     const pagePolygons = polygons.filter((p) => (p.pageNumber ?? 1) === pageNumber);
