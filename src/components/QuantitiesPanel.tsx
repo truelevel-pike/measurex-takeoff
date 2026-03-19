@@ -241,6 +241,42 @@ export default function QuantitiesPanel() {
     });
   }
 
+  function activateClassification(classificationId: string, isSelected: boolean) {
+    setSelectedClassification(isSelected ? null : classificationId);
+    toggleExpanded(classificationId);
+  }
+
+  function handleClassificationRowKeyDown(
+    event: React.KeyboardEvent<HTMLDivElement>,
+    classificationId: string,
+    isSelected: boolean
+  ) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      activateClassification(classificationId, isSelected);
+      return;
+    }
+
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+      return;
+    }
+
+    event.preventDefault();
+    const list = event.currentTarget.closest('[data-classification-list]');
+    if (!list) return;
+
+    const rows = Array.from(
+      list.querySelectorAll<HTMLElement>('[data-classification-row][tabindex="0"]')
+    );
+    const currentIndex = rows.indexOf(event.currentTarget);
+    if (currentIndex === -1) return;
+
+    const nextIndex = event.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0 || nextIndex >= rows.length) return;
+
+    rows[nextIndex]?.focus();
+  }
+
   function handleAddClassification(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = newName.trim();
@@ -540,7 +576,7 @@ export default function QuantitiesPanel() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-1">
+      <div className="flex-1 overflow-y-auto px-1" data-classification-list>
         {filtered.map((classification) => {
           const totals = totalsByClassification.get(classification.id) ?? { count: 0, areaReal: 0, lengthReal: 0 };
           const polygonsForClassification = polygonsByClassification.get(classification.id) ?? [];
@@ -614,10 +650,10 @@ export default function QuantitiesPanel() {
                   className={`group flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer ${
                     isSelected ? 'bg-[#00d4ff]/10 border border-[#00d4ff]/40' : 'hover:bg-[#0e1016]'
                   }`}
-                  onClick={() => {
-                    setSelectedClassification(isSelected ? null : classification.id);
-                    toggleExpanded(classification.id);
-                  }}
+                  onClick={() => activateClassification(classification.id, isSelected)}
+                  onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id, isSelected)}
+                  tabIndex={0}
+                  data-classification-row
                 >
                   {totals.count > 0 || classification.type === 'count' ? (
                     isExpanded ? (

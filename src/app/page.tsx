@@ -999,6 +999,8 @@ function PageInner() {
 
   return (
     <div className="relative flex flex-col h-screen w-screen bg-[#0a0a0f] text-white" onClick={closeContextMenu}>
+      {/* Hidden print header — populated by ExportPanel before window.print() */}
+      <div id="print-header" className="print-header" />
       <TopNavBar
         onAITakeoff={handleAITakeoff}
         aiLoading={aiLoading}

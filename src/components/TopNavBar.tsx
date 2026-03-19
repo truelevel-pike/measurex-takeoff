@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Link,
   MessageSquare,
   List,
   Grid3X3,
@@ -24,6 +25,7 @@ import {
   PanelRightOpen,
 } from 'lucide-react';
 import ReTogal from './ReTogal';
+import { useToast } from './Toast';
 
 interface TopNavBarProps {
   sheetName?: string;
@@ -86,6 +88,17 @@ export default function TopNavBar({
   const show3D = useStore((s) => s.show3D);
   const toggleShow3D = useStore((s) => s.toggleShow3D);
   const currentPage = useStore((s) => s.currentPage);
+  const { addToast } = useToast();
+
+  const handleCopyLink = React.useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      addToast('Link copied!', 'success');
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+      addToast('Failed to copy link', 'error');
+    }
+  }, [addToast]);
 
   // Prefer the auto-detected sheet name (e.g. "A1.00 — FLOOR PLAN") over generic "Page X of Y"
   const hasRealSheetName = sheetName && !sheetName.startsWith('Page ') && sheetName !== 'Sheet 1';
@@ -291,6 +304,34 @@ export default function TopNavBar({
                 <Search size={14} aria-hidden="true" />
                 Image Search
               </button>
+              <button
+                aria-label="Copy project link"
+                onClick={handleCopyLink}
+                style={{
+                  background: '#12121a',
+                  color: '#a1a1aa',
+                  border: '1px solid rgba(0,212,255,0.2)',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)';
+                  e.currentTarget.style.color = '#a1a1aa';
+                }}
+              >
+                <Link size={14} aria-hidden="true" />
+                Copy Link
+              </button>
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
               <NavIconButton
                 ariaLabel={show3D ? 'Switch to 2D view' : 'Switch to 3D view'}
@@ -371,6 +412,13 @@ export default function TopNavBar({
             style={{ touchAction: 'manipulation' }}
           >
             <Search size={16} /> Image Search
+          </button>
+          <button
+            onClick={() => { void handleCopyLink(); setShowMobileMenu(false); }}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-white bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Link size={16} /> Copy Link
           </button>
           <button
             onClick={() => { onExportJson?.(); setShowMobileMenu(false); }}
