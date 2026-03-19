@@ -166,6 +166,22 @@ export default function MXChat({ onClose }: MXChatProps) {
         }
       }
 
+      // Flush any remaining buffer content
+      if (buffer.trim()) {
+        const trimmed = buffer.trim();
+        if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(trimmed.slice(6));
+            if (parsed.content) {
+              fullText += parsed.content;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, text: fullText } : m)),
+              );
+            }
+          } catch { /* skip */ }
+        }
+      }
+
       if (!fullText.trim()) {
         throw new Error('No response from AI');
       }
