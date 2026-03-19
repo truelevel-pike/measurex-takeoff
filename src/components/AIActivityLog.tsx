@@ -48,44 +48,18 @@ function eventToLogEntry(event: string, data: Record<string, unknown>): LogEntry
       const label = (data.label as string) || (data.id as string)?.slice(0, 8) || 'unknown';
       const color = getClassificationColor(data.classificationId as string);
       const detail = typeLabel(data.type);
-      let message: string;
-      if (data.type === 'area' && data.area) {
-        message = `Room area measured: ${Math.round(data.area as number)} SF`;
-      } else if (data.type === 'area') {
-        message = `Area detected: ${label}`;
-      } else if (data.type === 'linear') {
-        message = `Linear item detected: ${label}`;
-      } else if (data.type === 'count') {
-        message = `Item detected: ${label}`;
-      } else {
-        message = `Shape detected: ${label}`;
-      }
-      return { id, timestamp, icon: '🤖', message, color, detail };
+      return { id, timestamp, icon: '\u{1F916}', message: label, color, detail };
     }
-    case 'polygon:updated': {
-      const label = (data.label as string);
-      return { id, timestamp, icon: '✏️', message: label ? `Updated: ${label}` : 'Measurement updated' };
-    }
-    case 'polygon:deleted': {
-      const label = (data.label as string);
-      return { id, timestamp, icon: '🗑️', message: label ? `Removed: ${label}` : 'Measurement removed' };
-    }
+    case 'polygon:updated':
+      return { id, timestamp, icon: '\u270F\uFE0F', message: `Updated: ${(data as { id?: string }).id?.slice(0, 8) || 'unknown'}` };
+    case 'polygon:deleted':
+      return { id, timestamp, icon: '\u{1F5D1}\uFE0F', message: `Deleted: ${(data as { id?: string }).id?.slice(0, 8) || 'unknown'}` };
     case 'classification:created':
-      return { id, timestamp, icon: '🏷️', message: `Classification added: ${(data as { name?: string }).name || 'unknown'}`, color: (data as { color?: string }).color };
+      return { id, timestamp, icon: '\u{1F3F7}\uFE0F', message: `New class: ${(data as { name?: string }).name || 'unknown'}`, color: (data as { color?: string }).color };
     case 'classification:updated':
-      return { id, timestamp, icon: '🏷️', message: `Classification updated: ${(data as { name?: string }).name || 'unknown'}`, color: (data as { color?: string }).color };
-    case 'scale:updated': {
-      const scaleLabel = (data as { label?: string }).label || (data as { ratio?: string }).ratio;
-      return { id, timestamp, icon: '📏', message: scaleLabel ? `Scale set: ${scaleLabel}` : 'Scale updated' };
-    }
-    case 'page:changed':
-      return { id, timestamp, icon: '📄', message: `Switched to page ${data.page}` };
-    case 'ai-detection:started':
-      return { id, timestamp, icon: '🔍', message: `AI scanning page ${data.page}...` };
-    case 'ai-detection:complete': {
-      const count = (data.count as number) ?? 0;
-      return { id, timestamp, icon: '✨', message: `AI found ${count} ${count === 1 ? 'item' : 'items'}` };
-    }
+      return { id, timestamp, icon: '\u{1F3F7}\uFE0F', message: `Updated class: ${(data as { name?: string }).name || 'unknown'}`, color: (data as { color?: string }).color };
+    case 'scale:updated':
+      return { id, timestamp, icon: '\u{1F4CF}', message: `Scale: ${(data as { label?: string }).label || 'unknown'}` };
     default:
       return null;
   }
