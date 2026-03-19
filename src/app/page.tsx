@@ -31,6 +31,7 @@ import ContextMenu from '@/components/ContextMenu';
 import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
+import TextSearchPanel from '@/components/TextSearchPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import AnnotationTool from '@/components/AnnotationTool';
@@ -259,6 +260,7 @@ function PageInner() {
   const [showCompare, setShowCompare] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
+  const [showTextSearch, setShowTextSearch] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [highlightedPolygonId, setHighlightedPolygonId] = useState<string | null>(null);
@@ -1380,6 +1382,8 @@ function PageInner() {
         onSettings={() => setShowProjectSettings(true)}
         onToggleTakeoffSearch={() => setShowTakeoffSearch((prev) => !prev)}
         isTakeoffSearchOpen={showTakeoffSearch}
+        onToggleTextSearch={() => setShowTextSearch((prev) => !prev)}
+        isTextSearchOpen={showTextSearch}
         onGoToPage={(zeroBasedPage) => {
           const page = zeroBasedPage + 1;
           const clamped = Math.max(1, Math.min(totalPages, page));
@@ -1400,6 +1404,19 @@ function PageInner() {
           safeGoToPage(next, 'top-nav:next');
         }}
       />
+      {showTextSearch && (
+        <TextSearchPanel
+          projectId={projectId}
+          onNavigate={(_pageId, pageNumber) => {
+            const clamped = Math.max(1, Math.min(totalPages, pageNumber));
+            setCurrentPageNum(clamped);
+            setCurrentPage(clamped, totalPages);
+            safeGoToPage(clamped, 'text-search:navigate');
+            setShowTextSearch(false);
+          }}
+          onClose={() => setShowTextSearch(false)}
+        />
+      )}
       {/* Floating 2D/3D toggle — always visible */}
       <div className="absolute top-14 left-3 z-50 flex items-center gap-1 bg-[rgba(18,18,26,0.92)] backdrop-blur-sm border border-[#00d4ff]/20 rounded-lg p-1 shadow-[0_0_20px_rgba(0,212,255,0.15)]">
         <button
