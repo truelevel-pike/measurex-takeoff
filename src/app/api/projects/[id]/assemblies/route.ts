@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAssemblies, createAssembly, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
+import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+
+const AssemblyBodySchema = z.object({
+  classificationId: z.string().uuid(),
+  name: z.string().min(1),
+}).passthrough();
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const assemblies = await getAssemblies(id);
     return NextResponse.json({ assemblies });
   } catch (err: unknown) {
@@ -16,12 +25,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    const body = await req.json();
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const bodyResult = AssemblyBodySchema.safeParse(body);
+    if (!bodyResult.success) return validationError(bodyResult.error);
     const { classificationId, name, unit, unitCost, quantityFormula } = body;
-    if (!classificationId || !name) {
-      return NextResponse.json({ error: 'classificationId and name required' }, { status: 400 });
-    }
     const assembly = await createAssembly(id, {
       classificationId,
       name,

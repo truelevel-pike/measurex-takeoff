@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Search, Settings, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
@@ -12,6 +12,7 @@ import AssembliesPanel from './AssembliesPanel';
 import EstimateSummary from './EstimateSummary';
 import MeasurementSettingsPanel from './MeasurementSettings';
 import ClassificationLibrary from './ClassificationLibrary';
+import UserPreferencesPanel from './UserPreferencesPanel';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -146,6 +147,12 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const focusPolygon = useStore((s) => s.focusPolygon);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
 
+  const groups = useStore((s) => s.groups);
+  const addGroup = useStore((s) => s.addGroup);
+  const updateGroup = useStore((s) => s.updateGroup);
+  const deleteGroup = useStore((s) => s.deleteGroup);
+  const moveClassificationToGroup = useStore((s) => s.moveClassificationToGroup);
+
   const [search, setSearch] = useState('');
   const [takeoffSearchQuery, setTakeoffSearchQuery] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
@@ -167,6 +174,12 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [showMeasurementSettings, setShowMeasurementSettings] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupColor, setGroupColor] = useState('#3b82f6');
+  const [groupSelectedClassificationIds, setGroupSelectedClassificationIds] = useState<Set<string>>(new Set());
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
   const { settings: measurementSettings, setSettings: setMeasurementSettings } = useMeasurementSettings();
 
@@ -530,6 +543,88 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     window.open(`/api/projects/${projectId}/export/json`, '_blank');
   }, [projectId]);
 
+  const handleOpenGroupModal = useCallback((existingGroupId?: string) => {
+    if (existingGroupId) {
+      const group = groups.find((g) => g.id === existingGroupId);
+      if (group) {
+        setEditingGroupId(existingGroupId);
+        setGroupName(group.name);
+        setGroupColor(group.color);
+        setGroupSelectedClassificationIds(new Set(group.classificationIds));
+      }
+    } else {
+      setEditingGroupId(null);
+      setGroupName('');
+      setGroupColor('#3b82f6');
+      setGroupSelectedClassificationIds(new Set());
+    }
+    setShowGroupModal(true);
+  }, [groups]);
+
+  const handleSaveGroup = useCallback(() => {
+    const trimmedName = groupName.trim();
+    if (!trimmedName) return;
+    if (editingGroupId) {
+      updateGroup(editingGroupId, {
+        name: trimmedName,
+        color: groupColor,
+        classificationIds: Array.from(groupSelectedClassificationIds),
+      });
+    } else {
+      addGroup(trimmedName, groupColor);
+      // find the newly added group and assign classifications
+      const newGroups = groups;
+      // moveClassificationToGroup handles one at a time
+      // We'll assign after creation via a microtask
+      setTimeout(() => {
+        const latest = useStore.getState().groups;
+        const created = latest.find((g) => g.name === trimmedName && !groups.some((og) => og.id === g.id));
+        if (created) {
+          groupSelectedClassificationIds.forEach((cid) => {
+            useStore.getState().moveClassificationToGroup(cid, created.id);
+          });
+        }
+      }, 0);
+    }
+    setShowGroupModal(false);
+  }, [groupName, groupColor, groupSelectedClassificationIds, editingGroupId, addGroup, updateGroup, groups]);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    deleteGroup(groupId);
+  }, [deleteGroup]);
+
+  const handleToggleGroupClassification = useCallback((classificationId: string) => {
+    setGroupSelectedClassificationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(classificationId)) next.delete(classificationId);
+      else next.add(classificationId);
+      return next;
+    });
+  }, []);
+
+  // Compute group totals
+  const groupTotals = useMemo(() => {
+    const result: Record<string, { classificationTotals: Record<string, ClassTotals>; combined: ClassTotals }> = {};
+    for (const group of groups) {
+      const classificationTotals: Record<string, ClassTotals> = {};
+      const combined: ClassTotals = { count: 0, areaReal: 0, lengthReal: 0 };
+      for (const cid of group.classificationIds) {
+        const classPolygons = polygons.filter((p) => p.classificationId === cid);
+        const totals: ClassTotals = { count: classPolygons.length, areaReal: 0, lengthReal: 0 };
+        for (const p of classPolygons) {
+          totals.areaReal += p.area / (ppu * ppu);
+          totals.lengthReal += p.linearFeet || 0;
+        }
+        classificationTotals[cid] = totals;
+        combined.count += totals.count;
+        combined.areaReal += totals.areaReal;
+        combined.lengthReal += totals.lengthReal;
+      }
+      result[group.id] = { classificationTotals, combined };
+    }
+    return result;
+  }, [groups, polygons, ppu]);
+
   const panel = (
     <>
       {/* Assemblies / Estimate tabs — conditionally renders to avoid hooks-of-rules violation */}
@@ -597,6 +692,15 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             title="Measurement Settings"
           >
             <Settings size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPreferences(true)}
+            className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
+            aria-label="User preferences"
+            title="User Preferences"
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" />
           </button>
         </div>
         {showMeasurementSettings && (

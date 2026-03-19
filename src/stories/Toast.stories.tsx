@@ -1,60 +1,82 @@
-import { useEffect } from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
+import React, { useEffect } from 'react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
-import { ToastProvider, useToast } from '@/components/Toast';
+import { ToastProvider, useToast, type ToastType } from '../components/Toast';
 
-function ToastStoryHarness({
-  toasts,
-}: {
-  toasts: Array<{ message: string; type: 'success' | 'error' | 'warning' | 'info'; duration?: number }>;
-}) {
+/* ------------------------------------------------------------------ */
+/*  Helper: renders inside ToastProvider and fires a toast on mount   */
+/* ------------------------------------------------------------------ */
+
+function ToastTrigger({ type, message, duration }: { type: ToastType; message: string; duration?: number }) {
   const { addToast } = useToast();
 
   useEffect(() => {
-    toasts.forEach((toast) => {
-      addToast(toast.message, toast.type, toast.duration ?? 6000);
-    });
-  }, [addToast, toasts]);
+    addToast(message, type, duration);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return <div style={{ minHeight: 220, padding: 16, color: '#cbd5e1' }}>Toast preview area</div>;
+  return null;
 }
 
+function ToastStory({ type, message, duration }: { type: ToastType; message: string; duration?: number }) {
+  return (
+    <ToastProvider>
+      <ToastTrigger type={type} message={message} duration={duration} />
+      <div style={{ padding: 24, color: '#999', fontSize: 14 }}>
+        Toast rendered at bottom-right &rarr;
+      </div>
+    </ToastProvider>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Meta                                                              */
+/* ------------------------------------------------------------------ */
+
 const meta = {
-  title: 'MeasureX/Toast',
-  component: ToastStoryHarness,
-  decorators: [
-    (Story) => (
-      <ToastProvider>
-        <Story />
-      </ToastProvider>
-    ),
-  ],
-  parameters: {
-    layout: 'fullscreen',
+  title: 'Feedback/Toast',
+  component: ToastStory,
+  parameters: { layout: 'fullscreen' },
+  argTypes: {
+    type: {
+      control: 'select',
+      options: ['success', 'error', 'warning', 'info'] as ToastType[],
+    },
+    message: { control: 'text' },
+    duration: { control: 'number' },
   },
-} satisfies Meta<typeof ToastStoryHarness>;
+} satisfies Meta<typeof ToastStory>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
+/* ------------------------------------------------------------------ */
+/*  Stories                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Success toast — green accent, check icon. */
+export const Success: Story = {
   args: {
-    toasts: [{ message: 'Project saved successfully.', type: 'success' }],
+    type: 'success',
+    message: 'Project saved successfully',
+    duration: 60000,
   },
 };
 
-export const ErrorToast: Story = {
+/** Error toast — red accent, X-circle icon. */
+export const Error: Story = {
   args: {
-    toasts: [{ message: 'Failed to update project settings.', type: 'error' }],
+    type: 'error',
+    message: 'Failed to upload PDF — file size exceeds 50 MB limit',
+    duration: 60000,
   },
 };
 
-export const MultipleToastsStacked: Story = {
+/** Info toast — blue accent, info icon. */
+export const Info: Story = {
   args: {
-    toasts: [
-      { message: 'Takeoff imported.', type: 'success' },
-      { message: 'Scale calibration may be inaccurate.', type: 'warning' },
-      { message: 'Could not sync one annotation.', type: 'error' },
-    ],
+    type: 'info',
+    message: 'AI takeoff is running on 12 pages…',
+    duration: 60000,
   },
 };

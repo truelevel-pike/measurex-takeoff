@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getScale, setScale, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
+import { ProjectIdSchema, ScaleSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const scale = await getScale(id);
     return NextResponse.json({ scale });
   } catch (err: unknown) {
@@ -16,10 +19,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    const body = await req.json();
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const bodyResult = ScaleSchema.passthrough().safeParse(body);
+    if (!bodyResult.success) return validationError(bodyResult.error);
     const { pixelsPerUnit, unit, label, source, pageNumber } = body;
-    if (!pixelsPerUnit || !unit) return NextResponse.json({ error: 'pixelsPerUnit and unit required' }, { status: 400 });
     const scale = await setScale(id, { pixelsPerUnit, unit, label: label || 'Custom', source: source || 'manual', pageNumber: pageNumber || 1 });
     broadcastToProject(id, 'scale:updated', scale);
     return NextResponse.json({ scale });

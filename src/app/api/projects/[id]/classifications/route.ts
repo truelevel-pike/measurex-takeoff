@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/app/api/ws/route';
+import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
     const classifications = await getClassifications(id);
     return NextResponse.json({ classifications });
   } catch (err: unknown) {
@@ -16,10 +19,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
-    const { id } = await params;
-    const body = await req.json();
-    const { name, type } = body;
-    if (!name || !type) return NextResponse.json({ error: 'name and type required' }, { status: 400 });
+    const paramsResult = ProjectIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id } = paramsResult.data;
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const bodyResult = ClassificationCreateSchema.passthrough().safeParse(body);
+    if (!bodyResult.success) return validationError(bodyResult.error);
+    const { name, type } = bodyResult.data;
     const classification = await createClassification(id, {
       id: body.id,
       name,

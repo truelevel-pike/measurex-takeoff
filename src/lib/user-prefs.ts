@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export const USER_PREFS_STORAGE_KEY = 'mx-user-prefs';
+export const USER_PREFS_STORAGE_KEY = 'mx-preferences';
 
 export type ThemeMode = 'dark' | 'light';
 export type UnitSystem = 'ft' | 'm';
@@ -10,6 +10,7 @@ export type DecimalPlaces = 0 | 1 | 2;
 export type SnapSensitivity = 'low' | 'med' | 'high';
 export type CloseThresholdPx = 15 | 25 | 40;
 export type ToastDurationMs = 2000 | 4000 | 8000;
+export type AutoSaveInterval = 0 | 30 | 60 | 300;
 
 export interface UserPrefs {
   themeMode: ThemeMode;
@@ -20,6 +21,7 @@ export interface UserPrefs {
   closeThresholdPx: CloseThresholdPx;
   defaultClassificationColor: string;
   toastDurationMs: ToastDurationMs;
+  autoSaveInterval: AutoSaveInterval;
 }
 
 export const DEFAULT_PREFS: UserPrefs = {
@@ -31,6 +33,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   closeThresholdPx: 25,
   defaultClassificationColor: '#3b82f6',
   toastDurationMs: 4000,
+  autoSaveInterval: 60,
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -61,6 +64,10 @@ function toToastDurationMs(value: unknown): ToastDurationMs | undefined {
   return value === 2000 || value === 4000 || value === 8000 ? value : undefined;
 }
 
+function toAutoSaveInterval(value: unknown): AutoSaveInterval | undefined {
+  return value === 0 || value === 30 || value === 60 || value === 300 ? value : undefined;
+}
+
 function toHexColor(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -84,6 +91,7 @@ function sanitizeUserPrefs(raw: unknown): UserPrefs {
     defaultClassificationColor:
       toHexColor(raw.defaultClassificationColor) ?? DEFAULT_PREFS.defaultClassificationColor,
     toastDurationMs: toToastDurationMs(raw.toastDurationMs) ?? DEFAULT_PREFS.toastDurationMs,
+    autoSaveInterval: toAutoSaveInterval(raw.autoSaveInterval) ?? DEFAULT_PREFS.autoSaveInterval,
   };
 }
 

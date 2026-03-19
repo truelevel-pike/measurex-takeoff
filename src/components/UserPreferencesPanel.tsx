@@ -196,6 +196,28 @@ export default function UserPreferencesPanel({ open, onClose }: UserPreferencesP
           </section>
 
           <section>
+            <h3 className="mb-2 text-xs uppercase tracking-wider text-[#8892a0] font-mono">Saving</h3>
+            <label className="flex items-center justify-between text-sm text-white">
+              <span>Auto-save Interval</span>
+              <select
+                value={prefs.autoSaveInterval}
+                onChange={(e) =>
+                  setPrefs((prev) => ({
+                    ...prev,
+                    autoSaveInterval: Number(e.target.value) as 0 | 30 | 60 | 300,
+                  }))
+                }
+                className="rounded border border-[rgba(0,212,255,0.2)] bg-[#12121a] px-2 py-1 text-sm"
+              >
+                <option value={0}>Off</option>
+                <option value={30}>30 seconds</option>
+                <option value={60}>1 minute</option>
+                <option value={300}>5 minutes</option>
+              </select>
+            </label>
+          </section>
+
+          <section>
             <h3 className="mb-2 text-xs uppercase tracking-wider text-[#8892a0] font-mono">Notifications</h3>
             <label className="flex items-center justify-between text-sm text-white">
               <span>Toast Duration</span>

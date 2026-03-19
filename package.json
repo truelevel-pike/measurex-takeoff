@@ -14,7 +14,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "analyze": "ANALYZE=true next build",
-    "migrate": "node --experimental-strip-types scripts/run-migrations.ts"
+    "migrate": "npx tsx scripts/migrate.ts",
+    "migrate:dry": "npx tsx scripts/migrate.ts --dry-run"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

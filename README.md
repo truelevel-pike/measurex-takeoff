@@ -1,80 +1,85 @@
 # MeasureX Takeoff
-AI-powered construction takeoff platform for extracting quantities from blueprint PDFs.
 
-## What It Does
-MeasureX Takeoff helps estimators and preconstruction teams perform digital takeoffs on plan sheets faster and more consistently. Users upload PDFs, set drawing scale, draw or generate polygons, and automatically compute area, linear, and count quantities. Results can be reviewed, classified, and exported for downstream estimating workflows.
+AI-powered construction PDF takeoff tool — upload blueprints, draw measurements, run AI detection, and export quantities.
 
-## Tech Stack
-- Next.js 15+ (App Router)
-- TypeScript
-- Supabase
-- PDF.js (`pdfjs-dist`)
-- Zustand
-- Tailwind CSS
+## Project Structure
 
-## Getting Started
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Create `.env.local` and set required variables:
-   ```bash
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-   OPENAI_API_KEY=your_openai_api_key
-   ```
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-4. Open `http://localhost:3000`.
-
-## Key Features
-- PDF upload and page parsing for construction drawings
-- AI-assisted takeoff and auto-detection workflows
-- Interactive polygon drawing for area, linear, and count measurements
-- Classification system for organized quantity groupings
-- Quantity export to JSON and Excel
-- Real-time project synchronization via SSE/WebSocket-style updates
-- 3D visualization support for model-assisted review
-
-## API Overview
-Key endpoints under `src/app/api`:
-
-| Endpoint | Methods | Purpose |
-| --- | --- | --- |
-| `/api/projects` | `GET`, `POST` | List projects and create a new project |
-| `/api/projects/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` | Fetch/update/delete a specific project |
-| `/api/projects/{id}/upload` | `POST` | Upload a blueprint PDF |
-| `/api/projects/{id}/pages` | `GET` | Retrieve parsed PDF page metadata |
-| `/api/projects/{id}/classifications` | `GET`, `POST` | Manage measurement classifications |
-| `/api/projects/{id}/polygons` | `GET`, `POST` | Create/read measurement polygons |
-| `/api/projects/{id}/quantities` | `GET` | Read computed quantity totals |
-| `/api/projects/{id}/scale` | `POST` | Set drawing scale for measurement conversion |
-| `/api/projects/{id}/ai-takeoff` | `POST` | Run AI takeoff for a project |
-| `/api/projects/{id}/ai-takeoff/apply` | `POST` | Apply AI takeoff results |
-| `/api/projects/{id}/export/json` | `GET` | Export project quantities as JSON |
-| `/api/projects/{id}/export/excel` | `GET` | Export project quantities as Excel |
-| `/api/projects/compare` | `POST` | Compare takeoff data between projects |
-| `/api/chat` | `POST` | AI assistant interactions |
-| `/api/image-search` | `POST` | Image search for references/materials |
-| `/api/vision-search` | `POST` | Vision-enabled search/analysis |
-| `/api/ws` | `GET` | Real-time stream endpoint |
-
-Additional routes also exist (for example `/api/projects/recent`, `/api/drawings`, `/api/polygons`, `/api/docs`). See `docs/openapi.yaml` and `src/app/api` for full coverage.
-
-## AI Agent Integration
-For full request/response examples, see [`docs/AI-AGENT-GUIDE.md`](docs/AI-AGENT-GUIDE.md).
-
-Quick start for AI agents:
-1. Create a project and upload a PDF (`POST /api/projects`, `POST /api/projects/{id}/upload`).
-2. Configure scale, create classifications, and submit polygons (`/scale`, `/classifications`, `/polygons`).
-3. Run AI takeoff and read/export final quantities (`/ai-takeoff`, `/quantities`, `/export/json` or `/export/excel`).
-
-## Development
-```bash
-npm run dev
-npm test
-npm run storybook
-npm run build
 ```
+src/
+├── app/                  # Next.js App Router pages & API routes
+│   ├── api/              # REST endpoints (projects, polygons, ai-takeoff, etc.)
+│   ├── projects/         # Project management pages
+│   ├── settings/         # Settings pages
+│   └── print/            # Print preview
+├── components/           # React UI components (PDFViewer, CanvasOverlay, QuantitiesPanel, etc.)
+├── hooks/                # Custom React hooks
+├── lib/                  # Utilities, types, Zustand store, geometry engine
+├── server/               # Server-side logic (project store, AI engine, PDF processor)
+└── stories/              # Storybook component stories
+supabase/                 # Database migrations
+scripts/                  # E2E test scripts
+docs/                     # OpenAPI spec & AI agent guide
+```
+
+## Environment Variables
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous/public key |
+
+## Dev Setup
+
+```bash
+# Clone the repo
+git clone <repo-url>
+cd measurex-takeoff
+
+# Install dependencies
+npm install
+
+# Copy environment variables
+cp .env.example .env.local
+# Edit .env.local with your Supabase credentials
+
+# Start the dev server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Test Commands
+
+```bash
+# Unit tests (Jest)
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+
+# Vitest
+npx vitest
+
+# E2E API tests
+npm run test:e2e
+
+# Storybook (component explorer)
+npm run storybook
+```
+
+## Deploy to Vercel
+
+1. Connect the repo to [Vercel](https://vercel.com).
+2. Set environment variables in the Vercel dashboard:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Deploy — Vercel auto-detects the Next.js framework.

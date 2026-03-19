@@ -1,79 +1,127 @@
 # Changelog
 
-## [Unreleased] — 2026-03-18
+All notable changes to MeasureX Takeoff are documented in this file.
+Format based on [Keep a Changelog](https://keepachangelog.com/).
+
+## [Wave 11] — 2026-03-18
 
 ### Added
-- Contractor report API route, recent projects API, and project duplication API. (`8ee4227`)
-- OpenAPI JSON/docs route, estimates tab/types/storage, logger utility, and Excel estimates sheet. (`aec9daf`)
-- Contractor report export, recent projects, and project duplication. (`003ff28`)
-- Estimate summary panel with cost breakdown per classification. (`86b2ee0`)
-- Multi-select polygons with bulk delete/reclassify actions. (`d6c4191`)
-- Image search UX, compare panel UI, undo/redo annotations, and multi-select delete. (`d7f23c4`)
-- Measurement precision settings, print/PDF export, and classification library. (`c959674`)
-- Wave 8 share button, project settings panel, and classification keyboard navigation. (`4b34748`)
-- Server-side sheet naming, measurement settings, and print export. (`4808bf5`)
-- Measurement precision settings for units/decimals with area/linear unit selectors. (`29555e0`)
-- Zoom controls UI, settings improvements, measurement precision settings, and geometry engine updates. (`fe986df`)
-- Print/PDF export with polygon overlays and print styles. (`088d6fc`)
-- Copy-link share button, project settings panel (rename/units/delete), and quantities keyboard nav. (`3f2ee27`)
-- Server-side PDF text extraction for sheet naming on upload. (`21e076a`)
-- Wave 7 onboarding scale+AI steps, toast stacking fix, and mobile toolbar. (`3bc5ef7`)
-- Annotation tool, compare API route, PATCH classification support, and annotation storage. (`adb5176`)
-- Project thumbnail capture/store/display on project cards. (`8576bcd`)
-- Annotation overlay, compare API, and quantities export `projectId` support. (`08fb9ce`)
-- Export JSON button in Quantities panel header. (`ed500cd`)
-- Scale calibration UX with line-draw mode panel. (`a1e8d40`)
-- Export JSON route with download headers and pretty-printed payloads. (`27eda1f`)
-- New project flow now navigates directly to takeoff view. (`9e176d0`)
-- Multi-page AI takeoff with Run on All Pages progress tracking. (`8994e27`)
-- Scale calibration UX auto-start, live preview, and confirmation state. (`b9b205b`)
-- Wave 5 ReRunAI wiring, drawing sets, and quantities count fix rollout. (`a9fc94a`)
-- Wave 5 MX Chat OpenAI integration, image search redirect, and shortcuts modal. (`57d8ff8`)
-- Project thumbnails on projects page with initials placeholder color hash. (`a3568d5`)
-- Wave 6 projects sort control, VersionHistory polish, and Export JSON button. (`8242229`)
-- Enhanced count classifications with presets, page breakdown, and one-click placement. (`3ff658e`)
-- Upload route SSE broadcast and pages-name column migration. (`61fcb49`)
-- Sheet naming wired to run on PDF text extraction and displayed in TopNavBar. (`f226680`)
-- AutoScalePopup accept action, keyboard shortcuts, auto-dismiss timer, and low-confidence warning. (`04f1295`)
-- Linear polyline draw mode with live open-path distance preview. (`0b961d2`)
+- Storybook stories for QuantitiesPanel (Empty, Loaded, Loading states)
+- Storybook stories for PDFViewer (Upload, Loaded states)
+- Storybook stories for Toast (Success, Error, Info variants)
+- Project README with structure, env setup, test commands, and Vercel deploy guide
+- This CHANGELOG
+
+## [Wave 10] — 2026-03-18
 
 ### Fixed
-- CanvasOverlay perf callbacks and `jest.config` `setupFilesAfterEnv` typo. (`2f768f2`)
-- Missing `ActivityFeed` component and `useRealtimeSync` hook import breakages. (`641f3f4`)
-- Wave 9 accessibility labels/roles, memoization callbacks, and broken import paths. (`48f40a9`)
-- 3D view toggle button wiring for `ThreeDViewer` visibility. (`101fa37`)
-- AI takeoff end-to-end response mapping, null safety, and type alignment. (`c1c3239`)
-- Build errors resolved. (`cf61320`)
-- SSE upsert logic for polygon/classification, project events, and AutoScalePopup polish. (`d1dd047`)
-- Wave 5 snap page scoping, vertex-drag area recompute, and Delete key polygon removal. (`b0e8a38`)
-- Export to Excel now includes all required fields. (`beec711`)
-- AI Activity Log SSE broadcasting for takeoff/apply events. (`243472b`)
-- Compare modal stub fix. (`74fd3aa`)
-- AI Activity Log SSE broadcast wiring for all event types. (`2437b62`)
-- Prevented unnecessary PDF reloads using `onPageChange` ref handling. (`e214946`)
-- PDF viewer retry cancellation, zoom anchor math, touch-pan guard, and page-change ref issues. (`00bd0f8`)
-- PDF viewer retry race, pending render, wheel anchor, and touch-pan guard issues. (`8765659`)
-- Sidebar thumbnail loading/error states, API error logging, and collapsible toggle behavior. (`fca1eb6`)
-- Draw-tool crosshair cursor and hydration bugs (BUG-R5-004/007). (`cf8db14`)
-- Project-store data integrity issues from AUDIT-A6 E17. (`2e4f40c`)
-- PDF viewer memory leaks and stale render issues (AUDIT-A6). (`598f9e6`)
-- Rules-of-Hooks crash in QuantitiesPanel (CRASH-001). (`a5265b7`)
-- Wave 2 fixes: linear loop close, `deletePage`, `recordHistory` await, and empty update guards. (`7e94bc7`)
-- Duplicate project-name creation on projects page (BUG-R5-005). (`f9606e5`)
-- Assemblies delete flow now removes from store only after API success. (`aac4c0f`)
-- Assemblies temp ID replacement with server-assigned ID. (`a63dbd9`)
-- Sheet number regex expanded for formats like A101/A-101/AD1.01/FA1.0. (`bca2538`)
-- Auto-load saved PDF by project ID with loading spinner (BUG-R5-002). (`59847d3`)
-- Geometry/store unit conversions, null-scale fallback, page-scoped scale, and formula fields. (`a10d4bd`)
-- Assemblies POST/PUT now guard `res.ok` before `res.json()`. (`59d07c6`)
-- Crash fix by splitting `baseDims` selector to avoid per-render object creation (CRASH-002). (`13473c7`)
-- SSE multi-instance fallback, assembly events, keepalive interval, and backoff jitter. (`df970a6`)
+- CanvasOverlay performance — memoized callbacks to prevent unnecessary re-renders
+- Jest config `setupFilesAfterSetup` typo corrected
+
+## [Wave 9] — 2026-03-17
+
+### Fixed
+- Accessibility: ARIA labels and roles across interactive components
+- Performance: `useMemo`/`useCallback` optimizations in hot paths
+- Broken ActivityFeed / useRealtimeSync imports resolved
 
 ### Changed
-- Added Jest infrastructure and unit tests for geometry/store/utils. (`fc562aa`)
-- Removed dev `console.log`s, replaced `any` with `unknown`, and performed quality cleanup. (`f758997`)
-- Added end-to-end API test script for core takeoff workflow. (`1cb37cc`)
-- Enabled dynamic imports for ThreeDScene/ComparePanel/downloadExcel to reduce initial bundle size. (`0efac28`)
-- Published OpenAPI 3.0 spec and AI Agent quick-start documentation. (`d113e76`)
-- Implemented GAP-002 AI takeoff fix, GAP-011 count classification upgrades, and 2D/3D toggle fix delivery. (`3545cc9`)
-- Parallelized page-thumbnail generation with progressive loading for better sidebar performance. (`635d0b7`)
+- Dynamic imports for ThreeDScene, ComparePanel, and downloadExcel to reduce initial bundle size
+
+## [Wave 8] — 2026-03-16
+
+### Added
+- Contractor report API route with Excel export
+- Recent projects API endpoint
+- Project duplication API
+- OpenAPI 3.0 spec and AI Agent quick-start guide (`docs/`)
+- Estimates tab with cost breakdown per classification
+- Copy-link share button
+- ProjectSettingsPanel (rename, units, delete)
+- QuantitiesPanel keyboard navigation (arrow keys, Enter, Escape)
+- Logger utility for server-side routes
+- Jest testing infrastructure with unit tests for geometry, store, and utils
+- E2E API test script for core takeoff workflow
+
+### Fixed
+- Missing ActivityFeed component and useRealtimeSync hook imports
+- Code quality pass — removed dev `console.log`s, replaced `any` types with `unknown`
+
+## [Wave 7] — 2026-03-14
+
+### Added
+- Image search UX with Google redirect
+- Compare panel UI for side-by-side sheet comparison
+- Undo/redo for annotations
+- Multi-select polygons with bulk delete/reclassify actions
+- Measurement precision settings — units, decimals, area/linear unit selector
+- Print/PDF export with polygon overlays and CSS print styles
+- Classification library for reusable classification templates
+- Onboarding flow — scale calibration + AI takeoff steps
+- Server-side sheet naming from PDF text extraction
+- Mobile toolbar
+
+### Fixed
+- Toast stacking overlap
+
+## [Wave 6] — 2026-03-12
+
+### Added
+- AnnotationTool component for text/arrow/cloud annotations
+- Compare API route for sheet comparison
+- PATCH support for classification updates
+- Export JSON button in QuantitiesPanel header
+- Export JSON API route with file download headers
+- Projects sort control and VersionHistory polish
+- Zoom controls UI and settings page improvements
+- New project navigates immediately to takeoff view
+- Project thumbnails — capture page 1 canvas, display on project card
+- Project thumbnails on projects page with initials placeholder and color hash
+
+### Fixed
+- Geometry engine unit conversion updates
+
+## [Wave 5] — 2026-03-10
+
+### Added
+- MX Chat with OpenAI integration
+- Image search with Google redirect
+- Keyboard shortcuts modal
+- ReRunAI wiring for re-processing pages
+- Drawing sets support
+- Multi-page AI takeoff — "Run on All Pages" with progress tracking
+- Scale calibration UX — auto-start, live preview, confirmation state
+- Enhanced count classifications — presets, page breakdown, single-click placement
+
+### Fixed
+- Quantities count calculation (GAP-005)
+- AI takeoff response mapping and null safety (GAP-002)
+- 2D/3D view toggle wiring
+- Snap page-scoping, vertex drag area recompute, Delete key polygon removal
+
+## [Pre-Wave 5] — 2026-03-01 to 2026-03-09
+
+### Added
+- MeasureX v1.0 — complete takeoff application with 46+ components
+- PDF viewer with pan/zoom, multi-page navigation, touch support
+- Canvas overlay for polygon drawing (SVG-based)
+- Classification CRUD with context menu
+- Zustand store with localStorage persistence
+- REST API layer — full CRUD for projects, classifications, polygons
+- AI takeoff engine with server-side pipeline
+- Excel export (.xlsx)
+- SSE real-time sync between clients
+- Supabase integration with migrations
+- Scale calibration panel with line-draw mode
+- Polygon labels on canvas
+- Vertex drag to reshape polygons
+- Assemblies cost linking with API-backed panel
+- Revision history — mx_history table and VersionHistory UI
+- Keyboard shortcuts (V/H/D/M/Esc/Ctrl+Z/Ctrl+Y)
+
+### Fixed
+- PDF viewer memory leaks, stale render issues, zoom anchor math
+- SSE registry keepalive, exponential backoff reconnect
+- Store data integrity fixes from multiple audits
+- Path traversal sanitization in file routes
+- Hydration issues and duplicate classification prevention
