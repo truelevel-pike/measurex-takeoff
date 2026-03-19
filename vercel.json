@@ -43,7 +43,6 @@
   ],
   "rewrites": [],
   "env": {
-    "NEXT_TELEMETRY_DISABLED": "1",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key"
+    "NEXT_TELEMETRY_DISABLED": "1"
   }
 }
