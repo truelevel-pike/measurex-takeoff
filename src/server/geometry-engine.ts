@@ -4,6 +4,8 @@
  */
 
 import type { Classification, Polygon } from '@/lib/types';
+import type { MeasurementSettings } from '@/lib/measurement-settings';
+import { formatArea, formatLinear, formatCount } from '@/lib/measurement-settings';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -174,4 +176,23 @@ export function computeQuantities(
   }
 
   return Array.from(rows.values());
+}
+
+// ── Formatting with Measurement Settings ─────────────────────────────
+
+/**
+ * Format a quantity row's primary value using measurement settings.
+ */
+export function formatQuantityValue(
+  row: QuantityRow,
+  settings: MeasurementSettings,
+): string {
+  switch (row.type) {
+    case 'area':
+      return formatArea(row.totalArea, settings);
+    case 'linear':
+      return formatLinear(row.totalLinear, settings);
+    case 'count':
+      return formatCount(row.totalCount);
+  }
 }

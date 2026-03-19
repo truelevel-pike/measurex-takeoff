@@ -1,8 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check } from 'lucide-react';
 import Link from 'next/link';
+import {
+  type MeasurementSettings,
+  type AreaUnit,
+  type LinearUnit,
+  type DecimalPlaces,
+  type ScaleDisplayFormat,
+  AREA_UNIT_LABELS,
+  LINEAR_UNIT_LABELS,
+  loadMeasurementSettings,
+  saveMeasurementSettings,
+} from '@/lib/measurement-settings';
 
 type SettingsTab = 'profile' | 'measurements' | 'organization' | 'account';
 
@@ -32,9 +43,22 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState('MeasureX Inc.');
 
   // Measurements state
-  const [unitSystem, setUnitSystem] = useState<'imperial' | 'metric'>('imperial');
   const [defaultScale, setDefaultScale] = useState('1/4" = 1\'');
   const [applyToAll, setApplyToAll] = useState(false);
+
+  // Measurement precision settings (persisted in localStorage)
+  const [ms, setMs] = useState<MeasurementSettings | null>(null);
+
+  useEffect(() => {
+    setMs(loadMeasurementSettings());
+  }, []);
+
+  const updateSetting = (patch: Partial<MeasurementSettings>) => {
+    if (!ms) return;
+    const next: MeasurementSettings = { ...ms, ...patch };
+    setMs(next);
+    saveMeasurementSettings(next);
+  };
 
   // Organization state
   const [teamName, setTeamName] = useState('MeasureX Team');
@@ -140,7 +164,7 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {activeTab === 'measurements' && (
+          {activeTab === 'measurements' && ms && (
             <section className="space-y-6">
               <h2 className="text-lg font-semibold mb-4">Measurements</h2>
 
@@ -149,26 +173,25 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm text-gray-300 mb-2">Unit System</label>
                   <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
-                    <button
-                      onClick={() => setUnitSystem('imperial')}
-                      className={`px-6 py-2.5 text-sm font-medium transition-colors ${
-                        unitSystem === 'imperial'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-800 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Imperial
-                    </button>
-                    <button
-                      onClick={() => setUnitSystem('metric')}
-                      className={`px-6 py-2.5 text-sm font-medium transition-colors ${
-                        unitSystem === 'metric'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-800 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Metric
-                    </button>
+                    {(['imperial', 'metric'] as const).map(u => (
+                      <button
+                        key={u}
+                        onClick={() => {
+                          if (u === 'metric') {
+                            updateSetting({ unit: u, areaUnit: 'sm', linearUnit: 'm' });
+                          } else {
+                            updateSetting({ unit: u, areaUnit: 'sf', linearUnit: 'ft' });
+                          }
+                        }}
+                        className={`px-6 py-2.5 text-sm font-medium capitalize transition-colors ${
+                          ms.unit === u
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -196,6 +219,101 @@ export default function SettingsPage() {
                   />
                   <span className="text-sm text-gray-300">Apply to all new projects</span>
                 </label>
+              </div>
+
+              {/* Measurement Precision Settings */}
+              <div className="bg-gray-900 rounded-xl p-6 space-y-6 border border-gray-800">
+                <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Precision &amp; Display</h3>
+
+                {/* Area units */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Area Unit</label>
+                  <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
+                    {(['sf', 'sy', 'sm', 'sm2'] as AreaUnit[]).map(u => (
+                      <button
+                        key={u}
+                        onClick={() => updateSetting({ areaUnit: u })}
+                        className={`px-5 py-2.5 text-sm font-medium transition-colors ${
+                          ms.areaUnit === u
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {AREA_UNIT_LABELS[u].toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Linear units */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Linear Unit</label>
+                  <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
+                    {(['ft', 'in', 'm', 'cm'] as LinearUnit[]).map(u => (
+                      <button
+                        key={u}
+                        onClick={() => updateSetting({ linearUnit: u })}
+                        className={`px-5 py-2.5 text-sm font-medium transition-colors ${
+                          ms.linearUnit === u
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {LINEAR_UNIT_LABELS[u].toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Decimal places */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Decimal Places</label>
+                  <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
+                    {([0, 1, 2, 3] as DecimalPlaces[]).map(d => (
+                      <button
+                        key={d}
+                        onClick={() => updateSetting({ decimals: d })}
+                        className={`px-6 py-2.5 text-sm font-medium transition-colors ${
+                          ms.decimals === d
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Scale display format */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Scale Display Format</label>
+                  <div className="flex gap-0 border border-gray-700 rounded-lg overflow-hidden w-fit">
+                    {([
+                      { value: 'architectural' as ScaleDisplayFormat, label: 'Architectural', example: '1/4" = 1\'' },
+                      { value: 'engineering' as ScaleDisplayFormat, label: 'Engineering', example: '1" = 20\'' },
+                      { value: 'ratio' as ScaleDisplayFormat, label: 'Ratio', example: '1:48' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => updateSetting({ scaleDisplayFormat: opt.value })}
+                        className={`px-5 py-2.5 text-sm font-medium transition-colors ${
+                          ms.scaleDisplayFormat === opt.value
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                        title={opt.example}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {ms.scaleDisplayFormat === 'architectural' && 'e.g. 1/4" = 1\''}
+                    {ms.scaleDisplayFormat === 'engineering' && 'e.g. 1" = 20\''}
+                    {ms.scaleDisplayFormat === 'ratio' && 'e.g. 1:48'}
+                  </p>
+                </div>
               </div>
             </section>
           )}

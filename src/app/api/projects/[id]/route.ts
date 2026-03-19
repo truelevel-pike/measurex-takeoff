@@ -106,6 +106,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const patch: Record<string, unknown> = {};
     if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
+    if (typeof body.name === 'string') patch.name = body.name;
+    if (body.metadata && typeof body.metadata === 'object') patch.metadata = body.metadata;
     const updated = await updateProject(id, patch as any);
     return NextResponse.json({ project: updated });
   } catch (err: any) {

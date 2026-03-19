@@ -92,8 +92,11 @@ export default function TopNavBar({
 
   const handleCopyLink = React.useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      addToast('Link copied!', 'success');
+      const url = new URL(window.location.href);
+      const pid = url.searchParams.get('project') || localStorage.getItem('measurex_project_id');
+      if (pid) url.searchParams.set('project', pid);
+      await navigator.clipboard.writeText(url.toString());
+      addToast('Link copied to clipboard', 'success');
     } catch (error) {
       console.error('Failed to copy link:', error);
       addToast('Failed to copy link', 'error');

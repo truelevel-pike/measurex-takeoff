@@ -43,8 +43,10 @@ export type Tool =
 export interface Store extends ProjectState {
   // UI state
   currentTool: Tool;
+  zoomLevel: number;
   showScalePopup: boolean;
   setShowScalePopup: (show: boolean) => void;
+  setZoomLevel: (zoomLevel: number) => void;
   selectedClassification: string | null;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
@@ -183,8 +185,10 @@ export const useStore = create<Store>()(
 
   // UI
   currentTool: 'select',
+  zoomLevel: 1,
   showScalePopup: false,
   setShowScalePopup: (show) => set({ showScalePopup: show }),
+  setZoomLevel: (zoomLevel) => set({ zoomLevel: Math.max(0.25, Math.min(4, zoomLevel)) }),
   selectedClassification: null,
   selectedPolygon: null,
   selectedPolygonId: null,
@@ -647,6 +651,7 @@ export const useStore = create<Store>()(
         classifications: state.classifications,
         polygons: state.polygons,
         annotations: state.annotations,
+        zoomLevel: state.zoomLevel,
         scale: state.scale,
         scales: state.scales,
         currentPage: state.currentPage,

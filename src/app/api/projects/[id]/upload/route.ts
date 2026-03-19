@@ -35,9 +35,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const page1 = result.pages.find((p) => p.pageNum === 1);
     const scaleResult = page1?.text ? detectScaleFromText(page1.text) : null;
 
+    // Collect sheet names so the client has them immediately
+    const sheetNames: Record<number, string> = {};
+    for (const page of result.pages) {
+      const name = extractSheetName(page.text ?? '');
+      if (name) sheetNames[page.pageNum] = name;
+    }
+
     const response: Record<string, unknown> = {
       pages: result.pages.length,
       dimensions: result.pages.map((p) => ({ page: p.pageNum, width: p.width, height: p.height })),
+      sheetNames,
     };
 
     if (scaleResult) {
