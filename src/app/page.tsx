@@ -920,6 +920,10 @@ function PageInner() {
             localStorage.setItem('measurex_hide_scale_popup', 'true');
             setShowAutoScalePopup(false);
           }}
+          onAccept={() => {
+            handleAcceptScale();
+            setShowAutoScalePopup(false);
+          }}
         />
       )}
 
