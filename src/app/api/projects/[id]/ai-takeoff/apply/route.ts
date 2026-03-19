@@ -121,7 +121,10 @@ export async function POST(
       if (element.type === 'area' && element.points.length >= 3) {
         areaPixels = shoelaceArea(element.points);
       } else if (element.type === 'linear' && element.points.length >= 2) {
-        linearPixels = euclidean(element.points[0], element.points[1]);
+        // Sum all segment distances for the full polyline length
+        for (let i = 1; i < element.points.length; i++) {
+          linearPixels += euclidean(element.points[i - 1], element.points[i]);
+        }
       }
 
       const newPolygon = await createPolygon(id, {
