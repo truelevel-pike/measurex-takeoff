@@ -4,14 +4,13 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ChevronDown, ChevronRight, Crosshair, Download, Eye, EyeOff, History, Layers, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import type { Classification, Polygon } from '@/lib/types';
-import { PRESET_COUNT_CLASSIFICATIONS } from '@/lib/classification-presets';
-import { CLASSIFICATION_LIBRARY } from '@/lib/classification-library';
 import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useMeasurementSettings } from '@/lib/use-measurement-settings';
 import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
 import MeasurementSettingsPanel from './MeasurementSettings';
+import ClassificationLibrary from './ClassificationLibrary';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -28,6 +27,15 @@ const CLASSIFICATION_COLOR_PRESETS = [
 ] as const;
 
 type ClassificationType = Classification['type'];
+
+export interface TakeoffSearchResult {
+  id: string;
+  classificationId: string;
+  classificationName: string;
+  pageNumber: number;
+  polygonCount: number;
+  polygonId: string;
+}
 
 type ClassTotals = {
   count: number;
@@ -111,7 +119,12 @@ function ClassificationShape({ index, color, size = 10 }: { index: number; color
   );
 }
 
-function QuantitiesPanel() {
+interface QuantitiesPanelProps {
+  showTakeoffSearch?: boolean;
+  onTakeoffSearchSelect?: (result: TakeoffSearchResult) => void;
+}
+
+function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies'>('quantities');
@@ -133,9 +146,9 @@ function QuantitiesPanel() {
   const setCurrentPage = useStore((s) => s.setCurrentPage);
 
   const [search, setSearch] = useState('');
+  const [takeoffSearchQuery, setTakeoffSearchQuery] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
-  const [showPresets, setShowPresets] = useState(false);
-  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -213,15 +226,6 @@ function QuantitiesPanel() {
     return polygons.filter((p) => p.label && p.label.toLowerCase().includes(searchLower));
   }, [polygons, searchLower]);
 
-  function loadTemplateSet(templateSetName: string) {
-    const templateSet = CLASSIFICATION_LIBRARY.find((ts) => ts.name === templateSetName);
-    if (!templateSet) return;
-    for (const t of templateSet.templates) {
-      addClassification({ name: t.name, color: t.color, type: t.type as Classification['type'], visible: true });
-    }
-    setShowTemplateDropdown(false);
-  }
-
   function handleFocusPolygon(polygon: Polygon) {
     setCurrentPage(polygon.pageNumber);
     focusPolygon(polygon.id);
@@ -239,6 +243,46 @@ function QuantitiesPanel() {
     }
     return byClass;
   }, [polygons]);
+
+  const polygonCountsByClassificationPage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const polygon of polygons) {
+      const key = `${polygon.classificationId}:${polygon.pageNumber}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [polygons]);
+
+  const takeoffSearchResults = useMemo(() => {
+    const query = takeoffSearchQuery.trim().toLowerCase();
+    if (!query) return [] as TakeoffSearchResult[];
+
+    const byClassPage = new Map<string, TakeoffSearchResult>();
+    for (const polygon of polygons) {
+      const classification = classifications.find((c) => c.id === polygon.classificationId);
+      if (!classification) continue;
+
+      const classMatch = classification.name.toLowerCase().includes(query);
+      const labelMatch = (polygon.label ?? '').toLowerCase().includes(query);
+      if (!classMatch && !labelMatch) continue;
+
+      const key = `${polygon.classificationId}:${polygon.pageNumber}`;
+      if (!byClassPage.has(key)) {
+        byClassPage.set(key, {
+          id: key,
+          classificationId: polygon.classificationId,
+          classificationName: classification.name,
+          pageNumber: polygon.pageNumber,
+          polygonCount: polygonCountsByClassificationPage.get(key) ?? 1,
+          polygonId: polygon.id,
+        });
+      }
+    }
+
+    return Array.from(byClassPage.values())
+      .sort((a, b) => (a.pageNumber - b.pageNumber) || a.classificationName.localeCompare(b.classificationName))
+      .slice(0, 30);
+  }, [takeoffSearchQuery, polygons, classifications, polygonCountsByClassificationPage]);
 
   // Count of classifications that have at least one polygon
   const activeClassificationCount = useMemo(
@@ -527,6 +571,39 @@ function QuantitiesPanel() {
       </div>
       {showHistory && <VersionHistory onClose={() => setShowHistory(false)} />}
 
+      {showTakeoffSearch && (
+        <div className="px-2 pt-2 pb-1 border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.4)]">
+          <div className="flex items-center gap-2">
+            <Search size={14} className="text-[#00d4ff]" aria-hidden="true" />
+            <input
+              placeholder="Search takeoff (classification or polygon label)"
+              className="flex-1 border px-2 py-1 rounded bg-[#0e1016] text-[#e5e7eb] text-[12px] outline-none focus:border-[#00d4ff]/40"
+              value={takeoffSearchQuery}
+              onChange={(event) => setTakeoffSearchQuery(event.target.value)}
+              aria-label="Search within takeoff"
+            />
+          </div>
+          {takeoffSearchQuery.trim() && (
+            <div className="mt-2 max-h-44 overflow-y-auto border border-[#00d4ff]/20 rounded bg-[#0a0a0f]">
+              {takeoffSearchResults.length > 0 ? (
+                takeoffSearchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => onTakeoffSearchSelect?.(result)}
+                    className="w-full text-left px-2 py-1.5 text-[12px] text-[#d1d5db] hover:bg-[#00d4ff]/10 border-b border-[#00d4ff]/10 last:border-b-0"
+                  >
+                    {result.classificationName} - Page {result.pageNumber}, {result.polygonCount} polygon{result.polygonCount === 1 ? '' : 's'}
+                  </button>
+                ))
+              ) : (
+                <div className="px-2 py-2 text-[11px] text-gray-400">No takeoff matches</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="px-2 pt-2 pb-1">
         <div className="flex items-center gap-2">
           <Search size={14} className="text-gray-300" aria-hidden="true" />
@@ -617,47 +694,53 @@ function QuantitiesPanel() {
       <div className="px-2 pb-2">
         <button
           type="button"
-          onClick={() => setShowPresets((prev) => !prev)}
-          className="w-full border border-purple-500/30 rounded px-2 py-1.5 text-xs text-purple-300 hover:bg-purple-500/10 flex items-center justify-center gap-1"
-          aria-label="Preset Classifications"
+          onClick={() => setShowTemplateLibrary(true)}
+          className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
+          aria-label="Classification Templates"
         >
-          <Plus size={13} />
-          Presets (Count)
+          <Layers size={13} />
+          Templates
         </button>
       </div>
 
-      {showPresets && (
-        <div className="mx-2 mb-2 p-2 bg-[#0e1016] border border-purple-500/20 rounded-lg">
-          <div className="text-[11px] text-gray-400 mb-2 font-mono">Quick-add count classifications:</div>
-          <div className="flex flex-wrap gap-1">
-            {PRESET_COUNT_CLASSIFICATIONS.map((preset) => {
-              const exists = classifications.some((c) => c.name.toLowerCase() === preset.name.toLowerCase());
-              return (
+      {searchLower && matchingPolygons.length > 0 && (
+        <div className="mx-2 mb-2 p-2 bg-[#0e1016] border border-[#00d4ff]/20 rounded-lg">
+          <div className="text-[11px] text-gray-400 mb-1 font-mono">Matching polygons:</div>
+          {matchingPolygons.map((polygon) => {
+            const cls = classifications.find((c) => c.id === polygon.classificationId);
+            return (
+              <div
+                key={polygon.id}
+                className="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300"
+              >
+                <span className="truncate flex items-center gap-1">
+                  {cls && (
+                    <span
+                      className="w-2 h-2 rounded-sm flex-shrink-0 inline-block"
+                      style={{ backgroundColor: cls.color }}
+                    />
+                  )}
+                  {polygon.label || 'Unnamed'}
+                  <span className="text-[9px] text-gray-500">p.{polygon.pageNumber}</span>
+                </span>
                 <button
-                  key={preset.name}
                   type="button"
-                  disabled={exists}
-                  onClick={() => {
-                    addClassification({ name: preset.name, color: preset.color, type: preset.type, visible: true });
-                  }}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border ${
-                    exists
-                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                      : 'border-purple-500/30 text-gray-200 hover:bg-purple-500/10 cursor-pointer'
-                  }`}
+                  onClick={() => handleFocusPolygon(polygon)}
+                  className="flex items-center gap-0.5 text-[#00d4ff] hover:text-[#00d4ff]/80 flex-shrink-0"
+                  aria-label="Find on canvas"
+                  title="Find on canvas"
                 >
-                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: preset.color }} />
-                  {preset.name}
-                  {exists && <span className="text-[9px] text-gray-500 ml-0.5">(added)</span>}
+                  <Crosshair size={11} />
+                  <span className="text-[9px]">Find</span>
                 </button>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-1" data-classification-list>
-        {filtered.map((classification) => {
+      <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list>
+        {filtered.map((classification, classIndex) => {
           const totals = totalsByClassification.get(classification.id) ?? { count: 0, areaReal: 0, lengthReal: 0 };
           const polygonsForClassification = polygonsByClassification.get(classification.id) ?? [];
           const isExpanded = expanded.has(classification.id);
@@ -753,6 +836,7 @@ function QuantitiesPanel() {
                     className={`w-3 h-3 rounded-sm border border-[#00d4ff]/30 flex-shrink-0${classification.type === 'count' && totals.count === 0 ? ' opacity-40' : ''}`}
                     style={{ backgroundColor: classification.color, boxShadow: `0 0 6px ${classification.color}55` }}
                   />
+                  <ClassificationShape index={classIndex} color={classification.color} />
 
                   <span className={`flex-1 font-medium truncate text-[12px] ${classification.type === 'count' && totals.count === 0 ? 'text-gray-500' : 'text-[#e5e7eb]'}`}>{classification.name}</span>
 
@@ -893,6 +977,7 @@ function QuantitiesPanel() {
           </div>
         )}
       </div>
+      <ClassificationLibrary open={showTemplateLibrary} onClose={() => setShowTemplateLibrary(false)} />
       </>
       )}
     </>
@@ -962,3 +1047,5 @@ function QuantitiesPanel() {
     </aside>
   );
 }
+
+export default QuantitiesPanel;

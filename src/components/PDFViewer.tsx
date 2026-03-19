@@ -31,7 +31,9 @@ export interface PDFViewerHandle {
   goToPage: (page: number) => void;
   setZoom: (zoom: number) => void;
   fitToPage: () => void;
+  focusOnNormalizedPoint: (point: { x: number; y: number }, targetZoom?: number) => void;
   getPageCanvas: () => HTMLCanvasElement | null;
+  renderPageForCapture: (page: number) => Promise<HTMLCanvasElement | null>;
 }
 
 const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
@@ -348,6 +350,40 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       setPan({ x: 0, y: 0 });
     }, [setZoom]);
 
+    const focusOnNormalizedPoint = useCallback((point: { x: number; y: number }, targetZoom = 2) => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const clampedPoint = {
+        x: Math.max(0, Math.min(1, point.x)),
+        y: Math.max(0, Math.min(1, point.y)),
+      };
+      const nextZoom = Math.max(0.25, Math.min(5, targetZoom));
+      const renderMultiplier = 1.5;
+      const pageWidthAtZoom1 = basePageSize.current.width > 0
+        ? basePageSize.current.width * renderMultiplier
+        : (pageDimensions.width > 0 ? pageDimensions.width / Math.max(zoomRef.current, 0.01) : 0);
+      const pageHeightAtZoom1 = basePageSize.current.height > 0
+        ? basePageSize.current.height * renderMultiplier
+        : (pageDimensions.height > 0 ? pageDimensions.height / Math.max(zoomRef.current, 0.01) : 0);
+      if (pageWidthAtZoom1 <= 0 || pageHeightAtZoom1 <= 0) {
+        setZoom(nextZoom);
+        return;
+      }
+
+      const pageWidth = pageWidthAtZoom1 * nextZoom;
+      const pageHeight = pageHeightAtZoom1 * nextZoom;
+      const panX = (0.5 - clampedPoint.x) * pageWidth;
+      const panY = (0.5 - clampedPoint.y) * pageHeight;
+
+      setZoomState(nextZoom);
+      zoomRef.current = nextZoom;
+      setPan({
+        x: Number.isFinite(panX) ? panX : 0,
+        y: Number.isFinite(panY) ? panY : 0,
+      });
+    }, [pageDimensions]);
+
     // Zoom to cursor
     // ISSUE #7 FIX: correct cursor-anchored zoom math.
     // Previous code subtracted pan before computing the canvas-space pivot, but that
@@ -480,10 +516,11 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         goToPage,
         setZoom,
         fitToPage,
+        focusOnNormalizedPoint,
         getPageCanvas: () => canvasRef.current,
         renderPageForCapture,
       }),
-      [zoom, pan, pageDimensions, goToPage, setZoom, fitToPage, renderPageForCapture]
+      [zoom, pan, pageDimensions, goToPage, setZoom, fitToPage, focusOnNormalizedPoint, renderPageForCapture]
     );
 
     // Touch handlers for mobile: pan (one finger) and pinch-to-zoom (two fingers)

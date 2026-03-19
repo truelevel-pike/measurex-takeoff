@@ -30,7 +30,7 @@ import ZoomControls from '@/components/ZoomControls';
 import ContextMenu from '@/components/ContextMenu';
 import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
-import QuantitiesPanel from '@/components/QuantitiesPanel';
+import QuantitiesPanel, { type TakeoffSearchResult } from '@/components/QuantitiesPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
 import AnnotationTool from '@/components/AnnotationTool';
@@ -185,6 +185,7 @@ function PageInner() {
   const scales = useStore((s) => s.scales);
   const totalPages = useStore((s) => s.totalPages);
   const currentPage = useStore((s) => s.currentPage);
+  const pageBaseDimensions = useStore((s) => s.pageBaseDimensions);
   const sheetNames = useStore((s) => s.sheetNames);
 
   const { addToast } = useToast();
@@ -232,8 +233,10 @@ function PageInner() {
   const [showChat, setShowChat] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
+  const [highlightedPolygonId, setHighlightedPolygonId] = useState<string | null>(null);
 
   // Compare overlay state
   const [compareOverlay, setCompareOverlay] = useState<{ added: Polygon[]; removed: Polygon[]; unchanged: Polygon[] } | null>(null);

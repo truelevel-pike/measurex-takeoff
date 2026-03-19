@@ -163,12 +163,10 @@ export interface Store extends ProjectState {
   pageBaseDimensions: Record<number, { width: number; height: number }>;
   setPageBaseDimensions: (page: number, dims: { width: number; height: number }) => void;
 
-  // Multi-select polygons
-  selectedPolygons: string[];
+  // Multi-select polygons (additional helpers)
   selectPolygon: (id: string) => void;
   deselectPolygon: (id: string) => void;
   clearSelectedPolygons: () => void;
-  setSelectedPolygons: (ids: string[]) => void;
 
   // Focus polygon (for "find on canvas")
   focusedPolygonId: string | null;
@@ -715,16 +713,18 @@ export const useStore = create<Store>()(
   pageBaseDimensions: {},
   setPageBaseDimensions: (page, dims) => set((s) => ({ pageBaseDimensions: { ...s.pageBaseDimensions, [page]: dims } })),
 
-  // ─── Multi-select Polygons ───
-  selectedPolygons: [],
+  // ─── Multi-select Polygons (additional helpers) ───
   selectPolygon: (id) => set((s) => ({
     selectedPolygons: s.selectedPolygons.includes(id) ? s.selectedPolygons : [...s.selectedPolygons, id],
+    selectedPolygon: id,
+    selectedPolygonId: id,
   })),
   deselectPolygon: (id) => set((s) => ({
     selectedPolygons: s.selectedPolygons.filter((pid) => pid !== id),
+    selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
+    selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
   })),
-  clearSelectedPolygons: () => set({ selectedPolygons: [] }),
-  setSelectedPolygons: (ids) => set({ selectedPolygons: ids }),
+  clearSelectedPolygons: () => set({ selectedPolygons: [], selectedPolygon: null, selectedPolygonId: null }),
 
   // ─── Focus Polygon ───
   focusedPolygonId: null,

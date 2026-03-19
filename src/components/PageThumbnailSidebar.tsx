@@ -23,7 +23,7 @@ interface PageThumbnailSidebarProps {
   pdfDoc?: PDFDocumentProxy | null;
 }
 
-export default function PageThumbnailSidebar({
+function PageThumbnailSidebar({
   totalPages,
   currentPage,
   onPageSelect,
@@ -227,3 +227,5 @@ export default function PageThumbnailSidebar({
     </div>
   );
 }
+
+export default React.memo(PageThumbnailSidebar);
