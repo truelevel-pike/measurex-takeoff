@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Edit, Trash, Copy, Info } from 'lucide-react';
+import { Camera, ChevronRight, Copy, Info, Trash } from 'lucide-react';
 
 interface ContextMenuProps {
   x: number;
@@ -19,16 +19,35 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const classifications = useStore((s) => s.classifications);
   const updatePolygon = useStore((s) => s.updatePolygon);
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
+  const projectId = useStore((s) => s.projectId);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showClassifications, setShowClassifications] = useState(false);
+  const [snapshotStatus, setSnapshotStatus] = useState<'idle' | 'saving' | 'done'>('idle');
 
   if (!polygonId) return null;
   const polygon = polygons.find((p) => p.id === polygonId);
 
-  const handleDelete = () => {
-    deletePolygon(polygonId);
-    onClose();
-  };
+  // Build menu items list for keyboard navigation
+  const menuItems: string[] = ['properties', 'duplicate', 'reclassify', 'delete', 'snapshot'];
 
-  const handleCopy = () => {
+  const handleDelete = useCallback(() => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    deletePolygon(polygonId);
+    if (projectId) {
+      fetch(`/api/projects/${projectId}/polygons/${polygonId}`, { method: 'DELETE' }).catch((err) =>
+        console.error('API deletePolygon failed:', err)
+      );
+    }
+    onClose();
+  }, [confirmDelete, deletePolygon, polygonId, projectId, onClose]);
+
+  const handleCopy = useCallback(() => {
     if (!polygon) return;
     addPolygon({
       points: polygon.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })),
@@ -40,82 +59,163 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       label: polygon.label,
     });
     onClose();
-  };
+  }, [polygon, addPolygon, onClose]);
 
-  const handleReclassify = (classId: string) => {
-    const cls = classifications.find((c) => c.id === classId);
-    if (cls) updatePolygon(polygonId, { classificationId: classId });
+  const handleReclassify = useCallback((classId: string) => {
+    updatePolygon(polygonId, { classificationId: classId });
     onClose();
-  };
+  }, [updatePolygon, polygonId, onClose]);
 
-  const handleOpenProperties = () => {
+  const handleOpenProperties = useCallback(() => {
     setSelectedPolygon(polygonId);
     onOpenProperties?.(polygonId);
     onClose();
-  };
+  }, [setSelectedPolygon, polygonId, onOpenProperties, onClose]);
+
+  const handleSnapshot = useCallback(async () => {
+    if (!projectId || snapshotStatus !== 'idle') return;
+    setSnapshotStatus('saving');
+    try {
+      await fetch(`/api/projects/${projectId}/snapshots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: `Quick snapshot` }),
+      });
+      setSnapshotStatus('done');
+      setTimeout(onClose, 600);
+    } catch {
+      setSnapshotStatus('idle');
+    }
+  }, [projectId, snapshotStatus, onClose]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusIndex((i) => (i + 1) % menuItems.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusIndex((i) => (i - 1 + menuItems.length) % menuItems.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const item = menuItems[focusIndex];
+        if (item === 'properties') handleOpenProperties();
+        else if (item === 'duplicate') handleCopy();
+        else if (item === 'reclassify') setShowClassifications((v) => !v);
+        else if (item === 'delete') handleDelete();
+        else if (item === 'snapshot') void handleSnapshot();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focusIndex, menuItems.length, handleOpenProperties, handleCopy, handleDelete, handleSnapshot]);
+
+  // Scroll to close
+  useEffect(() => {
+    const onScroll = () => onClose();
+    window.addEventListener('scroll', onScroll, true);
+    return () => window.removeEventListener('scroll', onScroll, true);
+  }, [onClose]);
+
+  // Focus the menu on mount
+  useEffect(() => {
+    menuRef.current?.focus();
+  }, []);
+
+  const itemClass = (idx: number, extra?: string) =>
+    `flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors ${
+      focusIndex === idx ? 'bg-white/10' : 'hover:bg-white/[0.07]'
+    } ${extra ?? ''}`;
 
   return (
     <div
+      ref={menuRef}
+      tabIndex={-1}
+      role="menu"
+      aria-label="Polygon context menu"
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: y,
         left: x,
-        zIndex: 50,
-        background: '#fff',
-        borderRadius: 8,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-        padding: 4,
-        minWidth: 180,
+        zIndex: 9999,
       }}
+      className="min-w-[200px] rounded-lg border border-slate-700/60 bg-[#111827]/[0.97] shadow-2xl backdrop-blur-sm p-1 text-slate-200 outline-none"
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="text-xs text-neutral-400 px-3 py-1">Actions</div>
-      {classifications.length > 0 && (
-        <>
-          <div className="text-xs text-neutral-400 px-3 py-1 mt-1">Reclassify</div>
+      {/* Properties */}
+      <button
+        role="menuitem"
+        className={itemClass(0)}
+        onMouseEnter={() => setFocusIndex(0)}
+        onClick={handleOpenProperties}
+      >
+        <Info size={14} className="text-slate-400" /> Properties
+      </button>
+
+      {/* Duplicate */}
+      <button
+        role="menuitem"
+        className={itemClass(1)}
+        onMouseEnter={() => setFocusIndex(1)}
+        onClick={handleCopy}
+      >
+        <Copy size={14} className="text-slate-400" /> Duplicate
+      </button>
+
+      {/* Change Classification */}
+      <button
+        role="menuitem"
+        className={itemClass(2)}
+        onMouseEnter={() => setFocusIndex(2)}
+        onClick={() => setShowClassifications((v) => !v)}
+      >
+        <ChevronRight
+          size={14}
+          className={`text-slate-400 transition-transform ${showClassifications ? 'rotate-90' : ''}`}
+        />
+        Change Classification
+      </button>
+      {showClassifications && classifications.length > 0 && (
+        <div className="ml-4 mr-1 my-0.5 max-h-[160px] overflow-y-auto">
           {classifications.map((cls) => (
             <button
               key={cls.id}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-neutral-100 rounded text-left"
+              role="menuitem"
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs rounded hover:bg-white/[0.07] text-slate-300"
               onClick={() => handleReclassify(cls.id)}
             >
-              <span className="w-3 h-3 rounded-full" style={{ background: cls.color }} />
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cls.color }} />
               {cls.name}
             </button>
           ))}
-        </>
+        </div>
       )}
 
+      <div className="my-1 border-t border-slate-700/50" />
+
+      {/* Delete */}
       <button
-        className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-neutral-100 rounded"
-        onClick={handleOpenProperties}
+        role="menuitem"
+        className={itemClass(3, confirmDelete ? 'text-red-400 bg-red-500/10' : 'text-red-400')}
+        onMouseEnter={() => setFocusIndex(3)}
+        onClick={handleDelete}
       >
-        <Info size={14} /> Properties
+        <Trash size={14} /> {confirmDelete ? 'Click again to confirm' : 'Delete'}
       </button>
 
+      {/* Add to snapshot */}
       <button
-        className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-neutral-100 rounded"
-        onClick={() => {
-          setSelectedPolygon(polygonId);
-          onClose();
-        }}
+        role="menuitem"
+        className={itemClass(4, 'text-slate-400')}
+        onMouseEnter={() => setFocusIndex(4)}
+        onClick={() => void handleSnapshot()}
+        disabled={snapshotStatus !== 'idle'}
       >
-        <Edit size={14} /> Edit Points
+        <Camera size={14} />
+        {snapshotStatus === 'saving' ? 'Saving...' : snapshotStatus === 'done' ? 'Saved!' : 'Add to snapshot'}
       </button>
-
-      <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-neutral-100 rounded" onClick={handleCopy}>
-        <Copy size={14} /> Duplicate
-      </button>
-
-      <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 rounded" onClick={handleDelete}>
-        <Trash size={14} /> Delete
-      </button>
-
-      <div className="border-top mt-1 pt-1">
-        <button className="w-full px-3 py-1.5 text-sm text-neutral-400 hover:bg-neutral-100 rounded text-left" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }
