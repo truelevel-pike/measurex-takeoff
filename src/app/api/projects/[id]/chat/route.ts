@@ -21,6 +21,7 @@ export async function POST(
 
     const message: string | undefined = body.message;
     const messages: Array<{ role: string; content: string }> | undefined = body.messages;
+    const currentPage: number | undefined = typeof body.currentPage === 'number' ? body.currentPage : undefined;
 
     // Normalise to messages array
     let history: Array<{ role: string; content: string }> = [];
@@ -79,6 +80,40 @@ export async function POST(
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(([pg, count]) => `  - Page ${pg}: ${count} polygons`);
 
+    // Build per-page per-classification breakdown
+    const pageClassBreakdown: Record<number, { name: string; count: number }[]> = {};
+    for (const p of polygons) {
+      const rawPg = (p as unknown as Record<string, unknown>).pageNumber;
+      const pg: number = typeof rawPg === 'number' ? rawPg : 1;
+      if (!pageClassBreakdown[pg]) pageClassBreakdown[pg] = [];
+      const cls = classifications.find((c) => c.id === p.classificationId);
+      if (!cls) continue;
+      const existing = pageClassBreakdown[pg].find((e) => e.name === cls.name);
+      if (existing) existing.count++;
+      else pageClassBreakdown[pg].push({ name: cls.name, count: 1 });
+    }
+
+    const pageClassLines = Object.entries(pageClassBreakdown)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([pg, entries]) => {
+        const parts = entries.map((e) => `${e.name} (${e.count})`).join(', ');
+        return `  - Page ${pg}: ${parts}`;
+      });
+
+    const totalPages = Object.keys(pageClassBreakdown).length;
+
+    // Build current page context if provided
+    let currentPageContext = '';
+    if (currentPage !== undefined) {
+      const currentPageEntries = pageClassBreakdown[currentPage];
+      if (currentPageEntries && currentPageEntries.length > 0) {
+        const lines = currentPageEntries.map((e) => `  - ${e.name}: ${e.count}`);
+        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) elements:\n${lines.join('\n')}`;
+      } else {
+        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) has no elements.`;
+      }
+    }
+
     // Detect model used for takeoff
     const modelCounts: Record<string, number> = {};
     for (const p of polygons) {
@@ -128,6 +163,9 @@ ${quantities.join('\n')}
 ${pageBreakdownLines.length > 0 ? `
 Polygons per page:
 ${pageBreakdownLines.join('\n')}` : ''}
+${pageClassLines.length > 0 ? `
+Per-page classification breakdown:
+${pageClassLines.join('\n')}` : ''}${currentPageContext}
 ${assemblyContext.length > 0 ? `
 Assemblies:
 ${assemblyContext.map((a) => `  - ${a.assemblyName}: $${a.unitCost.toFixed(2)}/unit × ${a.quantity} = $${a.projectedTotal.toFixed(2)}`).join('\n')}` : ''}${costTableBlock}`;
@@ -138,6 +176,8 @@ ${assemblyContext.map((a) => `  - ${a.assemblyName}: $${a.unitCost.toFixed(2)}/u
       'Be concise, practical, and speak like a seasoned estimator. ' +
       'When the user asks about their project, refer to the provided context. ' +
       'When assemblies and cost data are provided, use them for cost estimation. ' +
+      'When asked about elements on a specific page, use the per-page classification breakdown data provided. ' +
+      (currentPage !== undefined ? `The user is currently viewing page ${currentPage} of ${totalPages} pages. ` : '') +
       'Format numbers cleanly. Use bullet points for lists. Keep answers under 200 words unless detail is needed.' +
       contextBlock;
 

@@ -31,6 +31,7 @@ const SUGGESTED_QUESTIONS = [
   'What would this cost at $5/SF?',
   'Summarize my takeoff',
   'What is my total project cost?',
+  'Show me all elements on this page',
 ];
 
 const QUICK_REPLY_CHIPS = [
@@ -249,7 +250,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyForApi, ...(useProjectRoute ? {} : { context }) }),
+        body: JSON.stringify({ messages: historyForApi, ...(useProjectRoute ? { currentPage } : { context }) }),
         signal: abortRef.current.signal,
       });
 
@@ -469,7 +470,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;How many windows on page 3?&rdquo;</span>
               <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;Total linear footage of walls?&rdquo;</span>
-              <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;Compare floors 1 and 2?&rdquo;</span>
+              <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>&ldquo;What is on page 3?&rdquo;</span>
             </div>
           </div>
         )}
