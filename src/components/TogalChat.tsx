@@ -93,20 +93,60 @@ export function TogalChat({ onClose }: TogalChatProps) {
         body: JSON.stringify({ message: text, context }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(typeof data?.error === 'string' ? data.error : 'Chat request failed');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(typeof errData?.error === 'string' ? errData.error : 'Chat request failed');
       }
 
-      const reply = typeof data?.reply === 'string' ? data.reply.trim() : '';
-      if (!reply) {
+      // Parse SSE stream from /api/chat
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response stream');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) fullText += parsed.content;
+          } catch {
+            // skip malformed chunks
+          }
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        const trimmed = buffer.trim();
+        if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(trimmed.slice(6));
+            if (parsed.content) fullText += parsed.content;
+          } catch { /* skip */ }
+        }
+      }
+
+      if (!fullText.trim()) {
         throw new Error('No assistant reply returned');
       }
 
       const aiMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        text: reply,
+        text: fullText.trim(),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
