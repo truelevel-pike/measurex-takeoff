@@ -51,6 +51,7 @@ export default function MarkupTools({ onClose }: MarkupToolsProps) {
   const toggleShowMarkups = useStore((s) => s.toggleShowMarkups);
   const clearMarkups = useStore((s) => s.clearMarkups);
 
+  // TODO: BUG-A7-2-017 — wire activeTool/activeColor/strokeWidth to the canvas drawing layer
   const [activeTool, setActiveTool] = useState<MarkupToolType>('text');
   const [activeColor, setActiveColor] = useState('#ef4444');
   const [strokeWidth, setStrokeWidth] = useState(3);
