@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getProject, getPages, updatePage, createPage, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const PagePatchSchema = z.object({
   pageNum: z.number().int().positive(),
@@ -10,6 +11,10 @@ const PagePatchSchema = z.object({
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-089: add rate limiting
+  const limited = rateLimitResponse(_req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -25,6 +30,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-089: add rate limiting
+  const limitedPatch = rateLimitResponse(req);
+  if (limitedPatch) return limitedPatch;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
