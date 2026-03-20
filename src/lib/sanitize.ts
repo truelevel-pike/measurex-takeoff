@@ -4,7 +4,12 @@ const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 export function sanitizeName(input: unknown): string | null {
   if (typeof input !== 'string') return null;
 
-  const sanitized = input.trim().replace(/<[^>]*>/g, '').trim();
+  // Decode HTML entities first, then strip tags, decode again in case entities contained tags
+  const decoded = input
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+  const sanitized = decoded.trim().replace(/<[^>]*>/g, '').trim();
   if (!sanitized) return null;
   if (sanitized.length > 200) return null;
 
