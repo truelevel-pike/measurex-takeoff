@@ -21,6 +21,9 @@ export function assertSafeId(id: string, label = 'id'): void {
   if (!id || typeof id !== 'string') {
     throw new Error(`Invalid ${label}: must be a non-empty string`);
   }
+  if (id.length > MAX_ID_LENGTH) {
+    throw new Error(`Invalid ${label}: exceeds maximum length of ${MAX_ID_LENGTH} characters`);
+  }
   if (id.includes('/') || id.includes('\\') || id.includes('..') || id.includes('\0')) {
     throw new Error(`Invalid ${label}: path traversal characters detected`);
   }
