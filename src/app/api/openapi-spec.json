@@ -636,7 +636,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Created classification",
             "content": {
               "application/json": {
@@ -864,7 +864,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Created polygon",
             "content": {
               "application/json": {
@@ -1160,7 +1160,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Created assembly",
             "content": {
               "application/json": {
