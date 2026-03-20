@@ -27,3 +27,7 @@ create policy "groups_update" on mx_groups
 
 create policy "groups_delete" on mx_groups
   for delete using (true);
+
+-- BUG-A8-5-039 fix: add migration tracking so runner doesn't re-apply this migration.
+INSERT INTO _migrations (name) VALUES ('017_mx_groups.sql')
+ON CONFLICT (name) DO NOTHING;

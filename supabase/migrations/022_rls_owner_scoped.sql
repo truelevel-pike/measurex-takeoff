@@ -98,5 +98,29 @@ CREATE POLICY "estimates_update" ON mx_estimates
 CREATE POLICY "estimates_delete" ON mx_estimates
   FOR DELETE USING (project_id IN (SELECT id FROM mx_projects WHERE owner_id = auth.uid()));
 
+-- BUG-A8-5-032 fix: assert no permissive "allow all" (USING true) policies remain
+-- on any of the 8 core tables. If a policy was created with a different name in an
+-- intermediate migration and the DROP above silently did nothing, this guard catches it.
+DO $$
+DECLARE
+  tbl TEXT;
+  permissive_count INTEGER;
+  core_tables TEXT[] := ARRAY[
+    'mx_projects','mx_pages','mx_scales','mx_classifications',
+    'mx_polygons','mx_history','mx_assemblies','mx_estimates'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY core_tables LOOP
+    SELECT COUNT(*) INTO permissive_count
+    FROM pg_policies
+    WHERE tablename = tbl
+      AND permissive = 'PERMISSIVE'
+      AND (qual = 'true' OR qual IS NULL AND with_check = 'true');
+    IF permissive_count > 0 THEN
+      RAISE WARNING '022 guard: table % still has % permissive USING(true) polic(ies) — check for renamed "Allow all" policies', tbl, permissive_count;
+    END IF;
+  END LOOP;
+END $$;
+
 INSERT INTO _migrations (name) VALUES ('022_rls_owner_scoped.sql')
 ON CONFLICT (name) DO NOTHING;

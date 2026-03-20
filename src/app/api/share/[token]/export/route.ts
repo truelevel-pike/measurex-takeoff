@@ -177,8 +177,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  // BUG-A5-6-057: add rate limiting to shared export endpoint
-  const limited = rateLimitResponse(_req);
+  // BUG-A8-5-036 fix: apply rate limiting (was called with no limit args — now explicit 10/min)
+  const limited = rateLimitResponse(_req, 10, 60_000);
   if (limited) return limited;
 
   try {
@@ -203,6 +203,13 @@ export async function GET(
         { error: 'Share link not found or revoked' },
         { status: 404 },
       );
+    }
+
+    // BUG-A8-5-035 fix: check token expiry — was missing from export route,
+    // allowing expired share links to still export data.
+    const expiresAt = (project as unknown as Record<string, unknown>).expiresAt;
+    if (expiresAt && new Date(expiresAt as string) < new Date()) {
+      return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
     }
 
     // BUG-A5-6-058: log errors instead of silently swallowing them

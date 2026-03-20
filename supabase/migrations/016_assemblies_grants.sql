@@ -4,3 +4,7 @@ GRANT USAGE ON SCHEMA public TO service_role;
 -- Also ensure authenticated role has access
 GRANT ALL ON TABLE mx_assemblies TO authenticated;
 GRANT ALL ON TABLE mx_assemblies TO anon;
+
+-- BUG-A8-5-042 fix: add migration tracking
+INSERT INTO _migrations (name) VALUES ('016_assemblies_grants.sql')
+ON CONFLICT (name) DO NOTHING;

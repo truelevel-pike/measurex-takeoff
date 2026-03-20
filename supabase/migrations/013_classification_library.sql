@@ -41,3 +41,10 @@ insert into mx_classification_library (name, type, color, unit_cost, is_org, cre
   ('Plumbing Fixture',    'count',  '#10B981', 420.00,true, null),
   ('Column',              'count',  '#EF4444', 1200.00,true,null),
   ('Stair',               'count',  '#8B5CF6', 2500.00,true,null);
+
+-- BUG-A8-5-043 fix: add migration tracking and ON CONFLICT on seed data to prevent
+-- duplicate-key errors if this migration is re-applied.
+-- NOTE: seed inserts above don't have ON CONFLICT; add name-based unique guard.
+-- The safest fix is tracking — so runner won't re-apply this file after first run.
+INSERT INTO _migrations (name) VALUES ('013_classification_library.sql')
+ON CONFLICT (name) DO NOTHING;

@@ -3,3 +3,7 @@
 UPDATE mx_classification_library
   SET created_by = '00000000-0000-0000-0000-000000000000'
   WHERE is_org = true AND created_by IS NULL;
+
+-- BUG-A8-5-029 fix: add migration tracking so runner doesn't re-apply this migration.
+INSERT INTO _migrations (name) VALUES ('024_fix_seed_created_by.sql')
+ON CONFLICT (name) DO NOTHING;
