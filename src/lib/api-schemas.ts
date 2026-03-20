@@ -67,7 +67,7 @@ export const AssemblyUpdateSchema = AssemblyCreateSchema.partial();
 
 // Polygon update (partial)
 export const PolygonUpdateSchema = z.object({
-  points: z.array(PointSchema).min(1).optional(),
+  points: z.array(PointSchema).min(2).optional(),
   classificationId: z.string().uuid().optional(),
   pageNumber: z.number().int().positive().optional(),
   label: z.string().optional(),
