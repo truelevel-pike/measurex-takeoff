@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const limited = rateLimitResponse(req, 10, 60_000);
+  if (limited) return limited;
+
   try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) {
+    const { getSupabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) {
       return NextResponse.json({ events: [], note: 'no perf data yet' });
     }
-    const supabase = createClient(url, key);
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('mx_perf_events')
-      .select('*')
+      .select('timestamp, name, value, rating')
       .order('timestamp', { ascending: false })
       .limit(100);
 
