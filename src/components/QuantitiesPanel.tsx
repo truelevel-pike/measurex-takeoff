@@ -253,10 +253,15 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [projectId, setProjectId] = useState<string | null>(null);
   // BUG-A6-038 fix: removed duplicated isLoading state — use externalLoading prop directly
   // BUG-A6-023 fix: guard window.location.search for SSR safety
+  // BUG-A6-5-032 fix: use cancelled guard so stale setProjectId calls don't fire
+  // after unmount (relevant in test/SSR and rapid navigation scenarios).
   useEffect(() => {
+    let cancelled = false;
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    setProjectId(params.get('project') || localStorage.getItem('measurex_project_id'));
+    const pid = params.get('project') || localStorage.getItem('measurex_project_id');
+    if (!cancelled) setProjectId(pid);
+    return () => { cancelled = true; };
   }, []);
   const showLoadingSkeletons = externalLoading;
   const [newName, setNewName] = useState('');
@@ -1007,28 +1012,27 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     const trimmedName = groupName.trim();
     if (!trimmedName) return;
     if (editingGroupId) {
-      updateGroup(editingGroupId, {
-        name: trimmedName,
-        color: groupColor,
-      });
-      // Use moveClassificationToGroup so classifications are removed from other groups
-      groupSelectedClassificationIds.forEach((cid) => {
-        moveClassificationToGroup(cid, editingGroupId);
-      });
-      // Remove classifications that were unchecked
+      // BUG-A6-5-031 fix: snapshot add/remove sets BEFORE any store mutations to avoid
+      // reading stale Zustand state mid-update (updateGroup may not flush synchronously).
       const currentGroup = groups.find((g) => g.id === editingGroupId);
-      if (currentGroup) {
-        currentGroup.classificationIds.forEach((cid) => {
-          if (!groupSelectedClassificationIds.has(cid)) {
-            // Remove from this group by updating without it
-            const updated = useStore.getState().groups.find((g) => g.id === editingGroupId);
-            if (updated) {
-              updateGroup(editingGroupId, {
-                classificationIds: updated.classificationIds.filter((id) => id !== cid),
-              });
-            }
-          }
-        });
+      const prevIds = new Set(currentGroup?.classificationIds ?? []);
+      const toAdd = Array.from(groupSelectedClassificationIds).filter((id) => !prevIds.has(id));
+      const toRemove = Array.from(prevIds).filter((id) => !groupSelectedClassificationIds.has(id));
+
+      // Apply name/color update
+      updateGroup(editingGroupId, { name: trimmedName, color: groupColor });
+
+      // Move newly added classifications in
+      toAdd.forEach((cid) => moveClassificationToGroup(cid, editingGroupId));
+
+      // Remove unchecked classifications by reading the freshest state after mutations
+      if (toRemove.length > 0) {
+        const latest = useStore.getState().groups.find((g) => g.id === editingGroupId);
+        if (latest) {
+          updateGroup(editingGroupId, {
+            classificationIds: latest.classificationIds.filter((id) => !toRemove.includes(id)),
+          });
+        }
       }
     } else {
       // BUG-A6-010 fix: addGroup now returns the new group's ID synchronously, so

@@ -252,6 +252,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging, toSvgCoords, updatePolygon, baseDims]);
 
+  // BUG-A6-5-007 fix: track in-flight DELETE polygon IDs to prevent duplicate concurrent DELETEs
+  const inFlightDeleteIds = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
@@ -279,13 +282,18 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       }
       if (!selectedPolygonId) return;
 
+      // BUG-A6-5-007: skip if a DELETE is already in-flight for this polygon
+      if (inFlightDeleteIds.current.has(selectedPolygonId)) return;
+
       e.preventDefault();
       e.stopPropagation();
       deletePolygon(selectedPolygonId);
       if (projectId) {
-        fetch(`/api/projects/${projectId}/polygons/${selectedPolygonId}`, { method: 'DELETE' }).catch((err) =>
-          console.error('API deletePolygon failed:', err)
-        );
+        const idToDelete = selectedPolygonId;
+        inFlightDeleteIds.current.add(idToDelete);
+        fetch(`/api/projects/${projectId}/polygons/${idToDelete}`, { method: 'DELETE' })
+          .catch((err) => console.error('API deletePolygon failed:', err))
+          .finally(() => inFlightDeleteIds.current.delete(idToDelete));
       }
     };
 

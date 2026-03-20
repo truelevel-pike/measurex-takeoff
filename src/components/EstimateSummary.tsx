@@ -46,6 +46,10 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
       .then((res) => res.json())
       .then((data) => {
         if (cancelled || !Array.isArray(data.assemblies)) return;
+        // BUG-A6-5-019 fix: only populate from API if AssembliesPanel hasn't already loaded
+        // richer data into the store. Unconditionally calling setAssemblies here strips
+        // material details when the Estimates tab is viewed after AssembliesPanel.
+        if (useStore.getState().assemblies.length > 0) return;
         const mapped: Assembly[] = data.assemblies.map((row: AssemblyRow) => ({
           id: row.id,
           name: row.name,

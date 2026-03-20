@@ -364,6 +364,9 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
     }
 
     setRestoringEntryId(entry.id);
+    // BUG-A6-5-036 fix: guard the secondary history-reload fetch with a mounted flag
+    // so setApiEntries doesn't fire on an unmounted component (e.g. user closes panel mid-restore).
+    let mounted = true;
     try {
       const res = await fetch(`/api/projects/${projectId}/history/${entry.id}/restore`, {
         method: 'POST',
@@ -373,7 +376,7 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
         addToast('Version restored.', 'success');
         // Reload history after restore
         const refreshRes = await fetch(`/api/projects/${projectId}/history?limit=50`);
-        if (refreshRes.ok) {
+        if (refreshRes.ok && mounted) {
           const data = await refreshRes.json();
           if (data?.history) setApiEntries(data.history);
         }
@@ -384,8 +387,9 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
     } catch {
       addToast('Restore failed — network error.', 'error');
     } finally {
-      setRestoringEntryId(null);
+      if (mounted) setRestoringEntryId(null);
     }
+    return () => { mounted = false; };
   }
 
   function toggleExpand(id: string) {

@@ -163,6 +163,7 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Permission>('view');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState<string | null>(null);
 
@@ -218,10 +219,38 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
   }
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(FAKE_SHARE_URL).catch(() => {});
-    setCopied(true);
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    copiedTimerRef.current = setTimeout(() => setCopied(false), 2500);
+    // BUG-A6-5-010 fix: show error feedback if clipboard access is denied instead of
+    // silently swallowing the error while still showing "Copied!" toast.
+    navigator.clipboard.writeText(FAKE_SHARE_URL).then(() => {
+      setCopied(true);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {
+      // Fallback: execCommand copy
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = FAKE_SHARE_URL;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) {
+          setCopied(true);
+          if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+          copiedTimerRef.current = setTimeout(() => setCopied(false), 2500);
+        } else {
+          setCopyError(true);
+          if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+          copiedTimerRef.current = setTimeout(() => setCopyError(false), 3000);
+        }
+      } catch {
+        setCopyError(true);
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = setTimeout(() => setCopyError(false), 3000);
+      }
+    });
   }
 
   const tabCollabs = collaborators.filter((c) => c.type === activeTab);
@@ -423,9 +452,9 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
             onClick={handleCopyLink}
             aria-label="Copy share link"
             style={{
-              background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(0,212,255,0.1)',
-              border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(0,212,255,0.3)'}`,
-              color: copied ? '#4ade80' : '#00d4ff',
+              background: copied ? 'rgba(34,197,94,0.15)' : copyError ? 'rgba(239,68,68,0.15)' : 'rgba(0,212,255,0.1)',
+              border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : copyError ? 'rgba(239,68,68,0.4)' : 'rgba(0,212,255,0.3)'}`,
+              color: copied ? '#4ade80' : copyError ? '#f87171' : '#00d4ff',
               borderRadius: 6,
               padding: '4px 12px',
               fontSize: 11,
@@ -440,7 +469,7 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
             }}
           >
             {copied ? <Check size={12} /> : <Link2 size={12} />}
-            {copied ? 'Copied!' : 'Copy Link'}
+            {copied ? 'Copied!' : copyError ? 'Copy Failed' : 'Copy Link'}
           </button>
         </div>
 

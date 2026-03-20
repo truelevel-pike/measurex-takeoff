@@ -45,23 +45,28 @@ export default function ComparePanel({ currentProjectId, onOverlay, onClose }: C
   const [error, setError] = useState<string | null>(null);
 
   // Fetch project list
+  // BUG-A6-5-012 fix: guard fetch with cancelled flag so setProjects/setFetching
+  // don't fire on an unmounted component if the panel is closed while in-flight.
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch('/api/projects');
         if (!res.ok) throw new Error('Failed to fetch projects');
         const data = await res.json();
+        if (cancelled) return;
         const list: Project[] = (data.projects ?? data).filter(
           (p: Project) => p.id !== currentProjectId
         );
         setProjects(list);
         if (list.length > 0) setSelectedProjectId(list[0].id);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to load projects');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load projects');
       } finally {
-        setFetching(false);
+        if (!cancelled) setFetching(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [currentProjectId]);
 
   const handleCompare = async () => {

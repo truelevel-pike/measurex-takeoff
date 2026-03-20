@@ -62,8 +62,49 @@ export default function RepeatingGroupTool() {
     [toBaseCoords, boundingBox],
   );
 
+  // BUG-A6-5-022 fix: mirror CropOverlay — attach mousemove/mouseup to window while dragging
+  // so the drag doesn't get stuck when the pointer leaves the overlay div.
+  useEffect(() => {
+    if (!isDragging) return;
+    const onWindowMouseMove = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCurrentPoint({
+        x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+        y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+      });
+    };
+    const onWindowMouseUp = (e: MouseEvent) => {
+      setIsDragging(false);
+      if (!startPoint) return;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pt = {
+        x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+        y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+      };
+      const x = Math.min(startPoint.x, pt.x);
+      const y = Math.min(startPoint.y, pt.y);
+      const width = Math.abs(pt.x - startPoint.x);
+      const height = Math.abs(pt.y - startPoint.y);
+      if (width < 10 || height < 10) {
+        setStartPoint(null);
+        setCurrentPoint(null);
+        return;
+      }
+      setBoundingBox({ x, y, width, height });
+    };
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+    };
+  }, [isDragging, startPoint, baseDims]);
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Now handled by window listener while dragging; local handler is a no-op safety net
       if (!isDragging) return;
       setCurrentPoint(toBaseCoords(e));
     },
@@ -71,6 +112,7 @@ export default function RepeatingGroupTool() {
   );
 
   const handleMouseUp = useCallback(() => {
+    // Now handled by window listener to survive pointer leaving the overlay
     if (!isDragging || !startPoint || !currentPoint) return;
     setIsDragging(false);
 

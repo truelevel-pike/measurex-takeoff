@@ -33,14 +33,19 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
   );
   const [formula, setFormula] = useState('');
 
+  // BUG-A6-5-005 fix: store onClose in a ref so the keydown handler never re-registers
+  // due to an unstable onClose identity, which would briefly create duplicate listeners.
+  const onCloseRef = React.useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, []);
 
   function updateMaterial(index: number, patch: Partial<Material>) {
     setMaterials((prev) => prev.map((m, i) => (i === index ? { ...m, ...patch } : m)));

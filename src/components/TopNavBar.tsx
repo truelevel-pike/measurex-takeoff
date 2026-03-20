@@ -129,6 +129,31 @@ export default function TopNavBar({
   const [nameSaving, setNameSaving] = React.useState(false);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
 
+  // BUG-A6-5-034 fix: extract commitRename helper used by both onKeyDown and onBlur
+  // to avoid duplicated PATCH logic and risk of divergence between the two paths.
+  const commitRename = React.useCallback(async (trimmed: string) => {
+    if (!trimmed || trimmed === projectName || !projectId) {
+      setIsEditingName(false);
+      return;
+    }
+    setNameSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) throw new Error(`Rename failed (${res.status})`);
+      onProjectNameSaved?.(trimmed);
+      addToast('Project name updated', 'success');
+    } catch {
+      addToast('Failed to rename project', 'error');
+    } finally {
+      setNameSaving(false);
+      setIsEditingName(false);
+    }
+  }, [projectId, projectName, onProjectNameSaved, addToast]);
+
   // Check if project already has a share token on mount
   React.useEffect(() => {
     if (!projectId) return;
@@ -295,53 +320,15 @@ export default function TopNavBar({
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    const trimmed = nameInputValue.trim();
-                    if (!trimmed || trimmed === projectName || !projectId) {
-                      setIsEditingName(false);
-                      return;
-                    }
-                    setNameSaving(true);
-                    try {
-                      const res = await fetch(`/api/projects/${projectId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: trimmed }),
-                      });
-                      if (!res.ok) throw new Error(`Rename failed (${res.status})`);
-                      onProjectNameSaved?.(trimmed);
-                      addToast('Project name updated', 'success');
-                    } catch {
-                      addToast('Failed to rename project', 'error');
-                    } finally {
-                      setNameSaving(false);
-                      setIsEditingName(false);
-                    }
+                    // BUG-A6-5-034 fix: delegate to shared commitRename helper
+                    await commitRename(nameInputValue.trim());
                   } else if (e.key === 'Escape') {
                     setIsEditingName(false);
                   }
                 }}
                 onBlur={async () => {
-                  const trimmed = nameInputValue.trim();
-                  if (!trimmed || trimmed === projectName || !projectId) {
-                    setIsEditingName(false);
-                    return;
-                  }
-                  setNameSaving(true);
-                  try {
-                    const res = await fetch(`/api/projects/${projectId}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ name: trimmed }),
-                    });
-                    if (!res.ok) throw new Error(`Rename failed (${res.status})`);
-                    onProjectNameSaved?.(trimmed);
-                    addToast('Project name updated', 'success');
-                  } catch {
-                    addToast('Failed to rename project', 'error');
-                  } finally {
-                    setNameSaving(false);
-                    setIsEditingName(false);
-                  }
+                  // BUG-A6-5-034 fix: delegate to shared commitRename helper
+                  await commitRename(nameInputValue.trim());
                 }}
                 disabled={nameSaving}
                 style={{

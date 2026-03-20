@@ -23,6 +23,13 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
 
   const menuRef = useRef<HTMLDivElement>(null);
+  // BUG-A6-5-013 fix: track the snapshot close timer so it can be cancelled on unmount
+  const snapshotCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (snapshotCloseTimerRef.current) clearTimeout(snapshotCloseTimerRef.current);
+    };
+  }, []);
   const [focusIndex, setFocusIndex] = useState(-1);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showClassifications, setShowClassifications] = useState(false);
@@ -88,7 +95,8 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
         body: JSON.stringify({ label: `Quick snapshot` }),
       });
       setSnapshotStatus('done');
-      setTimeout(onClose, 600);
+      // BUG-A6-5-013 fix: store timer ref so it is cancelled if component unmounts
+      snapshotCloseTimerRef.current = setTimeout(onClose, 600);
     } catch {
       setSnapshotStatus('idle');
     }
