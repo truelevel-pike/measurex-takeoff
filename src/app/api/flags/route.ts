@@ -7,6 +7,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // BUG-A5-5-003: require ADMIN_SECRET header auth for flag mutation
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 

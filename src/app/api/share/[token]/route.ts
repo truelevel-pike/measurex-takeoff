@@ -10,6 +10,7 @@ import {
 } from '@/server/project-store';
 import { validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
+import { rateLimitResponse } from '@/lib/rate-limit';
 import type { Classification, Polygon } from '@/lib/types';
 import type { PageInfo } from '@/server/project-store';
 
@@ -20,6 +21,10 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(
   { params }: { params: Promise<{ token: string }> },
 ) {
   try {
+    // BUG-A5-5-002: token-level rate limiting
+    const limited = rateLimitResponse(_req, 30, 60_000);
+    if (limited) return limited;
+
     await initDataDir();
     const paramsResult = TokenSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
@@ -28,6 +33,12 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(
     const project = await getProjectByShareToken(token);
     if (!project) {
       return NextResponse.json({ error: 'Share link not found or revoked' }, { status: 404 });
+    }
+
+    // BUG-A5-5-002: check expiry if the field exists
+    const expiresAt = (project as Record<string, unknown>).expiresAt;
+    if (expiresAt && new Date(expiresAt as string) < new Date()) {
+      return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
     }
 
     const [classifications, polygons, scale, pages] = await Promise.all([

@@ -3,7 +3,7 @@
  * Returns a 503 JSON Response if the key is missing, or null if the key is present.
  */
 export function checkOpenAIKey(): Response | null {
-  const key = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const key = process.env.OPENAI_API_KEY;
   if (key) return null;
 
   return Response.json(
@@ -20,5 +20,5 @@ export function checkOpenAIKey(): Response | null {
  * Returns the OpenAI API key, or null if not configured.
  */
 export function getOpenAIKey(): string | null {
-  return process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY || null;
+  return process.env.OPENAI_API_KEY || null;
 }

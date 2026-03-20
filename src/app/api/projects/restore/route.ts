@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import {
   createProject,
   createClassification,
@@ -11,6 +12,13 @@ import {
   restoreSnapshot,
 } from '@/server/project-store';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const SnapshotRestoreSchema = z.object({
+  projectId: z.string().uuid(),
+  snapshotId: z.string().uuid(),
+});
+
 // Restore a project from either a full export object or a snapshot ID.
 export async function POST(req: Request) {
   try {
@@ -20,7 +28,12 @@ export async function POST(req: Request) {
 
     // Snapshot restore path: { projectId, snapshotId }
     if (body.projectId && body.snapshotId) {
-      const result = await restoreSnapshot(body.projectId as string, body.snapshotId as string);
+      // BUG-A5-5-004: validate UUIDs before passing to restoreSnapshot
+      const snapshotResult = SnapshotRestoreSchema.safeParse(body);
+      if (!snapshotResult.success) {
+        return NextResponse.json({ error: 'Invalid projectId or snapshotId (must be UUIDs)' }, { status: 400 });
+      }
+      const result = await restoreSnapshot(snapshotResult.data.projectId, snapshotResult.data.snapshotId);
       return NextResponse.json({ ok: true, ...result });
     }
 
