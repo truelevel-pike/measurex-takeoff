@@ -16,6 +16,10 @@ interface PluginEntry {
 const plugins: PluginEntry[] = [];
 
 export function registerPlugin(name: string, hooks: PluginHooks): void {
+  if (plugins.some((p) => p.name === name)) {
+    console.warn(`[plugins] Plugin "${name}" is already registered — skipping duplicate`);
+    return;
+  }
   plugins.push({ name, hooks });
 }
 
