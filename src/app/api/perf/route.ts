@@ -25,13 +25,20 @@ export async function POST(req: NextRequest) {
     console.log('[Perf Event]', parsed.data);
   }
 
-  // BUG-A5-5-013: use singleton getSupabase() instead of fresh client per request
   try {
-    const { getSupabase } = await import('@/lib/supabase');
+    const { getSupabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ ok: true, persisted: false });
+    }
     const supabase = getSupabase();
-    await supabase.from('mx_perf_events').insert(parsed.data);
-  } catch {
-    // Table may not exist yet — that's OK
+    const { error } = await supabase.from('mx_perf_events').insert(parsed.data);
+    if (error) {
+      console.warn('[Perf API] Insert failed:', error.message);
+      return NextResponse.json({ ok: true, persisted: false });
+    }
+  } catch (err) {
+    console.warn('[Perf API] Insert error:', err instanceof Error ? err.message : String(err));
+    return NextResponse.json({ ok: true, persisted: false });
   }
 
   return NextResponse.json({ ok: true });
