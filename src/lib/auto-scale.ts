@@ -86,7 +86,8 @@ function addCandidate(
 }
 
 function collectArchitecturalAndCivil(text: string, candidates: Candidate[]): void {
-  const inchesToken = '(\\d+(?:\\.\\d+)?(?:[ -]\\d+\\/\\d+)?|\\d+\\/\\d+)';
+  // BUG-A5-6-187: escape hyphen in character class to avoid unintended range
+  const inchesToken = '(\\d+(?:\\.\\d+)?(?:[\\s\\-]\\d+\\/\\d+)?|\\d+\\/\\d+)';
   const prefix = '(\\bscale\\b\\s*:?\\s*)?';
   const inchUnit = '(?:"|in)';
   const footUnit = "(?:'|ft)";
