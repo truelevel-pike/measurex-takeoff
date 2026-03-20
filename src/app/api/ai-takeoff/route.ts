@@ -6,6 +6,11 @@ import { broadcastToProject } from '@/lib/sse-broadcast';
 import { deletePolygonsByPage } from '@/server/project-store';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 import { fireWebhook } from '@/lib/webhooks';
+import { loadPDF } from '@/server/pdf-storage';
+import { renderPageAsImage } from '@/server/pdf-processor';
+import path from 'path';
+import fs from 'fs/promises';
+import os from 'os';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -286,7 +291,62 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = validateBody(AiTakeoffBodySchema, body);
     if ('error' in validated) return validated.error;
-    const { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
+    let { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
+
+    // Server-side PDF rendering fallback: if imageBase64 is not provided but
+    // projectId and pageNumber are, fetch the PDF and render the requested page.
+    if (!imageBase64 && projectId && pageNumber) {
+      const pdfBuffer = await loadPDF(projectId);
+      if (!pdfBuffer) {
+        return NextResponse.json(
+          { error: 'PDF not found for project — upload a PDF first' },
+          { status: 404 },
+        );
+      }
+
+      // Write PDF to a temp file so renderPageAsImage can read it
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-takeoff-'));
+      const tmpPdfPath = path.join(tmpDir, `${projectId}.pdf`);
+      try {
+        await fs.writeFile(tmpPdfPath, pdfBuffer);
+        const rendered = await renderPageAsImage(tmpPdfPath, pageNumber, 2.0);
+        if (!rendered) {
+          return NextResponse.json(
+            { error: 'Failed to render PDF page — ensure the PDF is valid and not password-protected' },
+            { status: 422 },
+          );
+        }
+        imageBase64 = rendered;
+
+        // Derive page dimensions from the PDF viewport if not provided by the caller
+        if (!pageWidth || !pageHeight) {
+          try {
+            const { processPDF } = await import('@/server/pdf-processor');
+            const info = await processPDF(tmpPdfPath, projectId);
+            const pageInfo = info.pages.find((p) => p.pageNum === pageNumber);
+            if (pageInfo) {
+              pageWidth = pageWidth ?? pageInfo.width;
+              pageHeight = pageHeight ?? pageInfo.height;
+            }
+          } catch {
+            // Non-fatal — dimensions will fall back to defaults below
+          }
+        }
+      } finally {
+        await fs.rm(tmpDir, { recursive: true }).catch(() => {});
+      }
+    }
+
+    if (!imageBase64) {
+      return NextResponse.json(
+        { error: 'imageBase64 is required (or provide projectId + pageNumber for server-side PDF rendering)' },
+        { status: 400 },
+      );
+    }
+
+    // Default page dimensions if still not set
+    const resolvedPageWidth = pageWidth ?? 1000;
+    const resolvedPageHeight = pageHeight ?? 1000;
 
     // Support user-supplied API key via X-OpenAI-Api-Key header (from Settings UI)
     const userSuppliedKey = req.headers.get('x-openai-api-key');
@@ -388,7 +448,7 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
     // Filter out any elements with empty points arrays before returning; the client schema
     // (DetectedElementSchema) requires points.length >= 1 and would reject the entire response
     // if any element has an empty points array.
-    const results = parseDetectedElements(raw, pageWidth, pageHeight).filter((el) => el.points.length > 0);
+    const results = parseDetectedElements(raw, resolvedPageWidth, resolvedPageHeight).filter((el) => el.points.length > 0);
 
     let persistedPolygons = 0;
     if (projectId) {

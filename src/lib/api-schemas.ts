@@ -144,13 +144,16 @@ export const DrawingBodySchema = z.object({
 
 // AI Takeoff body
 export const AiTakeoffBodySchema = z.object({
-  imageBase64: z.string().min(1),
-  pageWidth: z.number().positive(),
-  pageHeight: z.number().positive(),
+  imageBase64: z.string().min(1).optional(),
+  pageWidth: z.number().positive().optional(),
+  pageHeight: z.number().positive().optional(),
   projectId: z.string().uuid().optional(),
   pageNumber: z.number().int().positive().optional(),
   model: z.string().optional(),
-});
+}).refine(
+  (data) => data.imageBase64 || (data.projectId && data.pageNumber),
+  { message: 'Either imageBase64 or both projectId and pageNumber must be provided' },
+);
 
 // AI Takeoff options
 export const AiTakeoffOptionsSchema = z.object({
