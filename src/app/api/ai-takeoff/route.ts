@@ -521,68 +521,75 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
       // already has polygons (Re-Togal / second run scenario).
       await deletePolygonsByPage(projectId, page);
 
-      for (const el of results) {
-        const clsKey = `${el.type.toLowerCase()}::${el.classification.toLowerCase()}`;
-        let classificationId = classMap.get(clsKey);
+      // BUG-A5-6-129: Wrap polygon creation in try/catch so failures after
+      // deletePolygonsByPage are logged rather than silently losing data.
+      try {
+        for (const el of results) {
+          const clsKey = `${el.type.toLowerCase()}::${el.classification.toLowerCase()}`;
+          let classificationId = classMap.get(clsKey);
 
-        // Fuzzy-match against existing classifications if no exact match
-        if (!classificationId) {
-          const fuzzyId = fuzzyMatchClassification(el.classification, el.type, existingClassifications);
-          if (fuzzyId) {
-            classificationId = fuzzyId;
-            // Cache for subsequent elements with the same name
-            classMap.set(clsKey, fuzzyId);
+          // Fuzzy-match against existing classifications if no exact match
+          if (!classificationId) {
+            const fuzzyId = fuzzyMatchClassification(el.classification, el.type, existingClassifications);
+            if (fuzzyId) {
+              classificationId = fuzzyId;
+              // Cache for subsequent elements with the same name
+              classMap.set(clsKey, fuzzyId);
+            }
           }
-        }
 
-        if (!classificationId) {
-          const createClassRes = await fetch(`${apiBase}/api/projects/${projectId}/classifications`, {
+          if (!classificationId) {
+            const createClassRes = await fetch(`${apiBase}/api/projects/${projectId}/classifications`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: crypto.randomUUID(),
+                name: el.classification,
+                type: el.type,
+                color: el.color,
+                visible: true,
+              }),
+            });
+            if (!createClassRes.ok) {
+              const classErr = await createClassRes.text();
+              throw new Error(`Failed to create classification "${el.classification}": ${classErr}`);
+            }
+            const createClassData = await createClassRes.json();
+            classificationId = createClassData?.classification?.id;
+            if (!classificationId) {
+              throw new Error(`Classification create response missing id for "${el.classification}"`);
+            }
+            classMap.set(clsKey, classificationId);
+            // Also register in existingClassifications so later elements in this same
+            // batch can fuzzy-match against it and avoid creating near-duplicate entries.
+            existingClassifications.push({ id: classificationId, name: el.classification, type: el.type });
+          }
+
+          const persistPoints = toPersistablePoints(el);
+          if (!persistPoints) continue;
+
+          const polyRes = await fetch(`${apiBase}/api/projects/${projectId}/polygons`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               id: crypto.randomUUID(),
-              name: el.classification,
-              type: el.type,
-              color: el.color,
-              visible: true,
+              classificationId,
+              points: persistPoints,
+              pageNumber: page,
+              label: el.name,
+              confidence: el.confidence ?? 0.85,
+              detectedByModel: resolvedModel,
             }),
           });
-          if (!createClassRes.ok) {
-            const classErr = await createClassRes.text();
-            throw new Error(`Failed to create classification "${el.classification}": ${classErr}`);
+          if (!polyRes.ok) {
+            const polyError = await polyRes.text();
+            throw new Error(`Failed to persist polygon "${el.name}": ${polyError}`);
           }
-          const createClassData = await createClassRes.json();
-          classificationId = createClassData?.classification?.id;
-          if (!classificationId) {
-            throw new Error(`Classification create response missing id for "${el.classification}"`);
-          }
-          classMap.set(clsKey, classificationId);
-          // Also register in existingClassifications so later elements in this same
-          // batch can fuzzy-match against it and avoid creating near-duplicate entries.
-          existingClassifications.push({ id: classificationId, name: el.classification, type: el.type });
+          persistedPolygons += 1;
         }
-
-        const persistPoints = toPersistablePoints(el);
-        if (!persistPoints) continue;
-
-        const polyRes = await fetch(`${apiBase}/api/projects/${projectId}/polygons`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: crypto.randomUUID(),
-            classificationId,
-            points: persistPoints,
-            pageNumber: page,
-            label: el.name,
-            confidence: el.confidence ?? 0.85,
-            detectedByModel: resolvedModel,
-          }),
-        });
-        if (!polyRes.ok) {
-          const polyError = await polyRes.text();
-          throw new Error(`Failed to persist polygon "${el.name}": ${polyError}`);
-        }
-        persistedPolygons += 1;
+      } catch (createErr) {
+        console.error(`[AI Takeoff] Polygon creation failed after page delete (project=${projectId}, page=${page}, persisted=${persistedPolygons}):`, createErr);
+        throw createErr;
       }
 
       broadcastToProject(projectId, 'ai-takeoff:complete', {
