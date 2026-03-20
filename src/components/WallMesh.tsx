@@ -1,7 +1,7 @@
 // skills/togal-takeoff/src/components/WallMesh.tsx
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Vector2, Shape, ExtrudeGeometry, Vector3 } from 'three';
 import type { BufferGeometry } from 'three';
 import { Html } from "@react-three/drei";
@@ -92,6 +92,13 @@ export default function WallMesh({
       return { key: idx, geometry: extrude as BufferGeometry, position: center, color, opacity: seg.opacity ?? 0.85 };
     });
   }, [segments, defaultHeight, defaultThickness, defaultColor]);
+
+  // Dispose ExtrudeGeometry GPU resources when meshes change or on unmount
+  useEffect(() => {
+    return () => {
+      meshes.forEach((m) => m.geometry?.dispose());
+    };
+  }, [meshes]);
 
   return (
     <group>
