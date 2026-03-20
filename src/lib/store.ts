@@ -19,6 +19,16 @@ import { assignTradeGroup } from './trade-groups';
 const isHex = (c: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.trim());
 const trimLower = (s: string) => s.trim().toLowerCase();
 
+// BUG-A5-C3 fix: fire-and-forget API sync helper.
+// Mutations update local state optimistically, then persist to the API in the background.
+function apiSync(url: string, options: RequestInit): void {
+  if (typeof fetch === 'undefined') return; // SSR guard
+  fetch(url, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+  }).catch((err) => console.error(`[store] API sync failed: ${options.method} ${url}`, err));
+}
+
 // History snapshot limited to core state we need to restore
 interface HistorySnapshot {
   classifications: Classification[];
@@ -268,6 +278,14 @@ export const useStore = create<Store>()(
     const next: Classification = { id, name: name.trim(), color: color.trim(), type, visible, tradeGroup };
     const before = snapshot(s);
     set({ classifications: [...s.classifications, next], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/classifications`, {
+        method: 'POST',
+        body: JSON.stringify({ id, name: next.name, type: next.type, color: next.color, visible: next.visible }),
+      });
+    }
     return id;
   },
 
@@ -287,6 +305,14 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/classifications/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      });
+    }
   },
 
   deleteClassification: (id) => {
@@ -312,6 +338,11 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/classifications/${id}`, { method: 'DELETE' });
+    }
   },
 
   setSelectedClassification: (id) => set({ selectedClassification: id }),
@@ -370,6 +401,14 @@ export const useStore = create<Store>()(
     };
     const before = snapshot(s);
     set({ polygons: [...s.polygons, polygon], lastPolygon: polygon, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/polygons`, {
+        method: 'POST',
+        body: JSON.stringify({ id: polygon.id, points: polygon.points, classificationId: polygon.classificationId, pageNumber: polygon.pageNumber, area: polygon.area, linearFeet: polygon.linearFeet, isComplete: polygon.isComplete, label: polygon.label }),
+      });
+    }
     return id;
   },
 
@@ -381,6 +420,14 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/polygons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      });
+    }
   },
 
   deletePolygon: (id) => {
@@ -394,6 +441,11 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/polygons/${id}`, { method: 'DELETE' });
+    }
   },
 
   setSelectedPolygon: (id) => set({
@@ -556,11 +608,27 @@ export const useStore = create<Store>()(
     const s = get();
     const before = snapshot(s);
     set({ scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/scale`, {
+        method: 'POST',
+        body: JSON.stringify({ pixelsPerUnit: scale.pixelsPerUnit, unit: scale.unit, label: scale.label, source: scale.source, pageNumber: scale.pageNumber }),
+      });
+    }
   },
   setScaleForPage: (page, scale) => {
     const s = get();
     const before = snapshot(s);
     set({ scales: { ...s.scales, [page]: scale }, scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+    // BUG-A5-C3: sync to API
+    const pid = s.projectId;
+    if (pid) {
+      apiSync(`/api/projects/${pid}/scale`, {
+        method: 'POST',
+        body: JSON.stringify({ pixelsPerUnit: scale.pixelsPerUnit, unit: scale.unit, label: scale.label, source: scale.source, pageNumber: page }),
+      });
+    }
   },
   getScaleForPage: (page) => get().scales[page] ?? null,
 
