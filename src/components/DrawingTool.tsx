@@ -8,7 +8,6 @@ import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
 
 const SNAP_SCREEN_PX = 15;
-const SNAP_OPTIONS = { vertices: true, midpoints: true, edges: false, grid: true, gridSize: 20 } as const;
 
 function openPathDistance(pts: Point[], ppu: number): number {
   let total = 0;
@@ -31,6 +30,11 @@ export default function DrawingTool() {
   const currentPage = useStore((s) => s.currentPage);
   const drawingPage = currentPage || 1;
   const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
+  // BUG-A5-H01: read snap/grid settings from store instead of hardcoded constants
+  const snappingEnabled = useStore((s) => s.snappingEnabled);
+  const gridEnabled = useStore((s) => s.gridEnabled);
+  const gridSize = useStore((s) => s.gridSize);
+  const snapOptions = { vertices: snappingEnabled, midpoints: snappingEnabled, edges: false, grid: gridEnabled, gridSize };
   const snapPolygons = polygons.filter((polygon) => polygon.pageNumber === drawingPage);
   const containerRef = useRef<HTMLDivElement>(null);
   // Cache the container's bounding rect so rapid clicks never read a stale/zero rect
@@ -89,10 +93,10 @@ export default function DrawingTool() {
     // Convert 15 screen-px snap radius to base-space so snapping feels consistent at any zoom
     const screenToBase = baseDims.width / rect.width;
     const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
-    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, SNAP_OPTIONS);
+    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
     if (snap) return { x: snap.x, y: snap.y };
     return { x, y };
-  }, [baseDims, snapPolygons]);
+  }, [baseDims, snapPolygons, snappingEnabled, gridEnabled, gridSize]);
 
   const getSelectedClassification = useCallback(() => {
     return classifications.find((c) => c.id === selectedClassification) ?? null;
@@ -220,7 +224,7 @@ export default function DrawingTool() {
     const y = (clickY / rect.height) * baseDims.height;
     const screenToBase = baseDims.width / rect.width;
     const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
-    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, SNAP_OPTIONS);
+    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
     if (snap) {
       setCursor({ x: snap.x, y: snap.y });
       setSnapIndicator(snap);
@@ -228,7 +232,7 @@ export default function DrawingTool() {
       setCursor({ x, y });
       setSnapIndicator(null);
     }
-  }, [baseDims, snapPolygons]);
+  }, [baseDims, snapPolygons, snappingEnabled, gridEnabled, gridSize]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setPointsAndRef([]); setTool('select'); } // E36: Escape cancel drawing verified
