@@ -23,8 +23,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Unable to load PDF — the file may be corrupted or too large (max 50MB)' }, { status: 404 });
     }
 
-    // BUG-A5-6-064: slice to avoid leaking the entire Node.js Buffer pool
-    return new Response(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), {
+    // BUG-A5-6-064: slice to avoid leaking the entire Node.js Buffer pool.
+    // Use Buffer.from() to copy into a plain ArrayBuffer (not SharedArrayBuffer)
+    // so Response accepts it without TypeScript type errors.
+    const safeBuffer: ArrayBuffer = buf.buffer instanceof SharedArrayBuffer
+      ? buf.slice(0).buffer
+      : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return new Response(safeBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${id}.pdf"`,
