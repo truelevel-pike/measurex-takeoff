@@ -211,6 +211,10 @@ export default function DrawingTool() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // BUG-A7-2-013: If the proximity check in handleClick already called
+      // commitPolygon (clearing pointsRef), this second event in the
+      // double-click sequence would call commitPolygon on empty state.
+      if (pointsRef.current.length === 0) return;
       commitPolygon();
     },
     [commitPolygon]
