@@ -3,6 +3,7 @@ import { getScale, setScale, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, ScaleSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,6 +24,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-106: add rate limiting to POST handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);

@@ -485,7 +485,8 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
     if (projectId) {
       const page = pageNumber ?? 1;
       broadcastToProject(projectId, 'ai-takeoff:started', { page });
-      const apiBase = new URL(req.url).origin;
+      // BUG-A5-6-127: Use env var for origin to prevent SSRF via Host header injection.
+      const apiBase = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
       // Load existing classifications once and re-use by (type,name) key.
       const clsRes = await fetch(`${apiBase}/api/projects/${projectId}/classifications`);
