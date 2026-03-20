@@ -716,15 +716,13 @@ export const useStore = create<Store>()(
           redoStack: [],
         });
       }
-    } catch {
-      // Fallback: delete the polygon if Turf fails
+    } catch (err) {
+      // BUG-A5-6-182: keep the original polygon on error instead of silently deleting it
+      console.error('[store] cutPolygon failed, keeping original polygon:', err);
       set({
-        polygons: s.polygons.filter((p) => p.id !== id),
         selectedPolygons: [],
         selectedPolygon: null,
         selectedPolygonId: null,
-        undoStack: pushUndo(s.undoStack, before),
-        redoStack: [],
       });
     }
   },
