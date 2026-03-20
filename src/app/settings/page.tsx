@@ -116,19 +116,33 @@ export default function SettingsPage() {
   const [showNewKey, setShowNewKey] = useState(false);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
+  // R-A8-004 fix: one-time display flag — after dismissal the full key is cleared
+  const [justAddedKeyId, setJustAddedKeyId] = useState<string | null>(null);
+
   const addApiKey = () => {
     if (!newKeyLabel.trim() || !newKeyValue.trim()) return;
+    // R-A8-004 fix: use crypto.randomUUID() instead of Math.random()
+    const id = crypto.randomUUID();
     const key: ApiKey = {
-      id: Math.random().toString(36).slice(2),
+      id,
       label: newKeyLabel.trim(),
       key: newKeyValue.trim(),
       createdAt: new Date().toISOString(),
       lastUsed: null,
     };
     setApiKeys(prev => [...prev, key]);
+    setJustAddedKeyId(id);
     setNewKeyLabel('');
     setNewKeyValue('');
     setShowNewKey(false);
+  };
+
+  // R-A8-004 fix: after copying or dismissing, mask the key permanently in state
+  const dismissNewKey = (id: string) => {
+    setJustAddedKeyId(null);
+    setApiKeys(prev => prev.map(k =>
+      k.id === id ? { ...k, key: `${k.key.slice(0, 7)}...${'*'.repeat(20)}` } : k
+    ));
   };
 
   const removeApiKey = (id: string) => {
@@ -640,37 +654,58 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {apiKeys.map(k => (
-                    <div key={k.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
-                      <Key size={16} className="text-green-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-white">{k.label}</div>
-                        <div className="text-xs text-gray-500 font-mono mt-0.5">
-                          {k.key.slice(0, 7)}••••••••{k.key.slice(-4)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          Added {new Date(k.createdAt).toLocaleDateString()}
-                          {k.lastUsed && ` · Last used ${new Date(k.lastUsed).toLocaleDateString()}`}
+                  {apiKeys.map(k => {
+                    const isNew = justAddedKeyId === k.id;
+                    return (
+                      <div key={k.id} className={`bg-gray-900 border rounded-xl p-5 ${isNew ? 'border-yellow-600/50' : 'border-gray-800'}`}>
+                        {/* R-A8-004 fix: one-time copy warning for just-added keys */}
+                        {isNew && (
+                          <div className="mb-3 bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-xs text-yellow-300">
+                            Copy your key now — it will not be shown again after you dismiss this.
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                          <Key size={16} className="text-green-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white">{k.label}</div>
+                            <div className="text-xs text-gray-500 font-mono mt-0.5">
+                              {k.key.slice(0, 7)}{'••••••••••••••••••••'}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">
+                              Added {new Date(k.createdAt).toLocaleDateString()}
+                              {k.lastUsed && ` · Last used ${new Date(k.lastUsed).toLocaleDateString()}`}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isNew && (
+                              <button
+                                onClick={() => { copyKey(k.id, k.key); dismissNewKey(k.id); }}
+                                className="text-yellow-400 hover:text-yellow-300 p-2 transition-colors"
+                                title="Copy key (one-time)"
+                              >
+                                {copiedKeyId === k.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                              </button>
+                            )}
+                            {isNew && (
+                              <button
+                                onClick={() => dismissNewKey(k.id)}
+                                className="text-gray-500 hover:text-white text-xs px-2 py-1 border border-gray-700 rounded transition-colors"
+                              >
+                                Dismiss
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeApiKey(k.id)}
+                              className="text-gray-500 hover:text-red-400 p-2 transition-colors"
+                              title="Remove key"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => copyKey(k.id, k.key)}
-                          className="text-gray-500 hover:text-white p-2 transition-colors"
-                          title="Copy key"
-                        >
-                          {copiedKeyId === k.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                        </button>
-                        <button
-                          onClick={() => removeApiKey(k.id)}
-                          className="text-gray-500 hover:text-red-400 p-2 transition-colors"
-                          title="Remove key"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
