@@ -15,48 +15,52 @@ interface AssemblyTemplate {
   materials: Material[];
 }
 
-const DEFAULT_TEMPLATES: AssemblyTemplate[] = [
-  {
-    name: 'Exterior Wall Assembly',
-    unit: 'LF',
-    quantityFormula: 'linear',
-    materials: [
-      { id: crypto.randomUUID(), name: 'Framing', unitCost: 8, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
-      { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 4, wasteFactor: 3, coverageRate: 0, unit: 'LF' },
-      { id: crypto.randomUUID(), name: 'Siding', unitCost: 6, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
-    ],
-  },
-  {
-    name: 'Floor Slab Assembly',
-    unit: 'SF',
-    quantityFormula: 'area',
-    materials: [
-      { id: crypto.randomUUID(), name: 'Concrete', unitCost: 12, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Rebar', unitCost: 3, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Finishing', unitCost: 2, wasteFactor: 0, coverageRate: 0, unit: 'SF' },
-    ],
-  },
-  {
-    name: 'Roof Assembly',
-    unit: 'SF',
-    quantityFormula: 'area',
-    materials: [
-      { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Felt', unitCost: 1, wasteFactor: 2, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Shingles', unitCost: 4, wasteFactor: 8, coverageRate: 0, unit: 'SF' },
-    ],
-  },
-  {
-    name: 'Painting & Drywall Assembly',
-    unit: 'SF',
-    quantityFormula: 'area',
-    materials: [
-      { id: crypto.randomUUID(), name: 'Drywall', unitCost: 2.5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Tape & Mud', unitCost: 0.75, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
-      { id: crypto.randomUUID(), name: 'Paint', unitCost: 1.25, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
-    ],
-  },
-];
+// BUG-A6-5-004 fix: use a factory so material IDs are generated at call time,
+// not once at module load — avoids identical IDs across app instances.
+function createDefaultTemplates(): AssemblyTemplate[] {
+  return [
+    {
+      name: 'Exterior Wall Assembly',
+      unit: 'LF',
+      quantityFormula: 'linear',
+      materials: [
+        { id: crypto.randomUUID(), name: 'Framing', unitCost: 8, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
+        { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 4, wasteFactor: 3, coverageRate: 0, unit: 'LF' },
+        { id: crypto.randomUUID(), name: 'Siding', unitCost: 6, wasteFactor: 5, coverageRate: 0, unit: 'LF' },
+      ],
+    },
+    {
+      name: 'Floor Slab Assembly',
+      unit: 'SF',
+      quantityFormula: 'area',
+      materials: [
+        { id: crypto.randomUUID(), name: 'Concrete', unitCost: 12, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Rebar', unitCost: 3, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Finishing', unitCost: 2, wasteFactor: 0, coverageRate: 0, unit: 'SF' },
+      ],
+    },
+    {
+      name: 'Roof Assembly',
+      unit: 'SF',
+      quantityFormula: 'area',
+      materials: [
+        { id: crypto.randomUUID(), name: 'Sheathing', unitCost: 5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Felt', unitCost: 1, wasteFactor: 2, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Shingles', unitCost: 4, wasteFactor: 8, coverageRate: 0, unit: 'SF' },
+      ],
+    },
+    {
+      name: 'Painting & Drywall Assembly',
+      unit: 'SF',
+      quantityFormula: 'area',
+      materials: [
+        { id: crypto.randomUUID(), name: 'Drywall', unitCost: 2.5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Tape & Mud', unitCost: 0.75, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
+        { id: crypto.randomUUID(), name: 'Paint', unitCost: 1.25, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+      ],
+    },
+  ];
+}
 
 interface AssembliesPanelProps {
   onSwitchToQuantities: () => void;
@@ -164,8 +168,9 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
     // BUG-A6-5-003 fix: seed default templates concurrently instead of sequentially.
     // The previous for-await loop issued N serial POSTs; Promise.all fires all at once.
     async function seedDefaults(pid: string): Promise<Assembly[]> {
+      const templates = createDefaultTemplates();
       const results = await Promise.all(
-        DEFAULT_TEMPLATES.map(async (tpl, idx) => {
+        templates.map(async (tpl, idx) => {
           const totalUnitCost = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
           try {
             const res = await fetch(`/api/projects/${pid}/assemblies`, {
@@ -218,9 +223,10 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
           const seeded = await seedDefaults(projectId);
           if (!cancelled && seeded.length > 0) {
             setAssemblies(seeded);
+            const defaultFormulas = createDefaultTemplates();
             const fm: Record<string, string> = {};
             for (let i = 0; i < seeded.length; i++) {
-              fm[seeded[i].id] = DEFAULT_TEMPLATES[i].quantityFormula;
+              fm[seeded[i].id] = defaultFormulas[i]?.quantityFormula ?? 'area';
             }
             setFormulaMap(fm);
           }
