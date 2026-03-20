@@ -41,6 +41,8 @@ export default function DrawingTool() {
     const el = containerRef.current;
     if (!el) return;
     cachedRectRef.current = el.getBoundingClientRect();
+    // ResizeObserver may be absent in test environments (jsdom) — guard before use
+    if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
       cachedRectRef.current = el.getBoundingClientRect();
     });
