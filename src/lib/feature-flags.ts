@@ -104,7 +104,10 @@ export function getAllFlags(): Record<FlagName, boolean> {
 function loadFlags(): Record<string, boolean> {
   const flags: Record<string, boolean> = { ...DEFAULT_FLAGS };
 
-  const envOverrides = process.env.FEATURE_FLAGS;
+  const envOverrides =
+    typeof process !== 'undefined' && process.env
+      ? process.env.FEATURE_FLAGS
+      : undefined;
   if (envOverrides) {
     try {
       const parsed = JSON.parse(envOverrides);

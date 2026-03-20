@@ -1437,12 +1437,17 @@ export async function restoreSnapshot(projectId: string, snapshotId: string): Pr
   } else {
     // File mode: overwrite JSON files directly
     const dir = projectDir(projectId);
+    // BUG-A7-5-056 fix: write all per-page scale files, not just the first one
+    const scaleWrites = snapshot.scales.map((s) =>
+      writeJson(path.join(dir, `scale-${s.pageNumber ?? 1}.json`), s)
+    );
     await Promise.all([
       writeJson(path.join(dir, 'classifications.json'), snapshot.classifications),
       writeJson(path.join(dir, 'polygons.json'), snapshot.polygons),
       writeJson(path.join(dir, 'assemblies.json'), snapshot.assemblies),
       writeJson(path.join(dir, 'pages.json'), snapshot.pages),
       writeJson(path.join(dir, 'scale.json'), snapshot.scales[0] ?? null),
+      ...scaleWrites,
     ]);
   }
 
