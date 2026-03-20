@@ -95,6 +95,9 @@ function PrintViewInner() {
   const [state, setState] = useState<PrintState | null>(null);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // BUG-A8-4-005 fix: track canvas dimensions in state so useMemo re-computes
+  // when the canvas actually renders (refs are not reactive)
+  const [canvasDims, setCanvasDims] = useState<{ width: number; height: number } | null>(null);
 
   const settings = useMemo(() => loadMeasurementSettings(), []);
 
@@ -191,6 +194,8 @@ function PrintViewInner() {
         const canvas = canvasRef.current!;
         canvas.width = viewport.width;
         canvas.height = viewport.height;
+        // BUG-A8-4-005 fix: update canvas dims state so svgScale re-computes
+        setCanvasDims({ width: viewport.width, height: viewport.height });
         const ctx = canvas.getContext('2d')!;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await page.render({ canvasContext: ctx as unknown as any, viewport } as any).promise;
@@ -262,11 +267,12 @@ function PrintViewInner() {
     return rows;
   }, [state, settings]);
 
-  // Scale factor from base dims to canvas dims for SVG overlay
+  // BUG-A8-4-005 fix: use canvasDims state (not canvasRef) so useMemo re-computes
+  // when the canvas actually renders, not just when state changes.
   const svgScale = useMemo(() => {
-    if (!state || !canvasRef.current) return 1;
-    return (canvasRef.current?.width ?? state.pageDims.width) / state.pageDims.width;
-  }, [state]);
+    if (!state || !canvasDims) return 1;
+    return (canvasDims.width ?? state.pageDims.width) / state.pageDims.width;
+  }, [state, canvasDims]);
 
   if (error) {
     return (
@@ -312,7 +318,7 @@ function PrintViewInner() {
         {pdfLoaded && (
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox={`0 0 ${canvasRef.current?.width ?? state.pageDims.width} ${canvasRef.current?.height ?? state.pageDims.height}`}
+            viewBox={`0 0 ${canvasDims?.width ?? state.pageDims.width} ${canvasDims?.height ?? state.pageDims.height}`}
             preserveAspectRatio="none"
           >
             {state.polygons.map(poly => {

@@ -1174,7 +1174,7 @@ function PageInner() {
       setProjectId(project.id);
       setProjectName(project.name || name);
       localStorage.setItem('measurex_project_id', project.id);
-      window.history.replaceState({}, '', `/?project=${project.id}`);
+      window.history.replaceState({}, '', `/?project=${encodeURIComponent(project.id)}`);
 
       // GAP-006: Upload PDF to server and check for auto-detected scale
       if (file) {
@@ -1325,7 +1325,7 @@ function PageInner() {
         setProjectId(data.project.id);
         setProjectName(data.project.name || name);
         localStorage.setItem('measurex_project_id', data.project.id);
-        window.history.replaceState({}, '', `/?project=${data.project.id}`);
+        window.history.replaceState({}, '', `/?project=${encodeURIComponent(data.project.id)}`);
         persistSaveStatus('Saved!');
         addToast('Project saved', 'success');
       } else {

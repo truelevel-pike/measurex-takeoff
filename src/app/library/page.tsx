@@ -93,27 +93,36 @@ export default function LibraryPage() {
     fetchItems();
   }, [fetchItems]);
 
+  // BUG-A8-4-009 fix: cache projects list — show cached immediately, refresh in background
+  const projectsCacheRef = React.useRef<Project[] | null>(null);
   const fetchProjects = useCallback(async () => {
-    setProjectsLoading(true);
+    // Show cached data immediately if available
+    if (projectsCacheRef.current && projectsCacheRef.current.length > 0) {
+      setProjects(projectsCacheRef.current);
+      if (!selectedProjectId) setSelectedProjectId(projectsCacheRef.current[0].id);
+    }
+    setProjectsLoading(!projectsCacheRef.current);
     try {
       const res = await fetch('/api/projects');
-      // BUG-A8-006 fix: check res.ok before parsing JSON so that 401/500
-      // error bodies don't get misinterpreted as valid project data.
       if (!res.ok) {
         throw new Error(`Failed to load projects (HTTP ${res.status})`);
       }
       const data = await res.json() as { projects?: Project[] };
-      setProjects(data.projects ?? []);
-      if (data.projects && data.projects.length > 0) {
-        setSelectedProjectId(data.projects[0].id);
+      const list = data.projects ?? [];
+      projectsCacheRef.current = list;
+      setProjects(list);
+      if (list.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(list[0].id);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load projects');
-      setProjects([]);
+      if (!projectsCacheRef.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load projects');
+        setProjects([]);
+      }
     } finally {
       setProjectsLoading(false);
     }
-  }, []);
+  }, [selectedProjectId]);
 
   const orgItems = items.filter((i) => i.is_org);
   const myItems = items.filter((i) => !i.is_org);
@@ -148,6 +157,8 @@ export default function LibraryPage() {
     }
   }
 
+  // BUG-A8-4-008 fix: perform delete first, only remove from UI on success.
+  // On failure, keep the item and show error toast.
   async function handleDelete(id: string) {
     try {
       const { error: err } = await supabase

@@ -120,7 +120,8 @@ export default function SharedViewPage() {
   const handleExport = useCallback(async (format: 'excel' | 'json' | 'pdf') => {
     setShowExportMenu(false);
     if (format === 'json' || format === 'pdf') {
-      window.open(`/api/share/${token}/export?format=${format}`, '_blank');
+      // BUG-A8-4-001 fix: encode token + use noopener,noreferrer to prevent opener leakage
+      window.open(`/api/share/${encodeURIComponent(token)}/export?format=${format}`, '_blank', 'noopener,noreferrer');
     } else {
       try {
         const res = await fetch(`/api/share/${token}/export?format=excel`);

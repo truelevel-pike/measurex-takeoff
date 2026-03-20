@@ -1230,9 +1230,19 @@ export default function ProjectsPage() {
         </main>
       </div>
 
-      {/* Context menu */}
+      {/* Context menu — BUG-A8-4-010 fix: clamp to viewport bounds */}
       {contextMenu && (
         <div
+          ref={(el) => {
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const maxLeft = window.innerWidth - rect.width - 8;
+            const maxTop = window.innerHeight - rect.height - 8;
+            const clampedLeft = Math.min(contextMenu.x, maxLeft);
+            const clampedTop = Math.min(contextMenu.y, maxTop);
+            if (el.style.left !== `${clampedLeft}px`) el.style.left = `${clampedLeft}px`;
+            if (el.style.top !== `${clampedTop}px`) el.style.top = `${clampedTop}px`;
+          }}
           className="fixed bg-zinc-800 border border-zinc-600 rounded-lg shadow-xl py-1 z-50 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={e => e.stopPropagation()}
