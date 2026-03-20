@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const history = await getHistory(id, limit);
 
     return NextResponse.json({ history }, {
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+      headers: { 'Cache-Control': 'private, max-age=60' },
     });
   } catch (err: unknown) {
     console.error('[GET /history]', err);
