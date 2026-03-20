@@ -25,6 +25,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const rlResp = rateLimitResponse(req);
+    if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);

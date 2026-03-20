@@ -4,6 +4,7 @@ import {
   createPage,
   createPolygon,
   createProject,
+  deleteProject,
   getClassifications,
   getPages,
   getPolygons,
