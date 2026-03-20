@@ -16,6 +16,8 @@ import {
   ChevronUp,
   HelpCircle,
   Mail,
+  Pencil,
+  Keyboard,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -41,6 +43,45 @@ const GETTING_STARTED = [
     desc: 'Click "AI Takeoff" in the toolbar. The AI scans your drawing, identifies elements (walls, slabs, openings, etc.), and places polygons with measurements automatically.',
     detail: 'Review and edit any polygon before exporting. Export to Excel when ready.',
   },
+  {
+    step: 4,
+    icon: <Pencil size={24} />,
+    title: 'Review & Edit',
+    desc: 'Manually adjust any polygon, move vertices, change classifications, and add manual measurements. Fine-tune the AI results to match your exact requirements.',
+    detail:
+      'Tip: Use vertex snapping for precise adjustments. Right-click any polygon to change its classification.',
+  },
+  {
+    step: 5,
+    icon: <Download size={24} />,
+    title: 'Export Results',
+    desc: 'Export to Excel with all quantities, classifications, and cost breakdowns. Supports multi-sheet export with separate tabs for each trade or classification group.',
+    detail: 'Formats: XLSX with formulas, CSV for raw data. Share exports directly with your team.',
+  },
+];
+
+const KEYBOARD_SHORTCUTS = [
+  ['S', 'Set Scale'],
+  ['A', 'Area measurement'],
+  ['L', 'Linear measurement'],
+  ['C', 'Count measurement'],
+  ['Esc', 'Cancel / deselect'],
+  ['Del / Backspace', 'Delete selected measurement'],
+  ['Ctrl+Z / Cmd+Z', 'Undo'],
+  ['Ctrl+Shift+Z / Cmd+Shift+Z', 'Redo'],
+  ['Space', 'Pan mode'],
+  ['+ / -', 'Zoom in / out'],
+  ['Ctrl+A / Cmd+A', 'Select all'],
+  ['Ctrl+E / Cmd+E', 'Export to Excel'],
+];
+
+const MODEL_COMPARISON = [
+  ['Speed', 'Fast', 'Fastest', 'Moderate'],
+  ['Accuracy', 'High', 'High', 'Highest'],
+  ['Best For', 'General takeoffs', 'Large plans', 'Complex drawings'],
+  ['Multi-page', '✓', '✓', '✓'],
+  ['Auto-classify', '✓', '✓', '✓'],
+  ['Cost per run', '$', '$', '$$'],
 ];
 
 const TUTORIALS = [
@@ -59,12 +100,30 @@ const VIDEOS = [
 ];
 
 const FAQ_ITEMS = [
-  { q: 'How accurate is the AI takeoff?', a: 'Our AI achieves 95%+ accuracy on standard construction drawings. Results can always be manually adjusted for full precision.' },
-  { q: 'Can I import from other software?', a: 'Yes, MeasureX supports importing from common takeoff formats. You can also import classifications and assemblies from CSV files.' },
-  { q: 'What file formats are supported?', a: 'We support PDF, TIFF, PNG, and JPEG file formats. Multi-page PDFs are fully supported with per-page navigation.' },
-  { q: 'How do I share with my team?', a: 'Use the Share button on any project to invite team members by email. You can set view-only or edit permissions.' },
-  { q: 'Can I export to Excel?', a: 'Absolutely. Click Export in the top toolbar to generate an Excel spreadsheet with all quantities, classifications, and cost breakdowns.' },
-  { q: 'How does calibration work?', a: 'Draw a line between two known points on your plan and enter the real-world distance. MeasureX will calculate the scale for accurate measurements.' },
+  {
+    q: 'How accurate is the AI takeoff?',
+    a: 'Our AI achieves 95%+ accuracy on standard construction drawings. Results can always be manually adjusted for full precision.',
+  },
+  {
+    q: 'Can I import from other software?',
+    a: 'Yes, MeasureX supports importing from common takeoff formats. You can also import classifications and assemblies from CSV files.',
+  },
+  {
+    q: 'What file formats are supported?',
+    a: 'We support PDF, TIFF, PNG, and JPEG file formats. Multi-page PDFs are fully supported with per-page navigation.',
+  },
+  {
+    q: 'How do I share with my team?',
+    a: 'Use the Share button on any project to invite team members by email. You can set view-only or edit permissions.',
+  },
+  {
+    q: 'Can I export to Excel?',
+    a: 'Absolutely. Click Export in the top toolbar to generate an Excel spreadsheet with all quantities, classifications, and cost breakdowns.',
+  },
+  {
+    q: 'How does calibration work?',
+    a: 'Draw a line between two known points on your plan and enter the real-world distance. MeasureX will calculate the scale for accurate measurements.',
+  },
 ];
 
 export default function LearnPage() {
@@ -88,7 +147,7 @@ export default function LearnPage() {
         {/* Getting Started */}
         <section>
           <h2 className="text-lg font-semibold mb-6">Getting Started</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {GETTING_STARTED.map(item => (
               <div
                 key={item.step}
@@ -112,12 +171,95 @@ export default function LearnPage() {
           </div>
 
           {/* Connector arrows between steps */}
-          <div className="hidden md:flex items-center justify-center gap-2 mt-2 text-gray-700 text-xs select-none">
+          <div className="hidden lg:flex items-center justify-center gap-2 mt-2 text-gray-700 text-xs select-none">
             <span>Step 1</span>
             <ArrowRight size={14} />
             <span>Step 2</span>
             <ArrowRight size={14} />
             <span>Step 3</span>
+            <ArrowRight size={14} />
+            <span>Step 4</span>
+            <ArrowRight size={14} />
+            <span>Step 5</span>
+          </div>
+        </section>
+
+        {/* Keyboard Shortcuts */}
+        <section>
+          <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+            <Keyboard size={20} className="text-green-400" />
+            Keyboard Shortcuts
+          </h2>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-800">
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    Shortcut
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {KEYBOARD_SHORTCUTS.map(([shortcut, action]) => (
+                  <tr key={shortcut} className="hover:bg-gray-800/50 transition-colors">
+                    <td className="px-6 py-3">
+                      <span className="inline-flex gap-1.5 flex-wrap">
+                        {shortcut!.split(' / ').map((key, i) => (
+                          <span key={i}>
+                            {i > 0 && <span className="text-gray-600 mr-1.5">/</span>}
+                            <kbd className="bg-gray-800 border border-gray-700 rounded px-2 py-0.5 text-xs font-mono text-gray-200">
+                              {key}
+                            </kbd>
+                          </span>
+                        ))}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-300">{action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Model Comparison */}
+        <section>
+          <h2 className="text-lg font-semibold mb-2">Model Comparison</h2>
+          <p className="text-sm text-gray-400 mb-6">
+            Compare AI models available for takeoff: GPT-5.4, Gemini 3.1, and Opus 4.6.
+          </p>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-800">
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    Feature
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    GPT-5.4
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    Gemini 3.1
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">
+                    Opus 4.6
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {MODEL_COMPARISON.map(([feature, gpt, gemini, opus]) => (
+                  <tr key={feature} className="hover:bg-gray-800/50 transition-colors">
+                    <td className="px-6 py-3 text-sm font-medium text-white">{feature}</td>
+                    <td className="px-6 py-3 text-sm text-gray-300">{gpt}</td>
+                    <td className="px-6 py-3 text-sm text-gray-300">{gemini}</td>
+                    <td className="px-6 py-3 text-sm text-gray-300">{opus}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -135,7 +277,10 @@ export default function LearnPage() {
                   <div className="text-sm font-medium text-white">{tut.title}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{tut.time}</div>
                 </div>
-                <ArrowRight size={16} className="text-gray-600 group-hover:text-gray-400 shrink-0 transition-colors" />
+                <ArrowRight
+                  size={16}
+                  className="text-gray-600 group-hover:text-gray-400 shrink-0 transition-colors"
+                />
               </button>
             ))}
           </div>
@@ -181,9 +326,7 @@ export default function LearnPage() {
                   )}
                 </button>
                 {openFaq === i && (
-                  <div className="px-6 pb-4 text-sm text-gray-400 leading-relaxed">
-                    {faq.a}
-                  </div>
+                  <div className="px-6 pb-4 text-sm text-gray-400 leading-relaxed">{faq.a}</div>
                 )}
               </div>
             ))}
