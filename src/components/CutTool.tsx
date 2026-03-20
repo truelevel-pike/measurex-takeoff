@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 import { pointInPolygon } from '@/lib/polygon-utils';
@@ -15,6 +15,11 @@ export default function CutTool() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pagePolygons = polygons.filter((p) => p.pageNumber === currentPage);
+
+  // BUG-A7-5-029 fix: auto-focus on mount so keyboard (Escape) works immediately
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
 
   // Normalize screen-space mouse position to PDF base-coordinate space so that
   // hit-testing via pointInPolygon (which operates in base coords) works correctly

@@ -229,6 +229,9 @@ export interface Store extends ProjectState {
 
 const MAX_UNDO_STACK = 50;
 
+// BUG-A7-5-007 fix: abort in-flight scale fetch when page changes
+let scaleAbortController: AbortController | null = null;
+
 function snapshot(state: Store): HistorySnapshot {
   return {
     classifications: structuredClone(state.classifications),
@@ -766,15 +769,25 @@ export const useStore = create<Store>()(
       scale: pageScale,
     });
     // If no local per-page scale, try to fetch from API
+    // BUG-A7-5-007 fix: abort previous in-flight fetch when page changes
+    if (scaleAbortController) {
+      scaleAbortController.abort();
+      scaleAbortController = null;
+    }
     if (!pageScale && state.projectId) {
-      fetch(`/api/projects/${state.projectId}/scale?pageNumber=${page}`)
+      const controller = new AbortController();
+      scaleAbortController = controller;
+      fetch(`/api/projects/${state.projectId}/scale?pageNumber=${page}`, { signal: controller.signal })
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           if (data?.scale && get().currentPage === page) {
             set({ scale: data.scale, scales: { ...get().scales, [page]: data.scale } });
           }
         })
-        .catch(() => {}); // non-fatal
+        .catch(() => {}) // non-fatal (includes AbortError)
+        .finally(() => {
+          if (scaleAbortController === controller) scaleAbortController = null;
+        });
     }
   },
 
@@ -1143,12 +1156,24 @@ export const useStore = create<Store>()(
         drawingSets: state.drawingSets,
         groups: state.groups,
         assemblies: state.assemblies,
+        // BUG-A7-5-005 fix: persist markups and visibility toggle
+        markups: state.markups,
+        showMarkups: state.showMarkups,
         snappingEnabled: state.snappingEnabled,
         gridEnabled: state.gridEnabled,
         gridSize: state.gridSize,
         pageBaseDimensions: state.pageBaseDimensions,
         repeatingGroups: state.repeatingGroups,
       }),
+      // BUG-A7-5-006 fix: version the persist schema to handle future migrations
+      version: 1,
+      migrate: (persisted: Record<string, unknown>, version: number) => {
+        if (version === 0) {
+          // v0 → v1: ensure markups/showMarkups exist
+          return { ...persisted, markups: persisted.markups ?? [], showMarkups: persisted.showMarkups ?? true };
+        }
+        return persisted;
+      },
     }
   )
 );

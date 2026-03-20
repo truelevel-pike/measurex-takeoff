@@ -57,6 +57,8 @@ export default function DrawingTool() {
     return () => ro.disconnect();
   }, []);
   const pointsRef = useRef<Point[]>([]);
+  // BUG-A7-5-011 fix: track last touch end time for double-tap detection
+  const lastTouchEndRef = useRef(0);
   const { addToast } = useToast();
 
   // Focus on mount so keyboard events (Esc, Enter) work immediately
@@ -299,7 +301,15 @@ export default function DrawingTool() {
       onTouchEnd={(e) => {
         if (e.changedTouches.length > 0) {
           const t = e.changedTouches[0];
-          handleClick({ clientX: t.clientX, clientY: t.clientY, stopPropagation: () => {}, detail: 1 } as unknown as React.MouseEvent);
+          const now = Date.now();
+          // BUG-A7-5-011 fix: detect double-tap within 300ms → detail:2 → handleDoubleClick
+          const isDoubleTap = now - lastTouchEndRef.current < 300;
+          lastTouchEndRef.current = now;
+          if (isDoubleTap) {
+            handleDoubleClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent);
+          } else {
+            handleClick({ clientX: t.clientX, clientY: t.clientY, stopPropagation: () => {}, detail: 1 } as unknown as React.MouseEvent);
+          }
         }
       }}
       tabIndex={0}

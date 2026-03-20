@@ -8,10 +8,14 @@ import { useToast } from '@/components/Toast';
 
 export default function MergeSplitTool() {
   const polygons = useStore((s) => s.polygons);
+  const currentPage = useStore((s) => s.currentPage);
   const currentTool = useStore((s) => s.currentTool);
   const setTool = useStore((s) => s.setTool);
   const merge = useStore((s) => s.mergePolygons);
   const split = useStore((s) => s.splitPolygon);
+  // BUG-A7-5-041 fix: get base PDF dims for coordinate conversion
+  const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
+  const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
   const { addToast } = useToast();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,20 +41,24 @@ export default function MergeSplitTool() {
     return '';
   }, [isMerge, isSplit, firstPolyId, splitPolyId, splitPts.length]);
 
+  // BUG-A7-5-041 fix: convert screen pixels to base PDF coords
   const getCoords = useCallback((e: React.MouseEvent | MouseEvent): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
+    if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+      y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+    };
+  }, [baseDims]);
 
+  // BUG-A7-5-042 fix: filter by currentPage so merge/split only hits visible polygons
   const findPolygonAt = useCallback((pt: Point) => {
-    // search topmost first — iterate reversed
     for (let i = polygons.length - 1; i >= 0; i--) {
       const poly = polygons[i];
-      if (pointInPolygon(pt, poly.points)) return poly.id;
+      if (poly.pageNumber === currentPage && pointInPolygon(pt, poly.points)) return poly.id;
     }
     return null;
-  }, [polygons]);
+  }, [polygons, currentPage]);
 
   const resetState = useCallback(() => {
     setFirstPolyId(null);
@@ -136,10 +144,11 @@ export default function MergeSplitTool() {
           {instruction}
         </div>
       )}
-      {/* Split line preview — R-006: x2/y2 now reference cursor */}
+      {/* Split line preview — R-006: x2/y2 now reference cursor
+          BUG-A7-5-041 fix: viewBox matches base dims for zoom-correct rendering */}
       {isSplit && splitPts.length === 1 && cursor && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <line x1={splitPts[0].x} y1={splitPts[0].y} x2={cursor.x} y2={cursor.y} stroke="#00d4ff" strokeWidth={2} />
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${baseDims.width} ${baseDims.height}`} preserveAspectRatio="none">
+          <line x1={splitPts[0].x} y1={splitPts[0].y} x2={cursor.x} y2={cursor.y} stroke="#00d4ff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
         </svg>
       )}
     </div>

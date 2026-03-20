@@ -23,4 +23,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
   get(_t, prop) {
     return (getSupabase() as unknown as Record<string | symbol, unknown>)[prop];
   },
+  has(_t, prop) {
+    return prop in getSupabase();
+  },
 });

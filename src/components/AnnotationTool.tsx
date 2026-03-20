@@ -33,11 +33,15 @@ export default function AnnotationTool() {
     }
   }, [draft]);
 
+  // BUG-A7-5-025 fix: clamp popup position against container bounds
   const popupStyle = useMemo(() => {
     if (!draft) return undefined;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const maxX = rect ? rect.width - 220 : Infinity; // popup is ~210px wide
+    const maxY = rect ? rect.height - 50 : Infinity;  // popup is ~40px tall
     return {
-      left: Math.max(8, draft.screenX),
-      top: Math.max(8, draft.screenY),
+      left: Math.max(8, Math.min(draft.screenX, maxX)),
+      top: Math.max(8, Math.min(draft.screenY, maxY)),
     };
   }, [draft]);
 

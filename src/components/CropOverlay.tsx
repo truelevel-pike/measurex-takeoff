@@ -34,10 +34,11 @@ export default function CropOverlay({ onCropComplete, onCancel }: CropOverlayPro
     return () => window.removeEventListener('keydown', handler);
   }, [onCancel]);
 
+  // BUG-A7-5-028 fix: guard zero-dimension rect to avoid Infinity/NaN
   const toBaseCoords = useCallback(
     (e: React.MouseEvent): { x: number; y: number } => {
       const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return { x: 0, y: 0 };
+      if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
       return {
         x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
         y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
