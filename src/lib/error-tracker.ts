@@ -49,7 +49,10 @@ export function getErrors(): ErrorEntry[] {
 // Use addEventListener instead of overwriting window.onerror / window.onunhandledrejection
 // so we don't break Next.js's own error handlers (which causes the dev "Issues" badge).
 
-if (typeof window !== "undefined") {
+let listenersRegistered = false;
+
+if (typeof window !== "undefined" && !listenersRegistered) {
+  listenersRegistered = true;
   window.addEventListener("error", (event: ErrorEvent) => {
     captureError(event.error ?? event.message, {
       source: event.filename,
