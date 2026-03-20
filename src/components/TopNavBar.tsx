@@ -503,7 +503,7 @@ export default function TopNavBar({
                   onChange={(e) => onAiAllPagesModeChange?.(e.target.checked)}
                   style={{ accentColor: '#22c55e', width: 14, height: 14 }}
                 />
-                All Pages
+                Run Full Takeoff
               </label>
               <button
                 aria-label={aiLoading ? 'AI Takeoff running…' : aiAllPagesMode ? `Run Full Takeoff (all ${totalPages ?? '?'} pages)` : 'Run AI Takeoff on current page'}
