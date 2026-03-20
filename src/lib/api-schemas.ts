@@ -146,7 +146,7 @@ export const DrawingBodySchema = z.object({
 
 // AI Takeoff body
 export const AiTakeoffBodySchema = z.object({
-  imageBase64: z.string().min(1).optional(),
+  imageBase64: z.string().min(1).max(10_000_000).optional(),
   pageWidth: z.number().positive().optional(),
   pageHeight: z.number().positive().optional(),
   projectId: z.string().uuid().optional(),
