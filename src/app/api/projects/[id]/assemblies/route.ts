@@ -50,6 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       unit: unit || 'SF',
       unitCost: unitCost ?? 0,
       quantityFormula: quantityFormula || 'area',
+      updatedAt: new Date(),
     });
     broadcastToProject(id, 'assembly:created', assembly);
     return NextResponse.json({ assembly }, { status: 201 });
