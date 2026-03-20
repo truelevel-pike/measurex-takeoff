@@ -47,6 +47,29 @@ export function getWebhooksForProject(projectId: string): WebhookRegistration[] 
   return Array.from(registry.values()).filter((w) => w.projectId === projectId);
 }
 
+// BUG-A5-5-005: block localhost/private IPs to prevent SSRF
+function isPrivateUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '[::1]') return true;
+    // IPv4 private ranges
+    const parts = hostname.split('.');
+    if (parts.length === 4 && parts.every((p) => /^\d{1,3}$/.test(p))) {
+      const [a, b] = parts.map(Number);
+      if (a === 127) return true;            // 127.0.0.0/8
+      if (a === 10) return true;             // 10.0.0.0/8
+      if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+      if (a === 192 && b === 168) return true; // 192.168.0.0/16
+      if (a === 169 && b === 254) return true; // 169.254.0.0/16
+      if (a === 0) return true;              // 0.0.0.0/8
+    }
+    return false;
+  } catch {
+    return true; // Block unparseable URLs
+  }
+}
+
 export async function fireWebhook(
   projectId: string,
   event: string,
@@ -66,14 +89,16 @@ export async function fireWebhook(
   });
 
   await Promise.allSettled(
-    matching.map((w) =>
-      fetch(w.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      }).catch(() => {
-        // Silently ignore delivery failures — fire-and-forget
-      }),
-    ),
+    matching
+      .filter((w) => !isPrivateUrl(w.url))
+      .map((w) =>
+        fetch(w.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        }).catch(() => {
+          // Silently ignore delivery failures — fire-and-forget
+        }),
+      ),
   );
 }

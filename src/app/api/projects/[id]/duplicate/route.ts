@@ -51,9 +51,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     }
 
     for (const polygon of polygons) {
+      // BUG-A5-5-009: skip orphaned polygons whose classificationId isn't in the map
+      const mappedClassificationId = classificationIdMap.get(polygon.classificationId);
+      if (!mappedClassificationId) {
+        console.warn(`[duplicate] skipping orphaned polygon ${polygon.id} — classificationId ${polygon.classificationId} not in map`);
+        continue;
+      }
       await createPolygon(duplicated.id, {
         points: polygon.points,
-        classificationId: classificationIdMap.get(polygon.classificationId) || polygon.classificationId,
+        classificationId: mappedClassificationId,
         pageNumber: polygon.pageNumber,
         area: polygon.area,
         linearFeet: polygon.linearFeet,

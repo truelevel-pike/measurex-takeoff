@@ -14,6 +14,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing projectIdA or projectIdB' }, { status: 400 });
     }
 
+    // BUG-A5-5-007: UUID validation for projectIds
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(projectIdA) || !UUID_RE.test(projectIdB)) {
+      return NextResponse.json({ error: 'projectIdA and projectIdB must be valid UUIDs' }, { status: 400 });
+    }
+
     const [polygonsA, polygonsB, classificationsA, classificationsB] = await Promise.all([
       getPolygons(projectIdA),
       getPolygons(projectIdB),
@@ -21,9 +27,17 @@ export async function POST(req: Request) {
       getClassifications(projectIdB),
     ]);
 
-    // Match polygons by classificationId + similar area (within 20%)
+    // BUG-A5-5-007: build classification name maps for cross-project matching by normalized name
+    const classNameMapA = new Map<string, string>(); // classificationId -> normalized name
+    for (const c of classificationsA) classNameMapA.set(c.id, c.name.trim().toLowerCase());
+    const classNameMapB = new Map<string, string>();
+    for (const c of classificationsB) classNameMapB.set(c.id, c.name.trim().toLowerCase());
+
+    // Match polygons by normalized classification name + similar area (within 20%)
     function isMatch(a: Polygon, b: Polygon): boolean {
-      if (a.classificationId !== b.classificationId) return false;
+      const nameA = classNameMapA.get(a.classificationId) ?? '';
+      const nameB = classNameMapB.get(b.classificationId) ?? '';
+      if (!nameA || !nameB || nameA !== nameB) return false;
       const maxArea = Math.max(a.area, b.area, 1);
       return Math.abs(a.area - b.area) / maxArea < 0.2;
     }
