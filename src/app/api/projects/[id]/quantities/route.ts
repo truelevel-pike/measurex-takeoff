@@ -19,7 +19,7 @@ export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_re
     // pixelsPerUnit is the scale factor (pixels per real-world unit, e.g. pixels per foot).
     // Always recalculate from points using the geometry engine — the stored area/linearFeet
     // fields are in pixel-space (from the client DrawingTool) and must not be used directly.
-    const ppu = scale?.pixelsPerUnit ?? null;
+    const ppu = scale?.pixelsPerUnit ?? 0;
     const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
     const scaleConfig = { pixelsPerFoot: ppu, unit };
 
@@ -29,12 +29,15 @@ export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_re
       let totalLinear = 0;
       const count = classPolygons.length;
 
-      for (const p of classPolygons) {
-        if (c.type === 'area') {
-          // Always compute from geometry — stored area is pixel² not real-world SF
-          totalArea += calculatePolygonArea(p.points, scaleConfig) ?? 0;
-        } else if (c.type === 'linear') {
-          totalLinear += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+      // Skip area/length calculations when ppu is 0 (no scale set)
+      if (ppu > 0) {
+        for (const p of classPolygons) {
+          if (c.type === 'area') {
+            // Always compute from geometry — stored area is pixel² not real-world SF
+            totalArea += calculatePolygonArea(p.points, scaleConfig) ?? 0;
+          } else if (c.type === 'linear') {
+            totalLinear += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+          }
         }
       }
 

@@ -1,8 +1,13 @@
 import { getProject, getPolygons, getClassifications, getScale, getPages, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-055 / BUG-A5-6-056: add rate limiting to export endpoint
+  const limited = rateLimitResponse(_req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
