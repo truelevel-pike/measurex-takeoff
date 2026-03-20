@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Mail, Link2, Check, X, ChevronDown } from 'lucide-react';
 
 // --- Types ---
@@ -166,6 +166,18 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState<string | null>(null);
 
+  // BUG-A6-007 fix: store timer IDs so they can be cleared on unmount, preventing
+  // setState calls on an unmounted component.
+  const inviteSentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (inviteSentTimerRef.current) clearTimeout(inviteSentTimerRef.current);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
+
   function handleRoleChange(id: string, role: Permission) {
     setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, role } : c)));
   }
@@ -201,13 +213,15 @@ export default function CollaborationPanel({ projectName = 'Untitled Project', o
     setInviteSent(email);
     setInviteEmail('');
     setInviteError(null);
-    setTimeout(() => setInviteSent(null), 3000);
+    if (inviteSentTimerRef.current) clearTimeout(inviteSentTimerRef.current);
+    inviteSentTimerRef.current = setTimeout(() => setInviteSent(null), 3000);
   }
 
   function handleCopyLink() {
     navigator.clipboard.writeText(FAKE_SHARE_URL).catch(() => {});
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2500);
   }
 
   const tabCollabs = collaborators.filter((c) => c.type === activeTab);
