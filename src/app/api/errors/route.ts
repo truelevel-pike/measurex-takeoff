@@ -21,6 +21,8 @@ interface LoggedErrorReport {
 // Intentional in-memory storage: this serves as a short-lived error buffer
 // for recent error reports. Data is ephemeral and lost on restart by design.
 const MAX_ERRORS = 100;
+const MAX_STRING_LENGTH = 10_000;
+const MAX_URL_LENGTH = 2_000;
 const loggedErrors: LoggedErrorReport[] = [];
 
 export async function POST(request: Request) {
@@ -33,6 +35,17 @@ export async function POST(request: Request) {
     payload = (await request.json()) as IncomingErrorReport;
   } catch {
     return NextResponse.json({ received: false, error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  // Validate payload field sizes to prevent oversized payloads from consuming memory
+  if (typeof payload.message === "string" && payload.message.length > MAX_STRING_LENGTH) {
+    return NextResponse.json({ received: false, error: "message exceeds max length" }, { status: 400 });
+  }
+  if (typeof payload.stack === "string" && payload.stack.length > MAX_STRING_LENGTH) {
+    return NextResponse.json({ received: false, error: "stack exceeds max length" }, { status: 400 });
+  }
+  if (typeof payload.url === "string" && payload.url.length > MAX_URL_LENGTH) {
+    return NextResponse.json({ received: false, error: "url exceeds max length" }, { status: 400 });
   }
 
   const report: LoggedErrorReport = {
