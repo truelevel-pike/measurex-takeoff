@@ -54,6 +54,12 @@ async function callOpenAIVision(
   pageNumber?: number,
   model?: string,
 ): Promise<DetectedElement[]> {
+  // Client-side size guard: reject images larger than 10MB base64 (~7.5MB raw)
+  const MAX_BASE64_SIZE = 10_000_000;
+  if (imageBase64.length > MAX_BASE64_SIZE) {
+    throw new Error(`Image too large (${(imageBase64.length / 1_000_000).toFixed(1)}MB). Maximum allowed is 10MB base64.`);
+  }
+
   performance.mark('ai-takeoff-start');
   const res = await fetch('/api/ai-takeoff', {
     method: 'POST',
