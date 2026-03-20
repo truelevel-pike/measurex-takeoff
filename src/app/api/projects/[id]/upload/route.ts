@@ -42,6 +42,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Save file to storage (local + Supabase Storage in prod), then process
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // BUG-A5-6-092: verify PDF magic bytes (%PDF = 0x25 0x50 0x44 0x46)
+    if (buffer.length < 4 || buffer[0] !== 0x25 || buffer[1] !== 0x50 || buffer[2] !== 0x44 || buffer[3] !== 0x46) {
+      return NextResponse.json({ error: 'Invalid PDF file — magic bytes check failed' }, { status: 400 });
+    }
+
     const filePath = await savePDF(id, buffer);
     const result = await processPDF(filePath, id);
 
