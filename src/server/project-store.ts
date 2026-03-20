@@ -200,6 +200,25 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   return projects;
 }
 
+/** Quick summary flags used by the onboarding checklist. */
+export async function getProjectSummary(projectId: string): Promise<{ polygonCount: number; scaleCount: number }> {
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    const [{ count: pc }, { count: sc }] = await Promise.all([
+      sb.from('mx_polygons').select('*', { count: 'exact', head: true }).eq('project_id', projectId),
+      sb.from('mx_scales').select('*', { count: 'exact', head: true }).eq('project_id', projectId),
+    ]);
+    return { polygonCount: pc ?? 0, scaleCount: sc ?? 0 };
+  }
+  const dir = projectDir(projectId);
+  const [polygons, entries] = await Promise.all([
+    readJson<unknown[]>(path.join(dir, 'polygons.json'), []),
+    fs.readdir(dir).catch(() => [] as string[]),
+  ]);
+  const scaleCount = entries.filter((f: string) => /^scale-\d+\.json$/.test(f)).length;
+  return { polygonCount: polygons.length, scaleCount };
+}
+
 export async function getThumbnail(projectId: string): Promise<string | null> {
   const thumbPath = path.join(projectDir(projectId), 'thumbnail.txt');
   try {

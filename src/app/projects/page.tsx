@@ -84,6 +84,8 @@ interface ProjectRow {
   state?: ProjectState;
   thumbnail?: string;
   tags?: string[];
+  polygonCount?: number;
+  scaleCount?: number;
 }
 
 /** Format a project date — handles camelCase and snake_case API fields */
@@ -390,24 +392,18 @@ export default function ProjectsPage() {
     return sorted;
   }, [projects, activeSection, starredIds, searchQuery, folders, sortBy, selectedTags]);
 
-  // Onboarding step completion flags (read from localStorage on mount)
-  const [onboardingFlags, setOnboardingFlags] = useState({ scaleSet: false, takeoffRun: false, exported: false });
-  useEffect(() => {
-    setOnboardingFlags({
-      scaleSet: localStorage.getItem('mx-onboarding-scale-set') === 'true',
-      takeoffRun: localStorage.getItem('mx-onboarding-takeoff-run') === 'true',
-      exported: localStorage.getItem('mx-onboarding-exported') === 'true',
-    });
-  }, []);
-
-  // Onboarding steps
-  const onboardingSteps = useMemo(() => [
-    { label: 'Create a project', done: projects.length > 0, hint: '' },
-    { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0), hint: '' },
-    { label: 'Set the scale', done: onboardingFlags.scaleSet, hint: 'Click the "No scale" indicator in the toolbar to calibrate your drawing scale.' },
-    { label: 'Run AI takeoff', done: onboardingFlags.takeoffRun, hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
-    { label: 'Export quantities', done: onboardingFlags.exported, hint: '' },
-  ], [projects, onboardingFlags]);
+  // Onboarding steps — derived from real project data instead of stale localStorage flags
+  const onboardingSteps = useMemo(() => {
+    const hasScale = projects.some(p => (p.scaleCount ?? 0) > 0);
+    const hasPolygons = projects.some(p => (p.polygonCount ?? 0) > 0);
+    return [
+      { label: 'Create a project', done: projects.length > 0, hint: '' },
+      { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0), hint: '' },
+      { label: 'Set the scale', done: hasScale, hint: 'Click the "No scale" indicator in the toolbar to calibrate your drawing scale.' },
+      { label: 'Run AI takeoff', done: hasPolygons, hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
+      { label: 'Export quantities', done: hasPolygons, hint: '' },
+    ];
+  }, [projects]);
   const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
 
   // Collect all unique tags from all projects

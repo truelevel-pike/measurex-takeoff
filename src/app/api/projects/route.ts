@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listProjects, createProject, initDataDir, getThumbnail } from '@/server/project-store';
+import { listProjects, createProject, initDataDir, getThumbnail, getProjectSummary } from '@/server/project-store';
 import { ProjectCreateSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
 
@@ -9,8 +9,11 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET() {
     const projects = await listProjects();
     const withThumbnails = await Promise.all(
       projects.map(async (p) => {
-        const thumbnail = await getThumbnail(p.id).catch(() => null);
-        return { ...p, thumbnail };
+        const [thumbnail, summary] = await Promise.all([
+          getThumbnail(p.id).catch(() => null),
+          getProjectSummary(p.id).catch(() => ({ polygonCount: 0, scaleCount: 0 })),
+        ]);
+        return { ...p, thumbnail, polygonCount: summary.polygonCount, scaleCount: summary.scaleCount };
       })
     );
     return NextResponse.json({ projects: withThumbnails });
