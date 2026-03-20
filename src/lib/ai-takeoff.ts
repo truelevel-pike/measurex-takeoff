@@ -32,7 +32,13 @@ function downscaleCanvasToMax(canvas: HTMLCanvasElement, maxEdge = 2048): string
     throw new Error('Could not create 2D canvas context for downscaling');
   }
   ctx.drawImage(canvas, 0, 0, off.width, off.height);
-  return off.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+  const dataUrl = off.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+  // Release the backing GPU texture immediately — browsers (especially Safari) do not
+  // promptly GC canvas elements, and repeated AI takeoff calls can accumulate many
+  // unreleased 2048×2048 textures (BUG-A7-015).
+  off.width = 0;
+  off.height = 0;
+  return dataUrl;
 }
 
 export function capturePageScreenshot(canvas: HTMLCanvasElement): string {
