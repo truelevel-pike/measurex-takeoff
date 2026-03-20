@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     if (selectionUrl) {
       userContent.push({
         type: 'text',
-        text: `Here is a reference symbol (first image) from a construction blueprint. Find ALL instances of this same symbol on the full blueprint page (second image). The user describes it as: "${query}". Return their bounding boxes as percentage coordinates (0-100).`,
+        text: `Here is a reference symbol (first image) from a construction blueprint. Find ALL instances of this same symbol on the full blueprint page (second image). Return their bounding boxes as percentage coordinates (0-100).\n\n<user_description>\n${query}\n</user_description>`,
       });
       userContent.push({
         type: 'image_url',
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
         image_url: { url: imageUrl, detail: 'high' },
       });
     } else {
-      userContent.push({ type: 'text', text: query });
+      userContent.push({ type: 'text', text: `Find the following elements in the blueprint image:\n\n<user_query>\n${query}\n</user_query>` });
       userContent.push({
         type: 'image_url',
         image_url: { url: imageUrl, detail: 'high' },
