@@ -75,6 +75,22 @@ export function isPrivateUrl(urlStr: string): boolean {
   }
 }
 
+const SENSITIVE_KEYS = new Set(['apiKey', 'secret', 'token', 'password']);
+
+function redactSensitiveFields(obj: unknown): unknown {
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(redactSensitiveFields);
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (SENSITIVE_KEYS.has(key)) {
+      result[key] = '[REDACTED]';
+    } else {
+      result[key] = redactSensitiveFields(value);
+    }
+  }
+  return result;
+}
+
 export async function fireWebhook(
   projectId: string,
   event: string,
@@ -86,11 +102,13 @@ export async function fireWebhook(
 
   if (matching.length === 0) return;
 
+  const sanitizedPayload = redactSensitiveFields(payload);
+
   const body = JSON.stringify({
     event,
     projectId,
     timestamp: new Date().toISOString(),
-    data: payload,
+    data: sanitizedPayload,
   });
 
   await Promise.allSettled(
