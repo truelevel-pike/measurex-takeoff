@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 interface IncomingErrorReport {
   message?: unknown;
@@ -23,6 +24,9 @@ const MAX_ERRORS = 100;
 const loggedErrors: LoggedErrorReport[] = [];
 
 export async function POST(request: Request) {
+  const rlResponse = rateLimitResponse(request);
+  if (rlResponse) return rlResponse;
+
   let payload: IncomingErrorReport;
 
   try {
