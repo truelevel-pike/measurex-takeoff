@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   title: "MeasureX",
   description: "AI-powered construction takeoff",
   manifest: "/manifest.json",
+  openGraph: {
+    title: "MeasureX",
+    description: "AI-powered construction takeoff",
+    type: "website",
+  },
 };
 
 export function generateViewport(): Viewport {
