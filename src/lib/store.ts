@@ -521,9 +521,11 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+    // R-C5-001 fix: single batch DELETE instead of per-ID forEach
     if (!s.projectId) return;
-    idsToDelete.forEach((polygonId) => {
-      apiSync(`/api/projects/${s.projectId}/polygons/${polygonId}`, { method: 'DELETE' });
+    apiSync(`/api/projects/${s.projectId}/polygons`, {
+      method: 'DELETE',
+      body: JSON.stringify({ ids: idsToDelete }),
     });
   },
 

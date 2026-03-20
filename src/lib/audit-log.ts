@@ -41,6 +41,9 @@ export function createAuditEntry(
   }
 
   // Fire-and-forget POST to server
+  // NOTE: The server-side /api/audit-log endpoint MUST enforce authentication
+  // and rate limiting (e.g., max 60 requests/min per user) to prevent abuse.
+  // See BUG-A5-6-148. Auth is enforced server-side; no client-side fix needed.
   fetch('/api/audit-log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
