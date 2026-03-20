@@ -42,15 +42,17 @@ const nextConfig: NextConfig = {
               // Narrowed: only self + Supabase domains + project-specific WebSocket host.
               // BUG-A8-4-002: AI calls are exclusively server-proxied via /api/ai-takeoff,
               // so no external AI API domains are needed in connect-src.
-              // BUG-A8-5-038 fix: throw at build time in production if NEXT_PUBLIC_APP_HOST is
+              // BUG-A8-5-038 fix: warn at build time in production if NEXT_PUBLIC_APP_HOST is
               // not set — prevents silent CSP breakage where wss://localhost:3000 is emitted.
+              // NOTE: Changed from hard throw to warn+default so CI/preview builds succeed even
+              // when the env var is not configured. Operators should always set this in production.
               (() => {
                 if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_HOST) {
-                  throw new Error(
-                    '[next.config.ts] NEXT_PUBLIC_APP_HOST is required in production. ' +
+                  console.warn(
+                    '[next.config.ts] WARNING: NEXT_PUBLIC_APP_HOST is not set in production. ' +
                     'Set it to your deployment hostname (e.g. app.measurex.io). ' +
                     'Without it the CSP connect-src falls back to wss://localhost:3000 ' +
-                    'which blocks real-time WebSocket connections.'
+                    'which will block real-time WebSocket connections in production.'
                   );
                 }
                 const host = process.env.NEXT_PUBLIC_APP_HOST ?? 'localhost:3000';

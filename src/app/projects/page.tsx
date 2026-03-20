@@ -435,41 +435,13 @@ export default function ProjectsPage() {
     saveOnboardingDismissed(true);
   };
 
-  // Page-wide drag-and-drop handlers
-  const handlePageDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    pageDragCounter.current++;
-    if (e.dataTransfer.types.includes('Files')) {
-      setPageDragOver(true);
-    }
-  }, []);
-  const handlePageDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    pageDragCounter.current--;
-    if (pageDragCounter.current === 0) {
-      setPageDragOver(false);
-    }
-  }, []);
-  const handlePageDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-  // BUG-A8-5-009 fix: add handlePdfUpload to useCallback deps
-  const handlePageDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    pageDragCounter.current = 0;
-    setPageDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
-      handlePdfUpload(file);
-    }
-  }, [handlePdfUpload]);
-
   /** Auto-generate project name from PDF filename */
   const nameFromFile = (file: File) =>
     file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
 
   /** Full PDF upload flow: create project → upload file → redirect */
   // BUG-A8-5-009 fix: wrap in useCallback so handlePageDrop dep array is valid
+  // BUG-A8-6-001 fix: moved before handlePageDrop to fix "used before declaration" TS error
   const handlePdfUpload = useCallback(async (file: File, projectName?: string) => {
     const name = (projectName || nameFromFile(file)).trim();
     if (!name) return;
@@ -508,6 +480,36 @@ export default function ProjectsPage() {
       setUploading(false);
     }
   }, [loadProjects, router]);
+
+  // Page-wide drag-and-drop handlers
+  // BUG-A8-6-001 fix: moved after handlePdfUpload to fix "used before declaration" TS error
+  const handlePageDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setPageDragOver(true);
+    }
+  }, []);
+  const handlePageDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current--;
+    if (pageDragCounter.current === 0) {
+      setPageDragOver(false);
+    }
+  }, []);
+  const handlePageDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+  // BUG-A8-5-009 fix: add handlePdfUpload to useCallback deps
+  const handlePageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    pageDragCounter.current = 0;
+    setPageDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      handlePdfUpload(file);
+    }
+  }, [handlePdfUpload]);
 
   /** Handle file selection in the create modal */
   const handleFileSelect = (file: File | null) => {
