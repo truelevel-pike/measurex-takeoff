@@ -53,8 +53,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
   const [drawingMenuId, setDrawingMenuId] = useState<string | null>(null);
   const [moveSubmenuDrawingId, setMoveSubmenuDrawingId] = useState<string | null>(null);
   const [deleteConfirmSetId, setDeleteConfirmSetId] = useState<string | null>(null);
+  // BUG-A7-5-003 fix: inline drawing rename state — replaces window.prompt() which blocks in iframes/sandbox
+  const [editingDrawingId, setEditingDrawingId] = useState<string | null>(null);
+  const [editingDrawingName, setEditingDrawingName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const editDrawingInputRef = useRef<HTMLInputElement>(null);
   // BUG-A6-003 fix: track all upload interval IDs so they can be cleared on unmount.
   const uploadIntervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
 
@@ -447,7 +451,31 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-neutral-200 truncate">{d.name}</div>
+                  {editingDrawingId === d.id ? (
+                    // BUG-A7-5-003 fix: inline rename input — no window.prompt(), works in iframes
+                    <input
+                      ref={editDrawingInputRef}
+                      className="text-xs font-medium bg-[#2a2a3e] text-neutral-200 border border-blue-500 rounded px-1 w-full outline-none"
+                      value={editingDrawingName}
+                      onChange={(e) => setEditingDrawingName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && editingDrawingName.trim()) {
+                          renameDrawing(d.id, editingDrawingName.trim());
+                          setEditingDrawingId(null);
+                        } else if (e.key === 'Escape') {
+                          setEditingDrawingId(null);
+                        }
+                        e.stopPropagation();
+                      }}
+                      onBlur={() => {
+                        if (editingDrawingName.trim()) renameDrawing(d.id, editingDrawingName.trim());
+                        setEditingDrawingId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="text-xs font-medium text-neutral-200 truncate">{d.name}</div>
+                  )}
                   <div className="text-[10px] text-neutral-500">
                     {d.pageCount} pg{d.pageCount !== 1 ? 's' : ''}
                     {d.sheetNumber && <span className="ml-2">#{d.sheetNumber}</span>}
@@ -472,11 +500,11 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
                     >
                       <button
                         onClick={() => {
-                          const newName = prompt('New name:', d.name);
-                          if (newName?.trim()) {
-                            renameDrawing(d.id, newName.trim());
-                          }
+                          // BUG-A7-5-003 fix: inline rename instead of window.prompt() (blocks in iframes)
+                          setEditingDrawingId(d.id);
+                          setEditingDrawingName(d.name);
                           setDrawingMenuId(null);
+                          setTimeout(() => editDrawingInputRef.current?.focus(), 50);
                         }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#2a2a3e] flex items-center gap-2"
                       >
