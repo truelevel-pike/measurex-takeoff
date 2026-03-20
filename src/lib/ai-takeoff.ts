@@ -134,8 +134,11 @@ export async function triggerAITakeoff(
       return await callOpenAIVision(imageBase64, scale, pageWidth, pageHeight, projectId, pageNumber, model);
     } catch (err) {
       lastErr = err;
-      if (attempt < 2) {
+      // Only retry on 429 or 5xx errors, not 4xx client errors (BUG-A5-6-174)
+      if (attempt < 2 && isRetryableError(err)) {
         await delay(3000);
+      } else {
+        break;
       }
     }
   }
