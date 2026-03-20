@@ -22,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MeasureX Takeoff",
-  description: "Internal construction takeoff platform",
+  title: "MeasureX",
+  description: "AI-powered construction takeoff",
   manifest: "/manifest.json",
 };
 
