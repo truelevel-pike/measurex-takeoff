@@ -69,6 +69,13 @@ export default function CutTool() {
       className="absolute inset-0 z-30"
       onClick={onClick}
       onKeyDown={onKeyDown}
+      // BUG-A7-5-031 fix: touch support for mobile
+      onTouchEnd={(e) => {
+        if (e.changedTouches.length > 0) {
+          const t = e.changedTouches[0];
+          onClick({ clientX: t.clientX, clientY: t.clientY, stopPropagation: () => {} } as unknown as React.MouseEvent);
+        }
+      }}
       tabIndex={0}
       style={{ cursor: 'crosshair' }}
     >

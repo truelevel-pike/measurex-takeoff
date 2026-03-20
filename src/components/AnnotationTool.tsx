@@ -28,8 +28,15 @@ export default function AnnotationTool() {
 
   useEffect(() => {
     if (draft) {
+      // BUG-A7-5-037 fix: requestAnimationFrame retry if focus fails on first try
       inputRef.current?.focus();
       inputRef.current?.select();
+      if (document.activeElement !== inputRef.current) {
+        requestAnimationFrame(() => {
+          inputRef.current?.focus();
+          inputRef.current?.select();
+        });
+      }
     }
   }, [draft]);
 
@@ -96,6 +103,14 @@ export default function AnnotationTool() {
       tabIndex={0}
       onClick={handleCanvasClick}
       onKeyDown={handleKeyDown}
+      // BUG-A7-5-032 fix: touch support for mobile
+      onTouchEnd={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.changedTouches.length > 0) {
+          const t = e.changedTouches[0];
+          handleCanvasClick({ clientX: t.clientX, clientY: t.clientY, target: e.target, currentTarget: e.currentTarget } as unknown as React.MouseEvent<HTMLDivElement>);
+        }
+      }}
     >
       {draft && (
         <div

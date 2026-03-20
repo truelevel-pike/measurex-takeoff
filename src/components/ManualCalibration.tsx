@@ -4,6 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { CheckCircle2 } from 'lucide-react';
 
+// BUG-A7-5-036: This assumes PDF rendering at 72 DPI base resolution (1 point = 1 pixel).
+// If the renderer uses a different base DPI (e.g. 96 or 150), this constant must be updated
+// to match, otherwise pixelsPerUnit calculations will be off by the DPI ratio.
 const DPI = 72;
 
 type Mode = 'draw-line' | 'enter-number';

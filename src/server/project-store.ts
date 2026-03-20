@@ -104,8 +104,27 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
  * @param filePath - Absolute path to the destination JSON file.
  * @param data     - Any JSON-serializable value to persist.
  */
+// BUG-A7-5-060 fix: atomic write (tmp file + rename) to prevent corruption on crash
+// BUG-A7-5-063 fix: compact JSON (no pretty-print) to reduce disk I/O
 async function writeJson(filePath: string, data: unknown): Promise<void> {
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  const tmpPath = `${filePath}.tmp.${Date.now()}`;
+  await fs.writeFile(tmpPath, JSON.stringify(data), 'utf-8');
+  await fs.rename(tmpPath, filePath);
+}
+
+// BUG-A7-5-066 fix: reusable helper to update project's updatedAt timestamp
+export async function touchProject(projectId: string): Promise<void> {
+  const now = new Date().toISOString();
+  if (isSupabaseMode()) {
+    const sb = getClient();
+    await sb.from('mx_projects').update({ updated_at: now }).eq('id', projectId);
+  } else {
+    const filePath = path.join(projectDir(projectId), 'project.json');
+    const existing = await readJson<ProjectMeta | null>(filePath, null);
+    if (existing) {
+      await writeJson(filePath, { ...existing, updatedAt: now });
+    }
+  }
 }
 
 // ── initDataDir ───────────────────────────────────────────────────────
@@ -155,7 +174,7 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
     if (!data) return null;
     // totalPages is stored in the `description` column as JSON: {"totalPages":7}
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
@@ -231,7 +250,14 @@ export async function getThumbnail(projectId: string): Promise<string | null> {
   }
 }
 
+// BUG-A7-5-067 fix: 500KB size cap to prevent oversized thumbnails
+const MAX_THUMBNAIL_BYTES = 500 * 1024;
+
 export async function saveThumbnail(projectId: string, dataUrl: string): Promise<void> {
+  if (Buffer.byteLength(dataUrl, 'utf-8') > MAX_THUMBNAIL_BYTES) {
+    console.warn(`[saveThumbnail] Thumbnail for ${projectId} exceeds 500KB limit — skipped`);
+    return;
+  }
   const dir = projectDir(projectId);
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(path.join(dir, 'thumbnail.txt'), dataUrl, 'utf-8');
@@ -266,7 +292,7 @@ export async function updateProject(
     if (error) throw new Error(`updateProject: ${error.message}`);
     if (!data) return null;
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
@@ -395,7 +421,7 @@ export async function getProjectByShareToken(token: string): Promise<ProjectMeta
     if (error) throw new Error(`getProjectByShareToken: ${error.message}`);
     if (!data) return null;
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
+    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
@@ -405,21 +431,39 @@ export async function getProjectByShareToken(token: string): Promise<ProjectMeta
     };
   }
 
-  // File mode: scan all projects for the matching share token
+  // BUG-A7-5-059 fix: use share-index.json for O(1) token lookup instead of scanning all projects
+  const indexPath = path.join(PROJECTS_DIR, 'share-index.json');
+  const index = await readJson<Record<string, string>>(indexPath, {});
+  const projectId = index[token];
+  if (projectId) {
+    const meta = await readJson<ProjectMeta & { shareToken?: string } | null>(
+      path.join(PROJECTS_DIR, projectId, 'project.json'),
+      null,
+    );
+    if (meta?.shareToken === token) return meta;
+  }
+
+  // Fallback: scan all projects (rebuild index)
   let entries: string[];
   try {
     entries = await fs.readdir(PROJECTS_DIR);
   } catch {
     return null;
   }
+  const newIndex: Record<string, string> = {};
+  let found: ProjectMeta | null = null;
   for (const entry of entries) {
     const meta = await readJson<ProjectMeta & { shareToken?: string } | null>(
       path.join(PROJECTS_DIR, entry, 'project.json'),
       null,
     );
-    if (meta?.shareToken === token) return meta;
+    if (meta?.shareToken) {
+      newIndex[meta.shareToken] = entry;
+      if (meta.shareToken === token) found = meta;
+    }
   }
-  return null;
+  await writeJson(indexPath, newIndex).catch(() => {});
+  return found;
 }
 
 // ── Pages CRUD ─────────────────────────────────────────────────────────
@@ -596,11 +640,12 @@ export async function createClassification(
     };
     // Try full insert first; if formula columns don't exist in DB, retry without them
     let { error } = await sb.from('mx_classifications').insert({ ...baseRow, ...formulaFields });
-    if (error && /formula/.test(error.message)) {
+    // BUG-A7-5-061 fix: use error.code for schema errors instead of string matching
+    if (error && ((error as any).code === '42703' || /formula/.test(error.message))) {
       ({ error } = await sb.from('mx_classifications').insert(baseRow));
     }
     if (error) {
-      if (error.message?.includes("duplicate key") || (error as any).code === "23505") {
+      if ((error as any).code === '23505' || error.message?.includes("duplicate key")) {
         // Classification already exists — return the existing record
         const { data: existing } = await sb
           .from("mx_classifications")
@@ -698,8 +743,8 @@ export async function updateClassification(
       .eq('project_id', projectId)
       .select('*')
       .maybeSingle();
-    // If formula columns don't exist in DB, retry without them
-    if (error && /formula/.test(error.message) && formulaKeys.length > 0) {
+    // BUG-A7-5-061 fix: use error.code for schema errors
+    if (error && ((error as any).code === '42703' || /formula/.test(error.message)) && formulaKeys.length > 0) {
       for (const k of formulaKeys) delete updateData[k];
       ({ data: row, error } = await sb
         .from('mx_classifications')
@@ -1132,6 +1177,8 @@ export interface AssemblyRow {
   unitCost: number;
   quantityFormula: string;
   createdAt: string;
+  // BUG-A7-5-065 fix: track when the assembly was last updated
+  updatedAt: string;
 }
 
 export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {

@@ -450,6 +450,9 @@ function PageInner() {
   const hydrateRequestIdRef = useRef(0);
   const isCreatingProjectRef = useRef(false);
   const thumbnailCapturedRef = useRef(false);
+  // BUG-A8-5-006 fix: re-entry guard for AI takeoff — prevents concurrent
+  // requests from rapid keypresses during the brief window before aiLoading state updates.
+  const aiTakeoffInFlightRef = useRef(false);
 
   const reloadProjectPolygonsAndClassifications = useCallback(async (pid: string) => {
     const [classRes, polyRes] = await Promise.all([
@@ -785,10 +788,16 @@ function PageInner() {
 
   // AI Takeoff flow — processes ALL pages in the PDF
   const handleAITakeoff = useCallback(async () => {
+    // BUG-A8-5-006 fix: use ref for re-entry prevention (React state update is async;
+    // rapid keypresses could queue concurrent calls before aiLoading becomes true).
+    if (aiTakeoffInFlightRef.current) return;
+    aiTakeoffInFlightRef.current = true;
+
     const viewer = pdfViewerRef.current;
     if (!viewer || !projectId) {
       setAiStatus('AI takeoff requires a saved project');
       setTimeout(() => setAiStatus(null), 4000);
+      aiTakeoffInFlightRef.current = false;
       return;
     }
 
@@ -857,6 +866,7 @@ function PageInner() {
       setTimeout(() => setAiStatus(null), 7000);
     } finally {
       setAiLoading(false);
+      aiTakeoffInFlightRef.current = false; // BUG-A8-5-006 fix: release re-entry guard
     }
   }, [addToast, aiModel, projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
 

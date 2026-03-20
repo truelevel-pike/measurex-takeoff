@@ -560,6 +560,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       }}
     >
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${baseDims.width} ${baseDims.height}`}
         preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}

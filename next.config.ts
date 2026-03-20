@@ -31,8 +31,10 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // R-A8-007 fix: gate 'unsafe-eval' to dev only (required by webpack HMR + pdf.js eval).
-              // In production only 'unsafe-inline' is kept (pdf.js inline worker init).
-              `script-src 'self' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} 'unsafe-inline' https://cdn.jsdelivr.net`,
+              // BUG-A8-5-008 fix: remove 'unsafe-inline' from production script-src.
+              // Per-request nonces are injected by src/middleware.ts for HTML pages;
+              // this static header is only a fallback for non-HTML assets.
+              `script-src 'self' ${process.env.NODE_ENV === "development" ? "'unsafe-eval' 'unsafe-inline'" : ""} https://cdn.jsdelivr.net`,
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               // BUG-A8-4-L017 fix: narrow img-src from all HTTPS to specific trusted origins
               "img-src 'self' data: blob: https://*.supabase.co",

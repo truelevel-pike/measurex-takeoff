@@ -21,11 +21,18 @@ export default function AutoScalePopup({
   onDontShowAgain,
   onAccept,
 }: AutoScalePopupProps) {
+  // BUG-A7-5-038: TODO — dontShowAgain is currently global (applies to all projects).
+  // It should be scoped per-project so disabling auto-scale for one project doesn't
+  // suppress it for others. Requires storing the flag in project settings.
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [remaining, setRemaining] = useState(AUTO_DISMISS_MS);
   const startRef = useRef(0);
+  // BUG-A7-5-035 fix: track mount state to prevent state updates after unmount
+  const isMountedRef = useRef(true);
   useEffect(() => {
     startRef.current = Date.now();
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
   }, []);
   const focusTrapRef = useFocusTrap(true);
 

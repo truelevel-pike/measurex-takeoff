@@ -121,6 +121,13 @@ export default function CropOverlay({ onCropComplete, onCancel }: CropOverlayPro
       ref={containerRef}
       tabIndex={0}
       onMouseDown={handleMouseDown}
+      // BUG-A7-5-033 fix: touch support for mobile
+      onTouchStart={(e) => {
+        if (e.touches.length > 0) {
+          const t = e.touches[0];
+          handleMouseDown({ button: 0, clientX: t.clientX, clientY: t.clientY } as unknown as React.MouseEvent);
+        }
+      }}
       style={{
         position: 'absolute',
         inset: 0,
