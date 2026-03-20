@@ -41,9 +41,9 @@ export async function POST(req: Request, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? 'restore';
 
-    // BUG-A5-5-031: validate action is a string before comparing
-    if (typeof action !== 'string' || action !== 'restore') {
-      return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    const ALLOWED_ACTIONS = ['restore'] as const;
+    if (typeof action !== 'string' || !ALLOWED_ACTIONS.includes(action as typeof ALLOWED_ACTIONS[number])) {
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
     const result = await restoreSnapshot(id, sid);
