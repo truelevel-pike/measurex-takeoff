@@ -60,7 +60,8 @@ export function loadAIResults(
   }
 
   const state = readState();
-  const ppu = state.scale?.pixelsPerUnit ?? 1;
+  // BUG-A5-6-133: Use || so that explicit 0 also falls back to 1 (avoids division by zero).
+  const ppu = state.scale?.pixelsPerUnit || 1;
   const page = opts?.pageNumber ?? (state.currentPage || 1);
   const r = Math.max(5, Math.round((opts?.zoom ? 6 / opts.zoom : 6))); // count marker radius
 
