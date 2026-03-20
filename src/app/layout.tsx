@@ -23,11 +23,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MeasureX",
-  description: "AI-powered construction takeoff for contractors.",
+  description: "AI-powered construction takeoff",
   manifest: "/manifest.json",
   openGraph: {
     title: "MeasureX",
-    description: "AI-powered construction takeoff for contractors.",
+    description: "AI-powered construction takeoff",
     type: "website",
   },
 };

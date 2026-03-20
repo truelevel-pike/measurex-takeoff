@@ -1,7 +1,7 @@
 {
-  "name": "MeasureX Takeoff",
+  "name": "MeasureX",
   "short_name": "MeasureX",
-  "description": "AI-powered construction takeoff tool",
+  "description": "AI-powered construction takeoff",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0f0f",
