@@ -50,7 +50,12 @@ type SSEEvent =
 function handleSSEMessage(raw: MessageEvent) {
   let parsed: SSEEvent;
   try {
-    parsed = JSON.parse(raw.data) as SSEEvent;
+    const json = JSON.parse(raw.data);
+    // Validate the parsed object has the expected shape
+    if (typeof json !== 'object' || json === null || typeof json.event !== 'string') {
+      return;
+    }
+    parsed = json as SSEEvent;
   } catch {
     return;
   }
