@@ -29,6 +29,9 @@ class PluginRegistry {
 
   register(plugin: MeasureXPlugin): void {
     if (!plugin.name) throw new Error('Plugin must have a name');
+    if (this.plugins.has(plugin.name)) {
+      throw new Error(`Plugin "${plugin.name}" is already registered`);
+    }
     this.plugins.set(plugin.name, plugin);
   }
 
