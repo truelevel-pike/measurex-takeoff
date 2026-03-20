@@ -200,6 +200,10 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   const handleManualSave = useCallback(
     (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
+      if (ppu === null) {
+        addToast(`Unrecognized scale format: ${label}`, 'warning', 3000);
+        return;
+      }
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
       let unit: 'ft' | 'in' | 'm' | 'cm' | 'mm' = 'ft';
       if (ratioMatch) {
@@ -218,9 +222,11 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       }
       persistScale(cal);
       localStorage.setItem('mx-onboarding-scale-set', 'true');
+      // BUG-A7-5-047 fix: toast on manual save
+      addToast(`Scale saved: ${label}`, 'success', 3000);
       handleClose();
     },
-    [currentPage, setScale, setScaleForPage, persistScale, handleClose],
+    [currentPage, setScale, setScaleForPage, persistScale, handleClose, addToast],
   );
 
   const handleManualCancel = useCallback(() => {

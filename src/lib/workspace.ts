@@ -27,6 +27,7 @@ export function getWorkspaces(): Workspace[] {
 }
 
 export function saveWorkspaces(workspaces: Workspace[]): void {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(WORKSPACES_KEY, JSON.stringify(workspaces));
 }
 
@@ -38,5 +39,6 @@ export function getActiveWorkspace(): Workspace {
 }
 
 export function setActiveWorkspace(id: string): void {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(ACTIVE_KEY, id);
 }

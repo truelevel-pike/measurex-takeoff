@@ -81,9 +81,13 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
         return;
       }
 
+      // BUG-A5-6-179: only preventDefault if deleteSelected exists and is callable,
+      // so Backspace/Delete still work normally when no handler is available.
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        store.deleteSelected?.();
+        if (store.deleteSelected) {
+          event.preventDefault();
+          store.deleteSelected();
+        }
         return;
       }
 
