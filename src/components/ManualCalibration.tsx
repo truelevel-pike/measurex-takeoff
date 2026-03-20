@@ -34,9 +34,12 @@ export default function ManualCalibration({
   const [realFt, setRealFt] = useState('');
   const [realIn, setRealIn] = useState('');
 
-  // Snapping toggles (Draw Line mode)
-  const [autoSnap, setAutoSnap] = useState(true);
-  const [snapEdges, setSnapEdges] = useState(false);
+  // BUG-A7-5-027 fix: read snapping flags from the store so the canvas click
+  // handler can observe them when recording calibration points.
+  const autoSnap = useStore((s) => s.calibrationAutoSnap);
+  const setAutoSnap = useStore((s) => s.setCalibrationAutoSnap);
+  const snapEdges = useStore((s) => s.calibrationSnapEdges);
+  const setSnapEdges = useStore((s) => s.setCalibrationSnapEdges);
 
   // Store — calibration state
   const calibrationMode = useStore((s) => s.calibrationMode);
