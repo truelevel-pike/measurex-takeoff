@@ -143,7 +143,8 @@ export async function POST(
     for (const el of elements) {
       const result = ElementSchema.safeParse(el);
       if (result.success) {
-        validElements.push(el as AIDetectedElement);
+        // BUG-A5-6-098: use validated result.data instead of original el
+        validElements.push(result.data as AIDetectedElement);
       } else {
         console.warn('[ai-apply] skipping malformed element:', result.error.issues);
       }
