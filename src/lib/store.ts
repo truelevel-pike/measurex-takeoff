@@ -644,13 +644,29 @@ export const useStore = create<Store>()(
   // PDF is the source of truth for totalPages: when an explicit totalPages > 1 is
   // provided (e.g. from onPageChange after loading a multi-page PDF), always use it —
   // even if hydration had previously written a stale value of 1.
-  setCurrentPage: (page, totalPages) => set((state) => ({
-    currentPage: page,
-    totalPages: (totalPages !== undefined && totalPages > 1)
-      ? totalPages
-      : (state.totalPages > 1 ? state.totalPages : (totalPages ?? state.totalPages)),
-    scale: state.scales[page] ?? state.scale,
-  })),
+  setCurrentPage: (page, totalPages) => {
+    const state = get();
+    // BUG-A5-H07: use per-page scale if available, otherwise null (don't carry stale scale from previous page)
+    const pageScale = state.scales[page] ?? null;
+    set({
+      currentPage: page,
+      totalPages: (totalPages !== undefined && totalPages > 1)
+        ? totalPages
+        : (state.totalPages > 1 ? state.totalPages : (totalPages ?? state.totalPages)),
+      scale: pageScale,
+    });
+    // If no local per-page scale, try to fetch from API
+    if (!pageScale && state.projectId) {
+      fetch(`/api/projects/${state.projectId}/scale?pageNumber=${page}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.scale && get().currentPage === page) {
+            set({ scale: data.scale, scales: { ...get().scales, [page]: data.scale } });
+          }
+        })
+        .catch(() => {}); // non-fatal
+    }
+  },
 
   hydrateState: (state) => {
     // DO NOT regenerate IDs — trust persisted state
