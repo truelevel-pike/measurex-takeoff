@@ -182,6 +182,12 @@ export interface Store extends ProjectState {
   setCalibrationMode: (active: boolean) => void;
   addCalibrationPoint: (p: Point) => void;
   clearCalibrationPoints: () => void;
+  // BUG-A7-5-027 fix: expose calibration snapping flags in store so the canvas
+  // click handler can read them when recording calibration points.
+  calibrationAutoSnap: boolean;
+  calibrationSnapEdges: boolean;
+  setCalibrationAutoSnap: (v: boolean) => void;
+  setCalibrationSnapEdges: (v: boolean) => void;
 
   // Sheet names (auto-detected from PDF text)
   sheetNames: Record<number, string>;
@@ -972,6 +978,11 @@ export const useStore = create<Store>()(
   // ─── Calibration ───
   calibrationMode: false,
   calibrationPoints: [],
+  // BUG-A7-5-027 fix: calibration snapping flags in store (were dead local state in ManualCalibration)
+  calibrationAutoSnap: true,
+  calibrationSnapEdges: false,
+  setCalibrationAutoSnap: (v) => set({ calibrationAutoSnap: v }),
+  setCalibrationSnapEdges: (v) => set({ calibrationSnapEdges: v }),
   // BUG-A7-5-017 fix: always clear calibrationPoints when activating OR deactivating
   setCalibrationMode: (active) => set({ calibrationMode: active, calibrationPoints: [] }),
   // BUG-A7-5-018 fix: return boolean indicating whether the point was added
@@ -1188,8 +1199,12 @@ export const useStore = create<Store>()(
         totalPages: state.totalPages,
         sheetNames: state.sheetNames,
         drawingSets: state.drawingSets,
-        groups: state.groups,
-        assemblies: state.assemblies,
+        // BUG-A7-5-016 fix: omit `groups`, `assemblies`, and `repeatingGroups` from
+        // localStorage persistence.  The authoritative source for these fields is the
+        // API — they are loaded via hydrateState on project open.  Persisting them here
+        // caused the 8 hardcoded default groups to reappear from localStorage after
+        // hydrateState wiped them (race: persist rehydrates synchronously, hydrateState
+        // runs after the async project-load response).
         // BUG-A7-5-005 fix: persist markups and visibility toggle
         markups: state.markups,
         showMarkups: state.showMarkups,
@@ -1197,15 +1212,23 @@ export const useStore = create<Store>()(
         gridEnabled: state.gridEnabled,
         gridSize: state.gridSize,
         pageBaseDimensions: state.pageBaseDimensions,
-        repeatingGroups: state.repeatingGroups,
       }),
       // BUG-A7-5-006 fix: version the persist schema to handle future migrations
-      version: 1,
+      version: 2,
       migrate: (persistedState: unknown, version: number) => {
         const persisted = (persistedState ?? {}) as Record<string, unknown>;
         if (version === 0) {
           // v0 → v1: ensure markups/showMarkups exist
           return { ...persisted, markups: persisted.markups ?? [], showMarkups: persisted.showMarkups ?? true };
+        }
+        if (version === 1) {
+          // v1 → v2: drop groups/assemblies/repeatingGroups from localStorage
+          // (BUG-A7-5-016); they are now API-only, loaded via hydrateState.
+          const { groups: _g, assemblies: _a, repeatingGroups: _r, ...rest } = persisted as {
+            groups?: unknown; assemblies?: unknown; repeatingGroups?: unknown;
+            [k: string]: unknown;
+          };
+          return rest;
         }
         return persisted;
       },
