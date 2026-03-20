@@ -29,7 +29,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     const bodyResult = PagePatchSchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
 

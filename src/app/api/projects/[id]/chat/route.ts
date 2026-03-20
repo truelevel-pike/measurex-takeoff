@@ -206,7 +206,8 @@ ${assemblyContext.map((a) => `  - ${a.assemblyName}: $${a.unitCost.toFixed(2)}/u
       return NextResponse.json({ error: 'OpenAI API error' }, { status: 502 });
     }
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => null);
+    if (!data) return NextResponse.json({ error: 'Invalid response from OpenAI' }, { status: 502 });
     const content = data?.choices?.[0]?.message?.content ?? '';
 
     return NextResponse.json({ reply: content });

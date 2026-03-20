@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const scale = await getScale(id, pageNumber);
     return NextResponse.json({ scale });
   } catch (err: unknown) {
-    return NextResponse.json({ error: `Scale not configured — please set scale before running takeoff (${err instanceof Error ? err.message : String(err)})` }, { status: 500 });
+    return NextResponse.json({ error: `Scale not configured — please set scale before running takeoff (${err instanceof Error ? err.message : String(err)})` }, { status: 404 });
   }
 }
 
