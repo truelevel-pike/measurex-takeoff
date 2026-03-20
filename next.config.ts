@@ -21,9 +21,27 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: [
           {
+            // BUG-A8-003 fix: narrow connect-src from "wss: https:" (any host)
+            // to explicit trusted origins only.
+            // BUG-A8-010 fix: remove blob: from script-src-elem — service worker
+            // is served from /sw.js (same origin), not a blob URL. Dynamically
+            // created blob scripts are an XSS vector.
+            // Also removed esm.sh from script-src (arbitrary user packages).
             key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' wss: https:; worker-src blob: 'self' https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net blob:;",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
+              "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
+              // Narrowed: only self + Supabase domains + project-specific WebSocket host.
+              // Update NEXT_PUBLIC_APP_HOST at deploy time if your domain differs.
+              `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co"} wss://${process.env.NEXT_PUBLIC_APP_HOST ?? "localhost:3000"} https://*.supabase.co`,
+              // blob: kept in worker-src for pdf.js worker (loaded as blob worker by pdfjs-dist)
+              "worker-src blob: 'self' https://cdn.jsdelivr.net",
+              // script-src-elem: blob: removed (BUG-A8-010)
+              "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+            ].join("; "),
           },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
