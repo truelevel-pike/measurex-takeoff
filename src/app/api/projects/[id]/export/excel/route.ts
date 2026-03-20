@@ -191,7 +191,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const ppu = scale?.pixelsPerUnit ?? null;
+    const ppu = scale?.pixelsPerUnit ?? 0;
     const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
     const scaleConfig: ScaleConfig = { pixelsPerFoot: ppu, unit };
     const projectName = project.name || id;

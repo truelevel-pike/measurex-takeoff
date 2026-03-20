@@ -125,6 +125,7 @@ export interface Drawing {
   thumbnailUrl?: string;
   uploadedAt: string;
   sheetNumber?: string;
+  archived?: boolean;
 }
 
 export interface RepeatingGroup {
