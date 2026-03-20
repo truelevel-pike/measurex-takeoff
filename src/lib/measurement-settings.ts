@@ -62,8 +62,9 @@ export function loadMeasurementSettings(): MeasurementSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_MEASUREMENT_SETTINGS;
     const parsed = JSON.parse(raw);
+    const validUnit = parsed.unit === 'imperial' || parsed.unit === 'metric' ? parsed.unit : DEFAULT_MEASUREMENT_SETTINGS.unit;
     return {
-      unit: parsed.unit ?? DEFAULT_MEASUREMENT_SETTINGS.unit,
+      unit: validUnit,
       decimals: parsed.decimals ?? DEFAULT_MEASUREMENT_SETTINGS.decimals,
       areaUnit: parsed.areaUnit ?? DEFAULT_MEASUREMENT_SETTINGS.areaUnit,
       linearUnit: parsed.linearUnit ?? DEFAULT_MEASUREMENT_SETTINGS.linearUnit,
