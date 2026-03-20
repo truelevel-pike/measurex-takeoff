@@ -293,9 +293,25 @@ export async function POST(req: Request) {
     if ('error' in validated) return validated.error;
     let { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
 
+    // E10: server-side rendering path verified
+    //
+    // Full trace (no imageBase64 supplied):
+    //   1. loadPDF(projectId)        → Buffer | null   (local file or Supabase download)
+    //   2. fs.writeFile(tmpPdfPath)  → writes Buffer to a temp file
+    //   3. renderPageAsImage(...)    → `data:image/png;base64,<b64>` | null
+    //      • Returns a data URL, which is directly compatible with the OpenAI/OpenRouter
+    //        vision API `image_url.url` field used below.
+    //   4. imageBase64 = rendered    → variable re-used; guard at line ~340 catches null path
+    //   5. finally: fs.rm(tmpDir)    → temp directory cleaned up even on error (catch silenced
+    //      so cleanup failures do not mask the real error)
+    //
+    // AiTakeoffBodySchema: imageBase64 is z.string().min(1).optional() — confirmed optional.
+    // Schema refine ensures either imageBase64 OR (projectId + pageNumber) is present.
+
     // Server-side PDF rendering fallback: if imageBase64 is not provided but
     // projectId and pageNumber are, fetch the PDF and render the requested page.
     if (!imageBase64 && projectId && pageNumber) {
+      console.log(`[ai-takeoff] Server-side PDF rendering: project=${projectId} page=${pageNumber}`);
       const pdfBuffer = await loadPDF(projectId);
       if (!pdfBuffer) {
         return NextResponse.json(
@@ -304,7 +320,10 @@ export async function POST(req: Request) {
         );
       }
 
-      // Write PDF to a temp file so renderPageAsImage can read it
+      // Write PDF to a temp file so renderPageAsImage can read it.
+      // renderPageAsImage expects a file path (not a Buffer) because it uses
+      // pdfjs-dist which reads from disk.  The temp dir is always cleaned up in
+      // the finally block regardless of success or failure.
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-takeoff-'));
       const tmpPdfPath = path.join(tmpDir, `${projectId}.pdf`);
       try {
@@ -316,6 +335,8 @@ export async function POST(req: Request) {
             { status: 422 },
           );
         }
+        // rendered is a data URL: `data:image/png;base64,...`
+        // This is directly usable as image_url.url in the OpenAI vision payload.
         imageBase64 = rendered;
 
         // Derive page dimensions from the PDF viewport if not provided by the caller
@@ -333,6 +354,8 @@ export async function POST(req: Request) {
           }
         }
       } finally {
+        // Always clean up the temp directory; suppress errors so they don't mask
+        // the real result.  The Buffer was already fully consumed before this point.
         await fs.rm(tmpDir, { recursive: true }).catch(() => {});
       }
     }
