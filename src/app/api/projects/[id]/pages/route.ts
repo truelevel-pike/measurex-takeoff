@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getPages, updatePage, createPage, initDataDir } from '@/server/project-store';
+import { getProject, getPages, updatePage, createPage, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 const PagePatchSchema = z.object({
@@ -15,6 +15,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     const pages = await getPages(id);
     return NextResponse.json({ pages });
   } catch (err: unknown) {
