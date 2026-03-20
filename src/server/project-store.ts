@@ -748,6 +748,19 @@ export async function deletePolygonsByPage(projectId: string, pageNumber: number
   await writeJson(filePath, filtered);
 }
 
+/**
+ * Persist a new polygon (or upsert an existing one by id) for the given project.
+ *
+ * In Supabase mode the polygon is upserted into `mx_polygons` — if a row with
+ * the same `id` already exists it will be replaced.  In file mode the polygon
+ * is appended to `polygons.json`.  Either way a history record is written so
+ * the action can be undone.
+ *
+ * @param projectId - UUID of the parent project.
+ * @param data      - Polygon fields (minus `id`); supply `id` to force a
+ *                    specific UUID (e.g. when restoring from a snapshot).
+ * @returns The persisted {@link Polygon} with its resolved `id`.
+ */
 export async function createPolygon(
   projectId: string,
   data: Omit<Polygon, 'id'> & { id?: string },
