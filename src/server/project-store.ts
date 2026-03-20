@@ -313,6 +313,8 @@ export async function deleteProject(projectId: string): Promise<boolean> {
     // All child rows gone — safe to delete the project itself.
     const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
     if (error) throw new Error(`deleteProject: failed to delete mx_projects: ${error.message}`);
+    // BUG-A7-5-062 fix: clean up file-based snapshots directory (snapshots are always file-based)
+    await fs.rm(snapshotsDir(projectId), { recursive: true, force: true }).catch(() => {});
     return true;
   }
 
@@ -562,6 +564,10 @@ export async function deletePage(
   const filteredPolygons = polygons.filter((p) => p.pageNumber !== pageNumber);
   await writeJson(polygonsPath, filteredPolygons);
 
+  // BUG-A7-5-068 fix: clean up scale file for this page
+  const scaleFile = path.join(projectDir(projectId), `scale-${pageNumber}.json`);
+  await fs.rm(scaleFile, { force: true }).catch(() => {});
+
   return true;
 }
 
@@ -633,8 +639,14 @@ export async function createClassification(
 
   const filePath = path.join(projectDir(projectId), 'classifications.json');
   const list = await readJson<Classification[]>(filePath, []);
+  // BUG-A7-5-058 fix: upsert guard — if classification with same ID exists, update it
+  const existingIdx = list.findIndex((c) => c.id === id);
   const cls: Classification = { id, ...data };
-  list.push(cls);
+  if (existingIdx >= 0) {
+    list[existingIdx] = cls;
+  } else {
+    list.push(cls);
+  }
   await writeJson(filePath, list);
   return cls;
 }

@@ -14,7 +14,7 @@ import {
   loadMeasurementSettings,
   saveMeasurementSettings,
 } from '@/lib/measurement-settings';
-import { type AiSettings, loadAiSettings, saveAiSettings } from '@/lib/ai-settings';
+import { type AiSettings, loadAiSettings, saveAiSettings, clearAiKey } from '@/lib/ai-settings';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -59,6 +59,10 @@ export default function SettingsPage() {
   // Profile state
   // BUG-A8-4-004 fix: remove hardcoded PII defaults — use empty strings
   const PROFILE_KEY = 'mx-profile-settings';
+  // BUG-A8-5-002 fix: state for Change Email flow
+  const [emailChangePending, setEmailChangePending] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailChangeStatus, setEmailChangeStatus] = useState<string | null>(null);
   const [name, setName] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     try {
@@ -67,7 +71,7 @@ export default function SettingsPage() {
     } catch { /* ignore */ }
     return '';
   });
-  const [email] = useState('');
+  const [email, setEmail] = useState('');
   const [orgName, setOrgName] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     try {
@@ -77,6 +81,31 @@ export default function SettingsPage() {
     return '';
   });
   const [profileSaved, setProfileSaved] = useState(false);
+
+  // BUG-A8-5-005 fix: populate email from Supabase auth on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setEmail(data.user.email);
+    });
+  }, []);
+
+  // BUG-A8-5-002 fix: handle Change Email flow
+  const handleChangeEmail = async () => {
+    const trimmed = newEmailInput.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailChangeStatus('Please enter a valid email address.');
+      return;
+    }
+    setEmailChangeStatus(null);
+    const { error } = await supabase.auth.updateUser({ email: trimmed });
+    if (error) {
+      setEmailChangeStatus(`Error: ${error.message}`);
+    } else {
+      setEmailChangeStatus('Confirmation email sent. Check your inbox to confirm the change.');
+      setEmailChangePending(false);
+      setNewEmailInput('');
+    }
+  };
 
   const handleSaveProfile = () => {
     if (typeof window !== 'undefined') {
@@ -207,9 +236,37 @@ export default function SettingsPage() {
     { key: 'account', label: 'Account', icon: <Shield size={16} /> },
   ];
 
-  const handleDeleteAccount = () => {
-    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      // placeholder
+  // BUG-A8-5-003 fix: implement handleDeleteAccount — calls server-side delete endpoint
+  // that uses service_role to delete auth user + cascade data, then signs out.
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete your account? This will permanently remove all your projects and data. This action cannot be undone.'
+    );
+    if (!confirmed) return;
+    setDeleteAccountLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.alert('Not authenticated — please sign in again.');
+        return;
+      }
+      const res = await fetch('/api/account/delete', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        window.alert(`Failed to delete account: ${body.error ?? res.statusText}`);
+        return;
+      }
+      clearAiKey();
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (err) {
+      window.alert(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeleteAccountLoading(false);
     }
   };
 
@@ -250,8 +307,9 @@ export default function SettingsPage() {
 
               {/* Avatar */}
               <div className="flex items-center gap-4 mb-6">
+                {/* BUG-A8-5-004 fix: derive initials from name state */}
                 <div className="w-16 h-16 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xl font-bold text-green-400">
-                  NS
+                  {name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || 'ME'}
                 </div>
                 <div>
                   <div className="text-sm font-medium">{name}</div>
@@ -271,16 +329,50 @@ export default function SettingsPage() {
 
                 <div>
                   <label className="block text-sm text-gray-300 mb-1.5">Email</label>
+                  {/* BUG-A8-5-002 fix: wire Change Email to Supabase updateUser flow */}
                   <div className="flex items-center gap-3">
                     <input
                       value={email}
                       readOnly
                       className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-400 outline-none cursor-not-allowed"
                     />
-                    <button className="text-sm text-green-400 hover:text-green-300 whitespace-nowrap transition-colors">
+                    <button
+                      onClick={() => { setEmailChangePending(v => !v); setEmailChangeStatus(null); }}
+                      className="text-sm text-green-400 hover:text-green-300 whitespace-nowrap transition-colors"
+                    >
                       Change Email
                     </button>
                   </div>
+                  {emailChangePending && (
+                    <div className="mt-3 space-y-2">
+                      <input
+                        type="email"
+                        value={newEmailInput}
+                        onChange={e => setNewEmailInput(e.target.value)}
+                        placeholder="New email address"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 transition-colors"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleChangeEmail}
+                          className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Send Confirmation
+                        </button>
+                        <button
+                          onClick={() => { setEmailChangePending(false); setNewEmailInput(''); setEmailChangeStatus(null); }}
+                          className="border border-gray-600 text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {emailChangeStatus && (
+                        <p className={`text-xs mt-1 ${emailChangeStatus.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+                          {emailChangeStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -623,6 +715,7 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-300 mb-2">Session</label>
                   <button
                     onClick={async () => {
+                      clearAiKey(); // BUG-A8-5-001 fix: purge sessionStorage API key on sign-out
                       await supabase.auth.signOut();
                       router.push('/login');
                     }}
@@ -637,9 +730,10 @@ export default function SettingsPage() {
                   <label className="block text-sm text-red-400 mb-2">Danger Zone</label>
                   <button
                     onClick={handleDeleteAccount}
-                    className="border border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    disabled={deleteAccountLoading}
+                    className="border border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
                   >
-                    Delete Account
+                    {deleteAccountLoading ? 'Deleting…' : 'Delete Account'}
                   </button>
                   <p className="text-xs text-gray-500 mt-2">
                     This will permanently delete your account and all associated data.

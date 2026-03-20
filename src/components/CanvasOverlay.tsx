@@ -81,6 +81,8 @@ function getPolygonFillOpacity(
 // they do not violate React's Rules of Hooks. No hook reordering is required.
 function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedPolygonId }: CanvasOverlayProps = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // BUG-A7-5-043 fix: use ref instead of querySelector for SVG element
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const allPolygons = useStore((s) => s.polygons);
   const allAnnotations = useStore((s) => s.annotations);
@@ -1017,7 +1019,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       )}
       {/* Floating edit toolbar for single-selected polygon */}
       {currentTool === 'select' && singleSelectedPoly && floatingToolbarPos && (() => {
-        const svgEl = wrapperRef.current?.querySelector('svg');
+        const svgEl = svgRef.current;
         const svgRect = svgEl?.getBoundingClientRect();
         if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;
@@ -1103,7 +1105,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       })()}
       {/* Floating reclassify dropdown */}
       {showFloatingReclassify && singleSelectedPoly && floatingToolbarPos && (() => {
-        const svgEl = wrapperRef.current?.querySelector('svg');
+        const svgEl = svgRef.current;
         const svgRect = svgEl?.getBoundingClientRect();
         if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;

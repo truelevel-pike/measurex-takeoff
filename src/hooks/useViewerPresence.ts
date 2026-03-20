@@ -20,7 +20,8 @@ export function useViewerPresence(projectId: string | undefined, isShared: boole
       ) {
         const count = data.viewerCount as number;
         if (typeof count === 'number' && count >= 0) {
-          setViewerCount(count);
+          // BUG-A7-5-009 fix: clamp viewerCount to at least 1 (the current user)
+          setViewerCount(Math.max(1, count));
         }
       }
     });

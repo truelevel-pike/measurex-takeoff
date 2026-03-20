@@ -18,6 +18,9 @@ function formatDistance(distanceInUnit: number, unit: Unit): string {
 
   if (unit === 'in') return `${distanceInUnit.toFixed(2)} in`;
   if (unit === 'm') return `${distanceInUnit.toFixed(3)} m`;
+  // BUG-A7-5-049 fix: explicit mm/cm cases
+  if (unit === 'mm') return `${distanceInUnit.toFixed(1)} mm`;
+  if (unit === 'cm') return `${distanceInUnit.toFixed(2)} cm`;
   return `${distanceInUnit.toFixed(2)} ${unit}`;
 }
 

@@ -25,7 +25,11 @@ export function useTextSearch(projectId: string | null, query: string) {
     }
 
     const timer = setTimeout(async () => {
-      abortRef.current?.abort();
+      // BUG-A7-5-013 fix: reset abortRef after abort
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -52,7 +56,14 @@ export function useTextSearch(projectId: string | null, query: string) {
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : String(err));
+          // BUG-A7-5-014 fix: user-friendly error messages
+          let message = 'Search failed. Please try again.';
+          if (err instanceof TypeError && err.message.includes('fetch')) {
+            message = 'Network error — please check your connection.';
+          } else if (err instanceof Error && err.message) {
+            message = err.message;
+          }
+          setError(message);
           setResults([]);
         }
       } finally {
@@ -64,7 +75,11 @@ export function useTextSearch(projectId: string | null, query: string) {
 
     return () => {
       clearTimeout(timer);
-      abortRef.current?.abort();
+      // BUG-A7-5-013 fix: reset ref after abort
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
     };
   }, [projectId, query]);
 

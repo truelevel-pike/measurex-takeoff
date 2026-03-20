@@ -15,6 +15,22 @@ const AiTakeoffResponseSchema = z.object({
   results: DetectedElementsSchema,
 });
 
+class AiTakeoffError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = 'AiTakeoffError';
+  }
+}
+
+function isRetryableError(err: unknown): boolean {
+  if (err instanceof AiTakeoffError) {
+    // Only retry on 429 (rate limit) or 5xx (server errors)
+    return err.statusCode === 429 || err.statusCode >= 500;
+  }
+  // Network errors (no status code) are retryable
+  return true;
+}
+
 function toPngDataUrl(imageBase64: string): string {
   return imageBase64.startsWith('data:image/') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 }
@@ -80,7 +96,7 @@ async function callOpenAIVision(
     const msg = payload && typeof payload === 'object' && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
       ? (payload as { error: string }).error
       : `OpenAI route returned ${res.status}`;
-    throw new Error(msg);
+    throw new AiTakeoffError(msg, res.status);
   }
 
   const parsed = AiTakeoffResponseSchema.safeParse(payload);

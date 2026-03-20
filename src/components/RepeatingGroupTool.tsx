@@ -87,7 +87,9 @@ export default function RepeatingGroupTool() {
       const y = Math.min(startPoint.y, pt.y);
       const width = Math.abs(pt.x - startPoint.x);
       const height = Math.abs(pt.y - startPoint.y);
-      if (width < 10 || height < 10) {
+      // BUG-A7-5-051 fix: proportional min size based on base dims
+      const minSize = Math.max(10, Math.min(baseDims.width, baseDims.height) * 0.01);
+      if (width < minSize || height < minSize) {
         setStartPoint(null);
         setCurrentPoint(null);
         return;
@@ -250,7 +252,11 @@ export default function RepeatingGroupTool() {
               type="number"
               min={1}
               value={repeatCount}
-              onChange={(e) => setRepeatCount(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => {
+                // BUG-A7-5-050 fix: clamp repeatCount between 1 and 999
+                const val = parseInt(e.target.value, 10) || 1;
+                setRepeatCount(Math.max(1, Math.min(999, val)));
+              }}
               className="w-full px-2 py-1.5 mb-4 rounded bg-[#12121a] border border-[#00d4ff]/20 text-[#e5e7eb] text-sm outline-none focus:border-[#00d4ff]/60"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirm();

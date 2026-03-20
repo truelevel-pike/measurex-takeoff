@@ -14,12 +14,13 @@ export function useRealtimeSync(projectId: string | null) {
     if (!projectId) return;
     if (connectedRef.current === projectId) return;
 
-    connectedRef.current = projectId;
+    // BUG-A7-5-008 fix: set connectedRef only after successful connect
     connectToProject(projectId);
+    connectedRef.current = projectId;
 
     return () => {
-      connectedRef.current = null;
       disconnectFromProject();
+      connectedRef.current = null;
     };
   }, [projectId]);
 }
