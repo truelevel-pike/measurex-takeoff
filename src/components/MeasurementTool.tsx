@@ -123,8 +123,14 @@ export default function MeasurementTool() {
       tabIndex={0}
       style={{ cursor: 'crosshair' }}
     >
+      {/* BUG-A7-5-040 fix: use viewBox matching base PDF dims so coords render
+          correctly at any zoom level */}
       {start && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox={`0 0 ${baseDims.width} ${baseDims.height}`}
+          preserveAspectRatio="none"
+        >
           {lineEnd && (
             <line
               x1={start.x}
@@ -133,20 +139,23 @@ export default function MeasurementTool() {
               y2={lineEnd.y}
               stroke="#0ea5e9"
               strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
             />
           )}
-          <circle cx={start.x} cy={start.y} r={5} fill="#0ea5e9" stroke="#ffffff" strokeWidth={2} />
-          {lineEnd && <circle cx={lineEnd.x} cy={lineEnd.y} r={5} fill="#0ea5e9" stroke="#ffffff" strokeWidth={2} />}
+          <circle cx={start.x} cy={start.y} r={5} fill="#0ea5e9" stroke="#ffffff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          {lineEnd && <circle cx={lineEnd.x} cy={lineEnd.y} r={5} fill="#0ea5e9" stroke="#ffffff" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
         </svg>
       )}
 
+      {/* BUG-A7-5-040+048 fix: position label using percentage of container so it
+          stays correct at any zoom level */}
       {start && lineEnd && midpoint && (
         <div
           className="absolute bg-white/95 border border-sky-200 rounded px-2 py-1 text-xs font-mono text-sky-700 pointer-events-none"
           style={{
-            left: midpoint.x,
-            top: midpoint.y - 18,
-            transform: 'translateX(-50%)',
+            left: `${(midpoint.x / baseDims.width) * 100}%`,
+            top: `${(midpoint.y / baseDims.height) * 100}%`,
+            transform: 'translate(-50%, -100%)',
           }}
         >
           {realDistance !== null ? formatDistance(realDistance, unit) : `${pxDistance.toFixed(1)} px`}

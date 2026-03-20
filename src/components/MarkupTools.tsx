@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+// Note: useState still used for showClearConfirm below
 import type { LucideIcon } from 'lucide-react';
 import {
   Type,
@@ -51,10 +52,13 @@ export default function MarkupTools({ onClose }: MarkupToolsProps) {
   const toggleShowMarkups = useStore((s) => s.toggleShowMarkups);
   const clearMarkups = useStore((s) => s.clearMarkups);
 
-  // TODO: BUG-A7-2-017 — wire activeTool/activeColor/strokeWidth to the canvas drawing layer
-  const [activeTool, setActiveTool] = useState<MarkupToolType>('text');
-  const [activeColor, setActiveColor] = useState('#ef4444');
-  const [strokeWidth, setStrokeWidth] = useState(3);
+  // BUG-A7-5-024 fix: use store state so canvas drawing layer can read these values
+  const activeTool = useStore((s) => s.activeMarkupTool);
+  const setActiveTool = useStore((s) => s.setActiveMarkupTool);
+  const activeColor = useStore((s) => s.markupColor);
+  const setActiveColor = useStore((s) => s.setMarkupColor);
+  const strokeWidth = useStore((s) => s.markupStrokeWidth);
+  const setStrokeWidth = useStore((s) => s.setMarkupStrokeWidth);
   // BUG-A6-020 fix: inline confirmation replaces window.confirm
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 

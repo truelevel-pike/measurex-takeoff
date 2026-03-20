@@ -154,6 +154,14 @@ export interface Store extends ProjectState {
   clearMarkups: (pageNumber?: number) => void;
   toggleShowMarkups: () => void;
 
+  // BUG-A7-5-024 fix: markup tool state in store so canvas drawing layer can read it
+  activeMarkupTool: Markup['type'];
+  markupColor: string;
+  markupStrokeWidth: number;
+  setActiveMarkupTool: (tool: Markup['type']) => void;
+  setMarkupColor: (color: string) => void;
+  setMarkupStrokeWidth: (width: number) => void;
+
   // Calibration (Draw Line mode)
   calibrationMode: boolean;
   calibrationPoints: Point[];
@@ -921,6 +929,14 @@ export const useStore = create<Store>()(
     });
   },
   toggleShowMarkups: () => set((s) => ({ showMarkups: !s.showMarkups })),
+
+  // BUG-A7-5-024 fix: markup tool state in store
+  activeMarkupTool: 'text' as Markup['type'],
+  markupColor: '#ef4444',
+  markupStrokeWidth: 3,
+  setActiveMarkupTool: (tool) => set({ activeMarkupTool: tool }),
+  setMarkupColor: (color) => set({ markupColor: color }),
+  setMarkupStrokeWidth: (width) => set({ markupStrokeWidth: width }),
 
   // ─── Calibration ───
   calibrationMode: false,

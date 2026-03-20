@@ -13,6 +13,7 @@ import { emitPluginEvent } from '@/lib/plugin-system';
 import { z } from 'zod';
 import type { AIDetectedElement } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const PointSchema = z.object({
   x: z.number().finite(),
@@ -121,6 +122,10 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // BUG-A5-6-096: add rate limiting
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
