@@ -41,8 +41,8 @@ export async function POST(request: Request) {
   };
 
   loggedErrors.push(report);
-  if (loggedErrors.length > MAX_LOGGED_ERRORS) {
-    loggedErrors.splice(0, loggedErrors.length - MAX_LOGGED_ERRORS);
+  if (loggedErrors.length > MAX_ERRORS) {
+    loggedErrors.splice(0, loggedErrors.length - MAX_ERRORS);
   }
 
   console.error("[mx:error-report]", JSON.stringify(report));
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   if (!adminSecret || request.headers.get('x-admin-secret') !== adminSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  return NextResponse.json({ errors: loggedErrors.slice(-MAX_LOGGED_ERRORS) });
+  return NextResponse.json({ errors: loggedErrors.slice(-MAX_ERRORS) });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
