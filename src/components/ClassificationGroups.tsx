@@ -43,23 +43,29 @@ export default function ClassificationGroups() {
   const [addingBreakdownGroupId, setAddingBreakdownGroupId] = useState<string | null>(null);
   const [newBreakdownName, setNewBreakdownName] = useState('');
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  // BUG-A6-020 fix: inline confirmation replaces window.confirm
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  // BUG-A6-019 fix: store contextMenu in a ref so the persistent listener can read it
+  const contextMenuStateRef = useRef(contextMenu);
+  contextMenuStateRef.current = contextMenu;
 
   const ppu = scale?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
 
   // Close context menu on outside click
+  // BUG-A6-019 fix: persistent listener (empty deps) avoids add/remove churn
   useEffect(() => {
-    if (!contextMenu) return;
     function handleClick(e: MouseEvent) {
+      if (!contextMenuStateRef.current) return;
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenu(null);
       }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [contextMenu]);
+  }, []);
 
   // All classification IDs that belong to some group
   const groupedClassificationIds = useMemo(() => {
@@ -147,12 +153,15 @@ export default function ClassificationGroups() {
     setRenamingGroupId(null);
   }
 
+  // BUG-A6-020 fix: inline confirmation replaces window.confirm
   function handleDeleteGroup(groupId: string) {
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return;
-    const ok = window.confirm(`Delete group "${group.name}"? Classifications will become ungrouped.`);
-    if (ok) deleteGroup(groupId);
+    setConfirmDeleteGroupId(groupId);
     setContextMenu(null);
+  }
+
+  function confirmDeleteGroup(groupId: string) {
+    deleteGroup(groupId);
+    setConfirmDeleteGroupId(null);
   }
 
   // BUG-A6-009 fix: handleMoveGroup now calls reorderGroups to actually persist the swap.
@@ -527,6 +536,20 @@ export default function ClassificationGroups() {
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {/* BUG-A6-020: Inline delete confirmation */}
+      {confirmDeleteGroupId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onClick={() => setConfirmDeleteGroupId(null)}>
+          <div className="bg-[#12121a] border border-red-500/40 rounded-lg p-4 text-[12px] min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-red-400 mb-2">Delete group &ldquo;{groups.find((g) => g.id === confirmDeleteGroupId)?.name}&rdquo;?</div>
+            <div className="text-[11px] text-[#8892a0] mb-3">Classifications will become ungrouped.</div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setConfirmDeleteGroupId(null)} className="text-[#8892a0] hover:text-white text-[11px] px-2 py-1">Cancel</button>
+              <button type="button" onClick={() => confirmDeleteGroup(confirmDeleteGroupId)} className="text-red-400 hover:text-red-300 font-semibold text-[11px] px-2 py-1">Delete</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

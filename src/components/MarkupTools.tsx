@@ -55,11 +55,16 @@ export default function MarkupTools({ onClose }: MarkupToolsProps) {
   const [activeTool, setActiveTool] = useState<MarkupToolType>('text');
   const [activeColor, setActiveColor] = useState('#ef4444');
   const [strokeWidth, setStrokeWidth] = useState(3);
+  // BUG-A6-020 fix: inline confirmation replaces window.confirm
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   function handleClearAll() {
-    if (window.confirm('Clear all markups on every page?')) {
-      clearMarkups();
-    }
+    setShowClearConfirm(true);
+  }
+
+  function confirmClear() {
+    clearMarkups();
+    setShowClearConfirm(false);
   }
 
   return (
@@ -147,14 +152,22 @@ export default function MarkupTools({ onClose }: MarkupToolsProps) {
           {showMarkups ? <Eye size={13} /> : <EyeOff size={13} />}
           {showMarkups ? 'Hide' : 'Show'} Annotations
         </button>
-        <button
-          type="button"
-          onClick={handleClearAll}
-          className="flex items-center justify-center gap-1.5 text-[11px] py-1.5 px-3 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
-        >
-          <Trash2 size={13} />
-          Clear All
-        </button>
+        {showClearConfirm ? (
+          <span className="flex items-center gap-2 text-[11px]">
+            <span className="text-red-400">Clear all?</span>
+            <button type="button" onClick={confirmClear} className="text-red-400 hover:text-red-300 font-semibold" aria-label="Confirm clear all markups">Yes</button>
+            <button type="button" onClick={() => setShowClearConfirm(false)} className="text-gray-400 hover:text-white" aria-label="Cancel clear all markups">Cancel</button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="flex items-center justify-center gap-1.5 text-[11px] py-1.5 px-3 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            <Trash2 size={13} />
+            Clear All
+          </button>
+        )}
       </div>
     </div>
   );

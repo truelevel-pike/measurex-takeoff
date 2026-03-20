@@ -87,6 +87,8 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formulaMap, setFormulaMap] = useState<Record<string, string>>({});
+  // BUG-A6-020 fix: inline confirmation replaces window.confirm
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const costDebounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // BUG-A6-004 fix: clear all pending debounce timers on unmount so that
@@ -317,7 +319,6 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm('Delete this assembly?')) return;
     if (projectId) {
       try {
         const res = await fetch(`/api/projects/${projectId}/assemblies/${id}`, { method: 'DELETE' });
@@ -382,8 +383,9 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
             if (!data) return;
             const serverId = data?.assembly?.id;
             if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
+              // BUG-A6-021 fix: use reactive `assemblies` instead of getState() in callback
               setAssemblies(
-                useStore.getState().assemblies.map((a) =>
+                assemblies.map((a) =>
                   a.id === assembly.id ? { ...a, id: serverId } : a,
                 ),
               );
@@ -513,17 +515,25 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
                   <Pencil size={13} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(assembly.id);
-                  }}
-                  className="hidden group-hover:inline-flex text-red-400 hover:text-red-500"
-                  aria-label="Delete assembly"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {confirmDeleteId === assembly.id ? (
+                  <span className="inline-flex items-center gap-1 text-[10px]" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-red-400">Delete?</span>
+                    <button type="button" onClick={() => { handleDelete(assembly.id); setConfirmDeleteId(null); }} className="text-red-400 hover:text-red-300 font-semibold" aria-label="Confirm delete assembly">Yes</button>
+                    <button type="button" onClick={() => setConfirmDeleteId(null)} className="text-[#8892a0] hover:text-white" aria-label="Cancel delete assembly">No</button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(assembly.id);
+                    }}
+                    className="hidden group-hover:inline-flex text-red-400 hover:text-red-500"
+                    aria-label="Delete assembly"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
 
               {isExpanded && (
