@@ -57,32 +57,52 @@ export default function CropOverlay({ onCropComplete, onCancel }: CropOverlayPro
     [toBaseCoords],
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDragging) return;
-      setCurrentPoint(toBaseCoords(e));
-    },
-    [isDragging, toBaseCoords],
-  );
+  // BUG-A7-2-012: Attach mousemove/mouseup to window during drag so the user
+  // cannot escape the crop selection by dragging outside the overlay div bounds.
+  const startPointRef = useRef(startPoint);
+  useEffect(() => { startPointRef.current = startPoint; }, [startPoint]);
 
-  const handleMouseUp = useCallback(() => {
-    if (!isDragging || !startPoint || !currentPoint) return;
-    setIsDragging(false);
+  useEffect(() => {
+    if (!isDragging) return;
 
-    const x = Math.min(startPoint.x, currentPoint.x);
-    const y = Math.min(startPoint.y, currentPoint.y);
-    const width = Math.abs(currentPoint.x - startPoint.x);
-    const height = Math.abs(currentPoint.y - startPoint.y);
+    const onMove = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCurrentPoint({
+        x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+        y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+      });
+    };
 
-    // Require minimum size (at least 10px in base space)
-    if (width < 10 || height < 10) {
-      setStartPoint(null);
-      setCurrentPoint(null);
-      return;
-    }
+    const onUp = (e: MouseEvent) => {
+      const sp = startPointRef.current;
+      setIsDragging(false);
+      if (!sp) return;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cp = {
+        x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+        y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+      };
+      const x = Math.min(sp.x, cp.x);
+      const y = Math.min(sp.y, cp.y);
+      const width = Math.abs(cp.x - sp.x);
+      const height = Math.abs(cp.y - sp.y);
+      if (width < 10 || height < 10) {
+        setStartPoint(null);
+        setCurrentPoint(null);
+        return;
+      }
+      onCropComplete({ x, y, width, height });
+    };
 
-    onCropComplete({ x, y, width, height });
-  }, [isDragging, startPoint, currentPoint, onCropComplete]);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging, baseDims, onCropComplete]);
 
   // Compute the rect for rendering
   const cropRect =
@@ -100,8 +120,6 @@ export default function CropOverlay({ onCropComplete, onCancel }: CropOverlayPro
       ref={containerRef}
       tabIndex={0}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
       style={{
         position: 'absolute',
         inset: 0,
