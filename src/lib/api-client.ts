@@ -38,7 +38,8 @@ function validateId(id: string, label = 'id'): string {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  // BUG-A5-6-135: Send same-origin credentials so session cookies are included.
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
   if (!res.ok) {
     let message = `API error: ${res.status} ${res.statusText}`;
     try {
@@ -53,7 +54,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
-  const res = await fetch(url, options);
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
