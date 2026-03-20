@@ -26,7 +26,13 @@ function apiSync(url: string, options: RequestInit): void {
   fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
-  }).catch((err) => console.error(`[store] API sync failed: ${options.method} ${url}`, err));
+  }).catch((err) => {
+    // BUG-A5-5-042: notify user when apiSync fails
+    console.error(`[store] API sync failed: ${options.method} ${url}`, err);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mx:sync-error', { detail: { method: options.method, url, error: String(err) } }));
+    }
+  });
 }
 
 // History snapshot — includes all user-editable data so undo/redo is complete

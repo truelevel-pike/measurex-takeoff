@@ -13,6 +13,8 @@ export const PointSchema = z.object({ x: z.number(), y: z.number() });
 export const PolygonSchema = z.object({
   id: z.string().uuid().optional(),
   classificationId: z.string().uuid(),
+  // BUG-A5-5-041: min(2) here because linear/count types need only 2 points;
+  // sanitize.ts validatePoints() enforces min(3) for closed area polygons at the boundary layer
   points: z.array(PointSchema).min(2, 'Must have at least 2 points'),
   pageNumber: z.number().int().positive().optional(),
   label: z.string().optional(),

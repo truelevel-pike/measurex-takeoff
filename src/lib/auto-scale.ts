@@ -155,20 +155,21 @@ function collectRatios(text: string, candidates: Candidate[]): void {
       const pixelsPerFoot = PDF_DPI / (denominator / 12);
       addCandidate(candidates, pixelsPerFoot, label, confidence, match.index ?? 0);
     } else {
-      // Metric: 1:denominator means 1 unit on paper = denominator units real
-      // pixelsPerUnit(m) = PDF_DPI(pixels/inch) / denominator * 1000mm/m / 25.4mm/inch
+      // BUG-A5-5-039: use addCandidate-style guard for metric candidates
       const pixelsPerMeter = (PDF_DPI / denominator) * (1000 / 25.4);
-      candidates.push({
-        scale: {
-          pixelsPerUnit: pixelsPerMeter,
-          unit: 'm',
-          label,
-          source: 'auto',
+      if (Number.isFinite(pixelsPerMeter) && pixelsPerMeter > 0) {
+        candidates.push({
+          scale: {
+            pixelsPerUnit: pixelsPerMeter,
+            unit: 'm',
+            label,
+            source: 'auto',
+            confidence,
+          },
           confidence,
-        },
-        confidence,
-        matchIndex: match.index ?? 0,
-      });
+          matchIndex: match.index ?? 0,
+        });
+      }
     }
   }
 }

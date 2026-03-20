@@ -66,6 +66,10 @@ export function distance(a: Point, b: Point): number {
 
 // Merge polygons using turf v7 union(FeatureCollection)
 export function mergePolygons(poly1: Point[], poly2: Point[]): Point[] {
+  // BUG-A5-5-040: validate polygon lengths before calling turf
+  if (!poly1 || poly1.length < 3 || !poly2 || poly2.length < 3) {
+    return [...(poly1 || []), ...(poly2 || [])];
+  }
   try {
     const ring1: [number, number][] = poly1.map(p => [p.x, p.y]);
     const ring2: [number, number][] = poly2.map(p => [p.x, p.y]);
