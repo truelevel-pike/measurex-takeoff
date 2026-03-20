@@ -1,10 +1,20 @@
 import { NextRequest } from 'next/server';
 import { projectClients, projectEventBuffer, projectViewers, broadcastToProject } from '@/lib/sse-broadcast';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
+  // BUG-A5-6-065: add rate limiting to SSE endpoint
+  const limited = rateLimitResponse(request);
+  if (limited) return limited;
+
   const projectId = request.nextUrl.searchParams.get('projectId');
   if (!projectId) {
     return new Response('Missing projectId query param', { status: 400 });
+  }
+
+  // BUG-A5-6-065: validate projectId as UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    return new Response('Invalid projectId format', { status: 400 });
   }
   const headerLastEventId = request.headers.get('last-event-id');
   const queryLastEventId = request.nextUrl.searchParams.get('lastEventId');
