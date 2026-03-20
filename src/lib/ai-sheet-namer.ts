@@ -50,6 +50,8 @@ export async function aiSheetNamer(imageBase64: string): Promise<string | null> 
       }),
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) return null;
 
     const data = await response.json();
