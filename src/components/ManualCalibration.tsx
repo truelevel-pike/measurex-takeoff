@@ -129,8 +129,23 @@ export default function ManualCalibration({
       const pin = parseFloat(paperIn) || 0;
       const rft = parseFloat(realFt) || 0;
       const rin = parseFloat(realIn) || 0;
-      const paperTotal = pft * 12 + pin;
-      const realTotal = rft + rin / 12;
+      const paperTotal = pft * 12 + pin; // paper inches
+      const realTotal = rft + rin / 12;  // real feet
+      // BUG-A7-2-018: compute scale and persist it — previously only the label
+      // string was passed to onSave without actually calibrating the store.
+      // 72 DPI: 1 paper inch = 72 base pixels → pixelsPerFoot = (72 * paperTotal) / realTotal
+      const pixelsPerFoot = (72 * paperTotal) / realTotal;
+      const cal = {
+        pixelsPerUnit: pixelsPerFoot,
+        unit: 'ft' as const,
+        label: `${paperTotal}" = ${realTotal.toFixed(1)}'`,
+        source: 'manual' as const,
+      };
+      setScale(cal);
+      if (currentPage >= 1) {
+        setScaleForPage(currentPage, cal);
+      }
+      clearCalibrationPoints();
       onSave(`${paperTotal}" = ${realTotal.toFixed(1)}'`);
     }
   };
