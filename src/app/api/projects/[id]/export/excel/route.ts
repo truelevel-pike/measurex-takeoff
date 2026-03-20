@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
 import { getPolygons, getClassifications, getScale, getProject, getAssemblies, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
@@ -8,6 +9,15 @@ import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-e
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
 import type { UnitCostMap } from '@/types/estimates';
+
+const UnitCostSchema = z.object({
+  classificationId: z.string(),
+  classificationName: z.string(),
+  unit: z.enum(['SF', 'LF', 'EA', 'CY', 'SY', 'TON', 'GAL', 'HR', 'LS']),
+  costPerUnit: z.number().finite().nonnegative(),
+});
+
+const UnitCostMapSchema = z.record(z.string(), UnitCostSchema);
 
 type ClassificationType = Classification['type'];
 
@@ -190,7 +200,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     let unitCosts: UnitCostMap = {};
     if (unitCostsParam) {
       try {
-        unitCosts = JSON.parse(Buffer.from(unitCostsParam, 'base64').toString('utf-8')) as UnitCostMap;
+        const parsed: unknown = JSON.parse(Buffer.from(unitCostsParam, 'base64').toString('utf-8'));
+        const validated = UnitCostMapSchema.safeParse(parsed);
+        if (validated.success) {
+          unitCosts = validated.data;
+        }
+        // Invalid schema — fall through to empty costs
       } catch {
         // Invalid base64/JSON — use empty costs
       }

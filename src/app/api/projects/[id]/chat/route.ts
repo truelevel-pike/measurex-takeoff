@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getScale, getAssemblies } from '@/server/project-store';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
-import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { ProjectIdSchema, ChatBodySchema, validationError } from '@/lib/api-schemas';
+import { validateBody } from '@/lib/api/validate';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
@@ -21,20 +22,22 @@ export async function POST(
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
-    const body = await req.json().catch(() => null);
-    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    // BUG-A5-6-083: use ChatBodySchema to validate request body
+    const raw = await req.json().catch(() => null);
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const validated = validateBody(ChatBodySchema, raw);
+    if ('error' in validated) return validated.error;
+    const body = validated.data;
 
-    const message: string | undefined = body.message;
-    const messages: Array<{ role: string; content: string }> | undefined = body.messages;
-    const currentPage: number | undefined = typeof body.currentPage === 'number' ? body.currentPage : undefined;
+    const currentPage: number | undefined = body.context?.currentPage;
 
     // Normalise to messages array
+    // BUG-A5-6-082: ChatBodySchema already restricts role to 'user' | 'assistant'
     let history: Array<{ role: string; content: string }> = [];
-    if (Array.isArray(messages) && messages.length > 0) {
-      // BUG-A5-6-082: filter history to only allow user/assistant roles (block system injection)
-      history = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
-    } else if (typeof message === 'string' && message.trim()) {
-      history = [{ role: 'user', content: message.trim() }];
+    if (body.messages && body.messages.length > 0) {
+      history = body.messages;
+    } else if (body.message) {
+      history = [{ role: 'user', content: body.message.trim() }];
     } else {
       return NextResponse.json({ error: 'message or messages is required' }, { status: 400 });
     }
