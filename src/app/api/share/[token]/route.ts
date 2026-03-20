@@ -36,7 +36,7 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(
     }
 
     // BUG-A5-5-002: check expiry if the field exists
-    const expiresAt = (project as Record<string, unknown>).expiresAt;
+    const expiresAt = (project as unknown as Record<string, unknown>).expiresAt;
     if (expiresAt && new Date(expiresAt as string) < new Date()) {
       return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
     }
