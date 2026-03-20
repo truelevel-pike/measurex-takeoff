@@ -254,7 +254,7 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="relative flex flex-col w-[680px] max-h-[80vh] rounded-xl shadow-2xl overflow-hidden"
+      <div role="dialog" aria-modal="true" aria-label="Pattern Search" className="relative flex flex-col w-[680px] max-h-[80vh] rounded-xl shadow-2xl overflow-hidden"
            style={{ background: '#1a1a2e', border: '1px solid #2d2d4e' }}>
 
         {/* Header */}
@@ -419,7 +419,11 @@ export default function PatternSearch({ onClose, onAddToTakeoff, pdfPageImageDat
               {results.map((match) => (
                 <div
                   key={match.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleSelect(match.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(match.id); } }}
+                  aria-pressed={selected.has(match.id)}
                   className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                   style={{
                     background: selected.has(match.id) ? 'rgba(59,130,246,0.15)' : '#0f0f1e',

@@ -68,11 +68,33 @@ export default function LeftToolbar() {
     smartTriggerRef.current?.focus();
   }, []);
 
-  // Escape handler for Smart Tools panel
+  // Escape + focus-trap handler for Smart Tools panel
   const handleSmartPanelKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
         closeSmartTools();
+        return;
+      }
+      if (e.key === 'Tab' && smartPanelRef.current) {
+        const focusable = Array.from(
+          smartPanelRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute('disabled'));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     },
     [closeSmartTools]

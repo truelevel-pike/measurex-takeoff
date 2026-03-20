@@ -85,6 +85,9 @@ function ToastItem({ toast, index, onRemove }: { toast: Toast; index: number; on
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       style={{ position: 'absolute', right: 0, bottom: 16 + index * 72, transition: 'bottom 0.3s ease, opacity 0.3s ease' }}
       className={`pointer-events-auto flex items-center gap-3 bg-zinc-800 border border-zinc-700 border-l-4 ${borderColorMap[toast.type]} rounded-lg px-4 py-3 shadow-lg min-w-[280px] max-w-[400px] ${visible ? 'opacity-100' : 'opacity-0'}`}
     >

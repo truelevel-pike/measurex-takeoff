@@ -67,7 +67,7 @@ export default function TakeoffProgressModal({
     : '';
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+    <div role="dialog" aria-modal="true" aria-label="Takeoff Progress" className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
 
       {/* Central content */}
@@ -280,7 +280,7 @@ function TakeoffSummaryOverlay({
   const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center"
+    <div role="dialog" aria-modal="true" aria-label="Takeoff Summary" className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
       <div
         className={`flex flex-col items-center max-w-md w-full px-8 py-10 rounded-2xl transition-all duration-500 ${

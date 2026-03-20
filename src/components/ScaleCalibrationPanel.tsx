@@ -59,7 +59,7 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.65)' }}>
-      <div className="relative flex flex-col gap-4 rounded-xl p-6 w-full max-w-md shadow-2xl" style={{ background: '#13141a', border: '1px solid rgba(0,212,255,0.25)' }}>
+      <div role="dialog" aria-modal="true" aria-label="Scale Calibration" className="relative flex flex-col gap-4 rounded-xl p-6 w-full max-w-md shadow-2xl" style={{ background: '#13141a', border: '1px solid rgba(0,212,255,0.25)' }}>
         <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-white" aria-label="Close">
           <X size={18} />
         </button>

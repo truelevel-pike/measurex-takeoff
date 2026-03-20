@@ -48,6 +48,9 @@ export default function WhatsNewModal({ onClose }: { onClose: () => void }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="What's New"
         style={{
           background: '#0a0a0f',
           border: '1px solid rgba(0,212,255,0.25)',

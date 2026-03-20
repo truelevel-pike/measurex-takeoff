@@ -252,6 +252,9 @@ export default function CustomFormulas({ classification, onSave, onClose }: Cust
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Custom Formula"
         className="bg-[#1e1e2e] border border-white/10 rounded-xl shadow-2xl w-full max-w-lg mx-4"
         onClick={(e) => e.stopPropagation()}
       >
