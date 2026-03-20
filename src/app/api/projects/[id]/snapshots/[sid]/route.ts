@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProject, initDataDir, getSnapshot, deleteSnapshot, restoreSnapshot } from '@/server/project-store';
 import { SnapshotIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
+import { NotFoundError } from '@/lib/errors';
 
 type Params = { params: Promise<{ id: string; sid: string }> };
 
@@ -50,9 +51,11 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error('[POST /snapshots/:sid]', err);
+    if (err instanceof NotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: 404 });
+    }
     const msg = err instanceof Error ? err.message : 'Internal error';
-    const status = msg === 'Snapshot not found' ? 404 : 500;
-    return NextResponse.json({ error: msg }, { status });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 

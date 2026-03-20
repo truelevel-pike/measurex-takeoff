@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getAllFlags, setServerFlag, FLAG_NAMES, type FlagName } from '@/lib/feature-flags';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const rlResponse = rateLimitResponse(req);
+  if (rlResponse) return rlResponse;
+
   return NextResponse.json(getAllFlags());
 }
 

@@ -11,6 +11,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 import { assertSafeId } from '@/lib/safe-id';
+import { NotFoundError } from '@/lib/errors';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -1402,7 +1403,7 @@ export async function restoreSnapshot(projectId: string, snapshotId: string): Pr
   classificationCount: number;
 }> {
   const snapshot = await getSnapshot(projectId, snapshotId);
-  if (!snapshot) throw new Error('Snapshot not found');
+  if (!snapshot) throw new NotFoundError('Snapshot not found');
 
   if (isSupabaseMode()) {
     const sb = getClient();
