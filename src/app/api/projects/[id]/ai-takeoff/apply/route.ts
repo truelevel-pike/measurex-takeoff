@@ -10,8 +10,22 @@ import {
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
+import { z } from 'zod';
 import type { AIDetectedElement } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+
+const PointSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+});
+
+const ElementSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(['area', 'linear', 'count']),
+  points: z.array(PointSchema).min(1),
+  color: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
 
 /**
  * Synonym groups used to canonicalise AI-returned classification names.
@@ -113,8 +127,23 @@ export async function POST(
     const elements: AIDetectedElement[] = body?.elements;
     const page: number = body?.page ?? 1;
 
-    if (!Array.isArray(elements) || elements.length === 0) {
+    if (!Array.isArray(elements)) {
       return NextResponse.json({ error: 'elements[] is required' }, { status: 400 });
+    }
+
+    // Validate each element against schema, skipping malformed ones
+    const validElements: AIDetectedElement[] = [];
+    for (const el of elements) {
+      const result = ElementSchema.safeParse(el);
+      if (result.success) {
+        validElements.push(el as AIDetectedElement);
+      } else {
+        console.warn('[ai-apply] skipping malformed element:', result.error.issues);
+      }
+    }
+
+    if (validElements.length === 0) {
+      return NextResponse.json({ error: 'No valid elements provided' }, { status: 400 });
     }
 
     const project = await getProject(id);
@@ -135,7 +164,7 @@ export async function POST(
     let createdPolygons = 0;
     let skipped = 0;
 
-    for (const element of elements) {
+    for (const element of validElements) {
       // Find or create classification.
       // Use canonical synonym lookup so "Space" and "Room" resolve to the same entry.
       const elementCanonical = canonicalName(element.name);
@@ -201,7 +230,7 @@ export async function POST(
       classificationCount: createdClassifications,
       skipped,
     });
-    await emitPluginEvent('onTakeoffCompleted', elements, id);
+    await emitPluginEvent('onTakeoffCompleted', validElements, id);
 
     return NextResponse.json({
       created: { classifications: createdClassifications, polygons: createdPolygons },
