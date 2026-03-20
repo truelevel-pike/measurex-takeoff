@@ -93,6 +93,7 @@ export const PUT = withCache({ noStore: true }, async function PUT(req: Request,
       metaPatch.totalPages = state.totalPages;
     }
     const updated = await updateProject(id, metaPatch);
+    if (!updated) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ project: updated });
   } catch (err: unknown) {
     console.error("[project route]", err);
@@ -111,6 +112,7 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
     if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
     if (typeof body.name === 'string') patch.name = body.name;
     const updated = await updateProject(id, patch);
+    if (!updated) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ project: updated });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
