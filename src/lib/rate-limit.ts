@@ -7,6 +7,10 @@ const DEFAULT_MAX = 10;
 const DEFAULT_WINDOW_MS = 60_000; // 60 seconds
 
 // IP -> list of request timestamps (ms)
+// BUG-A5-6-189: This in-memory Map resets on cold starts in serverless environments
+// (e.g. Vercel Functions, AWS Lambda). For production-grade rate limiting, consider
+// using a shared store like Redis or Upstash. This is acceptable for single-instance
+// deployments and as a best-effort guard in serverless.
 const hits: Map<string, number[]> = new Map();
 
 // REG-002 fix (BUG-A5-3-406): Prune stale IP entries every 5 minutes to prevent unbounded memory growth.
