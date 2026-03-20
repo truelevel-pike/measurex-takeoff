@@ -124,6 +124,19 @@ function GroundPlane({ textureUrl, pageDimensions }: GroundPlaneProps) {
     return makeGridFallbackTexture();
   }, [textureUrl]);
 
+  // Dispose GPU textures when they change or on unmount
+  useEffect(() => {
+    return () => {
+      pdfTexture?.dispose();
+    };
+  }, [pdfTexture]);
+
+  useEffect(() => {
+    return () => {
+      fallbackTexture?.dispose();
+    };
+  }, [fallbackTexture]);
+
   const activeTexture = pdfTexture ?? fallbackTexture;
   const hasPdf = Boolean(pdfTexture);
 
