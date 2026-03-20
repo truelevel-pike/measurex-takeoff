@@ -382,12 +382,7 @@ function PageInner() {
   const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
   const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
   const [aiPageStatuses, setAiPageStatuses] = useState<PageStatus[]>([]);
-  const [aiModel, setAiModel] = useState<string>(() => { // persisted via localStorage: "measurex_ai_model"
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("measurex_ai_model") ?? "gpt-5.4";
-    }
-    return "gpt-5.4";
-  });
+  const [aiModel, setAiModel] = useState<string>("gpt-5.4"); // persisted via localStorage: "measurex_ai_model"
   const [takeoffSummary, setTakeoffSummary] = useState<TakeoffSummary | null>(null);
   const aiCancelRef = useRef(false);
 
@@ -666,6 +661,12 @@ function PageInner() {
       }
     }
   }, [setCurrentPage, setSheetName]);
+
+  // Hydrate aiModel from localStorage on mount (useEffect avoids Next.js SSR hydration mismatch)
+  useEffect(() => {
+    const saved = localStorage.getItem("measurex_ai_model");
+    if (saved) setAiModel(saved);
+  }, []);
 
   // Load project by URL param or localStorage on mount
   useEffect(() => {
