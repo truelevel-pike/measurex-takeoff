@@ -384,7 +384,10 @@ export async function POST(req: Request) {
 
     // If model is provided and not an openai model, route through OpenRouter
     const useOpenRouter = model && !model.startsWith("openai/") && !model.startsWith("gpt-");
-    const resolvedModel = model ?? "gpt-4o";
+    // BUG-A5-6-126: Strip "openai/" prefix before passing to OpenAI — the prefix is a
+    // routing hint, not part of the actual model name.
+    const rawModel = model ?? "gpt-4o";
+    const resolvedModel = rawModel.startsWith("openai/") ? rawModel.slice("openai/".length) : rawModel;
     const resolvedApiKey = useOpenRouter ? (process.env.OPENROUTER_API_KEY ?? "") : apiKey;
     const resolvedUrl = useOpenRouter ? OPENROUTER_URL : OPENAI_URL;
 
