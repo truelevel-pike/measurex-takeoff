@@ -64,6 +64,19 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
 
   const selectedSet = sets.find((s) => s.id === selectedSetId);
 
+  // BUG-A7-5-001 fix: fetch existing drawing sets from API on mount
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/drawing-sets`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.sets && Array.isArray(data.sets) && data.sets.length > 0) {
+          setSets(data.sets);
+          setSelectedSetId(data.sets[0].id);
+        }
+      })
+      .catch(() => {}); // non-fatal — keep local default
+  }, [projectId]);
+
   useEffect(() => {
     if (editingSetId && editInputRef.current) {
       editInputRef.current.focus();

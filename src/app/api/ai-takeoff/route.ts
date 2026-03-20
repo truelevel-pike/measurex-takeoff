@@ -371,14 +371,14 @@ export async function POST(req: Request) {
     const resolvedPageWidth = pageWidth ?? 1000;
     const resolvedPageHeight = pageHeight ?? 1000;
 
-    // Support user-supplied API key via X-OpenAI-Api-Key header (from Settings UI)
-    const userSuppliedKey = req.headers.get('x-openai-api-key');
-    const effectiveOpenAIKey = userSuppliedKey || getOpenAIKey();
-    if (!effectiveOpenAIKey) {
+    // BUG-A5-6-124: Only use server-configured OPENAI_API_KEY — ignore user-supplied keys
+    // to prevent credential theft / proxy abuse.
+    const serverKey = getOpenAIKey();
+    if (!serverKey) {
       const guard = checkOpenAIKey();
       if (guard) return guard;
     }
-    const apiKey = effectiveOpenAIKey!;
+    const apiKey = serverKey!;
 
     const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 

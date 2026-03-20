@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
 import { withCache } from '@/lib/with-cache';
+import { rateLimitResponse } from '@/lib/rate-limit';
+
+// BUG-A5-6-102,103: extend schema to validate id and formula fields instead of reading raw body
+const ClassificationCreateBodySchema = ClassificationCreateSchema.extend({
+  id: z.string().uuid().optional(),
+  formula: z.string().optional(),
+  formulaUnit: z.string().optional(),
+  formulaSavedToLibrary: z.boolean().optional(),
+});
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
