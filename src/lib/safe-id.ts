@@ -9,6 +9,9 @@
 /** Only allow UUIDs and simple alphanumeric-dash-underscore identifiers. */
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
 
+/** BUG-A5-6-178: Maximum allowed ID length to prevent abuse via excessively long strings. */
+const MAX_ID_LENGTH = 128;
+
 /**
  * Validate that an id is safe for use in filesystem paths.
  * Rejects path separators, "..", and any non-alphanumeric/dash/underscore characters.

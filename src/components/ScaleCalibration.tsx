@@ -152,8 +152,12 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   );
 
   const handleSelectScale = useCallback(
-    async (label: string) => {
+    (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
+      if (ppu === null) {
+        addToast(`Unrecognized scale format: ${label}`, 'warning', 3000);
+        return;
+      }
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
       let unit: 'ft' | 'in' | 'm' | 'cm' | 'mm' = 'ft';
       if (ratioMatch) {
@@ -174,7 +178,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       }
       persistScale(cal);
       localStorage.setItem('mx-onboarding-scale-set', 'true');
-      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+      // BUG-A7-5-044 fix: use static import instead of dynamic import()
       if (getNotificationPrefs().scaleChanged) {
         addToast(`Scale set to ${label}`, 'success', 3000);
       }

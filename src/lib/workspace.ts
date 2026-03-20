@@ -17,7 +17,9 @@ export function getWorkspaces(): Workspace[] {
   if (typeof window === 'undefined') return [DEFAULT_WORKSPACE];
   try {
     const raw = localStorage.getItem(WORKSPACES_KEY);
-    const parsed: Workspace[] = raw ? JSON.parse(raw) : [];
+    if (!raw) return [DEFAULT_WORKSPACE];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [DEFAULT_WORKSPACE];
     return parsed.length > 0 ? parsed : [DEFAULT_WORKSPACE];
   } catch {
     return [DEFAULT_WORKSPACE];
