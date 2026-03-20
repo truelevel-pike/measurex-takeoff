@@ -3,9 +3,12 @@ import { updateAssembly, deleteAssembly, initDataDir } from '@/server/project-st
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { AssemblyIdSchema, AssemblyPutSchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
@@ -26,6 +29,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
@@ -44,8 +49,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);

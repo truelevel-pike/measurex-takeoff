@@ -31,7 +31,8 @@ export async function POST(
     // Normalise to messages array
     let history: Array<{ role: string; content: string }> = [];
     if (Array.isArray(messages) && messages.length > 0) {
-      history = messages;
+      // BUG-A5-6-082: filter history to only allow user/assistant roles (block system injection)
+      history = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
     } else if (typeof message === 'string' && message.trim()) {
       history = [{ role: 'user', content: message.trim() }];
     } else {
