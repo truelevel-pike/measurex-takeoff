@@ -37,28 +37,44 @@ function validateId(id: string, label = 'id'): string {
   return id;
 }
 
+// BUG-A5-6-136: Default request timeout (30 seconds).
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  // BUG-A5-6-135: Send same-origin credentials so session cookies are included.
-  const res = await fetch(url, { credentials: 'same-origin', ...options });
-  if (!res.ok) {
-    let message = `API error: ${res.status} ${res.statusText}`;
-    try {
-      const body = await res.json();
-      if (body?.error) message = body.error;
-    } catch {
-      // ignore parse errors
+  // BUG-A5-6-136: Abort requests that exceed the timeout to avoid hanging indefinitely.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  try {
+    // BUG-A5-6-135: Send same-origin credentials so session cookies are included.
+    const res = await fetch(url, { credentials: 'same-origin', signal: controller.signal, ...options });
+    if (!res.ok) {
+      let message = `API error: ${res.status} ${res.statusText}`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(message);
     }
-    throw new Error(message);
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
-  const res = await fetch(url, { credentials: 'same-origin', ...options });
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { credentials: 'same-origin', signal: controller.signal, ...options });
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} ${res.statusText}`);
+    }
+    return res.blob();
+  } finally {
+    clearTimeout(timer);
   }
-  return res.blob();
 }
 
 // ─── Projects ───
