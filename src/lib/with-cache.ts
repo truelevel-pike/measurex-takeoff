@@ -19,6 +19,12 @@ export function withCache<C = any>(
 ): (req: Request, ctx: C) => Promise<Response> {
   return async (req: Request, ctx: C) => {
     const res = await handler(req, ctx);
+
+    // Only apply cache headers to successful responses (2xx)
+    if (res.status < 200 || res.status >= 300) {
+      return res;
+    }
+
     const parts: string[] = [];
 
     if (options.noStore) {
