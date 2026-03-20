@@ -28,6 +28,11 @@ export function registerWebhook(
   url: string,
   events: string[],
 ): WebhookRegistration {
+  // BUG-A5-6-139: validate URL at registration time to block private/internal targets
+  if (isPrivateUrl(url)) {
+    throw new Error('Webhook URL must not target private/internal networks');
+  }
+
   const webhook: WebhookRegistration = {
     id: randomUUID(),
     projectId,
