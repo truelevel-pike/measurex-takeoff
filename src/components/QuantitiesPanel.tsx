@@ -223,6 +223,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const addClassification = useStore((s) => s.addClassification);
   const updateClassification = useStore((s) => s.updateClassification);
   const deleteClassification = useStore((s) => s.deleteClassification);
+  const deletePolygon = useStore((s) => s.deletePolygon);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
   const toggleClassification = useStore((s) => s.toggleClassification);
   const mergeClassifications = useStore((s) => s.mergeClassifications);
@@ -1021,6 +1022,18 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     deleteGroup(groupId);
   }, [deleteGroup]);
 
+  const handleClearAllPolygons = useCallback(() => {
+    if (polygons.length === 0) return;
+    const confirmed = window.confirm(
+      `Delete all ${polygons.length} polygon${polygons.length === 1 ? '' : 's'}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    const polygonIds = polygons.map((polygon) => polygon.id);
+    polygonIds.forEach((polygonId) => {
+      deletePolygon(polygonId);
+    });
+  }, [polygons, deletePolygon]);
+
   const handleToggleGroupClassification = useCallback((classificationId: string) => {
     setGroupSelectedClassificationIds((prev) => {
       const next = new Set(prev);
@@ -1255,6 +1268,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               <Printer size={14} aria-hidden="true" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleClearAllPolygons}
+            disabled={polygons.length === 0}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-red-500/40 text-[10px] font-mono tracking-wide text-red-300 hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Clear all polygons"
+            title="Clear all polygons"
+          >
+            <Trash2 size={10} aria-hidden="true" />
+            Clear All
+          </button>
           <button
             type="button"
             onClick={handleToggleHistory}
