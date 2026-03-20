@@ -94,9 +94,21 @@ const TUTORIALS = [
 ];
 
 const VIDEOS = [
-  { title: 'Full Walkthrough', duration: '12:34' },
-  { title: 'Advanced Calibration', duration: '8:15' },
-  { title: 'Team Collaboration', duration: '6:42' },
+  {
+    title: 'Full Walkthrough',
+    duration: '12:34',
+    description: 'Upload drawings, run AI takeoff, and export your first estimate end to end.',
+  },
+  {
+    title: 'Advanced Calibration',
+    duration: '8:15',
+    description: 'Set precise scale on any drawing using known dimensions for accurate measurements.',
+  },
+  {
+    title: 'Team Collaboration',
+    duration: '6:42',
+    description: 'Invite teammates, assign edit or view permissions, and review takeoffs together.',
+  },
 ];
 
 const FAQ_ITEMS = [
@@ -286,7 +298,7 @@ export default function LearnPage() {
           </div>
         </section>
 
-        {/* Video Placeholders */}
+        {/* Video Guides */}
         <section>
           <h2 className="text-lg font-semibold mb-6">Video Guides</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -302,6 +314,7 @@ export default function LearnPage() {
                 </div>
                 <div className="p-4">
                   <h3 className="text-sm font-medium text-white">{vid.title}</h3>
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{vid.description}</p>
                 </div>
               </div>
             ))}
