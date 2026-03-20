@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { initDataDir, listProjects } from '@/server/project-store';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const projects = await listProjects();
