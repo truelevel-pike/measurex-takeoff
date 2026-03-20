@@ -215,20 +215,26 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
   };
 
   const moveDrawing = (drawingId: string, targetSetId: string) => {
-    let movedDrawing: Drawing | null = null;
-    setSets((prev) =>
-      prev.map((s) => {
+    setSets((prev) => {
+      // Two-pass: first find the drawing and remove it from its source set.
+      let movedDrawing: Drawing | null = null;
+      const afterRemove = prev.map((s) => {
         const found = s.drawings.find((d) => d.id === drawingId);
         if (found) {
           movedDrawing = { ...found, setId: targetSetId };
           return { ...s, drawings: s.drawings.filter((d) => d.id !== drawingId) };
         }
-        if (s.id === targetSetId && movedDrawing) {
-          return { ...s, drawings: [...s.drawings, movedDrawing] };
+        return s;
+      });
+      if (!movedDrawing) return prev; // drawing not found — no-op
+      // Second pass: insert into the target set.
+      return afterRemove.map((s) => {
+        if (s.id === targetSetId) {
+          return { ...s, drawings: [...s.drawings, movedDrawing!] };
         }
         return s;
-      })
-    );
+      });
+    });
     setDrawingMenuId(null);
     setMoveSubmenuDrawingId(null);
   };
