@@ -109,6 +109,17 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   } | null>(null);
   const [dragPoints, setDragPoints] = useState<Point[] | null>(null);
   const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
+
+  // Refs to keep drag handlers current without re-registering on every polygon/scale
+  // change (prevents dropped mousemove events during fast drags — BUG-A7-008).
+  const allPolygonsRef = useRef(allPolygons);
+  useEffect(() => { allPolygonsRef.current = allPolygons; }, [allPolygons]);
+  const classificationsRef = useRef(classifications);
+  useEffect(() => { classificationsRef.current = classifications; }, [classifications]);
+  const scaleRef = useRef(scale);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  const currentPageRef = useRef(currentPage);
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
   const [showBatchClassificationPicker, setShowBatchClassificationPicker] = useState(false);
   const [showFloatingReclassify, setShowFloatingReclassify] = useState(false);
   const [hoveredPoly, setHoveredPoly] = useState<{ id: string; clientX: number; clientY: number } | null>(null);
@@ -160,11 +171,15 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     const handleMove = (e: MouseEvent) => {
       e.preventDefault();
       const pt = toSvgCoords(e);
-      // Snap dragged vertex to nearby vertices on other polygons
+      // Snap dragged vertex to nearby vertices on other polygons.
+      // Read from refs so this handler never needs to be re-registered when
+      // allPolygons/scale/currentPage change mid-drag (avoids dropped events — BUG-A7-008).
       const rect = wrapperRef.current?.getBoundingClientRect();
       const screenToBase = rect ? baseDims.width / rect.width : 1;
       const snapThreshold = 10 * screenToBase;
-      const otherPolygons = allPolygons.filter((p) => p.pageNumber === currentPage && p.id !== dragging.polygonId);
+      const otherPolygons = allPolygonsRef.current.filter(
+        (p) => p.pageNumber === currentPageRef.current && p.id !== dragging.polygonId
+      );
       const snap = snapToNearestVertex(pt, otherPolygons, snapThreshold);
       const snappedPt = snap ? { x: snap.x, y: snap.y } : pt;
       setSnapIndicator(snap);
@@ -181,10 +196,11 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       setSnapIndicator(null);
       setDragPoints((prev) => {
         if (prev) {
-          const polygon = allPolygons.find((p) => p.id === dragging.polygonId);
-          const cls = polygon ? classifications.find((c) => c.id === polygon.classificationId) : null;
+          // Read from refs to get the freshest polygon/scale data without re-registering
+          const polygon = allPolygonsRef.current.find((p) => p.id === dragging.polygonId);
+          const cls = polygon ? classificationsRef.current.find((c) => c.id === polygon.classificationId) : null;
           const isLinear = cls?.type === 'linear';
-          const ppu = scale?.pixelsPerUnit || 1;
+          const ppu = scaleRef.current?.pixelsPerUnit || 1;
           const area = calculatePolygonArea(prev);
           const linearFeet = isLinear ? calculateLinearFeet(prev, ppu, false) : 0;
           updatePolygon(dragging.polygonId, { points: prev, area, linearFeet });
@@ -200,7 +216,10 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, toSvgCoords, updatePolygon, allPolygons, classifications, scale, currentPage, baseDims]);
+    // Only re-register handlers when dragging starts/stops or coordinate-space changes.
+    // allPolygons/classifications/scale/currentPage are accessed via stable refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging, toSvgCoords, updatePolygon, baseDims]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
