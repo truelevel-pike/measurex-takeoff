@@ -277,4 +277,56 @@ REVOKE SELECT ON mx_classification_library FROM anon;
 If migrations are re-applied out of order (e.g., dev environment fresh setup, or if 013 runs after 023 due to a deployment script bug), the GRANT in 013 will silently re-open anonymous read access that 023 intended to close. There is no guard in 023 to detect this regression.
 - Fix: Remove `grant select on public.mx_classification_library to anon;` from `013_classification_library.sql` entirely, since 023 explicitly revokes it. The correct intent is for the REVOKE in 023 to be the authoritative state.
 
-**NEW
+**BUG-A8-6-040: `supabase/migrations/009_complete_schema.sql:188–216` [LOW] RLS policies in 009 use `USING (true)` — superseded by 022, but ordering risk remains**
+Migration 009 creates permissive "Allow all" policies with `USING (true)` on all tables as part of its "initial setup" block. Migration 022 drops and replaces them. If 009 is ever re-run (e.g., partial rollback scenario), the permissive policies come back. The 022 migration is not re-run automatically after a partial 009 re-run.
+- Fix: Remove the "Allow all" policy creation from 009 entirely, or replace with commented-out stubs and a note that 022 provides the real policies.
+
+✅ CLEAN migrations (idempotent, tracked, correct):
+- `000_bootstrap.sql` — RCE fix confirmed ✅
+- `001_mx_tables.sql` through `008_performance_indexes.sql` — all idempotent ✅
+- `010_share_tokens.sql` — idempotent, tracked ✅
+- `011_add_formula_columns.sql` — idempotent ✅
+- `014_drawing_set_fix.sql` through `020_mx_scales_add_cm_unit.sql` — idempotent ✅
+- `021_add_owner_id_to_projects.sql` — owner_id fix, idempotent ✅
+- `022_rls_owner_scoped.sql` — RLS fix confirmed (with BUG-A8-6-036 caveat) ✅
+- `023_security_hardening.sql` — hardening fixes confirmed ✅
+
+---
+
+## New Bugs Found in Cycle 6 (Not Previously Flagged)
+
+| ID | File | Severity | Description |
+|----|------|----------|-------------|
+| BUG-A8-6-028 | `public/sw.js` | MEDIUM | General `/api/` catch-all caches ALL API GET responses 24h including auth-sensitive endpoints |
+| BUG-A8-6-039 | `supabase/migrations/013_classification_library.sql` | MEDIUM | `grant select to anon` conflicts with 023's REVOKE — re-open risk if migrations run out of order |
+| BUG-A8-6-040 | `supabase/migrations/009_complete_schema.sql` | LOW | `USING (true)` policies in 009 can reappear if 009 is re-run without re-running 022 |
+| BUG-A8-6-015 | `src/app/settings/page.tsx` | LOW | `Bell` icon decorative placeholder with no accessible label or action |
+| BUG-A8-6-017 | `src/app/share/[token]/page.tsx` | LOW | Token not encoded in initial fetch URL (inconsistency with export handler) |
+
+---
+
+## Summary
+
+| Severity | Count | Notes |
+|----------|-------|-------|
+| CRITICAL | 0 | All prior CRITICAL issues confirmed fixed |
+| HIGH | 2 | OpenAI API key in localStorage (×2 entry points: settings page + page.tsx) |
+| MEDIUM | 11 | CSP unsafe-inline, SW cache TTLs x3, migration tracking issues, UUID validation, anon grant regression risk |
+| LOW | 13 | UX, accessibility, manifest, print auto-trigger, code quality, migration stubs |
+| **Total** | **26** | 5 new bugs + 21 carry-over unresolved from Cycle 5 |
+
+### Regressions from Cycle 5
+None. All security fixes from Cycles 1–5 confirmed intact.
+
+### Top Priorities for Fix Wave
+
+1. **BUG-A8-6-001 / BUG-A8-6-011** — OpenAI API key persisted in localStorage (HIGH) — two entry points, same root cause
+2. **BUG-A8-6-022** — `unsafe-inline` in production `script-src` (MEDIUM)
+3. **BUG-A8-6-028** — SW general API cache serves all authenticated GET responses for 24h (MEDIUM, data leakage on shared devices)
+4. **BUG-A8-6-025** — SW caches `/api/projects` for 24h (MEDIUM)
+5. **BUG-A8-6-026** — PDF CacheFirst no expiry (MEDIUM)
+6. **BUG-A8-6-039** — anon GRANT in 013 conflicts with REVOKE in 023 (MEDIUM)
+7. **BUG-A8-6-033** — Migration 024 not tracked in `_migrations` (MEDIUM)
+8. **BUG-A8-6-034 / BUG-A8-6-035** — Duplicate migration prefixes 006 and 013 (MEDIUM)
+9. **BUG-A8-6-036** — Silent partial policy drop in 022 (MEDIUM)
+10. **BUG-A8-6-002** — localStorage projectId used without UUID validation (MEDIUM)
