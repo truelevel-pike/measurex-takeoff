@@ -3,7 +3,17 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { X, Download, FileSpreadsheet, FileText, Eye, Printer } from 'lucide-react';
 import { useFocusTrap } from '@/lib/use-focus-trap';
-import * as XLSX from 'xlsx';
+// BUG-A8-011: xlsx@0.18.x has known prototype pollution / ReDoS CVEs
+// (CVE-2023-30533 and related). TODO: migrate to exceljs or SheetJS Pro.
+// For now, lazy-load via dynamic import to restrict client bundle exposure.
+// The server-side API routes (api/projects/[id]/export/excel) are the
+// preferred export path; this component is a fallback for offline/quick use.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _xlsxModule: any = null;
+async function getXLSX() {
+  if (!_xlsxModule) _xlsxModule = await import('xlsx');
+  return _xlsxModule as typeof import('xlsx');
+}
 import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
@@ -322,7 +332,9 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   }, [filteredClassifications, filteredPolygons, scale, scales, groupBy1, groupBy2, groupBy3, classifications, groups]);
 
   // ── Export: Screen View (grouped/filtered, visible columns) ──
-  const handleScreenViewExport = useCallback(() => {
+  // BUG-A8-011: xlsx loaded via dynamic import (lazy) to reduce client bundle exposure
+  const handleScreenViewExport = useCallback(async () => {
+    const XLSX = await getXLSX();
     const wb = XLSX.utils.book_new();
     const headers: string[] = [];
     if (columns.name) headers.push('Name');
@@ -377,7 +389,9 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   }, [previewRows, columns, showToast]);
 
   // ── Export: Full Export (flat dump, all columns, no grouping) ──
-  const handleFullExport = useCallback(() => {
+  // BUG-A8-011: xlsx loaded via dynamic import
+  const handleFullExport = useCallback(async () => {
+    const XLSX = await getXLSX();
     const allRows = computeClassificationTotals(
       filteredClassifications,
       filteredPolygons,
