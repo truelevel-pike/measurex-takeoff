@@ -1019,46 +1019,60 @@ export const useStore = create<Store>()(
   },
 
   // BUG-A6-009 fix: reorder groups by supplying an ordered array of IDs.
-  reorderGroups: (ids) =>
-    set((s) => {
-      const map = new Map(s.groups.map((g) => [g.id, g]));
-      const reordered = ids.map((id) => map.get(id)).filter(Boolean) as typeof s.groups;
-      // Append any groups not in the ids array (safety net).
-      const idSet = new Set(ids);
-      const rest = s.groups.filter((g) => !idSet.has(g.id));
-      return { groups: [...reordered, ...rest] };
-    }),
+  // R-C5-002 fix: push undo snapshot for all group mutations
+  reorderGroups: (ids) => {
+    const s = get();
+    const before = snapshot(s);
+    const map = new Map(s.groups.map((g) => [g.id, g]));
+    const reordered = ids.map((id) => map.get(id)).filter(Boolean) as typeof s.groups;
+    const idSet = new Set(ids);
+    const rest = s.groups.filter((g) => !idSet.has(g.id));
+    set({ groups: [...reordered, ...rest], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+  },
 
-  moveClassificationToGroup: (classificationId, groupId) =>
-    set((s) => ({
+  moveClassificationToGroup: (classificationId, groupId) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       groups: s.groups.map((g) => {
-        // Remove from all groups first
         const filtered = g.classificationIds.filter((cid) => cid !== classificationId);
-        // Add to target group
         if (g.id === groupId) {
           return { ...g, classificationIds: [...filtered, classificationId] };
         }
         return { ...g, classificationIds: filtered };
       }),
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
 
-  addBreakdown: (groupId, name) =>
-    set((s) => ({
+  addBreakdown: (groupId, name) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       groups: s.groups.map((g) =>
         g.id === groupId
           ? { ...g, breakdowns: [...g.breakdowns, { id: crypto.randomUUID(), name: name.trim(), classificationIds: [] }] }
           : g
       ),
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
 
-  deleteBreakdown: (groupId, breakdownId) =>
-    set((s) => ({
+  deleteBreakdown: (groupId, breakdownId) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       groups: s.groups.map((g) =>
         g.id === groupId
           ? { ...g, breakdowns: g.breakdowns.filter((b) => b.id !== breakdownId) }
           : g
       ),
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
 
   // ─── Snapping & Grid ───
   snappingEnabled: true,

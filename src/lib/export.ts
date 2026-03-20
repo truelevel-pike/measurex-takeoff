@@ -150,6 +150,9 @@ function buildSummarySheet(
       }
     }
 
+    // BUG-A5-6-177: Unit is derived from the first polygon's page scale only.
+    // If polygons span multiple pages with different scale units, this may be inaccurate.
+    // TODO: verify unit consistency across pages or report per-page breakdowns.
     const pageScale = pickScaleForPage(clsPolygons[0].pageNumber ?? 1, scales, scale);
     const baseUnit = pageScale?.unit ?? 'px';
     const unit = cls.type === 'area' ? `sq ${baseUnit}` : cls.type === 'linear' ? baseUnit : 'ea';

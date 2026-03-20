@@ -29,7 +29,8 @@ export function createAuditEntry(
   // Persist to localStorage
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const entries: AuditEntry[] = raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    const entries: AuditEntry[] = Array.isArray(parsed) ? parsed : [];
     entries.push(entry);
     // Keep only the most recent MAX_ENTRIES
     if (entries.length > MAX_ENTRIES) {
@@ -58,7 +59,9 @@ export function createAuditEntry(
 export function getAuditLog(): AuditEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
