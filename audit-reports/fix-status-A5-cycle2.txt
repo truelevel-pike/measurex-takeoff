@@ -1,0 +1,66 @@
+DONE - All A5 cycle 2 bugs fixed
+
+Date: 2026-03-20
+Sector: A5 (API + Backend)
+Cycle: 2
+
+=== CRITICAL BUGS (3/3 fixed) ===
+
+[FIXED] BUG-A5-C1: Path traversal risk — unvalidated id param in API routes
+  → All 27 API routes already validate params as UUIDs via zod schemas (ProjectIdSchema,
+    ClassificationIdSchema, etc). Added defense-in-depth assertSafeId() guard in
+    project-store.ts and pdf-storage.ts that rejects path separators, "..", null bytes,
+    and non-alphanumeric characters before constructing filesystem paths.
+  → New file: src/lib/safe-id.ts
+
+[FIXED] BUG-A5-C2: Path traversal in PDF reads — unsanitized id in filesystem path
+  → Added assertSafeId() calls to savePDF(), loadPDF(), getPDFPath() in pdf-storage.ts
+    as a second layer of defense behind the UUID validation at the API layer.
+
+[FIXED] BUG-A5-C3: Store mutations never sync to API — data loss on reload
+  → Added fire-and-forget API sync to store mutations: addPolygon (POST), updatePolygon
+    (PUT), deletePolygon (DELETE), addClassification (POST), updateClassification (PUT),
+    deleteClassification (DELETE), setScale (POST), setScaleForPage (POST).
+  → New apiSync() helper function in store.ts for background persistence.
+
+=== HIGH BUGS (10/10 fixed) ===
+
+[FIXED] BUG-A5-H01: DrawingTool snap settings ignored
+  → Replaced hardcoded SNAP_OPTIONS constant with reactive store reads for
+    snappingEnabled, gridEnabled, gridSize. Updated useCallback dependency arrays.
+
+[FIXED] BUG-A5-H02: Linear measurements broken
+  → commitPolygon now computes linearFeet (perimeter) for area polygons too
+    (closed=true), not just linear polygons. Previously area polygons stored
+    linearFeet=0.
+
+[FIXED] BUG-A5-H03: CanvasOverlay vertex drag doesn't recompute measurements
+  → handleUp in vertex drag now computes linearFeet for both area (closed perimeter)
+    and linear (open path) polygon types, not just linear.
+
+[FIXED] BUG-A5-H04: API routes return wrong status codes
+  → POST endpoints for polygons, classifications, assemblies now return 201 (Created).
+  → Scale GET distinguishes 404 (not configured) from 500 (server error).
+
+[FIXED] BUG-A5-H05: Missing validation on API routes
+  → Replaced manual typeof/Array.isArray validation in webhooks POST route with
+    proper zod schema (WebhookCreateSchema).
+
+[FIXED] BUG-A5-H06: Store undo history excludes key data
+  → Added groups, assemblies, markups to HistorySnapshot interface, snapshot()
+    function, and undo/redo restore logic.
+
+[FIXED] BUG-A5-H07: Page navigation uses stale scale values
+  → setCurrentPage no longer falls back to the previous page's scale. Uses null
+    when no per-page scale is cached, then fetches from API asynchronously.
+
+[FIXED] BUG-A5-H08: Missing multi-scale endpoint
+  → New /api/projects/:id/scales endpoint with GET (bulk fetch) and PUT (bulk set).
+
+[FIXED] BUG-A5-H09: Missing batch operations endpoint
+  → New /api/projects/:id/batch endpoint for bulk mutations (create/delete polygons
+    and classifications in a single request).
+
+[FIXED] BUG-A5-H10: Missing estimate endpoint
+  → New /api/projects/:id/estimates endpoint with GET (quantity summary) and POST
+    (cost estimate with unit costs).
