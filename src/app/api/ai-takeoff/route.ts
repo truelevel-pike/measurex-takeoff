@@ -456,10 +456,15 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
     });
 
     if (!resp.ok) {
+      // BUG-A5-3-005: Do NOT pass upstream error body to the client — it can leak
+      // rate-limit headers, partial API key info, or internal routing details.
+      // Log the full error server-side only and return a sanitized message.
       const text = await resp.text();
+      const requestId = crypto.randomUUID();
+      console.error(`[AI Takeoff] Upstream error ${resp.status} (requestId=${requestId}):`, text);
       return NextResponse.json(
-        { error: `OpenAI/OpenRouter error ${resp.status}: ${text}` },
-        { status: 500 },
+        { error: "AI service unavailable. Please try again later.", requestId },
+        { status: 502 },
       );
     }
 
