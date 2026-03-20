@@ -453,6 +453,7 @@ export default function ProjectsPage() {
   const handlePageDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
+  // BUG-A8-5-009 fix: add handlePdfUpload to useCallback deps
   const handlePageDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     pageDragCounter.current = 0;
@@ -461,14 +462,15 @@ export default function ProjectsPage() {
     if (file && file.type === 'application/pdf') {
       handlePdfUpload(file);
     }
-  }, []);
+  }, [handlePdfUpload]);
 
   /** Auto-generate project name from PDF filename */
   const nameFromFile = (file: File) =>
     file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
 
   /** Full PDF upload flow: create project → upload file → redirect */
-  const handlePdfUpload = async (file: File, projectName?: string) => {
+  // BUG-A8-5-009 fix: wrap in useCallback so handlePageDrop dep array is valid
+  const handlePdfUpload = useCallback(async (file: File, projectName?: string) => {
     const name = (projectName || nameFromFile(file)).trim();
     if (!name) return;
     setUploading(true);
@@ -505,7 +507,7 @@ export default function ProjectsPage() {
       await loadProjects();
       setUploading(false);
     }
-  };
+  }, [loadProjects, router]);
 
   /** Handle file selection in the create modal */
   const handleFileSelect = (file: File | null) => {

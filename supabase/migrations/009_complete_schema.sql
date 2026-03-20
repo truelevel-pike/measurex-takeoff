@@ -1,6 +1,12 @@
 -- 009_complete_schema.sql
 -- Production-readiness: RLS policies, missing triggers, schema hardening
 -- E38 — 2026-03-18
+--
+-- BUG-A8-5-034 note: this migration creates mx_projects WITHOUT the owner_id column
+-- that is required by the RLS policies in 022_rls_owner_scoped.sql.
+-- DEPENDENCY ORDER: 021_add_owner_id_to_projects.sql MUST run after this migration.
+-- Running 009 in isolation on a fresh database will produce a schema that is
+-- missing owner_id — the app will fail until 021 has also been applied.
 
 -- ============================================================
 -- 1. Ensure all tables exist (idempotent — will not drop existing)

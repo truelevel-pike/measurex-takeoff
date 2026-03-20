@@ -113,8 +113,20 @@ function PrintViewInner() {
       if (settled) return;
       settled = true;
       // BUG-A8-005 null guard: ensure we have classifications before computing quantityRows
-      const classifications = Array.isArray(storeState.classifications) ? storeState.classifications as Classification[] : [];
-      const allPolygons = Array.isArray(storeState.polygons) ? storeState.polygons as Polygon[] : [];
+      // BUG-A8-5-016 fix: validate minimum required fields on each polygon/classification
+      // before setState to avoid downstream errors on malformed BroadcastChannel data.
+      const rawClassifications = Array.isArray(storeState.classifications) ? storeState.classifications : [];
+      const classifications = (rawClassifications as unknown[]).filter((c): c is Classification =>
+        typeof c === 'object' && c !== null &&
+        typeof (c as Record<string, unknown>).id === 'string' &&
+        typeof (c as Record<string, unknown>).type === 'string'
+      );
+      const rawPolygons = Array.isArray(storeState.polygons) ? storeState.polygons : [];
+      const allPolygons = (rawPolygons as unknown[]).filter((p): p is Polygon =>
+        typeof p === 'object' && p !== null &&
+        Array.isArray((p as Record<string, unknown>).points) &&
+        typeof (p as Record<string, unknown>).classificationId === 'string'
+      );
       setState({
         projectName,
         currentPage: pageNum,
@@ -211,11 +223,26 @@ function PrintViewInner() {
   }, [projectId, pageNum, state]);
 
   // Auto-print when PDF is loaded
+  // BUG-A8-5-018 fix: check visibilityState before calling window.print() —
+  // some browsers suppress the print dialog when the tab is not visible.
   const hasPrinted = useRef(false);
   useEffect(() => {
     if (pdfLoaded && !hasPrinted.current) {
       hasPrinted.current = true;
-      setTimeout(() => window.print(), 500);
+      setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          window.print();
+        } else {
+          // Wait for tab to become visible before triggering print
+          const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+              document.removeEventListener('visibilitychange', onVisible);
+              window.print();
+            }
+          };
+          document.addEventListener('visibilitychange', onVisible);
+        }
+      }, 500);
     }
   }, [pdfLoaded]);
 
