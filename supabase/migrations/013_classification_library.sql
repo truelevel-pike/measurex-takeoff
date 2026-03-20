@@ -24,6 +24,10 @@ create policy "org_library_update" on mx_classification_library
 create policy "org_library_delete" on mx_classification_library
   for delete using (auth.uid() = created_by);
 
+-- Grant access to Supabase roles (required for PostgREST API access)
+grant select, insert, update, delete on public.mx_classification_library to authenticated;
+grant select on public.mx_classification_library to anon;
+
 -- Seed 10 common construction classifications as org templates
 -- Using a system/null created_by for seeded org templates
 insert into mx_classification_library (name, type, color, unit_cost, is_org, created_by) values

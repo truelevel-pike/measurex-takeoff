@@ -94,7 +94,7 @@ export default function SharedViewPage() {
           classifications: proj.state.classifications,
           polygons: proj.state.polygons,
           scale: proj.state.scale as Parameters<typeof hydrateState>[0]['scale'],
-          scales: {},
+          scales: (proj.state.scales ?? {}) as Parameters<typeof hydrateState>[0]['scales'],
           currentPage: 1,
           totalPages: proj.state.totalPages,
           annotations: [],
