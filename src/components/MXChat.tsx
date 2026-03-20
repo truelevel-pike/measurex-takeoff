@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Check, Copy, MessageSquare, Send, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
@@ -120,16 +120,17 @@ function renderMessageContent(text: string): React.ReactNode {
       <table style={tableStyle}>
         <thead>
           <tr>
-            {table.headers.map((h, i) => (
-              <th key={i} style={thStyle}>{h}</th>
+            {/* BUG-A6-026 fix: use stable keys for table cells */}
+            {table.headers.map((h) => (
+              <th key={h} style={thStyle}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {table.rows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+            <tr key={`row-${ri}`} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
               {row.map((cell, ci) => (
-                <td key={ci} style={tdStyle}>{cell}</td>
+                <td key={`r${ri}-c${ci}`} style={tdStyle}>{cell}</td>
               ))}
             </tr>
           ))}
@@ -171,6 +172,8 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
   // Track the id of the assistant message currently being streamed so we only
   // render the typing cursor on that message, not on all prior assistant messages.
   const streamingIdRef = useRef<string | null>(null);
+  // BUG-A6-013 fix: track copy timer so it can be cleared on unmount
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -178,6 +181,11 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // BUG-A6-013 fix: cleanup copy timer on unmount
+  useEffect(() => {
+    return () => { clearTimeout(copyTimerRef.current); };
   }, []);
 
   // Build per-classification quantities (all pages + current page breakdown)
@@ -524,7 +532,8 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
                   onClick={() => {
                     void navigator.clipboard.writeText(msg.text);
                     setCopiedId(msg.id);
-                    setTimeout(() => setCopiedId((prev) => (prev === msg.id ? null : prev)), 2000);
+                    clearTimeout(copyTimerRef.current);
+                    copyTimerRef.current = setTimeout(() => setCopiedId((prev) => (prev === msg.id ? null : prev)), 2000);
                   }}
                   style={{
                     position: 'absolute',

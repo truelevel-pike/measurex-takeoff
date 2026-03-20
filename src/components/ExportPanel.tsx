@@ -383,7 +383,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      URL.revokeObjectURL(url);
     }
     if (getNotificationPrefs().exportReady) showToast('Screen view exported!');
   }, [previewRows, columns, showToast]);
@@ -434,14 +434,14 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      URL.revokeObjectURL(url);
     }
     if (getNotificationPrefs().exportReady) showToast('Full export completed!');
   }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
 
   // ── Export: Print / PDF ──
   const handlePrintExport = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const derivedName = params.get('name');
     const name = derivedName && derivedName.trim().length > 0 ? derivedName : 'Untitled Project';
     const printUrl = `/print?projectId=${projectId}&name=${encodeURIComponent(name)}&page=${currentPage}`;
@@ -457,7 +457,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
   // ── Export: JSON ──
   const handleJsonExport = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const derivedProjectName = params.get('name');
     const projectName = derivedProjectName && derivedProjectName.trim().length > 0
       ? derivedProjectName
@@ -495,7 +495,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
   // ── Export: IFC Stub (JSON) ──
   const handleIfcStubExport = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const projectName = params.get('name')?.trim() || 'Untitled Project';
 
     const ifcSpaces = filteredPolygons.map((poly) => {
@@ -559,7 +559,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
   // ── Export: Markdown Report ──
   const handleMarkdownExport = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const projectName = params.get('name')?.trim() || 'Untitled Project';
     const date = new Date().toLocaleDateString();
 
@@ -892,7 +892,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
                   )}
                   {previewRows.map((row, i) => (
                     <tr
-                      key={i}
+                      key={row.name ? `${row.name}-${i}` : i}
                       className={
                         row.isGroupHeader
                           ? 'bg-gray-800/80 font-semibold text-emerald-400'

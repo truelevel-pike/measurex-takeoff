@@ -251,15 +251,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [showImportFromLibrary, setShowImportFromLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(externalLoading);
+  // BUG-A6-038 fix: removed duplicated isLoading state — use externalLoading prop directly
+  // BUG-A6-023 fix: guard window.location.search for SSR safety
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     setProjectId(params.get('project') || localStorage.getItem('measurex_project_id'));
   }, []);
-  useEffect(() => {
-    setIsLoading(externalLoading);
-  }, [externalLoading]);
-  const showLoadingSkeletons = externalLoading || isLoading;
+  const showLoadingSkeletons = externalLoading;
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -1072,7 +1071,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             </p>
             <div className="overflow-y-auto flex flex-col gap-3 flex-1">
               {cleanUpSuggestions.map((suggestion, i) => (
-                <div key={i} className={`rounded-lg p-3 border ${acceptedSuggestions.has(i) ? 'border-cyan-500/40 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/30 opacity-60'}`}>
+                <div key={`sug-${i}-${suggestion.survivor?.name?.slice(0, 10) ?? i}`} className={`rounded-lg p-3 border ${acceptedSuggestions.has(i) ? 'border-cyan-500/40 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/30 opacity-60'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <div className="text-xs text-gray-400 mb-1">{suggestion.reason}</div>
@@ -1623,7 +1622,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         {showLoadingSkeletons && (
           <div className="py-2 px-1.5 space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-2 px-2 rounded border border-[#2b3240]/60 bg-[#171c24]">
+              <div key={`skeleton-${i}`} className="flex items-center justify-between py-2 px-2 rounded border border-[#2b3240]/60 bg-[#171c24]">
                 <div className="h-3 rounded quantities-skeleton-shimmer" style={{ width: `${72 - (i * 7)}%` }} />
                 <div className="w-12 h-3 rounded quantities-skeleton-shimmer" />
               </div>

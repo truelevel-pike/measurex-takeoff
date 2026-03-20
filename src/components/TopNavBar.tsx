@@ -166,7 +166,8 @@ export default function TopNavBar({
       }
       const { token } = await res.json();
 
-      const shareUrl = `${window.location.origin}/share/${token}`;
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const shareUrl = `${origin}/share/${token}`;
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
       } else {
@@ -382,7 +383,7 @@ export default function TopNavBar({
                     {Array.from({ length: Math.min(viewerCount - 1, 2) }).map((_, i) => {
                       const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff'];
                       return (
-                        <span key={i} style={{ width: 18, height: 18, borderRadius: '50%', background: colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#000', marginLeft: i > 0 ? -4 : 0, border: '1.5px solid rgba(10,10,15,0.9)' }}>
+                        <span key={`viewer-${i}`} style={{ width: 18, height: 18, borderRadius: '50%', background: colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#000', marginLeft: i > 0 ? -4 : 0, border: '1.5px solid rgba(10,10,15,0.9)' }}>
                           {String.fromCharCode(65 + i)}
                         </span>
                       );

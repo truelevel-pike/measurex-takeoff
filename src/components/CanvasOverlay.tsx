@@ -666,10 +666,11 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 )
               )}
               {/* Corner handles when selected */}
+              {/* BUG-A6-015 fix: stable keys for vertex handles */}
               {isSelected &&
                 displayPoints.map((pt: Point, i: number) => (
                   <rect
-                    key={i}
+                    key={`v-${poly.id}-${i}`}
                     x={pt.x - 4}
                     y={pt.y - 4}
                     width={8}
@@ -882,8 +883,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               boxShadow: `0 4px 16px rgba(0,0,0,0.5), 0 0 8px ${labelColor}33`,
             }}
           >
+            {/* BUG-A6-015 fix: stable keys for tooltip lines */}
             {lines.map((line, i) => (
-              <div key={i} style={i === 0 ? { color: labelColor, fontWeight: 600 } : undefined}>
+              <div key={`tl-${i}`} style={i === 0 ? { color: labelColor, fontWeight: 600 } : undefined}>
                 {line}
               </div>
             ))}
@@ -982,12 +984,16 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;
         const scaleY = svgRect.height / baseDims.height;
-        const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
-        const screenY = svgRect.top + floatingToolbarPos.centY * scaleY;
+        // BUG-A6-040 fix: use wrapper-relative coordinates with scroll offset compensation
+        const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+        const offsetLeft = wrapperRect ? svgRect.left - wrapperRect.left : 0;
+        const offsetTop = wrapperRect ? svgRect.top - wrapperRect.top : 0;
+        const screenX = offsetLeft + floatingToolbarPos.centX * scaleX;
+        const screenY = offsetTop + floatingToolbarPos.centY * scaleY;
         return (
           <div
             style={{
-              position: 'fixed',
+              position: 'absolute',
               left: screenX,
               top: screenY - 44,
               transform: 'translateX(-50%)',
@@ -1064,12 +1070,16 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;
         const scaleY = svgRect.height / baseDims.height;
-        const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
-        const screenY = svgRect.top + floatingToolbarPos.centY * scaleY;
+        // BUG-A6-040 fix: use wrapper-relative coordinates
+        const wrapperRect2 = wrapperRef.current?.getBoundingClientRect();
+        const offsetLeft2 = wrapperRect2 ? svgRect.left - wrapperRect2.left : 0;
+        const offsetTop2 = wrapperRect2 ? svgRect.top - wrapperRect2.top : 0;
+        const screenX = offsetLeft2 + floatingToolbarPos.centX * scaleX;
+        const screenY = offsetTop2 + floatingToolbarPos.centY * scaleY;
         return (
           <div
             style={{
-              position: 'fixed',
+              position: 'absolute',
               left: screenX,
               top: screenY - 48 - 8,
               transform: 'translate(-50%, -100%)',

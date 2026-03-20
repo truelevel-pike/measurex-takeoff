@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Layers, X } from 'lucide-react';
 
 import { useStore } from '@/lib/store';
@@ -24,6 +24,11 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
+  // BUG-A6-037 fix: capture onClose in a ref so the Escape handler never triggers
+  // re-registration when the parent passes a new function identity.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   // BUG-A6-002 fix: replace the render-body setState pattern (getDerivedStateFromProps
   // anti-pattern) with a useEffect that resets state when the dialog opens.
   useEffect(() => {
@@ -38,14 +43,15 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
   );
   const currentCollection = byId.get(activeTab) ?? CLASSIFICATION_PRESET_COLLECTIONS[0];
 
+  // BUG-A6-037 fix: use onCloseRef.current inside the handler to avoid dep churn
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

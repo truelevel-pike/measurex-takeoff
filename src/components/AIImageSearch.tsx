@@ -303,6 +303,7 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onS
           <button
             type="submit"
             disabled={!query.trim() || loading}
+            aria-label="Search drawings"
             style={{
               background: query.trim() && !loading ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
               border: `1px solid ${query.trim() && !loading ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
@@ -368,6 +369,7 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onS
           {hasPdf && onStartCrop && (
             <button
               type="button"
+              aria-label="Crop area for image search"
               onClick={onStartCrop}
               disabled={loading}
               style={{
@@ -492,7 +494,7 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onS
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {result.matches.map((match, i) => (
                     <div
-                      key={i}
+                      key={match.name ?? i}
                       style={{
                         padding: '12px 16px',
                         background: 'rgba(255,255,255,0.03)',
@@ -522,6 +524,7 @@ export function AIImageSearch({ onClose, hasPdf, getPageCanvas, onHighlight, onS
                         {match.boundingBoxes && match.boundingBoxes.length > 0 && (
                           <button
                             type="button"
+                            aria-label={`Highlight ${match.name} on drawing`}
                             onClick={() => handleHighlight(match.boundingBoxes!)}
                             style={{
                               marginLeft: 'auto',

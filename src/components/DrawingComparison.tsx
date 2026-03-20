@@ -76,7 +76,7 @@ function PanelPlaceholder({ label, diffRegions, showDiff }: { label: string; dif
       {showDiff &&
         diffRegions.map((region, i) => (
           <div
-            key={i}
+            key={`diff-${region.label}-${i}`}
             title={region.label}
             style={{
               position: 'absolute',
@@ -527,7 +527,7 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
                 >
                   {SAMPLE_DIFF_REGIONS.map((region, i) => (
                     <div
-                      key={i}
+                      key={`diff-${region.label}-${i}`}
                       style={{
                         position: 'absolute',
                         left: `${region.x}%`,
