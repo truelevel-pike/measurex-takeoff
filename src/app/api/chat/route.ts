@@ -131,15 +131,16 @@ export async function POST(req: Request) {
       return Response.json({ error: 'OpenAI API error' }, { status: 502 });
     }
 
+    // BUG-A5-6-047: return error if response body is null instead of empty stream
+    if (!resp.body) {
+      return Response.json({ error: 'Empty response from OpenAI' }, { status: 502 });
+    }
+
     // Stream SSE back to client
     const encoder = new TextEncoder();
+    const reader = resp.body.getReader();
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = resp.body?.getReader();
-        if (!reader) {
-          controller.close();
-          return;
-        }
         const decoder = new TextDecoder();
         let buffer = '';
 

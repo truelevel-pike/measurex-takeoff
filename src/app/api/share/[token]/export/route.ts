@@ -10,6 +10,7 @@ import {
   getPages,
 } from '@/server/project-store';
 import { validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
@@ -176,6 +177,10 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  // BUG-A5-6-057: add rate limiting to shared export endpoint
+  const limited = rateLimitResponse(_req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const paramsResult = TokenSchema.safeParse(await params);
@@ -200,11 +205,12 @@ export async function GET(
       );
     }
 
+    // BUG-A5-6-058: log errors instead of silently swallowing them
     const [classifications, polygons, scale, pages] = await Promise.all([
-      getClassifications(project.id).catch(() => [] as Classification[]),
-      getPolygons(project.id).catch(() => [] as Polygon[]),
-      getScale(project.id).catch(() => null),
-      getPages(project.id).catch(() => [] as PageInfo[]),
+      getClassifications(project.id).catch((err) => { console.error('[share export] getClassifications failed:', err); return [] as Classification[]; }),
+      getPolygons(project.id).catch((err) => { console.error('[share export] getPolygons failed:', err); return [] as Polygon[]; }),
+      getScale(project.id).catch((err) => { console.error('[share export] getScale failed:', err); return null; }),
+      getPages(project.id).catch((err) => { console.error('[share export] getPages failed:', err); return [] as PageInfo[]; }),
     ]);
 
     const ppu = scale?.pixelsPerUnit ?? null;
