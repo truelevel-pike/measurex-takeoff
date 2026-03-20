@@ -1324,5 +1324,247 @@ No Cycle 4 bugs were specifically scoped to `project-store.ts`. All functions re
 
 ---
 
-*Report finalised by Admiral 7 — 2026-03-20 (E36–E40 dispatch, final)*  
-*Grand total: 68 new bugs (1 CRITICAL, 8 HIGH, 25 MEDIUM, 34 LOW) + 2 regressions + 45 confirmed fixes across 21 files.*
+*Report first finalised by Admiral 7 — 2026-03-20 (E36–E40 dispatch)*  
+*Grand total (pre-E41 pass): 68 new bugs (1 CRITICAL, 8 HIGH, 25 MEDIUM, 34 LOW) + 2 regressions + 45 confirmed fixes across 21 files.*
+
+---
+
+## CYCLE 5 RE-AUDIT — E41 DISPATCH (2026-03-20 13:43 ET)
+
+**Scope:** Full re-read of all files named in the E26–E30 dispatch:
+`src/store/` (hooks only — no standalone store/ dir found), `src/hooks/*.ts`,
+`DrawingTool.tsx`, `CanvasOverlay.tsx`, `AnnotationTool.tsx`, `CutTool.tsx`,
+`CropOverlay.tsx`, `FloorAreaMesh.tsx`, `MarkupTools.tsx`, `ManualCalibration.tsx`,
+`AutoScalePopup.tsx`.
+
+**Method:** All files read in full. File sizes compared against prior audit notes —
+several files have grown materially: CanvasOverlay (700 → 1184 lines), ManualCalibration
+(310 → 440 lines), DrawingTool (295 → 372 lines), AutoScalePopup (120 → 178 lines).
+New code sections audited against all 12 cycle-5 checklist items.
+
+---
+
+### REGRESSION STATUS (E41)
+
+All regressions from prior passes confirmed still open:
+
+| ID | File | Status |
+|----|------|--------|
+| R-C5-001 | store.ts:507–511 | STILL OPEN — per-ID API forEach on deleteSelectedPolygons |
+| R-C5-002 | store.ts:982 area | STILL OPEN — reorderGroups/moveClassificationToGroup/addBreakdown/deleteBreakdown no undo |
+
+---
+
+### OPEN BUGS CONFIRMED IN CURRENT SOURCE (E41)
+
+The following prior bugs were verified still open (unfixed) in the current source:
+
+| Bug ID | File | Severity | Status |
+|--------|------|----------|--------|
+| BUG-A7-5-011 | DrawingTool.tsx:302 | MEDIUM | STILL OPEN — touch double-tap hardcodes `detail:1`, preventing polygon close on mobile |
+| BUG-A7-5-024 | MarkupTools.tsx:52 | HIGH | STILL OPEN — activeTool/activeColor/strokeWidth dead local state, markup drawing non-functional |
+| BUG-A7-5-025 | AnnotationTool.tsx:36–40 | MEDIUM | STILL OPEN — popup clips off right/bottom edges |
+| BUG-A7-5-026 | ManualCalibration.tsx:59–63 | MEDIUM | STILL OPEN — unmount does not call `setCalibrationMode(false)` |
+| BUG-A7-5-027 | ManualCalibration.tsx:40–41 | MEDIUM | STILL OPEN — autoSnap/snapEdges dead local state |
+| BUG-A7-5-028 | CropOverlay.tsx:44–50 | MEDIUM | STILL OPEN — `toBaseCoords` no zero-rect guard |
+| BUG-A7-5-029 | CutTool.tsx | MEDIUM | STILL OPEN — no auto-focus on mount, Escape trap |
+| BUG-A7-5-030 | CutTool.tsx:17 | LOW | STILL OPEN — `pagePolygons` not memoised |
+| BUG-A7-5-031 | CutTool.tsx | LOW | STILL OPEN — no touch event handlers |
+| BUG-A7-5-032 | AnnotationTool.tsx | LOW | STILL OPEN — no touch event handlers |
+| BUG-A7-5-033 | CropOverlay.tsx | LOW | STILL OPEN — no touch handlers |
+| BUG-A7-5-034 | FloorAreaMesh.tsx:152 | LOW | STILL OPEN — `<Line color>` calls `brighten()` inline per render |
+| BUG-A7-5-035 | AutoScalePopup.tsx:56–59 | LOW | STILL OPEN — `setRemaining` called after `onDismiss` may update unmounted component |
+| BUG-A7-5-036 | ManualCalibration.tsx:14 | LOW | STILL OPEN — DPI hardcoded to 72 |
+| BUG-A7-5-037 | AnnotationTool.tsx | LOW | STILL OPEN — Escape only works when container has focus |
+| BUG-A7-5-038 | AutoScalePopup.tsx | LOW | STILL OPEN — dontShowAgain not scoped to project |
+| BUG-A7-5-039 | CanvasOverlay.tsx:291–297 | HIGH | STILL OPEN — Delete key fires store.deletePolygon + raw fetch DELETE (double-delete) |
+| BUG-A7-5-043 | CanvasOverlay.tsx | MEDIUM | STILL OPEN — floating toolbar/reclassify depend on SVG child querySelector |
+| BUG-A7-5-046 | CanvasOverlay.tsx:625 | MEDIUM | STILL OPEN — polyline onClick cast as `unknown` |
+| BUG-A7-5-052 | CanvasOverlay.tsx | LOW | STILL OPEN — batchMenuPosition centroid uses only last-selected polygon |
+| BUG-A7-5-053 | CanvasOverlay.tsx:771 | LOW | STILL OPEN — polygon label linearReal uses active-page ppu, ignores per-page scale |
+
+---
+
+### NEW BUGS FOUND IN E41 RE-AUDIT
+
+---
+
+### BUG-A7-5-069 (MEDIUM) — AutoScalePopup.tsx: Enter key conflict — window keydown handler fires handleAccept while focused "Set Manually" button also fires handleIgnore
+**File:** `src/components/AutoScalePopup.tsx:67–78, 157–165`  
+**Description:** `useFocusTrap(true)` focuses the **first focusable element** inside the
+dialog on mount. DOM order is: `<input type="checkbox">` (dontShowAgain), then
+`<button onClick={handleIgnore}>` ("Set Manually"), then `<button onClick={handleAccept}>`
+("Accept Scale"). The focus trap correctly focuses the checkbox first.
+
+However, when the user presses Tab once to move to the "Set Manually" button and then
+presses Enter, **two handlers fire in sequence**:
+1. The focused `type="button"` fires a `click` event → `handleIgnore()` is called.
+2. The `window.addEventListener('keydown', handler)` also captures Enter → `handleAccept()` is called.
+
+Both `onDismiss` and `onAccept` are called in the same event cycle. Downstream effects:
+- `onDismiss` may trigger parent state cleanup or unmount the component.
+- `onAccept(detectedScale)` applies the auto-detected scale to the project.
+- Net result: scale IS applied (data mutation), but the parent component also receives a dismiss
+  signal, potentially creating UI state inconsistency (scale applied but UI shows "not calibrated").
+
+Similarly, if the user presses Enter while focus is on "Accept Scale" button: the button
+click fires `handleAccept()` AND the window keydown fires `handleAccept()` again — scale
+is applied twice, creating a duplicate undo entry or double-save API call.
+
+**Fix:** Remove the `window.addEventListener('keydown', ...)` handler entirely. Instead
+handle Enter/Escape via `onKeyDown` on the dialog div itself (which already has focus via
+useFocusTrap). This avoids the global capture conflict and is consistent with how
+`AnnotationTool`, `CropOverlay`, and `CutTool` handle keyboard shortcuts:
+```ts
+const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  if (e.key === 'Enter') { e.preventDefault(); handleAccept(); }
+  else if (e.key === 'Escape') { e.preventDefault(); handleIgnore(); }
+}, [handleAccept, handleIgnore]);
+// In JSX: <div ref={focusTrapRef} onKeyDown={handleKeyDown} ...>
+```
+Also suppress the window listener approach to avoid duplicate calls.
+
+---
+
+### BUG-A7-5-070 (MEDIUM) — ManualCalibration.tsx: mount effect silently skips calibration startup when stale calibrationPoints remain in store
+**File:** `src/components/ManualCalibration.tsx:52–57`  
+**Description:** The mount effect that starts calibration mode has the guard:
+```ts
+if (mode === 'draw-line' && !calibrationMode && calibrationPoints.length === 0) {
+  setCalibrationMode(true);
+}
+```
+When `ManualCalibration` is closed and reopened, `setCalibrationMode(false)` is **not** called
+on unmount (BUG-A7-5-026 — still open). This means on the next mount:
+- `calibrationMode` may be `false` (reset externally), but
+- `calibrationPoints.length` may be `> 0` (stale from previous session).
+
+In this case, the condition `calibrationPoints.length === 0` is false → `setCalibrationMode(true)`
+is never called → the calibration cursor (crosshair on canvas) is never activated → the user
+clicks the drawing but no calibration points are recorded → the component appears active but
+is silently broken.
+
+The guard was intended to prevent double-activation, but it also prevents recovery from the
+stale-state scenario introduced by BUG-A7-5-026. These two bugs compound each other.
+
+**Fix (short-term):** Fix BUG-A7-5-026 first (add `setCalibrationMode(false)` to unmount
+cleanup). Once that is fixed, stale points cannot accumulate and this guard is safe again.
+
+**Fix (defensive):** Change the guard to clear stale points on mount:
+```ts
+useEffect(() => {
+  if (mode === 'draw-line') {
+    clearCalibrationPoints();   // always start clean
+    setCalibrationMode(true);
+  }
+  return () => {
+    setCalibrationMode(false);
+    clearCalibrationPoints();
+  };
+}, []); // eslint-disable-line react-hooks/exhaustive-deps
+```
+This makes BUG-A7-5-070 and BUG-A7-5-026 both resolved in one edit.
+
+---
+
+### BUG-A7-5-071 (LOW) — CanvasOverlay.tsx: hover tooltip computes countPolys with two O(n) passes on every pointer move
+**File:** `src/components/CanvasOverlay.tsx:898–900`  
+**Description:** The hover tooltip IIFE (rendered on every pointer move that updates
+`hoveredPoly` state) computes:
+```ts
+const countPolys = polygons.filter((p) => p.classificationId === poly.classificationId);
+const idx = countPolys.findIndex((p) => p.id === poly.id) + 1;
+```
+Both are O(n) passes over `polygons` (the current-page polygon array, which may be large).
+These are called inside a JSX render expression on every `hoveredPoly` state update.
+`hoveredPoly` is updated on every `onPointerMove` event (every few milliseconds), meaning
+this pair of O(n) filters runs at pointer-event frequency (~60× per second while the user
+moves the mouse over a count polygon).
+
+With 500 count polygons on a page, each hover move triggers 1000 array iterations before
+producing output. Combined with the SVG rerender of potentially 500+ polygon elements,
+this contributes to jank on large drawings.
+
+**Fix:** Precompute a `countByClassificationId` map (already exists as
+`polygonCountByClassification`) and use it for the count. For the individual index, use a
+pre-built `Map<id, index>` memoised per `polygons` array change:
+```ts
+const polygonIndexMap = useMemo(() => {
+  const map = new Map<string, number>();
+  const clsCounts = new Map<string, number>();
+  for (const p of polygons) {
+    const c = clsCounts.get(p.classificationId) ?? 0;
+    map.set(p.id, c + 1);
+    clsCounts.set(p.classificationId, c + 1);
+  }
+  return map;
+}, [polygons]);
+```
+Replace the IIFE logic with `const idx = polygonIndexMap.get(poly.id) ?? 1;`.
+
+---
+
+### CONFIRMED FIXES IN E41 RE-AUDIT
+
+The following bugs from prior cycles were verified **fixed** in the current source:
+
+| Bug ID | File | Fixed |
+|--------|------|-------|
+| BUG-A7-5-013 | use-text-search.ts | ✅ AbortController cleans up correctly, debounce timer cleared on unmount |
+| BUG-A7-5-015 | use-feature-flag.ts | ✅ TTL-based cache expiry added (5 min); stale cache cleared on flag fetch |
+| BUG-A7-5-008 | useRealtimeSync.ts | ✅ connectedRef logic reviewed — disconnect/reconnect cycle on projectId change works correctly |
+| BUG-A7-5-009 | useViewerPresence.ts | ✅ `subscribeToActivity` unsubscribe returned and called on cleanup; viewerCount resets to 1 on unmount |
+| BUG-A7-4-054 | CanvasOverlay.tsx | ✅ Touch move/end handlers added for vertex drag (window-level) |
+| BUG-A7-4-009 | CanvasOverlay.tsx | ✅ RAF coalescing on mousemove during vertex drag; RAF cancelled in cleanup |
+| BUG-A7-4-055 | CanvasOverlay.tsx | ✅ selectedSet is a memoised `Set` for O(1) lookup |
+| BUG-A7-4-056 | CanvasOverlay.tsx | ✅ Group hover callbacks read id from `data-polygon-id`, stable references |
+| BUG-A7-4-007 | CanvasOverlay.tsx | ✅ `batchUpdatePolygons` used for reclassify (single undo snapshot) |
+
+---
+
+### UPDATED SUMMARY TABLE (Full Cycle 5 including E41)
+
+| Severity | New Bugs | Confirmed Regressions | Confirmed Fixes |
+|----------|----------|-----------------------|-----------------|
+| CRITICAL | 1        | 0                     | —               |
+| HIGH     | 8        | 0                     | 16              |
+| MEDIUM   | 13       | 1                     | 15              |
+| LOW      | 20       | 1                     | 22              |
+| **TOTAL**| **42**   | **2**                 | **53**          |
+
+*(Note: prior table showed 68 bugs; the E41 pass adds 3 new bugs — BUG-A7-5-069 through BUG-A7-5-071 — bringing the in-scope new-bug total to 71. The table above covers the files in scope for this dispatch only; see prior sections for server/project-store/ScaleCalibration/MeasurementTool etc.)*
+
+---
+
+### PRIORITISED FIX ORDER (E41 Additions)
+
+1. **BUG-A7-5-026 + BUG-A7-5-070 together** — Fix ManualCalibration unmount first; BUG-A7-5-070 is resolved as a side-effect. Single 3-line edit.
+2. **BUG-A7-5-069 (MEDIUM)** — AutoScalePopup Enter key conflict. Remove window keydown listener; use dialog-level `onKeyDown`.
+3. **BUG-A7-5-071 (LOW)** — CanvasOverlay hover tooltip O(n) — add `polygonIndexMap` memo.
+
+---
+
+## Appendix: Files Re-Audited in E41
+
+| File | Lines (current) | Prior audit lines | New bugs | Status |
+|------|-----------------|-------------------|----------|--------|
+| src/hooks/use-feature-flag.ts | 45 | 40 | 0 | BUG-A7-5-004 open, BUG-A7-5-015 fixed |
+| src/hooks/use-text-search.ts | 72 | 65 | 0 | BUG-A7-5-013/014 open |
+| src/hooks/useRealtimeSync.ts | 25 | 28 | 0 | BUG-A7-5-008 fixed |
+| src/hooks/useViewerPresence.ts | 32 | 40 | 0 | BUG-A7-5-009 fixed |
+| src/components/DrawingTool.tsx | 372 | ~295 | 0 | BUG-A7-5-011 still open; touch handlers partially added |
+| src/components/CanvasOverlay.tsx | 1184 | ~700 | 1 | BUG-A7-5-071 (NEW); prior bugs still open |
+| src/components/AnnotationTool.tsx | 134 | ~115 | 0 | BUG-A7-5-025/032/037 still open |
+| src/components/CutTool.tsx | 74 | ~65 | 0 | BUG-A7-5-029/030/031 still open |
+| src/components/CropOverlay.tsx | 190 | ~130 | 0 | BUG-A7-5-028/033 still open |
+| src/components/FloorAreaMesh.tsx | 170 | ~155 | 0 | BUG-A7-5-034 still open |
+| src/components/MarkupTools.tsx | 174 | ~160 | 0 | BUG-A7-5-024 still open |
+| src/components/ManualCalibration.tsx | 440 | ~310 | 1 | BUG-A7-5-070 (NEW); prior bugs still open |
+| src/components/AutoScalePopup.tsx | 178 | ~120 | 1 | BUG-A7-5-069 (NEW); prior bugs still open |
+
+---
+
+*E41 dispatch complete — 2026-03-20 13:43 ET*  
+*3 new bugs added (BUG-A7-5-069 MEDIUM, BUG-A7-5-070 MEDIUM, BUG-A7-5-071 LOW)*  
+*21 prior bugs re-verified open; 9 prior bugs confirmed fixed in current source.*  
+*Cumulative cycle 5 total: 71 new bugs (1 CRITICAL, 8 HIGH, 25 MEDIUM, 37 LOW) + 2 regressions.*
