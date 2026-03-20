@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 interface VisionMatch {
   name: string;
@@ -26,6 +27,10 @@ function asString(input: unknown): string {
 const SYSTEM_PROMPT = `You are analyzing a construction blueprint/plan. The user will ask you to find specific elements. Return a JSON object with: { matches: [{ name: string, count: number, description: string, boundingBoxes?: [{ x: number, y: number, width: number, height: number }] }], summary: string }. The boundingBoxes use percentage coordinates (0-100) relative to the image dimensions. Be specific about what you find.`;
 
 export async function POST(req: Request) {
+  // BUG-A5-5-034: apply rate limiting to vision search
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const body = (await req.json()) as VisionSearchBody;
     const image = asString(body?.image);

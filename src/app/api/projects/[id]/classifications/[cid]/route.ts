@@ -33,9 +33,10 @@ async function patchClassification(req: Request, params: Promise<{ id: string; c
     const { id, cid } = paramsResult.data;
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    const bodyResult = ClassificationUpdateSchema.passthrough().safeParse(body);
+    // BUG-A5-5-028: remove .passthrough() and pass bodyResult.data instead of raw body
+    const bodyResult = ClassificationUpdateSchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
-    const updated = await updateClassification(id, cid, body);
+    const updated = await updateClassification(id, cid, bodyResult.data);
     if (updated) broadcastToProject(id, 'classification:updated', updated);
     return NextResponse.json({ classification: updated });
   } catch (err: unknown) {

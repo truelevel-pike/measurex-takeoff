@@ -38,7 +38,8 @@ export async function POST(req: Request, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? 'restore';
 
-    if (action !== 'restore') {
+    // BUG-A5-5-031: validate action is a string before comparing
+    if (typeof action !== 'string' || action !== 'restore') {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
 

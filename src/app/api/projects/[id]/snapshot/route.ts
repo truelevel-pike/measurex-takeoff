@@ -30,6 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
+    // BUG-A5-5-030: add Cache-Control: no-store to prevent CDN caching
     return new Response(
       JSON.stringify({
         version: 1,
@@ -38,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       },
     );
   } catch (err: unknown) {
