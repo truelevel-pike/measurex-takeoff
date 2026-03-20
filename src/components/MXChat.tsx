@@ -168,6 +168,9 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Track the id of the assistant message currently being streamed so we only
+  // render the typing cursor on that message, not on all prior assistant messages.
+  const streamingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -235,6 +238,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
 
     // Create a placeholder for the assistant response
     const assistantId = generateId();
+    streamingIdRef.current = assistantId;
     setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', text: '', timestamp: new Date() }]);
 
     try {
@@ -331,6 +335,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
     } finally {
       setIsLoading(false);
       abortRef.current = null;
+      streamingIdRef.current = null;
     }
   }
 
@@ -509,7 +514,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
               }}
             >
               {msg.role === 'assistant' && msg.text ? renderMessageContent(msg.text) : msg.text}
-              {msg.role === 'assistant' && isLoading && msg.text && msg.id !== 'welcome' && (
+              {msg.role === 'assistant' && isLoading && msg.text && msg.id === streamingIdRef.current && (
                 <span style={{ color: '#00d4ff', opacity: 0.7, marginLeft: 2 }}>&#x258C;</span>
               )}
               {/* Copy button for assistant messages */}
