@@ -58,7 +58,7 @@ export const AssemblyCreateSchema = z.object({
   description: z.string().max(2000).optional(),
   items: z.array(z.object({
     classificationId: z.string().uuid(),
-    quantity: z.number(),
+    quantity: z.number().positive().finite(),
     unit: z.string(),
   })).optional(),
 });
