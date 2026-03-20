@@ -78,7 +78,8 @@ export async function POST(
       `  - ${q.name}: ${q.quantity.toFixed(1)} ${q.unitLabel} (${q.count} polygons)`,
     );
 
-    const totalArea = polygons.reduce((sum, p) => sum + p.area, 0) / (ppu * ppu);
+    // BUG-A5-6-084: guard against null/undefined p.area
+    const totalArea = polygons.reduce((sum, p) => sum + (p.area ?? 0), 0) / (ppu * ppu);
 
     // Build per-page element counts so AI can answer "which page has the most elements"
     const pageCountMap: Record<number, number> = {};
