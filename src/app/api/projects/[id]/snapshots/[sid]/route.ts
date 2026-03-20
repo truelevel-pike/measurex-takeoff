@@ -58,6 +58,8 @@ export async function POST(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
+    const rlResp = rateLimitResponse(_req);
+    if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = SnapshotIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);

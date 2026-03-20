@@ -39,67 +39,79 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ]);
 
     const duplicated = await createProject(`Copy of ${sourceProject.name}`);
-    const classificationIdMap = new Map<string, string>();
 
-    for (const classification of classifications) {
-      const created = await createClassification(duplicated.id, {
-        name: classification.name,
-        color: classification.color,
-        type: classification.type,
-        visible: classification.visible,
-        formula: classification.formula,
-        formulaUnit: classification.formulaUnit,
-        formulaSavedToLibrary: classification.formulaSavedToLibrary,
-      });
-      classificationIdMap.set(classification.id, created.id);
-    }
+    try {
+      const classificationIdMap = new Map<string, string>();
 
-    for (const polygon of polygons) {
-      // BUG-A5-5-009: skip orphaned polygons whose classificationId isn't in the map
-      const mappedClassificationId = classificationIdMap.get(polygon.classificationId);
-      if (!mappedClassificationId) {
-        console.warn(`[duplicate] skipping orphaned polygon ${polygon.id} — classificationId ${polygon.classificationId} not in map`);
-        continue;
+      for (const classification of classifications) {
+        const created = await createClassification(duplicated.id, {
+          name: classification.name,
+          color: classification.color,
+          type: classification.type,
+          visible: classification.visible,
+          formula: classification.formula,
+          formulaUnit: classification.formulaUnit,
+          formulaSavedToLibrary: classification.formulaSavedToLibrary,
+        });
+        classificationIdMap.set(classification.id, created.id);
       }
-      await createPolygon(duplicated.id, {
-        points: polygon.points,
-        classificationId: mappedClassificationId,
-        pageNumber: polygon.pageNumber,
-        area: polygon.area,
-        linearFeet: polygon.linearFeet,
-        isComplete: polygon.isComplete,
-        label: polygon.label,
-      });
-    }
 
-    for (const page of pages) {
-      await createPage(duplicated.id, {
-        pageNum: page.pageNum,
-        width: page.width,
-        height: page.height,
-        text: page.text,
-        name: page.name,
-        drawingSet: page.drawingSet,
-      });
-    }
+      for (const polygon of polygons) {
+        // BUG-A5-5-009: skip orphaned polygons whose classificationId isn't in the map
+        const mappedClassificationId = classificationIdMap.get(polygon.classificationId);
+        if (!mappedClassificationId) {
+          console.warn(`[duplicate] skipping orphaned polygon ${polygon.id} — classificationId ${polygon.classificationId} not in map`);
+          continue;
+        }
+        await createPolygon(duplicated.id, {
+          points: polygon.points,
+          classificationId: mappedClassificationId,
+          pageNumber: polygon.pageNumber,
+          area: polygon.area,
+          linearFeet: polygon.linearFeet,
+          isComplete: polygon.isComplete,
+          label: polygon.label,
+        });
+      }
 
-    if (scale) {
-      await setScale(duplicated.id, {
-        pixelsPerUnit: scale.pixelsPerUnit,
-        unit: scale.unit,
-        label: scale.label,
-        source: scale.source,
-        confidence: scale.confidence,
-        pageNumber: scale.pageNumber,
-      });
-    }
+      for (const page of pages) {
+        await createPage(duplicated.id, {
+          pageNum: page.pageNum,
+          width: page.width,
+          height: page.height,
+          text: page.text,
+          name: page.name,
+          drawingSet: page.drawingSet,
+        });
+      }
 
-    if (pages.length > 0) {
-      await updateProject(duplicated.id, { totalPages: pages.length });
-    }
+      if (scale) {
+        await setScale(duplicated.id, {
+          pixelsPerUnit: scale.pixelsPerUnit,
+          unit: scale.unit,
+          label: scale.label,
+          source: scale.source,
+          confidence: scale.confidence,
+          pageNumber: scale.pageNumber,
+        });
+      }
 
-    const newProject = await getProject(duplicated.id);
-    return NextResponse.json({ project: newProject ?? duplicated });
+      if (pages.length > 0) {
+        await updateProject(duplicated.id, { totalPages: pages.length });
+      }
+
+      const newProject = await getProject(duplicated.id);
+      return NextResponse.json({ project: newProject ?? duplicated });
+    } catch (dupErr: unknown) {
+      // BUG-A5-6-015: cleanup partially-created project on failure
+      console.error(`[duplicate] failed to duplicate project ${id}, cleaning up ${duplicated.id}`, dupErr);
+      try {
+        await deleteProject(duplicated.id);
+      } catch (cleanupErr) {
+        console.error(`[duplicate] cleanup of ${duplicated.id} also failed`, cleanupErr);
+      }
+      throw dupErr;
+    }
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
