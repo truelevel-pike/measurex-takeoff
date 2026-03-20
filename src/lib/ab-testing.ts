@@ -74,7 +74,8 @@ function saveAssignments(assignments: Record<string, string>): void {
 }
 
 /** Pick a variant based on weights using Math.random(). */
-function pickVariant(experiment: Experiment): string {
+function pickVariant(experiment: Experiment): string | null {
+  if (!experiment.variants.length) return null;
   const totalWeight = experiment.variants.reduce((sum, v) => sum + v.weight, 0);
   let rand = Math.random() * totalWeight;
   for (const v of experiment.variants) {
@@ -96,6 +97,7 @@ export function getVariant(experimentName: string): string | null {
   if (assignments[experimentName]) return assignments[experimentName];
 
   const variant = pickVariant(experiment);
+  if (!variant) return null;
   assignments[experimentName] = variant;
   saveAssignments(assignments);
   return variant;

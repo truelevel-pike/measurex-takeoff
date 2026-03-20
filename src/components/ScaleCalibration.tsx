@@ -16,7 +16,8 @@ const ARCH_RATIOS_FT = new Set([5, 10, 20, 24, 48, 50, 60, 96, 100, 120, 125, 15
 /**
  * Convert a preset label string into a pixelsPerUnit value at 72 DPI.
  */
-function labelToPixelsPerUnit(label: string): number {
+// BUG-A7-5-054 fix: return null for unrecognized formats instead of silent fallback
+function labelToPixelsPerUnit(label: string): number | null {
   // Ratio / Metric: "1 : 500"
   const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
   if (ratioMatch) {
@@ -35,11 +36,12 @@ function labelToPixelsPerUnit(label: string): number {
   const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
   if (archMatch) {
     const frac = parseFraction(archMatch[1].trim());
-    if (frac === null || frac <= 0) return DPI * 0.125; // fallback
+    if (frac === null || frac <= 0) return null;
     return frac * DPI;
   }
 
-  return DPI * 0.125; // fallback: 1/8" = 1'
+  // BUG-A7-5-054: return null for unrecognized format
+  return null;
 }
 
 /** Parse fraction strings like "3/64", "1 1/2", "1", "3" */
