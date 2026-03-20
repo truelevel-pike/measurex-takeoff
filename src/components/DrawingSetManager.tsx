@@ -115,6 +115,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
     setSelectedSetId(id);
     setEditingSetId(id);
     setEditingSetName('Untitled Set');
+    // BUG-A7-5-001 fix: persist new set to API
+    fetch(`/api/projects/${projectId}/drawing-sets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSet),
+    }).catch(() => {}); // optimistic — local state already updated
   };
 
   const commitRename = (setId: string) => {

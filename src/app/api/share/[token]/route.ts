@@ -80,6 +80,6 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(
     });
   } catch (err: unknown) {
     console.error('[share token GET]', err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
