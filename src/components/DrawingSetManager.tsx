@@ -55,6 +55,8 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
   const [deleteConfirmSetId, setDeleteConfirmSetId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  // BUG-A6-003 fix: track all upload interval IDs so they can be cleared on unmount.
+  const uploadIntervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
 
   const selectedSet = sets.find((s) => s.id === selectedSetId);
 
@@ -64,6 +66,13 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
       editInputRef.current.select();
     }
   }, [editingSetId]);
+
+  // BUG-A6-003 fix: clear all in-flight upload intervals on unmount.
+  useEffect(() => {
+    return () => {
+      uploadIntervalsRef.current.forEach((id) => clearInterval(id));
+    };
+  }, []);
 
   // Close menus on outside click
   useEffect(() => {
@@ -130,6 +139,8 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
           if (progress >= 100) {
             progress = 100;
             clearInterval(interval);
+            // Remove from tracked intervals ref
+            uploadIntervalsRef.current = uploadIntervalsRef.current.filter((id) => id !== interval);
 
             // Add drawing to set
             const drawing: Drawing = {
@@ -151,6 +162,8 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
           }
           setUploads((prev) => prev.map((u) => (u.id === upload.id ? { ...u, progress, done: progress >= 100 } : u)));
         }, 300);
+        // Track the interval ID so it can be cleared on unmount (BUG-A6-003).
+        uploadIntervalsRef.current.push(interval);
       });
     },
     [selectedSetId]
