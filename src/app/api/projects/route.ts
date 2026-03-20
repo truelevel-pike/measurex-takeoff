@@ -29,6 +29,8 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
     await initDataDir();
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });

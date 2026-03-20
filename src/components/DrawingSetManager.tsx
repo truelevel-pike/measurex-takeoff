@@ -138,12 +138,20 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
   };
 
   const deleteSet = (setId: string) => {
-    setSets((prev) => prev.filter((s) => s.id !== setId));
-    if (selectedSetId === setId) {
-      setSelectedSetId(sets.find((s) => s.id !== setId)?.id ?? '');
-    }
+    setSets((prev) => {
+      const remaining = prev.filter((s) => s.id !== setId);
+      // BUG-A7-5-010 fix: use functional setState to avoid stale closure on `sets`
+      if (selectedSetId === setId) {
+        setSelectedSetId(remaining[0]?.id ?? '');
+      }
+      return remaining;
+    });
     setDeleteConfirmSetId(null);
     setSetMenuId(null);
+    // BUG-A7-5-001 fix: persist delete to API
+    fetch(`/api/projects/${projectId}/drawing-sets/${setId}`, {
+      method: 'DELETE',
+    }).catch(() => {});
   };
 
   const simulateUpload = useCallback(

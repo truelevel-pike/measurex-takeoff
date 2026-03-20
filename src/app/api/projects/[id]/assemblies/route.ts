@@ -3,14 +3,16 @@ import { z } from 'zod';
 import { getAssemblies, createAssembly, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
+// BUG-A5-6-105: remove .passthrough() so only validated fields are used
 const AssemblyBodySchema = z.object({
   classificationId: z.string().uuid().optional(),
   name: z.string().min(1),
   unit: z.string().optional(),
   unitCost: z.number().optional(),
   quantityFormula: z.string().optional(),
-}).passthrough();
+});
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,6 +28,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-104: add rate limiting to POST handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
