@@ -6,9 +6,14 @@ import { extractSheetName } from '@/lib/sheet-namer';
 import { aiSheetNamer } from '@/lib/ai-sheet-namer';
 import { detectScaleFromText } from '@/lib/auto-scale';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // BUG-A5-6-091: rate-limit upload endpoint to prevent abuse
+    const limited = rateLimitResponse(req, 5, 60_000);
+    if (limited) return limited;
+
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
