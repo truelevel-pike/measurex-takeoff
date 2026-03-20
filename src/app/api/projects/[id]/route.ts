@@ -60,7 +60,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     });
   } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    // BUG-A5-6-087: return generic error message, do not leak err.message
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -106,7 +107,8 @@ export const PUT = withCache({ noStore: true }, async function PUT(req: Request,
     return NextResponse.json({ project: updated });
   } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    // BUG-A5-6-087: return generic error message, do not leak err.message
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
@@ -134,7 +136,8 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
     if (!updated) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ project: updated });
   } catch (err: unknown) {
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    // BUG-A5-6-087: return generic error message, do not leak err.message
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
@@ -153,6 +156,7 @@ export const DELETE = withCache({ noStore: true }, async function DELETE(_req: R
     return NextResponse.json({ ok });
   } catch (err: unknown) {
     console.error("[project route]", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    // BUG-A5-6-087: return generic error message, do not leak err.message
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
