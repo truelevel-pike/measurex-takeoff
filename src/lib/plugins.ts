@@ -29,8 +29,8 @@ export function triggerHook(hookName: keyof PluginHooks, data: unknown): void {
     if (fn) {
       try {
         fn(data);
-      } catch {
-        // Silently ignore plugin errors
+      } catch (err) {
+        console.warn(`[plugins] Error in plugin "${plugin.name}" hook "${hookName}":`, err);
       }
     }
   }

@@ -27,5 +27,11 @@ export function loadAiSettings(): AiSettings {
 
 export function saveAiSettings(settings: AiSettings): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  // WARNING: Never store the full API key in localStorage — only persist the
+  // last 4 characters for display purposes (e.g. "sk-...Ab1Z").
+  const redacted = { ...settings };
+  if (redacted.openaiApiKey && redacted.openaiApiKey.length > 4) {
+    redacted.openaiApiKey = `...${redacted.openaiApiKey.slice(-4)}`;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(redacted));
 }
