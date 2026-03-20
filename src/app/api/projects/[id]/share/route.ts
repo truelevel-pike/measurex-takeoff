@@ -13,6 +13,10 @@ export const GET = withCache({ noStore: true }, async function GET(
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
+    // BUG-A5-6-054: verify project exists before returning token
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
     const token = await getShareToken(id);
     return NextResponse.json({ token: token ?? null });
   } catch (err: unknown) {
