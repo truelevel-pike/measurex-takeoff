@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const MetricSchema = z.object({
   name: z.enum(['CLS', 'FCP', 'INP', 'LCP', 'TTFB']),
@@ -8,9 +9,11 @@ const MetricSchema = z.object({
   delta: z.number(),
   id: z.string(),
   timestamp: z.number().optional(),
-}).passthrough();
+}).strict();
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimitResponse(req, 30, 60_000);
+  if (limited) return limited;
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 
