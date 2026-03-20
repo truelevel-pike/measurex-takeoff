@@ -873,7 +873,11 @@ export const useStore = create<Store>()(
       assemblies: prev.assemblies,
       markups: prev.markups,
       undoStack: rest,
-      redoStack: [...s.redoStack, now],
+      // BUG-A5-6-184: cap redo stack at the same MAX_UNDO_STACK limit
+      redoStack: (() => {
+        const next = [...s.redoStack, now];
+        return next.length > MAX_UNDO_STACK ? next.slice(next.length - MAX_UNDO_STACK) : next;
+      })(),
     });
   },
   redo: () => {
