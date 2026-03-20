@@ -30,6 +30,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-101: add rate limiting to POST handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -37,18 +40,20 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     const { id } = paramsResult.data;
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    const bodyResult = ClassificationCreateSchema.safeParse(body);
+    const bodyResult = ClassificationCreateBodySchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
     const data = bodyResult.data;
     const classification = await createClassification(id, {
-      id: body.id,
+      // BUG-A5-6-102: use validated id from schema instead of raw body
+      id: data.id,
       name: data.name,
       type: data.type,
       color: data.color || '#3b82f6',
       visible: data.visible ?? true,
-      formula: body.formula,
-      formulaUnit: body.formulaUnit,
-      formulaSavedToLibrary: body.formulaSavedToLibrary,
+      // BUG-A5-6-103: use validated formula fields from schema instead of raw body
+      formula: data.formula,
+      formulaUnit: data.formulaUnit,
+      formulaSavedToLibrary: data.formulaSavedToLibrary,
     });
     broadcastToProject(id, 'classification:created', classification);
     fireWebhook(id, 'classification.created', classification);

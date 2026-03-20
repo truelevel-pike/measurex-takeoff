@@ -384,7 +384,7 @@ export async function POST(req: Request) {
 
     // If model is provided and not an openai model, route through OpenRouter
     const useOpenRouter = model && !model.startsWith("openai/") && !model.startsWith("gpt-");
-    const resolvedModel = model ?? "gpt-5.4";
+    const resolvedModel = model ?? "gpt-4o";
     const resolvedApiKey = useOpenRouter ? (process.env.OPENROUTER_API_KEY ?? "") : apiKey;
     const resolvedUrl = useOpenRouter ? OPENROUTER_URL : OPENAI_URL;
 
