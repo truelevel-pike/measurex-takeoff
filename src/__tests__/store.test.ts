@@ -28,7 +28,9 @@ describe('useStore — basic state', () => {
   it('store has currentTool set to a valid tool', () => {
     const state = useStore.getState();
     expect(state.currentTool).toBeDefined();
-    expect(['select', 'pan', 'draw', 'merge', 'split', 'cut', 'ai', 'measure', 'annotate', 'calibrate']).toContain(state.currentTool);
+    // BUG-A7-5-009 fix: 'crop' is a valid Tool and must be included so the test
+    // doesn't falsely fail if currentTool is ever initialised to 'crop'.
+    expect(['select', 'pan', 'draw', 'merge', 'split', 'cut', 'ai', 'measure', 'annotate', 'calibrate', 'crop']).toContain(state.currentTool);
   });
 
   it('store has undo/redo stacks', () => {
