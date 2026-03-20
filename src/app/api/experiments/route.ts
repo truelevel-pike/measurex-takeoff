@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAllExperiments } from '@/lib/ab-testing';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(req: Request) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
+
     const cookieHeader = req.headers.get('cookie') ?? undefined;
     const experiments = getAllExperiments(cookieHeader);
     return NextResponse.json({ experiments });
