@@ -1094,3 +1094,235 @@ has no `viewBox` attribute and no `preserveAspectRatio`. The `<line>` coordinate
 
 *Report finalised by Admiral 7 — 2026-03-20 (E31–E35 dispatch, full cycle 5 complete)*  
 *Grand total: 55 new bugs (1 CRITICAL, 6 HIGH, 20 MEDIUM, 28 LOW) + 2 regressions + 45 confirmed fixes.*
+
+---
+
+# CYCLE 5 DISPATCH E36–E40 — SERVER-SIDE STORE
+**Auditor:** Admiral 7  
+**Date:** 2026-03-20  
+**Scope:** src/server/project-store.ts (dual-mode Supabase/file persistence layer)  
+**Method:** Full file read (~1455 lines); all functions reviewed.
+
+---
+
+## Summary Table (E36–E40 Additions)
+
+| Severity | New Bugs |
+|----------|----------|
+| HIGH     | 2        |
+| MEDIUM   | 5        |
+| LOW      | 6        |
+| **TOTAL**| **13**   |
+
+---
+
+## NEW HIGH BUGS (E36–E40)
+
+### BUG-A7-5-056 (HIGH) — project-store.ts: restoreSnapshot (file mode) only writes scale-1.json — all per-page scales beyond page 1 silently lost
+**File:** src/server/project-store.ts (restoreSnapshot, file mode branch, ~line 736)  
+**Description:** In file mode, `restoreSnapshot` writes back scale data as:
+```ts
+writeJson(path.join(dir, 'scale.json'), snapshot.scales[0] ?? null),
+```
+This writes only the **first** scale from the snapshot array to `scale.json`. All other per-page scales (`scale-2.json`, `scale-3.json`, etc.) are left on disk with their current (pre-restore) values if the files already exist, or are simply absent if the project directory was fresh. For a 10-page project, restoring a snapshot silently loses 9 of 10 scale calibrations. The Supabase mode handles this correctly (deletes and re-inserts all scales). Only file mode is broken.  
+**Fix:** Replace the single `writeJson` with a loop that writes one file per page scale:
+```ts
+for (const scale of snapshot.scales) {
+  await writeJson(path.join(dir, `scale-${scale.pageNumber ?? 1}.json`), scale);
+}
+// Remove stale scale files not present in the snapshot
+const existing = (await fs.readdir(dir)).filter(f => /^scale-\d+\.json$/.test(f));
+const snapshotPageNums = new Set(snapshot.scales.map(s => s.pageNumber ?? 1));
+for (const f of existing) {
+  const pageNum = parseInt(f.replace('scale-', '').replace('.json', ''), 10);
+  if (!snapshotPageNums.has(pageNum)) await fs.unlink(path.join(dir, f));
+}
+```
+
+### BUG-A7-5-057 (HIGH) — project-store.ts: listScales (file mode) shadows the module-level `fs` import with a dynamic `import('fs/promises')`
+**File:** src/server/project-store.ts (listScales, ~line 594)  
+**Description:**
+```ts
+const fs = await import('fs/promises');
+```
+This line inside `listScales` shadows the **module-level** `import fs from 'fs/promises'` that was destructured at the top of the file. The dynamic import is unnecessary — `fs` is already available in module scope. The dynamic import:
+(a) forces an `async` re-import on every `listScales` call, adding latency,
+(b) returns the module namespace object which is typed as `typeof import('fs/promises')` — identical to the top-level import but adds noise,
+(c) masks any ESM/CJS interop issues at build time (the top-level import would catch them at module load; the dynamic import defers errors to call time).
+No other function in the file uses this pattern — all others use the top-level `fs`.  
+**Fix:** Remove the `const fs = await import('fs/promises');` line. The existing top-level `fs` import is already in scope.
+
+---
+
+## NEW MEDIUM BUGS (E36–E40)
+
+### BUG-A7-5-058 (MEDIUM) — project-store.ts: createPolygon (file mode) upserts by ID but createClassification (file mode) does not — duplicate classification IDs cause silent list corruption
+**File:** src/server/project-store.ts (createClassification, file mode, ~line 383)  
+**Description:** `createPolygon` (file mode) correctly handles the case where a polygon with the same ID already exists by finding it and replacing it in the list (lines ~553–557). However `createClassification` (file mode) at line ~383 simply calls `list.push(cls)` without checking for an existing classification with the same ID. If `createClassification` is called twice with the same ID (e.g. during a snapshot restore loop that doesn't first delete existing classifications, or during an idempotent API retry), the classification will appear twice in `classifications.json` with the same ID. Downstream reads (`getClassifications`) return both, causing duplicate entries in the UI classification list and breaking ID-uniqueness invariants throughout the system.  
+**Fix:** Add the same upsert pattern used in `createPolygon`:
+```ts
+const existingIdx = list.findIndex((c) => c.id === id);
+if (existingIdx !== -1) {
+  list[existingIdx] = cls;
+} else {
+  list.push(cls);
+}
+```
+
+### BUG-A7-5-059 (MEDIUM) — project-store.ts: getProjectByShareToken (file mode) does O(n) scan of all project directories — performance degrades linearly with project count
+**File:** src/server/project-store.ts (getProjectByShareToken, file mode, ~line 270)  
+**Description:** The share token lookup reads every project directory sequentially:
+```ts
+for (const entry of entries) {
+  const meta = await readJson<ProjectMeta & { shareToken?: string } | null>(
+    path.join(PROJECTS_DIR, entry, 'project.json'), null
+  );
+  if (meta?.shareToken === token) return meta;
+}
+```
+This is O(n) sequential disk I/O — with 1000 projects, it reads up to 1000 JSON files per request. Share link clicks are user-facing and latency-sensitive. This also creates a TOCTOU window: a project could be deleted between `fs.readdir` and `readJson`, causing a stale scan.  
+**Fix:** Maintain an index file `data/projects/share-index.json` that maps `{ [token]: projectId }`. Update it in `generateShareToken`, `revokeShareToken`, and `deleteProject`. `getProjectByShareToken` then does a single O(1) index lookup + one project read.
+
+### BUG-A7-5-060 (MEDIUM) — project-store.ts: recordHistory (file mode) trims history to 200 entries but does so after unshift — reads and writes the full array every call
+**File:** src/server/project-store.ts (recordHistory, ~line 619)  
+**Description:** Every `recordHistory` call in file mode reads the full `history.json` into memory, prepends one entry, trims to 200, and writes the entire array back to disk. With projects that have frequent mutations (AI takeoff generating 500+ polygons at once), this means 500+ full file reads and writes of a ~200-entry history file in rapid succession. This creates heavy I/O contention and can corrupt `history.json` if two concurrent writes interleave (no file locking or atomic write-rename pattern).  
+**Fix:** Use an atomic write pattern (write to a temp file then `fs.rename`). For high-throughput scenarios, batch history writes: buffer entries in memory and flush every N entries or on a debounced timer rather than writing on every mutation.
+
+### BUG-A7-5-061 (MEDIUM) — project-store.ts: createPage (Supabase mode) strips `name`/`drawing_set` on schema error but the error check uses string matching on error.message — brittle
+**File:** src/server/project-store.ts (createPage, Supabase mode, ~line 424)  
+**Description:**
+```ts
+if (error && (error.message.includes("column") || error.message.includes("schema cache"))) {
+  // fall back to core-only insert
+}
+```
+The fallback logic depends on Supabase error message strings containing `"column"` or `"schema cache"`. These are English-language strings from the Supabase library that could change across library versions, be localised, or appear in unrelated errors (e.g. a `"column name violates not-null constraint"` might also match `"column"` and trigger the fallback when it should propagate the error). The same brittle pattern recurs in `createAssembly` and `createClassification`.  
+**Fix:** Match on PostgreSQL error codes instead of message strings. Supabase surfaces the PostgreSQL error code in `error.code`. Schema-missing column errors produce code `42703` (undefined_column) or Supabase's schema-cache error has a distinct code. Use:
+```ts
+if (error && (error.code === '42703' || error.code === 'PGRST204')) { ... }
+```
+
+### BUG-A7-5-062 (MEDIUM) — project-store.ts: deleteProject (Supabase mode) does not delete snapshots — file-based snapshots accumulate indefinitely
+**File:** src/server/project-store.ts (deleteProject, Supabase mode, ~line 225)  
+**Description:** In Supabase mode, `deleteProject` deletes child rows from `mx_scales`, `mx_polygons`, `mx_classifications`, `mx_assemblies`, `mx_pages`, and `mx_history`, then deletes the `mx_projects` row. However **snapshots are always stored as local files** (even in Supabase mode — see `createSnapshot` which always uses `snapshotsDir(projectId)` regardless of mode). `deleteProject` (Supabase mode) never calls `fs.rm` on `snapshotsDir(projectId)`. Deleted projects leave behind orphaned snapshot directories consuming disk space indefinitely with no cleanup path.  
+**Fix:** At the end of `deleteProject` (both modes, not just file mode), add:
+```ts
+const snapDir = snapshotsDir(projectId);
+await fs.rm(snapDir, { recursive: true, force: true }).catch(() => {});
+```
+Also applies to file-mode `deleteProject` which uses `fs.rm(projectDir(...))` recursively — but `snapshotsDir` is a subdirectory of `projectDir`, so file mode is actually fine. Only Supabase mode is broken.
+
+---
+
+## NEW LOW BUGS (E36–E40)
+
+### BUG-A7-5-063 (LOW) — project-store.ts: writeJson uses `JSON.stringify(data, null, 2)` — pretty-printing wastes disk space for large polygon arrays
+**File:** src/server/project-store.ts (writeJson, ~line 87)  
+**Description:** All file-mode writes use `JSON.stringify(data, null, 2)` (pretty-printed with 2-space indentation). For a project with 5000 polygons, each polygon containing 20 points, pretty-printing adds roughly 30–40% file size overhead vs compact JSON. A typical large project's `polygons.json` might be 2–4 MB compact; pretty-printed it becomes 3–6 MB. This is read into memory on every `getPolygons` call. For small projects this is irrelevant. For large AI-assisted takeoffs with hundreds of detected shapes it becomes noticeable.  
+**Fix:** Use compact JSON for data files (drop the `null, 2`). Pretty-printing is appropriate for human-readable configs; binary data stores should be compact.
+
+### BUG-A7-5-064 (LOW) — project-store.ts: getProject (Supabase mode) parses `description` JSON inline with a silent `try/catch` — `totalPages` silently lost on JSON parse error
+**File:** src/server/project-store.ts (getProject, Supabase mode, ~line 120)  
+```ts
+try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch {}
+```
+A silent empty `catch {}` means any corruption in the `description` column (e.g. a partial write, manual DB edit, or future schema change) silently loses `totalPages`. The project loads with `totalPages: undefined` — the PDF viewer then treats the document as 1-page. Users with multi-page documents see only page 1 with no error or warning.  
+**Fix:** Add a `console.warn` in the catch block and consider surfacing the issue:
+```ts
+catch (e) { console.warn('[getProject] failed to parse description JSON:', e); }
+```
+The same pattern recurs in `updateProject` and `getProjectByShareToken` — fix all three.
+
+### BUG-A7-5-065 (LOW) — project-store.ts: updateAssembly (Supabase mode) unconditionally sets `updated_at` but does not update `updated_at` in file mode
+**File:** src/server/project-store.ts (updateAssembly, ~line 786)  
+**Description:** In Supabase mode, `updateAssembly` adds `updated_at: new Date().toISOString()` to the update payload. In file mode, `list[idx] = { ...list[idx], ...patch }` — no `updatedAt` is set. The `AssemblyRow` type has a `createdAt` field but no `updatedAt`. The Supabase mode silently updates a DB column (`updated_at`) that is not reflected in the TypeScript type, and the file mode has no equivalent timestamp. This inconsistency means clients cannot rely on assembly update timestamps in file mode.  
+**Fix:** Add `updatedAt: string` to `AssemblyRow`. Populate it in `createAssembly` (same as `createdAt`) and update it in `updateAssembly` (both modes).
+
+### BUG-A7-5-066 (LOW) — project-store.ts: listProjects (file mode) reads directories in arbitrary fs order — sort by updatedAt, but `updatedAt` is read from JSON, not filesystem mtime
+**File:** src/server/project-store.ts (listProjects, file mode, ~line 155)  
+**Description:** Projects are sorted by `updatedAt` field from `project.json`. However `project.json` is only updated by `updateProject` — operations like `createPolygon`, `updatePolygon`, `deletePolygon`, and `setScale` do NOT call `updateProject`, so `updatedAt` does not reflect the last actual data modification. A project that was last modified by adding a polygon will sort incorrectly relative to one that was renamed. In the UI, the "recent projects" list can show stale ordering.  
+**Fix:** Either update `project.json`'s `updatedAt` on every write operation (add a helper `touchProject(projectId)` called by all mutation functions), or use the filesystem's `mtime` of `project.json` as the sort key (which reflects all writes to that file, but not writes to `polygons.json` etc. — still imperfect). The most reliable fix is `touchProject`.
+
+### BUG-A7-5-067 (LOW) — project-store.ts: saveThumbnail writes to `thumbnail.txt` (base64 data URL) — no size cap, can exhaust disk
+**File:** src/server/project-store.ts (saveThumbnail, ~line 189)  
+**Description:** Thumbnail data URLs are written as raw strings to `thumbnail.txt`. A full-resolution base64-encoded PNG of a large architectural drawing can be hundreds of kilobytes. There is no size limit enforced. If the client passes an uncompressed or high-resolution data URL, `thumbnail.txt` can grow to 5–20 MB per project. With 100+ projects, this exhausts disk space silently. `getThumbnail` reads the entire file into memory with no streaming or size check.  
+**Fix:** Enforce a maximum thumbnail size (e.g. 500 KB) before writing:
+```ts
+if (dataUrl.length > 500_000) throw new Error('Thumbnail too large (max 500 KB)');
+```
+Alternatively, the client should resize/compress the thumbnail canvas before uploading.
+
+### BUG-A7-5-068 (LOW) — project-store.ts: deletePage (file mode) deletes polygons for the page but does NOT delete the per-page scale file (`scale-{pageNumber}.json`)
+**File:** src/server/project-store.ts (deletePage, file mode, ~line 466)  
+**Description:** When a page is deleted in file mode, `polygons.json` is filtered to remove that page's polygons. However `scale-${pageNumber}.json` (if it exists) is left on disk. On subsequent `listScales` calls, the orphaned scale file is still read and returned, causing the deleted page's scale to reappear in scale listings. This can cause the deleted page's scale to be applied when navigating to a different page that happens to have the same number (e.g. after inserting/deleting pages and renumbering).  
+**Fix:** Add scale file cleanup to `deletePage` (file mode):
+```ts
+const scaleFile = path.join(projectDir(projectId), `scale-${pageNumber}.json`);
+await fs.unlink(scaleFile).catch(() => {}); // ignore if file doesn't exist
+```
+
+---
+
+## CONFIRMED FIXES (E36–E40)
+
+No Cycle 4 bugs were specifically scoped to `project-store.ts`. All functions reviewed are new to Cycle 5 scope.
+
+---
+
+## UPDATED SUMMARY TABLE (Full Cycle 5, E1–E40)
+
+| Severity | E1–E25 | E26–E30 | E31–E35 | E36–E40 | Total New | Regressions | Fixes |
+|----------|--------|---------|---------|---------|-----------|-------------|-------|
+| CRITICAL | 1      | 0       | 0       | 0       | 1         | 0           | —     |
+| HIGH     | 3      | 1       | 2       | 2       | 8         | 0           | —     |
+| MEDIUM   | 8      | 5       | 7       | 5       | 25        | 1           | —     |
+| LOW      | 11     | 9       | 8       | 6       | 34        | 1           | —     |
+| **TOTAL**| **23** | **15**  | **17**  | **13**  | **68**    | **2**       | **45**|
+
+---
+
+## PRIORITISED FIX ORDER ADDENDUM (E36–E40)
+
+1. **BUG-A7-5-056** — restoreSnapshot (file mode) only restores page-1 scale — all other scales lost (HIGH)
+2. **BUG-A7-5-057** — listScales redundant dynamic import shadows module-level fs (HIGH, easy fix)
+3. **BUG-A7-5-062** — deleteProject (Supabase mode) leaves orphaned snapshot directories (MEDIUM)
+4. **BUG-A7-5-058** — createClassification (file mode) pushes duplicates — no upsert guard (MEDIUM)
+5. **BUG-A7-5-060** — recordHistory non-atomic file writes under concurrent load (MEDIUM)
+6. **BUG-A7-5-059** — getProjectByShareToken O(n) full-directory scan (MEDIUM)
+7. **BUG-A7-5-061** — createPage/createAssembly/createClassification schema error detection brittle string match (MEDIUM)
+8. **BUG-A7-5-068** — deletePage does not clean up scale file (LOW)
+9. **BUG-A7-5-064 / BUG-A7-5-065 / BUG-A7-5-066** — silent description parse fail, missing updatedAt in AssemblyRow, stale project sort (LOW)
+10. **BUG-A7-5-063 / BUG-A7-5-067** — pretty-printed JSON overhead, unbounded thumbnail writes (LOW)
+
+---
+
+## Appendix: Files Audited in Cycle 5 (Full, E1–E40)
+
+| File | Lines | Issues Found |
+|------|-------|-------------|
+| src/lib/store.ts | 1132 | R-C5-001, R-C5-002, BUG-A7-5-005..007, BUG-A7-5-016..018 |
+| src/hooks/use-feature-flag.ts | 40 | BUG-A7-5-004, BUG-A7-5-015 |
+| src/hooks/use-text-search.ts | 65 | BUG-A7-5-013, BUG-A7-5-014 |
+| src/hooks/useRealtimeSync.ts | 28 | BUG-A7-5-008 |
+| src/hooks/useViewerPresence.ts | 40 | BUG-A7-5-009 |
+| src/components/DrawingTool.tsx | ~295 | BUG-A7-5-011, BUG-A7-5-023 |
+| src/components/DrawingSetManager.tsx | ~400 | BUG-A7-5-001..003, BUG-A7-5-010, BUG-A7-5-019..020 |
+| src/components/DrawingComparison.tsx | ~440 | BUG-A7-5-012, BUG-A7-5-021..022 |
+| src/components/AnnotationTool.tsx | ~115 | BUG-A7-5-025, BUG-A7-5-032, BUG-A7-5-037 |
+| src/components/CutTool.tsx | ~65 | BUG-A7-5-029..031 |
+| src/components/CropOverlay.tsx | ~130 | BUG-A7-5-028, BUG-A7-5-033 |
+| src/components/FloorAreaMesh.tsx | ~155 | BUG-A7-5-034 |
+| src/components/MarkupTools.tsx | ~160 | BUG-A7-5-024 |
+| src/components/ManualCalibration.tsx | ~310 | BUG-A7-5-026..027, BUG-A7-5-036 |
+| src/components/AutoScalePopup.tsx | ~120 | BUG-A7-5-035, BUG-A7-5-038 |
+| src/components/CanvasOverlay.tsx | ~700 | BUG-A7-5-039, BUG-A7-5-043, BUG-A7-5-046, BUG-A7-5-052..053 |
+| src/components/MeasurementTool.tsx | ~130 | BUG-A7-5-040, BUG-A7-5-048..049 |
+| src/components/MergeSplitTool.tsx | ~135 | BUG-A7-5-041..042, BUG-A7-5-055 |
+| src/components/ScaleCalibration.tsx | ~220 | BUG-A7-5-044, BUG-A7-5-047, BUG-A7-5-054 |
+| src/components/RepeatingGroupTool.tsx | ~155 | BUG-A7-5-045, BUG-A7-5-050..051 |
+| src/server/project-store.ts | ~1455 | BUG-A7-5-056..068 |
+
+---
+
+*Report finalised by Admiral 7 — 2026-03-20 (E36–E40 dispatch, final)*  
+*Grand total: 68 new bugs (1 CRITICAL, 8 HIGH, 25 MEDIUM, 34 LOW) + 2 regressions + 45 confirmed fixes across 21 files.*
