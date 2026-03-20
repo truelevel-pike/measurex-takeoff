@@ -122,7 +122,13 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
     const { id } = paramsResult.data;
     const body = await req.json();
     const patch: Partial<Pick<ProjectMeta, 'name' | 'thumbnail'>> = {};
-    if (typeof body.thumbnail === 'string') patch.thumbnail = body.thumbnail;
+    // BUG-A5-6-086: reject oversized thumbnails (~375KB limit)
+    if (typeof body.thumbnail === 'string') {
+      if (body.thumbnail.length > 500_000) {
+        return NextResponse.json({ error: 'Thumbnail too large (max ~375KB)' }, { status: 400 });
+      }
+      patch.thumbnail = body.thumbnail;
+    }
     if (typeof body.name === 'string') patch.name = body.name;
     const updated = await updateProject(id, patch);
     if (!updated) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
