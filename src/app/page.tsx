@@ -78,6 +78,38 @@ const ZOOM_STEP = 0.25;
 const MAX_CLASSIFICATIONS = 20;
 
 /**
+ * Synonym groups: any word within a group is treated as equivalent to any other.
+ * Used during dedup so "Room", "Space", "Area", "Rooms", "Room/Space" all collapse
+ * to a single canonical classification (shortest/simplest name wins).
+ */
+const DEDUP_SYNONYM_GROUPS: string[][] = [
+  ['room', 'space', 'area'],
+];
+
+/**
+ * Return the synonym-group index for a normalized base word, or -1 if none.
+ */
+function synonymGroupIndex(word: string): number {
+  return DEDUP_SYNONYM_GROUPS.findIndex((g) => g.includes(word));
+}
+
+/**
+ * Given a normalized name (e.g. "room space", "rooms", "spaces"), extract the
+ * primary base words (stripping trailing 's' for plurals) and return the first
+ * synonym-group index found among them, or -1.
+ */
+function getSynonymGroup(normalizedName: string): number {
+  const words = normalizedName.split(' ').filter((w) => w.length > 1);
+  for (const w of words) {
+    // Try exact match first, then de-pluralised form
+    let idx = synonymGroupIndex(w);
+    if (idx === -1 && w.endsWith('s')) idx = synonymGroupIndex(w.slice(0, -1));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+/**
  * Merge all pairs of classifications with similar names regardless of total count.
  * Runs after every AI takeoff to prevent the panel from filling up with near-duplicate
  * entries like "Room", "Room/Space", "Rooms" that the AI generates for the same concept.
@@ -93,6 +125,9 @@ function deduplicateSimilarClassifications(
   const isSimilar = (a: string, b: string) => {
     const na = normalize(a), nb = normalize(b);
     if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+    // Synonym-group check: if both names resolve to the same synonym group they are duplicates
+    const ga = getSynonymGroup(na), gb = getSynonymGroup(nb);
+    if (ga !== -1 && ga === gb) return true;
     const wa = splitWords(a), wb = splitWords(b);
     if (!wa.length || !wb.length) return false;
     const overlap = wa.filter((w) => wb.includes(w));

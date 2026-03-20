@@ -5,12 +5,58 @@ import {
   getPolygons,
   createClassification,
   createPolygon,
+  deletePolygonsByPage,
 } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { fireWebhook } from '@/lib/webhooks';
 import { emitPluginEvent } from '@/lib/plugin-system';
 import type { AIDetectedElement } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+
+/**
+ * Synonym groups used to canonicalise AI-returned classification names.
+ * Any name whose normalised primary word falls in the same group is treated
+ * as the same classification during lookup, so "Space" finds an existing
+ * "Room" and vice-versa rather than creating a duplicate entry.
+ */
+const APPLY_SYNONYM_GROUPS: string[][] = [
+  ['room', 'space', 'area'],
+];
+
+/**
+ * Normalise a classification name to its canonical lookup key.
+ * Steps:
+ *   1. Lower-case, collapse slashes/dashes to spaces, collapse whitespace.
+ *   2. Extract words; for each word try exact synonym match then de-pluralised match.
+ *   3. If ANY word maps to a known synonym group, replace the ENTIRE normalised name
+ *      with the first (canonical) word in that group so all synonyms share one key.
+ *
+ * Examples:
+ *   "Room"      → "room"
+ *   "Rooms"     → "room"
+ *   "Space"     → "room"   (same group)
+ *   "Spaces"    → "room"
+ *   "Room/Space"→ "room"
+ *   "Bathroom"  → "bathroom"  (no synonym match → unchanged)
+ */
+function canonicalName(name: string): string {
+  const normalized = name.trim().toLowerCase().replace(/[\/\-]+/g, ' ').replace(/\s+/g, ' ');
+  const words = normalized.split(' ').filter((w) => w.length > 0);
+  for (const w of words) {
+    // Exact group match
+    for (const group of APPLY_SYNONYM_GROUPS) {
+      if (group.includes(w)) return group[0];
+    }
+    // De-pluralised match (e.g. "rooms" → "room")
+    if (w.endsWith('s')) {
+      const singular = w.slice(0, -1);
+      for (const group of APPLY_SYNONYM_GROUPS) {
+        if (group.includes(singular)) return group[0];
+      }
+    }
+  }
+  return normalized;
+}
 
 /**
  * Shoelace formula for polygon area in pixels.
@@ -84,9 +130,11 @@ export async function POST(
     let skipped = 0;
 
     for (const element of elements) {
-      // Find or create classification (case-insensitive match)
+      // Find or create classification.
+      // Use canonical synonym lookup so "Space" and "Room" resolve to the same entry.
+      const elementCanonical = canonicalName(element.name);
       let classification = classifications.find(
-        (c) => c.name.toLowerCase() === element.name.toLowerCase(),
+        (c) => canonicalName(c.name) === elementCanonical,
       );
 
       if (!classification) {
