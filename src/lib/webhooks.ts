@@ -96,14 +96,19 @@ export async function fireWebhook(
   await Promise.allSettled(
     matching
       .filter((w) => !isPrivateUrl(w.url))
-      .map((w) =>
-        fetch(w.url, {
+      .map((w) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10_000);
+        return fetch(w.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
-        }).catch(() => {
-          // Silently ignore delivery failures — fire-and-forget
-        }),
-      ),
+          signal: controller.signal,
+        })
+          .catch(() => {
+            // Silently ignore delivery failures — fire-and-forget
+          })
+          .finally(() => clearTimeout(timeoutId));
+      }),
   );
 }

@@ -55,6 +55,7 @@ export function getFlag(name: FlagName): boolean {
       ? process.env[envKey]
       : undefined;
   if (envVal === 'false') return false;
+  if (envVal === 'true') return true;
 
   // 2. Server-side override
   if (serverOverrides.has(name)) return serverOverrides.get(name)!;
@@ -64,6 +65,7 @@ export function getFlag(name: FlagName): boolean {
     try {
       const stored = localStorage.getItem(`flag:${name}`);
       if (stored === 'false') return false;
+      if (stored === 'true') return true;
     } catch {
       // localStorage unavailable
     }
