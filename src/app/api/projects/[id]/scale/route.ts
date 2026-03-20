@@ -13,9 +13,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const url = new URL(req.url);
     const pageNumber = parseInt(url.searchParams.get('pageNumber') || '1', 10) || 1;
     const scale = await getScale(id, pageNumber);
+    if (!scale) {
+      return NextResponse.json({ error: 'Scale not configured — please set scale before running takeoff' }, { status: 404 });
+    }
     return NextResponse.json({ scale });
   } catch (err: unknown) {
-    return NextResponse.json({ error: `Scale not configured — please set scale before running takeoff (${err instanceof Error ? err.message : String(err)})` }, { status: 404 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 

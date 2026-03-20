@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       quantityFormula: quantityFormula || 'area',
     });
     broadcastToProject(id, 'assembly:created', assembly);
-    return NextResponse.json({ assembly });
+    return NextResponse.json({ assembly }, { status: 201 });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

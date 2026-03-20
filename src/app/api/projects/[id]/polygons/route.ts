@@ -67,7 +67,7 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     broadcastToProject(id, 'polygon:created', polygon);
     fireWebhook(id, 'polygon.created', polygon);
     await emitPluginEvent('onPolygonCreated', polygon, id);
-    return NextResponse.json({ polygon });
+    return NextResponse.json({ polygon }, { status: 201 });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

@@ -43,7 +43,7 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     broadcastToProject(id, 'classification:created', classification);
     fireWebhook(id, 'classification.created', classification);
     await emitPluginEvent('onClassificationCreated', classification, id);
-    return NextResponse.json({ classification });
+    return NextResponse.json({ classification }, { status: 201 });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
