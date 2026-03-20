@@ -109,7 +109,10 @@ function loadStarred(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
     const raw = localStorage.getItem('mx-starred');
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed);
   } catch { return new Set(); }
 }
 function saveStarred(s: Set<string>) {
@@ -119,7 +122,10 @@ function loadFolders(): FolderItem[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem('mx-folders');
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
   } catch { return []; }
 }
 function saveFolders(f: FolderItem[]) {
@@ -130,7 +136,10 @@ function loadProjectTags(): Record<string, string[]> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem('mx-project-tags');
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    return parsed;
   } catch { return {}; }
 }
 function saveProjectTags(tags: Record<string, string[]>) {
