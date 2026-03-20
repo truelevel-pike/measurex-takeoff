@@ -32,6 +32,8 @@ export default function ContractorReportButton({
       }
 
       const html = await response.text();
+      // BUG-A6-5-015 fix: guard DOM manipulation for SSR/test environments
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
       const blob = new Blob([html], { type: 'text/html' });
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
