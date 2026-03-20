@@ -46,6 +46,16 @@ const DEFAULT_TEMPLATES: AssemblyTemplate[] = [
       { id: crypto.randomUUID(), name: 'Shingles', unitCost: 4, wasteFactor: 8, coverageRate: 0, unit: 'SF' },
     ],
   },
+  {
+    name: 'Painting & Drywall Assembly',
+    unit: 'SF',
+    quantityFormula: 'area',
+    materials: [
+      { id: crypto.randomUUID(), name: 'Drywall', unitCost: 2.5, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Tape & Mud', unitCost: 0.75, wasteFactor: 3, coverageRate: 0, unit: 'SF' },
+      { id: crypto.randomUUID(), name: 'Paint', unitCost: 1.25, wasteFactor: 5, coverageRate: 0, unit: 'SF' },
+    ],
+  },
 ];
 
 interface AssembliesPanelProps {
