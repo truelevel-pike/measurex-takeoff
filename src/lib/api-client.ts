@@ -27,6 +27,16 @@ export interface Quantities {
   }>;
 }
 
+// BUG-A5-6-134: Validate IDs as UUIDs before interpolating into URL paths
+// to prevent path injection attacks.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validateId(id: string, label = 'id'): string {
+  if (!UUID_RE.test(id)) {
+    throw new Error(`Invalid ${label}: expected UUID, got "${id}"`);
+  }
+  return id;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
   if (!res.ok) {
@@ -62,6 +72,7 @@ export async function createProject(name: string): Promise<Project> {
 }
 
 export async function getProject(id: string): Promise<Project> {
+  validateId(id, 'projectId');
   const data = await request<{ project: Project }>(`/api/projects/${id}`);
   return data.project;
 }
@@ -78,6 +89,7 @@ export async function uploadPDF(
   projectId: string,
   file: File
 ): Promise<UploadPDFResponse> {
+  validateId(projectId, 'projectId');
   const formData = new FormData();
   formData.append('file', file);
   return request<UploadPDFResponse>(
@@ -92,6 +104,7 @@ export async function createClassification(
   projectId: string,
   data: Partial<Classification>
 ): Promise<Classification> {
+  validateId(projectId, 'projectId');
   const result = await request<{ classification: Classification }>(
     `/api/projects/${projectId}/classifications`,
     {
@@ -108,6 +121,8 @@ export async function updateClassification(
   id: string,
   data: Partial<Classification>
 ): Promise<Classification> {
+  validateId(projectId, 'projectId');
+  validateId(id, 'classificationId');
   const result = await request<{ classification: Classification }>(
     `/api/projects/${projectId}/classifications/${id}`,
     {
@@ -123,6 +138,8 @@ export async function deleteClassification(
   projectId: string,
   id: string
 ): Promise<void> {
+  validateId(projectId, 'projectId');
+  validateId(id, 'classificationId');
   await request<unknown>(`/api/projects/${projectId}/classifications/${id}`, {
     method: 'DELETE',
   });
@@ -134,6 +151,7 @@ export async function createPolygon(
   projectId: string,
   data: Partial<Polygon>
 ): Promise<Polygon> {
+  validateId(projectId, 'projectId');
   const result = await request<{ polygon: Polygon }>(
     `/api/projects/${projectId}/polygons`,
     {
@@ -150,6 +168,8 @@ export async function updatePolygon(
   id: string,
   data: Partial<Polygon>
 ): Promise<Polygon> {
+  validateId(projectId, 'projectId');
+  validateId(id, 'polygonId');
   const result = await request<{ polygon: Polygon }>(
     `/api/projects/${projectId}/polygons/${id}`,
     {
@@ -165,6 +185,8 @@ export async function deletePolygon(
   projectId: string,
   id: string
 ): Promise<void> {
+  validateId(projectId, 'projectId');
+  validateId(id, 'polygonId');
   await request<unknown>(`/api/projects/${projectId}/polygons/${id}`, {
     method: 'DELETE',
   });
@@ -173,13 +195,16 @@ export async function deletePolygon(
 // ─── Quantities & Export ───
 
 export async function getQuantities(projectId: string): Promise<Quantities> {
+  validateId(projectId, 'projectId');
   return request<Quantities>(`/api/projects/${projectId}/quantities`);
 }
 
 export async function exportExcel(projectId: string): Promise<Blob> {
+  validateId(projectId, 'projectId');
   return requestBlob(`/api/projects/${projectId}/export/excel`);
 }
 
 export async function exportJSON(projectId: string): Promise<unknown> {
+  validateId(projectId, 'projectId');
   return request<unknown>(`/api/projects/${projectId}/export/json`);
 }
