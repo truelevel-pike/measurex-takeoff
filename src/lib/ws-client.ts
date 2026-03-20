@@ -267,9 +267,13 @@ export function connectToProject(projectId: string): void {
 function startFallbackPolling(projectId: string): void {
   if (pollTimer !== null) return; // already running
   pollTimer = setInterval(async () => {
-    if (!projectId) return;
+    // Use the module-level currentProjectId rather than the closure-captured
+    // projectId parameter: if startFallbackPolling is called during a project
+    // switch (e.g. onerror fires after disconnectFromProject), the parameter
+    // holds the old id but currentProjectId already reflects the new project (or null).
+    if (!currentProjectId) return;
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(currentProjectId)}`);
       if (!res.ok) return;
       const data = await res.json();
       const state = data?.project?.state;
