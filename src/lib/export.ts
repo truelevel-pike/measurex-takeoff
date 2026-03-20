@@ -1,5 +1,7 @@
-// BUG-A8-011: xlsx@0.18.x has known CVEs (CVE-2023-30533 and related).
-// TODO: migrate to exceljs. For now, tree-shake and restrict to server path.
+// BUG-A8-011 / BUG-A5-6-176: xlsx@0.18.x has known CVEs (CVE-2023-30533,
+// CVE-2024-22363, and related prototype-pollution / ReDoS vulnerabilities).
+// The package.json pins "^0.18.5" which is affected. Upgrade to xlsx >= 0.20.x
+// or migrate to exceljs to resolve. For now, tree-shake and restrict to server path.
 import * as XLSX from 'xlsx';
 import type { Classification, Polygon, ScaleCalibration } from './types';
 import { calculateLinearFeet } from './polygon-utils';

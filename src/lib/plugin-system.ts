@@ -55,7 +55,12 @@ class PluginRegistry {
       }
     }
     // Await all async handlers; swallow per-plugin errors so one plugin can't break others.
-    await Promise.allSettled(promises);
+    const results = await Promise.allSettled(promises);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error(`[plugin] async handler rejected in ${event}:`, result.reason);
+      }
+    }
   }
 
   list(): MeasureXPlugin[] {

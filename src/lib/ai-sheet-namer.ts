@@ -15,8 +15,12 @@ export async function aiSheetNamer(imageBase64: string): Promise<string | null> 
   const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
