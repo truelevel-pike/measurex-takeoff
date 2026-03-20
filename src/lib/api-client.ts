@@ -94,6 +94,12 @@ export async function getProject(id: string): Promise<Project> {
   return data.project;
 }
 
+// BUG-A8-5-013 fix: used to clean up orphaned projects on PDF upload failure
+export async function deleteProject(id: string): Promise<void> {
+  validateId(id, 'projectId');
+  await request<void>(`/api/projects/${id}`, { method: 'DELETE' });
+}
+
 // ─── PDF Upload ───
 
 export interface UploadPDFResponse {

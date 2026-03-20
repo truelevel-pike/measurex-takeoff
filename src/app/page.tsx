@@ -1188,6 +1188,8 @@ function PageInner() {
       window.history.replaceState({}, '', `/?project=${encodeURIComponent(project.id)}`);
 
       // GAP-006: Upload PDF to server and check for auto-detected scale
+      // BUG-A8-5-013 fix: clean up the newly-created project if PDF upload fails
+      // so we don't leave orphaned projects with no PDF attached.
       if (file) {
         try {
           const uploadResult = await api.uploadPDF(project.id, file);
@@ -1195,7 +1197,18 @@ function PageInner() {
             setUploadDetectedScale(uploadResult.detectedScale);
           }
         } catch (uploadErr) {
-          console.error('PDF upload failed:', uploadErr);
+          console.error('PDF upload failed — cleaning up orphaned project:', uploadErr);
+          // Best-effort cleanup: delete the project we just created
+          api.deleteProject(project.id).catch((cleanupErr) =>
+            console.error('Failed to clean up orphaned project:', cleanupErr)
+          );
+          // Reset local state so the user can try again
+          setProjectId('');
+          setProjectName('');
+          localStorage.removeItem('measurex_project_id');
+          window.history.replaceState({}, '', '/');
+          addToast('PDF upload failed. Please try again.', 'error');
+          return;
         }
       }
     } catch (err) {
@@ -1203,7 +1216,7 @@ function PageInner() {
     } finally {
       isCreatingProjectRef.current = false;
     }
-  }, [projectId]);
+  }, [projectId, addToast]);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];

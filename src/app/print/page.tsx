@@ -290,11 +290,18 @@ function PrintViewInner() {
     );
   }
 
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  // BUG-A8-5-012 fix: avoid SSR/client hydration mismatch by deferring dateStr
+  // to client-side only. `new Date()` differs between server render time and
+  // client hydration time, causing React hydration warnings. useEffect ensures
+  // the value is only set on the client where it's stable.
+  const [dateStr, setDateStr] = useState('');
+  useEffect(() => {
+    setDateStr(new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }));
+  }, []);
 
   return (
     <div className="print-view bg-white text-black min-h-screen">

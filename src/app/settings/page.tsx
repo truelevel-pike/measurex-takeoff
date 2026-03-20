@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Settings, Building2, Shield, Bell, ArrowLeft, Check, Brain, Eye, EyeOff, Key, Plus, Trash2, Copy } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -63,11 +63,16 @@ export default function SettingsPage() {
   const [emailChangePending, setEmailChangePending] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
   const [emailChangeStatus, setEmailChangeStatus] = useState<string | null>(null);
+  // BUG-A8-5-014 fix: validate localStorage parse results before use
   const [name, setName] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) return JSON.parse(raw).name ?? '';
+      if (!raw) return '';
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return '';
+      const v = (parsed as Record<string, unknown>).name;
+      return typeof v === 'string' ? v : '';
     } catch { /* ignore */ }
     return '';
   });
@@ -76,7 +81,11 @@ export default function SettingsPage() {
     if (typeof window === 'undefined') return '';
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) return JSON.parse(raw).orgName ?? '';
+      if (!raw) return '';
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return '';
+      const v = (parsed as Record<string, unknown>).orgName;
+      return typeof v === 'string' ? v : '';
     } catch { /* ignore */ }
     return '';
   });
@@ -117,11 +126,16 @@ export default function SettingsPage() {
 
   // R-A8-005 fix: persist defaultScale and applyToAll to localStorage
   const MEASURE_PREFS_KEY = 'mx-measure-prefs';
+  // BUG-A8-5-014 fix: validate parsed localStorage values
   const [defaultScale, setDefaultScale] = useState<string>(() => {
     if (typeof window === 'undefined') return '1/4" = 1\'';
     try {
       const raw = localStorage.getItem(MEASURE_PREFS_KEY);
-      if (raw) return JSON.parse(raw).defaultScale ?? '1/4" = 1\'';
+      if (!raw) return '1/4" = 1\'';
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return '1/4" = 1\'';
+      const v = (parsed as Record<string, unknown>).defaultScale;
+      return typeof v === 'string' && SCALE_OPTIONS.includes(v) ? v : '1/4" = 1\'';
     } catch { /* ignore */ }
     return '1/4" = 1\'';
   });
@@ -129,7 +143,11 @@ export default function SettingsPage() {
     if (typeof window === 'undefined') return false;
     try {
       const raw = localStorage.getItem(MEASURE_PREFS_KEY);
-      if (raw) return JSON.parse(raw).applyToAll ?? false;
+      if (!raw) return false;
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+      const v = (parsed as Record<string, unknown>).applyToAll;
+      return typeof v === 'boolean' ? v : false;
     } catch { /* ignore */ }
     return false;
   });

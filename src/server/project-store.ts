@@ -1178,7 +1178,7 @@ export interface AssemblyRow {
   quantityFormula: string;
   createdAt: string;
   // BUG-A7-5-065 fix: track when the assembly was last updated
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export async function getAssemblies(projectId: string): Promise<AssemblyRow[]> {
