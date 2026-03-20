@@ -21,6 +21,7 @@ export async function POST(
     const { id } = paramsResult.data;
     const body = await req.json();
     const pageNum: number = body?.page;
+    const model: string | undefined = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
 
     if (!pageNum || typeof pageNum !== 'number') {
       return NextResponse.json({ error: 'page (number) is required' }, { status: 400 });
@@ -56,7 +57,7 @@ export async function POST(
 
     broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 
-    const elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight);
+    const elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
 
     broadcastToProject(id, 'ai-takeoff:complete', {
       page: pageNum,

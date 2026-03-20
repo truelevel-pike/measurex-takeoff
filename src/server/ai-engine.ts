@@ -54,16 +54,25 @@ For count items, set the "quantity" field to the number of that element detected
 
 Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex), confidence: number (0-1) }. No prose, no markdown fences.`;
 
+const DEFAULT_MODEL = 'gpt-4o-mini';
+
 /**
  * Analyze a blueprint page image using OpenAI vision and return detected elements.
+ * @param imageBase64DataUrl - Base64-encoded PNG data URL of the page image.
+ * @param pageWidth - Width of the page in pixels.
+ * @param pageHeight - Height of the page in pixels.
+ * @param model - Optional OpenAI model to use (defaults to gpt-4o-mini).
  */
 export async function analyzePageImage(
   imageBase64DataUrl: string,
   pageWidth: number,
   pageHeight: number,
+  model?: string,
 ): Promise<AIDetectedElement[]> {
   const apiKey = getOpenAIKey();
   if (!apiKey) throw new Error('OpenAI API key not configured — set OPENAI_API_KEY in your environment or .env.local');
+
+  const resolvedModel = model && typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_MODEL;
 
   const content = [
     {
@@ -83,7 +92,7 @@ export async function analyzePageImage(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: resolvedModel,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content },
