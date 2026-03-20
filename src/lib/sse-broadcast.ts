@@ -22,6 +22,9 @@ export const projectEventCounters = globalThis.__projectEventCounters;
 export const projectEventBuffer = globalThis.__projectEventBuffer;
 export const projectViewers = globalThis.__projectViewers;
 
+// BUG-A5-6-191: cap number of tracked projects to prevent unbounded memory growth
+const MAX_PROJECTS = 500;
+
 /** Broadcast an SSE event to all clients subscribed to a project */
 export function broadcastToProject(projectId: string, event: string, data: unknown) {
   const seq = (projectEventCounters.get(projectId) ?? 0) + 1;
@@ -31,6 +34,15 @@ export function broadcastToProject(projectId: string, event: string, data: unkno
   buffer.push({ seq, event, data });
   if (buffer.length > 50) buffer.shift();
   projectEventBuffer.set(projectId, buffer);
+
+  // Evict oldest project entries if we exceed the cap
+  if (projectEventBuffer.size > MAX_PROJECTS) {
+    const oldest = projectEventBuffer.keys().next().value;
+    if (oldest !== undefined) {
+      projectEventBuffer.delete(oldest);
+      projectEventCounters.delete(oldest);
+    }
+  }
 
   const clients = projectClients.get(projectId);
   if (!clients || clients.size === 0) return;
