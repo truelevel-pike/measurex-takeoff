@@ -3,8 +3,10 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { X, Download, FileSpreadsheet, FileText, Eye, Printer } from 'lucide-react';
 import { useFocusTrap } from '@/lib/use-focus-trap';
-// BUG-A8-011: xlsx@0.18.x has known prototype pollution / ReDoS CVEs
-// (CVE-2023-30533 and related). TODO: migrate to exceljs or SheetJS Pro.
+// BUG-A6-5-020 / BUG-A8-011: xlsx@0.18.x has known prototype pollution / ReDoS CVEs
+// (CVE-2023-30533 — SEVERITY: HIGH — prototype pollution + ReDoS).
+// TODO(security): Migrate to `exceljs` or `xlsx@0.20.x+` before production release.
+// Migration is deferred to a dedicated cycle due to API surface differences.
 // For now, lazy-load via dynamic import to restrict client bundle exposure.
 // The server-side API routes (api/projects/[id]/export/excel) are the
 // preferred export path; this component is a fallback for offline/quick use.
