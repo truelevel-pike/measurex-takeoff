@@ -323,6 +323,19 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     }
     return counts;
   }, [polygons]);
+
+  // BUG-A7-5-071 fix: pre-build per-polygon index map so hover tooltip avoids
+  // two O(n) filter+findIndex passes on every pointer-move event.
+  const polygonIndexInClassMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const clsCount = new Map<string, number>();
+    for (const p of polygons) {
+      const next = (clsCount.get(p.classificationId) ?? 0) + 1;
+      map.set(p.id, next);
+      clsCount.set(p.classificationId, next);
+    }
+    return map;
+  }, [polygons]);
   const polygonIds = useMemo(() => new Set(allPolygons.map((polygon) => polygon.id)), [allPolygons]);
   const annotations = useMemo(
     () => (allAnnotations ?? []).filter((a) => a.page === currentPage),
@@ -339,19 +352,18 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     }
     return null;
   }, [polygons, selectedPolygons]);
+  // BUG-A7-5-052 fix: compute centroid across ALL selected polygons, not just the last one
   const batchMenuPosition = useMemo(() => {
-    if (!lastSelectedOnPage || lastSelectedOnPage.points.length === 0) return null;
-    const centroid = lastSelectedOnPage.points.reduce(
-      (acc, pt) => ({ x: acc.x + pt.x, y: acc.y + pt.y }),
-      { x: 0, y: 0 }
-    );
-    centroid.x /= lastSelectedOnPage.points.length;
-    centroid.y /= lastSelectedOnPage.points.length;
+    if (selectedPolygonsOnPage.length === 0) return null;
+    const allPoints = selectedPolygonsOnPage.flatMap((p) => p.points);
+    if (allPoints.length === 0) return null;
+    const sumX = allPoints.reduce((s, p) => s + p.x, 0);
+    const sumY = allPoints.reduce((s, p) => s + p.y, 0);
     return {
-      xPct: (centroid.x / baseDims.width) * 100,
-      yPct: (centroid.y / baseDims.height) * 100,
+      xPct: (sumX / allPoints.length / baseDims.width) * 100,
+      yPct: (sumY / allPoints.length / baseDims.height) * 100,
     };
-  }, [lastSelectedOnPage, baseDims]);
+  }, [selectedPolygonsOnPage, baseDims]);
   const showBatchMenu = selectedPolygonsOnPage.length > 1 && batchMenuPosition !== null;
 
   // Handle right-click on a polygon via SVG element data attributes
@@ -378,8 +390,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     [onCanvasPointerDown, currentTool, calibrationMode, calibrationPoints, addCalibrationPoint, baseDims]
   );
 
-  const handlePolygonClick = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement>) => {
+  // BUG-A7-5-046 fix: use union type for both SVGPolygonElement and SVGPolylineElement
+  // so no unsafe `as unknown as` cast is needed on the polyline onClick handlers.
+  type SvgPolyHandler = React.MouseEventHandler<SVGPolygonElement | SVGPolylineElement>;
+
+  const handlePolygonClick: SvgPolyHandler = useCallback(
+    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement>) => {
       e.stopPropagation();
       onCanvasPointerDown?.();
       const polygonId = e.currentTarget.dataset.polygonId;
@@ -395,8 +411,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     [currentTool, togglePolygonSelection, setSelectedPolygon, onCanvasPointerDown]
   );
 
-  const handlePolygonContextMenu = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement>) => {
+  const handlePolygonContextMenu: SvgPolyHandler = useCallback(
+    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement>) => {
       e.preventDefault();
       e.stopPropagation();
       const polygonId = e.currentTarget.dataset.polygonId;
@@ -617,8 +633,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                     vectorEffect="non-scaling-stroke"
                     style={sharedStyle}
                     data-polygon-id={poly.id}
-                    onClick={handlePolygonClick as unknown as React.MouseEventHandler<SVGPolylineElement>}
-                    onContextMenu={handlePolygonContextMenu as unknown as React.MouseEventHandler<SVGPolylineElement>}
+                    onClick={handlePolygonClick}
+                    onContextMenu={handlePolygonContextMenu}
                     aria-label={cls?.name ?? 'Unknown classification'}
                   >
                     <title>{`${cls?.name ?? 'Polyline'}${poly.confidence !== undefined ? ` | ${Math.round(poly.confidence * 100)}% confidence` : ''}${poly.detectedByModel ? ` | Model: ${poly.detectedByModel}` : ''}`}</title>
@@ -763,7 +779,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   ? (polygonCountByClassification.get(poly.classificationId) ?? 0)
                   : 0;
                 const areaReal = poly.area / (ppu * ppu);
-                const linearReal = calculateLinearFeet(poly.points, ppu, false);
+                // BUG-A7-5-053 fix: use closed=false only for linear (open-path) polygons;
+                // area polygons are closed so their perimeter includes the closing segment.
+                const linearReal = calculateLinearFeet(poly.points, ppu, clsType !== 'linear');
                 const rawLabel = (poly.label ?? cls?.name ?? '').trim();
                 const measureStr =
                   clsType === 'linear'
@@ -891,9 +909,10 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const linearReal = calculateLinearFeet(poly.points, ppu, false);
           lines.push(`${linearReal.toFixed(1)} LF`);
         } else if (clsType === 'count') {
-          const countPolys = polygons.filter((p) => p.classificationId === poly.classificationId);
-          const idx = countPolys.findIndex((p) => p.id === poly.id) + 1;
-          lines.push(`${cls?.name ?? 'Item'} ${idx} of ${countPolys.length}`);
+          // BUG-A7-5-071 fix: use pre-built map instead of O(n) filter+findIndex
+          const idx = polygonIndexInClassMap.get(poly.id) ?? 1;
+          const total = polygonCountByClassification.get(poly.classificationId) ?? 1;
+          lines.push(`${cls?.name ?? 'Item'} ${idx} of ${total}`);
         }
         lines.push(`Page ${poly.pageNumber}`);
         if (poly.detectedByModel || poly.confidence !== undefined) {
