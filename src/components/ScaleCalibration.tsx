@@ -151,7 +151,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     async (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
-      let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
+      let unit: 'ft' | 'in' | 'm' | 'cm' | 'mm' = 'ft';
       if (ratioMatch) {
         const ratio = parseInt(ratioMatch[1], 10);
         unit = ARCH_RATIOS_FT.has(ratio) ? 'ft' : 'm';
@@ -193,7 +193,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
       const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
-      let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
+      let unit: 'ft' | 'in' | 'm' | 'cm' | 'mm' = 'ft';
       if (ratioMatch) {
         const ratio = parseInt(ratioMatch[1], 10);
         unit = ARCH_RATIOS_FT.has(ratio) ? 'ft' : 'm';

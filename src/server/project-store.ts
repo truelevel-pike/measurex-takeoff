@@ -1088,7 +1088,7 @@ export async function listScales(projectId: string): Promise<ScaleCalibration[]>
     if (error) throw new Error(`listScales: ${error.message}`);
     return (data || []).map((row: Record<string, unknown>): ScaleCalibration => ({
       pixelsPerUnit: row.pixels_per_unit as number,
-      unit: row.unit as 'ft' | 'in' | 'm' | 'mm',
+      unit: row.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm',
       label: row.label as string,
       source: row.source as ScaleCalibration['source'],
       confidence: (row.confidence as number | null) ?? undefined,

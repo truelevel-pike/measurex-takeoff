@@ -41,7 +41,7 @@ export interface Annotation {
 
 export interface ScaleCalibration {
   pixelsPerUnit: number;
-  unit: 'ft' | 'in' | 'm' | 'mm';
+  unit: 'ft' | 'in' | 'm' | 'mm' | 'cm';
   label: string;
   source: 'manual' | 'auto' | 'ai';
   confidence?: number;

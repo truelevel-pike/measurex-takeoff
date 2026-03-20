@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     if (scale) {
       await setScale(created.id, {
         pixelsPerUnit: scale.pixelsPerUnit as number,
-        unit: scale.unit as 'ft' | 'in' | 'm' | 'mm',
+        unit: scale.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm',
         label: (scale.label as string) ?? '',
         source: (scale.source as 'manual' | 'auto' | 'ai') ?? 'manual',
         confidence: scale.confidence as number | undefined,

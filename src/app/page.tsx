@@ -2135,13 +2135,13 @@ function PageInner() {
             onClick={() => {
               setScale({
                 pixelsPerUnit: uploadDetectedScale.pixelsPerUnit,
-                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'mm',
+                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm',
                 label: uploadDetectedScale.description,
                 source: 'auto',
               });
               setScaleForPage(1, {
                 pixelsPerUnit: uploadDetectedScale.pixelsPerUnit,
-                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'mm',
+                unit: uploadDetectedScale.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm',
                 label: uploadDetectedScale.description,
                 source: 'auto',
               });

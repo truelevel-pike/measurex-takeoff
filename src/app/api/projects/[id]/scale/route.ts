@@ -33,7 +33,7 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     const bodyResult = ScaleSchema.passthrough().safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
     const validated = bodyResult.data;
-    const unitVal = validated.unit as 'ft' | 'in' | 'm' | 'mm';
+    const unitVal = validated.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm';
     const label = typeof body.label === 'string' ? body.label : 'Custom';
     const source = (typeof body.source === 'string' ? body.source : 'manual') as 'manual' | 'auto' | 'ai';
     const scale = await setScale(id, { pixelsPerUnit: validated.pixelsPerUnit, unit: unitVal, label, source, pageNumber: validated.pageNumber || 1 });

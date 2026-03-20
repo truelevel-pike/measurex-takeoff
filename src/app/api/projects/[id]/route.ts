@@ -78,7 +78,7 @@ export const PUT = withCache({ noStore: true }, async function PUT(req: Request,
       const s = state.scale;
       await setScale(id, {
         pixelsPerUnit: s.pixelsPerUnit,
-        unit: s.unit as 'm' | 'ft' | 'in' | 'mm',
+        unit: s.unit as 'ft' | 'in' | 'm' | 'cm' | 'mm',
         label: s.label || 'Custom',
         source: (s.source || 'manual') as 'auto' | 'manual' | 'ai',
         pageNumber: s.pageNumber || 1,
