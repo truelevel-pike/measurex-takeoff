@@ -37,7 +37,8 @@ export const updateClassificationSchema = createClassificationSchema.partial();
 
 // Polygon
 export const createPolygonSchema = z.object({
-  points: z.array(pointSchema).min(2, 'Polygon must have at least 2 points'),
+  // BUG-A5-6-193: require at least 3 points to prevent degenerate polygons
+  points: z.array(pointSchema).min(3, 'Polygon must have at least 3 points'),
   classificationId: uuidSchema,
   pageNumber: z.number().int().positive(),
   area: z.number().nonnegative().optional(),
