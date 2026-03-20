@@ -619,6 +619,10 @@ export default function ProjectsPage() {
             className="hidden lg:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
             <FileText size={14} aria-hidden /> Auto-Name
           </button>
+          <button aria-label="What's New" onClick={whatsNew.open}
+            className="hidden lg:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            <Star size={14} aria-hidden /> What&apos;s New
+          </button>
           <button aria-label="New Project"
             onClick={() => setShowCreate(true)}
             className="text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors hover:bg-zinc-700"
@@ -1019,61 +1023,63 @@ export default function ProjectsPage() {
                   )}
                 </div>
               ) : (
-                <>
-                  <div className="text-center mb-6">
-                    <div className="bg-blue-600/10 rounded-full p-4 inline-block mb-4">
-                      <FileSpreadsheet size={40} className="text-blue-400" aria-hidden />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white mb-1">Ready to start your first takeoff?</h3>
-                    <p className="text-sm text-zinc-400">Upload a PDF blueprint and let MeasureX do the heavy lifting.</p>
+                <div className="flex flex-col items-center gap-6 max-w-lg text-center">
+                  <div className="bg-blue-600/20 p-5 rounded-2xl">
+                    <FileSpreadsheet size={56} className="text-blue-400" />
                   </div>
+                  <div>
+                    <h2 className="text-3xl font-bold tracking-tight mb-2">Welcome to MeasureX</h2>
+                    <p className="text-zinc-400 text-base">Upload a PDF blueprint to get started with AI-powered construction takeoff.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.pdf';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) handlePdfUpload(file);
+                      };
+                      input.click();
+                    }}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 transition-colors shadow-lg shadow-blue-600/25"
+                  >
+                    <Upload size={22} /> Upload PDF Blueprint
+                  </button>
                   <div
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={handleDrop}
-                    className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center transition-colors ${
+                    className={`w-full border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
                       dragOver
                         ? 'border-blue-400 bg-blue-600/10'
-                        : 'border-zinc-600 bg-zinc-800/50 hover:border-zinc-500'
+                        : 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-500'
                     }`}
                   >
-                    <Upload size={40} className={`mx-auto mb-3 ${dragOver ? 'text-blue-400' : 'text-zinc-500'}`} aria-hidden />
-                    <div className={`text-lg font-medium mb-1 ${dragOver ? 'text-blue-300' : 'text-zinc-300'}`}>
-                      {dragOver ? 'Drop PDF here' : 'Drag & drop a PDF'}
+                    <Upload size={28} className={`mx-auto mb-2 ${dragOver ? 'text-blue-400' : 'text-zinc-600'}`} aria-hidden />
+                    <div className={`text-sm font-medium ${dragOver ? 'text-blue-300' : 'text-zinc-500'}`}>
+                      {dragOver ? 'Drop PDF here' : 'or drag & drop a PDF here'}
                     </div>
-                    <div className="text-sm text-zinc-500 mb-5">or click to browse your files</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowCreate(true)}
+                      className="text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition-colors"
+                    >
+                      Create blank project
+                    </button>
+                    <span className="text-zinc-600">·</span>
                     <button
                       onClick={() => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = '.pdf';
-                        input.onchange = (e) => {
-                          const file = (e.target as HTMLInputElement).files?.[0];
-                          if (file) handlePdfUpload(file);
-                        };
-                        input.click();
+                        saveDemoProject();
+                        router.push(`/?project=${DEMO_PROJECT_ID}`);
                       }}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors inline-flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                      className="text-sm text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 transition-colors"
                     >
-                      <Upload size={14} /> Upload PDF
+                      <Play size={13} /> Try Demo
                     </button>
                   </div>
-                  <button
-                    onClick={() => setShowCreate(true)}
-                    className="mt-4 text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
-                  >
-                    or create a blank project
-                  </button>
-                  <button
-                    onClick={() => {
-                      saveDemoProject();
-                      router.push(`/?project=${DEMO_PROJECT_ID}`);
-                    }}
-                    className="mt-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors border border-zinc-600"
-                  >
-                    <Play size={14} /> Try Demo
-                  </button>
-                </>
+                </div>
               )}
             </div>
           ) : viewMode === 'grid' ? (

@@ -27,7 +27,9 @@ export function useWhatsNew() {
     setShow(false);
   };
 
-  return { show, dismiss };
+  const open = () => setShow(true);
+
+  return { show, dismiss, open };
 }
 
 export default function WhatsNewModal({ onClose }: { onClose: () => void }) {
