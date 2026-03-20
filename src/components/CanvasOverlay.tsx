@@ -97,6 +97,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const projectId = useStore((s) => s.projectId);
   const currentTool = useStore((s) => s.currentTool);
   const updatePolygon = useStore((s) => s.updatePolygon);
+  const batchUpdatePolygons = useStore((s) => s.batchUpdatePolygons);
   const addPolygon = useStore((s) => s.addPolygon);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
   const scale = useStore((s) => s.scale);
@@ -104,6 +105,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
   const hoveredClassificationId = useStore((s) => s.hoveredClassificationId);
   const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
+  // BUG-A7-4-055: pre-build Set for O(1) selectedPolygons lookup
+  const selectedSet = useMemo(() => new Set(selectedPolygons), [selectedPolygons]);
   const { prefs } = useUserPrefs();
 
   // Vertex drag state
@@ -148,7 +151,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const toSvgCoords = useCallback(
     (e: React.MouseEvent | MouseEvent): Point => {
       const rect = wrapperRef.current?.getBoundingClientRect();
-      if (!rect) return { x: 0, y: 0 };
+      // BUG-A7-4-008: guard zero-dimension rect to avoid Infinity/NaN
+      if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
       return {
         x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
         y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
@@ -169,29 +173,33 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     [allPolygons]
   );
 
+  // BUG-A7-4-009: RAF ref for coalescing mousemove during vertex drag
+  const rafRef = useRef<number>(0);
+
   useEffect(() => {
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
       e.preventDefault();
-      const pt = toSvgCoords(e);
-      // Snap dragged vertex to nearby vertices on other polygons.
-      // Read from refs so this handler never needs to be re-registered when
-      // allPolygons/scale/currentPage change mid-drag (avoids dropped events — BUG-A7-008).
-      const rect = wrapperRef.current?.getBoundingClientRect();
-      const screenToBase = rect ? baseDims.width / rect.width : 1;
-      const snapThreshold = 10 * screenToBase;
-      const otherPolygons = allPolygonsRef.current.filter(
-        (p) => p.pageNumber === currentPageRef.current && p.id !== dragging.polygonId
-      );
-      const snap = snapToNearestVertex(pt, otherPolygons, snapThreshold);
-      const snappedPt = snap ? { x: snap.x, y: snap.y } : pt;
-      setSnapIndicator(snap);
-      setDragPoints((prev) => {
-        if (!prev) return prev;
-        const updated = [...prev];
-        updated[dragging.vertexIndex] = snappedPt;
-        return updated;
+      // BUG-A7-4-009: coalesce with requestAnimationFrame
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const pt = toSvgCoords(e);
+        const rect = wrapperRef.current?.getBoundingClientRect();
+        const screenToBase = rect ? baseDims.width / rect.width : 1;
+        const snapThreshold = 10 * screenToBase;
+        const otherPolygons = allPolygonsRef.current.filter(
+          (p) => p.pageNumber === currentPageRef.current && p.id !== dragging.polygonId
+        );
+        const snap = snapToNearestVertex(pt, otherPolygons, snapThreshold);
+        const snappedPt = snap ? { x: snap.x, y: snap.y } : pt;
+        setSnapIndicator(snap);
+        setDragPoints((prev) => {
+          if (!prev) return prev;
+          const updated = [...prev];
+          updated[dragging.vertexIndex] = snappedPt;
+          return updated;
+        });
       });
     };
 
@@ -217,11 +225,27 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       setDragging(null);
     };
 
+    // BUG-A7-4-054: add touch handlers for mobile vertex drag
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        handleMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, preventDefault: () => {} } as unknown as MouseEvent);
+      }
+    };
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length > 0) {
+        handleUp({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY, preventDefault: () => {} } as unknown as MouseEvent);
+      }
+    };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
     return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
     // Only re-register handlers when dragging starts/stops or coordinate-space changes.
     // allPolygons/classifications/scale/currentPage are accessed via stable refs.
@@ -407,16 +431,18 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     setShowBatchClassificationPicker(false);
   }, [deleteSelectedPolygons]);
 
+  // BUG-A7-4-007: use batchUpdatePolygons for single undo snapshot
   const handleBatchReclassify = useCallback(
     (classificationId: string) => {
-      selectedPolygons.forEach((polygonId) => {
-        if (polygonIds.has(polygonId)) {
-          updatePolygon(polygonId, { classificationId });
-        }
-      });
+      const patches = selectedPolygons
+        .filter((polygonId) => polygonIds.has(polygonId))
+        .map((polygonId) => ({ id: polygonId, patch: { classificationId } }));
+      if (patches.length > 0) {
+        batchUpdatePolygons(patches);
+      }
       setShowBatchClassificationPicker(false);
     },
-    [selectedPolygons, polygonIds, updatePolygon]
+    [selectedPolygons, polygonIds, batchUpdatePolygons]
   );
 
   const handleBatchReclassifyClick = useCallback(
@@ -458,10 +484,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     }
   }, [singleSelectedPoly, deletePolygon, projectId]);
 
+  // BUG-A7-4-057: use baseDims-relative offset instead of hardcoded +20
   const handleFloatingDuplicate = useCallback(() => {
     if (!singleSelectedPoly) return;
+    const offset = Math.max(1, baseDims.width * 0.01);
     addPolygon({
-      points: singleSelectedPoly.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })),
+      points: singleSelectedPoly.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
       classificationId: singleSelectedPoly.classificationId,
       pageNumber: singleSelectedPoly.pageNumber,
       area: singleSelectedPoly.area,
@@ -469,7 +497,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       isComplete: singleSelectedPoly.isComplete,
       label: singleSelectedPoly.label,
     });
-  }, [singleSelectedPoly, addPolygon]);
+  }, [singleSelectedPoly, addPolygon, baseDims.width]);
 
   const handleFloatingReclassify = useCallback((classId: string) => {
     if (!singleSelectedPoly) return;
@@ -487,6 +515,20 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
 
   const handleToggleBatchClassificationPicker = useCallback(() => {
     setShowBatchClassificationPicker((prev) => !prev);
+  }, []);
+
+  // BUG-A7-4-056: stable callbacks for polygon group hover — read id from data-polygon-id
+  const handleGroupPointerEnter = useCallback((e: React.PointerEvent<SVGGElement>) => {
+    const id = e.currentTarget.dataset.polygonId;
+    if (id) setHoveredPoly({ id, clientX: e.clientX, clientY: e.clientY });
+  }, []);
+  const handleGroupPointerMove = useCallback((e: React.PointerEvent<SVGGElement>) => {
+    const id = e.currentTarget.dataset.polygonId;
+    if (id) setHoveredPoly((prev) => prev?.id === id ? { id, clientX: e.clientX, clientY: e.clientY } : prev);
+  }, []);
+  const handleGroupPointerLeave = useCallback((e: React.PointerEvent<SVGGElement>) => {
+    const id = e.currentTarget.dataset.polygonId;
+    setHoveredPoly((prev) => prev?.id === id ? null : prev);
   }, []);
 
   // Disable pointer events so tool-specific overlays (z-20) receive clicks
@@ -530,7 +572,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const cls = classificationById.get(poly.classificationId);
           if (cls && !cls.visible) return null;
           if (!poly.points || poly.points.length === 0) return null;
-          const isSelected = selectedPolygons.includes(poly.id) || selectedPolygon === poly.id;
+          const isSelected = selectedSet.has(poly.id) || selectedPolygon === poly.id;
           const isHighlighted = highlightedPolygonId === poly.id;
           const isDraggingThis = dragging?.polygonId === poly.id;
           const displayPoints = isDraggingThis && dragPoints ? dragPoints : poly.points;
@@ -555,15 +597,10 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           return (
             <g
               key={poly.id}
-              onPointerEnter={(currentTool === 'select' || currentTool === 'pan') ? (e) => {
-                setHoveredPoly({ id: poly.id, clientX: e.clientX, clientY: e.clientY });
-              } : undefined}
-              onPointerMove={(currentTool === 'select' || currentTool === 'pan') ? (e) => {
-                setHoveredPoly((prev) => prev?.id === poly.id ? { id: poly.id, clientX: e.clientX, clientY: e.clientY } : prev);
-              } : undefined}
-              onPointerLeave={(currentTool === 'select' || currentTool === 'pan') ? () => {
-                setHoveredPoly((prev) => prev?.id === poly.id ? null : prev);
-              } : undefined}
+              data-polygon-id={poly.id}
+              onPointerEnter={(currentTool === 'select' || currentTool === 'pan') ? handleGroupPointerEnter : undefined}
+              onPointerMove={(currentTool === 'select' || currentTool === 'pan') ? handleGroupPointerMove : undefined}
+              onPointerLeave={(currentTool === 'select' || currentTool === 'pan') ? handleGroupPointerLeave : undefined}
             >
               {isLinearPoly ? (
                 <>

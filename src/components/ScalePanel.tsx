@@ -78,8 +78,8 @@ const commonScaleShortLabels: Record<string, string> = {
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
+// BUG-A7-4-064: removed dead currentPage prop
 interface ScalePanelProps {
-  currentPage: number;
   selectedScale: string | null;
   autoDetected: boolean;
   scalePreview: string | null;
@@ -91,15 +91,16 @@ interface ScalePanelProps {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function ScalePanel({
-  selectedScale,
-  autoDetected,
-  scalePreview,
-  onSelectScale,
-  onOpenManual,
-  onStartCalibrate,
-  onClose,
-}: ScalePanelProps) {
+export default function ScalePanel(props: ScalePanelProps) {
+  const {
+    selectedScale,
+    autoDetected,
+    scalePreview,
+    onSelectScale,
+    onOpenManual,
+    onStartCalibrate,
+    onClose,
+  } = props;
   const focusTrapRef = useFocusTrap(true);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 

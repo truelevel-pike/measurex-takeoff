@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Ruler, CheckCircle } from 'lucide-react';
 
@@ -26,6 +26,9 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const currentPage = useStore((s) => s.currentPage);
   const setTool = useStore((s) => s.setTool);
+  // BUG-A7-4-063: track setTimeout so it can be cleared on unmount
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const startCalibrationDraw = useCallback(() => {
     setTool('calibrate');
@@ -51,7 +54,7 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
     setScale(cal);
     setScaleForPage(currentPage, cal);
     setStep('done');
-    setTimeout(() => { onCalibrated?.(); onClose(); }, 1200);
+    timerRef.current = setTimeout(() => { onCalibrated?.(); onClose(); }, 1200);
   }, [lineLengthPx, realDimension, unit, currentPage, setScale, setScaleForPage, onCalibrated, onClose]);
 
   return (

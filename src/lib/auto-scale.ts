@@ -135,17 +135,41 @@ function collectArchitecturalAndCivil(text: string, candidates: Candidate[]): vo
   }
 }
 
+// BUG-A7-4-012: detect metric ratios instead of hardcoding unit='ft'
 function collectRatios(text: string, candidates: Candidate[]): void {
   const ratio = /(\bscale\b\s*:?\s*)?1\s*:\s*(\d{1,5})/gi;
+
+  // Common architectural ft ratios (denominator = inches-per-foot * factor)
+  const ARCH_FT_DENOMS = new Set([5, 10, 20, 24, 48, 50, 60, 96, 100, 120, 125, 150, 200, 240, 250, 300, 480, 500]);
 
   for (const match of text.matchAll(ratio)) {
     const denominator = Number(match[2]);
     if (!Number.isFinite(denominator) || denominator <= 0) continue;
 
-    const pixelsPerFoot = PDF_DPI / (denominator / 12);
     const label = `1:${denominator}`;
+    const isLabeled = Boolean(match[1] && /\bscale\b/i.test(match[1]));
+    const confidence = isLabeled ? 0.85 : 0.75;
 
-    addCandidate(candidates, pixelsPerFoot, label, 0.75, match.index ?? 0);
+    if (ARCH_FT_DENOMS.has(denominator)) {
+      // Architectural / imperial: pixels per foot
+      const pixelsPerFoot = PDF_DPI / (denominator / 12);
+      addCandidate(candidates, pixelsPerFoot, label, confidence, match.index ?? 0);
+    } else {
+      // Metric: 1:denominator means 1 unit on paper = denominator units real
+      // pixelsPerUnit(m) = PDF_DPI(pixels/inch) / denominator * 1000mm/m / 25.4mm/inch
+      const pixelsPerMeter = (PDF_DPI / denominator) * (1000 / 25.4);
+      candidates.push({
+        scale: {
+          pixelsPerUnit: pixelsPerMeter,
+          unit: 'm',
+          label,
+          source: 'auto',
+          confidence,
+        },
+        confidence,
+        matchIndex: match.index ?? 0,
+      });
+    }
   }
 }
 

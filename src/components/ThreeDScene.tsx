@@ -42,13 +42,14 @@ export default function ThreeDScene({
   // Pull takeoff data from the global store
   const polygons = useStore((s) => s.polygons);
   const classifications = useStore((s) => s.classifications);
-  const scale = useStore((s) => s.scale);
-  const { show3D, setShow3D } = useStore();
+  // BUG-A7-4-H001: use individual selectors instead of bare useStore()
+  const show3D = useStore((s) => s.show3D);
+  const setShow3D = useStore((s) => s.setShow3D);
 
   // selectedPolygon from store is the shared selection state.
   // QuantitiesPanel writes to it via setSelectedPolygon; we read it here to highlight in 3D.
   const selectedPolygon = useStore((s) => s.selectedPolygon);
-  const storeClassifications = useStore((s) => s.classifications);
+  // BUG-A7-4-010: removed duplicate storeClassifications selector — reuse classifications
 
   // If caller passed explicit walls/areas (non-empty), use them directly.
   // Otherwise, derive geometry from the store via convertTakeoffTo3D,
@@ -77,15 +78,16 @@ export default function ThreeDScene({
     }
 
     return result;
+  // BUG-A7-4-011: removed scale from deps — not used in memo body
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallsProp, areasProp, labelsProp, polygons, classifications, scale]);
+  }, [wallsProp, areasProp, labelsProp, polygons, classifications]);
 
   // Build visibility filter: hide areas whose classification is toggled off
   const visibilityHiddenIds = React.useMemo(() => {
-    return storeClassifications
+    return classifications
       .filter((c) => c.visible === false)
       .map((c) => c.id);
-  }, [storeClassifications]);
+  }, [classifications]);
 
   // selectedId drives 3D highlight and is sourced from the store so that
   // clicking a row in QuantitiesPanel (which calls setSelectedPolygon) automatically

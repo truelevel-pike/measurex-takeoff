@@ -31,24 +31,28 @@ export function calculatePolygonArea(points: Point[]): number {
 }
 
 // Perimeter (linear units) — set closed=false for line segments
+// BUG-A7-4-006: guard negative ppu with Math.abs
 export function calculateLinearFeet(points: Point[], pixelsPerUnit = 1, closed = true): number {
   if (!points || points.length < 2) return 0;
+  const ppu = Math.abs(pixelsPerUnit) || 1;
   let total = 0;
   for (let i = 0; i < points.length - 1; i++) {
-    total += distance(points[i], points[i + 1]) / (pixelsPerUnit || 1);
+    total += distance(points[i], points[i + 1]) / ppu;
   }
   if (closed && points.length > 2) {
-    total += distance(points[points.length - 1], points[0]) / (pixelsPerUnit || 1);
+    total += distance(points[points.length - 1], points[0]) / ppu;
   }
   return total;
 }
 
+// BUG-A7-4-061: removed dead denominator guard; added horizontal edge skip
 export function pointInPolygon(p: Point, poly: Point[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const xi = poly[i].x, yi = poly[i].y;
     const xj = poly[j].x, yj = poly[j].y;
-    const intersect = (yi > p.y) !== (yj > p.y) && (p.x < (xj - xi) * (p.y - yi) / ((yj - yi) || 1e-10) + xi);
+    if (yi === yj) continue; // skip horizontal edges
+    const intersect = (yi > p.y) !== (yj > p.y) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
     if (intersect) inside = !inside;
   }
   return inside;
@@ -104,13 +108,15 @@ export function mergePolygons(poly1: Point[], poly2: Point[]): Point[] {
 // distance relative to that unit square, then map the result back to pixel space.
 export function splitPolygonByLine(polygon: Point[], lineStart: Point, lineEnd: Point): [Point[], Point[]] {
   try {
-    // Compute bounding box to normalise coordinates
-    const xs = polygon.map((p) => p.x);
-    const ys = polygon.map((p) => p.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
+    // BUG-A7-4-005: compute bounding box with explicit loop to avoid RangeError on large polygons
+    let minX = polygon[0].x, maxX = polygon[0].x;
+    let minY = polygon[0].y, maxY = polygon[0].y;
+    for (const pt of polygon) {
+      if (pt.x < minX) minX = pt.x;
+      if (pt.x > maxX) maxX = pt.x;
+      if (pt.y < minY) minY = pt.y;
+      if (pt.y > maxY) maxY = pt.y;
+    }
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
 

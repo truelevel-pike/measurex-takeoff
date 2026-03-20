@@ -98,6 +98,7 @@ export interface Store extends ProjectState {
   togglePolygonSelection: (id: string) => void;
   clearPolygonSelection: () => void;
   deleteSelectedPolygons: () => void;
+  batchUpdatePolygons: (patches: Array<{ id: string; patch: Partial<Polygon> }>) => void;
 
   // Actions — Annotations
   addAnnotation: (a: Omit<Annotation, 'id'>) => string;
@@ -505,10 +506,34 @@ export const useStore = create<Store>()(
     });
     if (!s.projectId) return;
     idsToDelete.forEach((polygonId) => {
-      fetch(`/api/projects/${s.projectId}/polygons/${polygonId}`, { method: 'DELETE' }).catch((err) =>
-        console.error(`API deletePolygon failed for ${polygonId}:`, err)
-      );
+      apiSync(`/api/projects/${s.projectId}/polygons/${polygonId}`, { method: 'DELETE' });
     });
+  },
+
+  // BUG-A7-4-007: batch update polygons with a single undo snapshot
+  batchUpdatePolygons: (patches) => {
+    const s = get();
+    if (patches.length === 0) return;
+    const before = snapshot(s);
+    const patchMap = new Map(patches.map((p) => [p.id, p.patch]));
+    set({
+      polygons: s.polygons.map((p) => {
+        const patch = patchMap.get(p.id);
+        return patch ? { ...p, ...patch } : p;
+      }),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    // Sync each update to API
+    const pid = s.projectId;
+    if (pid) {
+      for (const { id, patch } of patches) {
+        apiSync(`/api/projects/${pid}/polygons/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(patch),
+        });
+      }
+    }
   },
 
   addAnnotation: (a) => {
@@ -597,21 +622,84 @@ export const useStore = create<Store>()(
   },
 
   cutPolygon: (id, cutShape) => {
-    void cutShape;
     const s = get();
+    const poly = s.polygons.find((p) => p.id === id);
+    if (!poly || cutShape.length < 3) return;
     const before = snapshot(s);
-    set({
-      polygons: s.polygons.filter((p) => p.id !== id),
-      selectedPolygons: [],
-      selectedPolygon: null,
-      selectedPolygonId: null,
-      undoStack: pushUndo(s.undoStack, before),
-      redoStack: [],
-    });
+    try {
+      const turf = require('@turf/turf');
+      const polyRing: [number, number][] = poly.points.map((p) => [p.x, p.y]);
+      polyRing.push([poly.points[0].x, poly.points[0].y]);
+      const cutRing: [number, number][] = cutShape.map((p) => [p.x, p.y]);
+      cutRing.push([cutShape[0].x, cutShape[0].y]);
+      const turfPoly = turf.polygon([polyRing]);
+      const turfCut = turf.polygon([cutRing]);
+      const fc = turf.featureCollection([turfPoly, turfCut]);
+      const diff = turf.difference(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
+      if (!diff) {
+        // Cut removed entire polygon
+        set({
+          polygons: s.polygons.filter((p) => p.id !== id),
+          selectedPolygons: [],
+          selectedPolygon: null,
+          selectedPolygonId: null,
+          undoStack: pushUndo(s.undoStack, before),
+          redoStack: [],
+        });
+        return;
+      }
+      const results: Polygon[] = [];
+      const extractRing = (coords: number[][]) =>
+        coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
+      if (diff.geometry.type === 'Polygon') {
+        const pts = extractRing(diff.geometry.coordinates[0]);
+        if (pts.length >= 3) {
+          results.push({ ...poly, id: crypto.randomUUID(), points: pts, area: calculatePolygonArea(pts) });
+        }
+      } else {
+        for (const rings of (diff.geometry as GeoJSON.MultiPolygon).coordinates) {
+          const pts = extractRing(rings[0]);
+          if (pts.length >= 3) {
+            results.push({ ...poly, id: crypto.randomUUID(), points: pts, area: calculatePolygonArea(pts) });
+          }
+        }
+      }
+      if (results.length === 0) {
+        set({
+          polygons: s.polygons.filter((p) => p.id !== id),
+          selectedPolygons: [],
+          selectedPolygon: null,
+          selectedPolygonId: null,
+          undoStack: pushUndo(s.undoStack, before),
+          redoStack: [],
+        });
+      } else {
+        set({
+          polygons: s.polygons.filter((p) => p.id !== id).concat(results),
+          selectedPolygon: results[0].id,
+          selectedPolygonId: results[0].id,
+          selectedPolygons: [results[0].id],
+          undoStack: pushUndo(s.undoStack, before),
+          redoStack: [],
+        });
+      }
+    } catch {
+      // Fallback: delete the polygon if Turf fails
+      set({
+        polygons: s.polygons.filter((p) => p.id !== id),
+        selectedPolygons: [],
+        selectedPolygon: null,
+        selectedPolygonId: null,
+        undoStack: pushUndo(s.undoStack, before),
+        redoStack: [],
+      });
+    }
   },
 
   // Scale per page
   setScale: (scale) => {
+    // BUG-A7-4-002: reject non-finite or non-positive pixelsPerUnit
+    if (!Number.isFinite(scale.pixelsPerUnit) || scale.pixelsPerUnit <= 0) return;
     const s = get();
     const before = snapshot(s);
     set({ scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
@@ -625,9 +713,17 @@ export const useStore = create<Store>()(
     }
   },
   setScaleForPage: (page, scale) => {
+    // BUG-A7-4-002: reject non-finite or non-positive pixelsPerUnit
+    if (!Number.isFinite(scale.pixelsPerUnit) || scale.pixelsPerUnit <= 0) return;
     const s = get();
     const before = snapshot(s);
-    set({ scales: { ...s.scales, [page]: scale }, scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+    // BUG-A7-4-003: only update global scale when page matches currentPage
+    set({
+      scales: { ...s.scales, [page]: scale },
+      ...(page === s.currentPage ? { scale } : {}),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
     // BUG-A5-C3: sync to API
     const pid = s.projectId;
     if (pid) {
@@ -703,6 +799,14 @@ export const useStore = create<Store>()(
       selectedPolygon: null,
       selectedPolygonId: null,
       selectedPolygons: [],
+      // R-002: reset fields that were previously leaked across hydrations
+      groups: [],
+      assemblies: [],
+      markups: [],
+      repeatingGroups: [],
+      sheetNames: {},
+      drawingSets: {},
+      pageBaseDimensions: {},
     });
   },
 
@@ -763,12 +867,25 @@ export const useStore = create<Store>()(
   // ─── Assemblies ───
   assemblies: [],
   setAssemblies: (assemblies) => set({ assemblies }),
-  addAssembly: (assembly) => set((s) => ({ assemblies: [...s.assemblies, assembly] })),
-  updateAssembly: (id, updates) =>
-    set((s) => ({
+  addAssembly: (assembly) => {
+    const s = get();
+    const before = snapshot(s);
+    set({ assemblies: [...s.assemblies, assembly], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+  },
+  updateAssembly: (id, updates) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       assemblies: s.assemblies.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-    })),
-  deleteAssembly: (id) => set((s) => ({ assemblies: s.assemblies.filter((a) => a.id !== id) })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
+  deleteAssembly: (id) => {
+    const s = get();
+    const before = snapshot(s);
+    set({ assemblies: s.assemblies.filter((a) => a.id !== id), undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+  },
 
   // ─── 3D View ───
   show3D: false,
@@ -778,12 +895,25 @@ export const useStore = create<Store>()(
   // ─── Markups ───
   markups: [],
   showMarkups: true,
-  addMarkup: (markup) => set((s) => ({ markups: [...s.markups, markup] })),
-  deleteMarkup: (id) => set((s) => ({ markups: s.markups.filter((m) => m.id !== id) })),
-  clearMarkups: (pageNumber) =>
-    set((s) => ({
+  addMarkup: (markup) => {
+    const s = get();
+    const before = snapshot(s);
+    set({ markups: [...s.markups, markup], undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+  },
+  deleteMarkup: (id) => {
+    const s = get();
+    const before = snapshot(s);
+    set({ markups: s.markups.filter((m) => m.id !== id), undoStack: pushUndo(s.undoStack, before), redoStack: [] });
+  },
+  clearMarkups: (pageNumber) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       markups: pageNumber !== undefined ? s.markups.filter((m) => m.pageNumber !== pageNumber) : [],
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
   toggleShowMarkups: () => set((s) => ({ showMarkups: !s.showMarkups })),
 
   // ─── Calibration ───
@@ -820,22 +950,36 @@ export const useStore = create<Store>()(
   // BUG-A6-010 fix: return the new group's ID so callers can avoid the fragile
   // setTimeout(0) pattern to find the newly created group.
   addGroup: (name, color) => {
+    const s = get();
     const id = crypto.randomUUID();
-    set((s) => ({
+    const before = snapshot(s);
+    set({
       groups: [...s.groups, { id, name: name.trim(), color, classificationIds: [], breakdowns: [] }],
-    }));
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
     return id;
   },
 
-  updateGroup: (id, patch) =>
-    set((s) => ({
+  updateGroup: (id, patch) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       groups: s.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)),
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
 
-  deleteGroup: (id) =>
-    set((s) => ({
+  deleteGroup: (id) => {
+    const s = get();
+    const before = snapshot(s);
+    set({
       groups: s.groups.filter((g) => g.id !== id),
-    })),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+  },
 
   // BUG-A6-009 fix: reorder groups by supplying an ordered array of IDs.
   reorderGroups: (ids) =>

@@ -106,16 +106,22 @@ export default function FloorAreaMesh({
     };
   }, [geometry]);
 
-  if (!geometry) return null;
-
-  const fillColor = new Color(selected ? brighten(color) : color);
+  // BUG-A7-4-059: memoize Color objects to avoid creating new ones per render
+  const fillColor = useMemo(() => new Color(selected ? brighten(color) : color), [color, selected]);
+  const emissiveColor = useMemo(() => selected ? new Color(color) : new Color('#000000'), [color, selected]);
   const opacity = selected ? 0.8 : 0.5;
   const outlineY = 0.02; // slightly above fill
 
-  const outlinePoints = [
-    ...pointsToVec3(points, outlineY),
-    ...pointsToVec3(points, outlineY).slice(0, 1),
-  ];
+  // BUG-A7-4-060: memoize outlinePoints, fix closing point to avoid O(n) slice
+  const outlinePoints = useMemo(() => {
+    if (points.length < 3) return [];
+    return [
+      ...pointsToVec3(points, outlineY),
+      new Vector3(points[0].x, outlineY, points[0].y),
+    ];
+  }, [points, outlineY]);
+
+  if (!geometry) return null;
 
   return (
     <group
@@ -133,7 +139,7 @@ export default function FloorAreaMesh({
           color={fillColor}
           transparent
           opacity={opacity}
-          emissive={selected ? new Color(color) : new Color('#000000')}
+          emissive={emissiveColor}
           emissiveIntensity={selected ? 0.35 : 0}
           depthWrite={false}
           side={DoubleSide}

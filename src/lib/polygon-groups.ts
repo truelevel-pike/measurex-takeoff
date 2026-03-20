@@ -46,6 +46,8 @@ export function removeFromGroup(group: PolygonGroup, polygonId: string): Polygon
   };
 }
 
+// BUG-A7-4-062: O(groups × polygons) when called per group in a render loop.
+// Callers with many groups should pre-build a Map<id, Polygon> and avoid repeated full scans.
 export function getGroupStats(group: PolygonGroup, polygons: Polygon[]): GroupStats {
   const polygonIds = new Set(group.polygonIds);
   let polygonCount = 0;

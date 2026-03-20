@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
@@ -35,7 +35,10 @@ export default function DrawingTool() {
   const gridEnabled = useStore((s) => s.gridEnabled);
   const gridSize = useStore((s) => s.gridSize);
   const snapOptions = { vertices: snappingEnabled, midpoints: snappingEnabled, edges: false, grid: gridEnabled, gridSize };
-  const snapPolygons = polygons.filter((polygon) => polygon.pageNumber === drawingPage);
+  // BUG-A7-4-050: memoize snapPolygons to prevent useCallback invalidation
+  const snapPolygons = useMemo(() => polygons.filter((polygon) => polygon.pageNumber === drawingPage), [polygons, drawingPage]);
+  // BUG-A7-4-051: disable snapping when baseDims are placeholder values
+  const snappingActive = snappingEnabled && baseDims.width > 1;
   const containerRef = useRef<HTMLDivElement>(null);
   // Cache the container's bounding rect so rapid clicks never read a stale/zero rect
   // (can happen mid-layout when getBoundingClientRect() is called during a React re-render).
@@ -93,10 +96,13 @@ export default function DrawingTool() {
     // Convert 15 screen-px snap radius to base-space so snapping feels consistent at any zoom
     const screenToBase = baseDims.width / rect.width;
     const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
-    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
-    if (snap) return { x: snap.x, y: snap.y };
+    // BUG-A7-4-051: skip snapping when baseDims are placeholder
+    if (snappingActive) {
+      const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
+      if (snap) return { x: snap.x, y: snap.y };
+    }
     return { x, y };
-  }, [baseDims, snapPolygons, snappingEnabled, gridEnabled, gridSize]);
+  }, [baseDims, snapPolygons, snappingActive, gridEnabled, gridSize]);
 
   const getSelectedClassification = useCallback(() => {
     return classifications.find((c) => c.id === selectedClassification) ?? null;
@@ -133,7 +139,11 @@ export default function DrawingTool() {
       typeof performance !== 'undefined' &&
       typeof performance.mark === 'function' &&
       typeof performance.measure === 'function';
-    if (canMeasurePerf) performance.mark('polygon-draw-start');
+    // BUG-A7-4-052: append per-call UUID to performance mark names
+    const perfId = canMeasurePerf ? crypto.randomUUID() : '';
+    const startMark = `polygon-draw-start-${perfId}`;
+    const endMark = `polygon-draw-end-${perfId}`;
+    if (canMeasurePerf) performance.mark(startMark);
     const ppu = scale?.pixelsPerUnit || 1;
     // BUG-A5-H02: compute both area and linearFeet for all polygon types.
     // Area polygons get perimeter (closed=true), linear polygons get path length (closed=false).
@@ -151,8 +161,8 @@ export default function DrawingTool() {
       label: cls.name,
     });
     if (canMeasurePerf) {
-      performance.mark('polygon-draw-end');
-      const polyMeasure = performance.measure('polygon-draw', 'polygon-draw-start', 'polygon-draw-end');
+      performance.mark(endMark);
+      const polyMeasure = performance.measure(`polygon-draw-${perfId}`, startMark, endMark);
       if (typeof window !== 'undefined') {
         if (!window.__perfMarks) window.__perfMarks = { pdfRender: null, aiTakeoff: null, polygonDraw: null };
         window.__perfMarks.polygonDraw = polyMeasure.duration;
@@ -232,15 +242,17 @@ export default function DrawingTool() {
     const y = (clickY / rect.height) * baseDims.height;
     const screenToBase = baseDims.width / rect.width;
     const snapRadiusBase = SNAP_SCREEN_PX * screenToBase;
-    const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
-    if (snap) {
-      setCursor({ x: snap.x, y: snap.y });
-      setSnapIndicator(snap);
-    } else {
-      setCursor({ x, y });
-      setSnapIndicator(null);
+    if (snappingActive) {
+      const snap = findNearestSnapPoint(x, y, snapPolygons, snapRadiusBase, snapOptions);
+      if (snap) {
+        setCursor({ x: snap.x, y: snap.y });
+        setSnapIndicator(snap);
+        return;
+      }
     }
-  }, [baseDims, snapPolygons, snappingEnabled, gridEnabled, gridSize]);
+    setCursor({ x, y });
+    setSnapIndicator(null);
+  }, [baseDims, snapPolygons, snappingActive, gridEnabled, gridSize]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setPointsAndRef([]); setTool('select'); } // E36: Escape cancel drawing verified
@@ -274,6 +286,22 @@ export default function DrawingTool() {
       onMouseMove={handleMouseMove}
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}
+      onTouchStart={(e) => {
+        e.stopPropagation();
+        containerRef.current?.focus();
+      }}
+      onTouchMove={(e) => {
+        if (e.touches.length > 0) {
+          const t = e.touches[0];
+          handleMouseMove({ clientX: t.clientX, clientY: t.clientY } as unknown as React.MouseEvent);
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.changedTouches.length > 0) {
+          const t = e.changedTouches[0];
+          handleClick({ clientX: t.clientX, clientY: t.clientY, stopPropagation: () => {}, detail: 1 } as unknown as React.MouseEvent);
+        }
+      }}
       tabIndex={0}
     >
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={vb} preserveAspectRatio="none">

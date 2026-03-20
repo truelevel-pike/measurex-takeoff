@@ -33,6 +33,7 @@ function labelToPixelsPerUnit(label: string): number {
   const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
   if (archMatch) {
     const frac = parseFraction(archMatch[1].trim());
+    if (frac === null || frac <= 0) return DPI * 0.125; // fallback
     return frac * DPI;
   }
 
@@ -40,16 +41,22 @@ function labelToPixelsPerUnit(label: string): number {
 }
 
 /** Parse fraction strings like "3/64", "1 1/2", "1", "3" */
-function parseFraction(s: string): number {
+// BUG-A7-4-013: guard denominator=0 returning null
+function parseFraction(s: string): number | null {
   const mixedMatch = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixedMatch) {
-    return parseInt(mixedMatch[1], 10) + parseInt(mixedMatch[2], 10) / parseInt(mixedMatch[3], 10);
+    const den = parseInt(mixedMatch[3], 10);
+    if (den === 0) return null;
+    return parseInt(mixedMatch[1], 10) + parseInt(mixedMatch[2], 10) / den;
   }
   const fracMatch = s.match(/^(\d+)\/(\d+)$/);
   if (fracMatch) {
-    return parseInt(fracMatch[1], 10) / parseInt(fracMatch[2], 10);
+    const den = parseInt(fracMatch[2], 10);
+    if (den === 0) return null;
+    return parseInt(fracMatch[1], 10) / den;
   }
-  return parseFloat(s) || 0;
+  const val = parseFloat(s);
+  return (val && Number.isFinite(val)) ? val : null;
 }
 
 /**
@@ -61,7 +68,7 @@ function buildScalePreview(label: string, ppu: number, unit: string): string {
   const archMatch = label.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
   if (archMatch) {
     const frac = parseFraction(archMatch[1].trim());
-    if (frac > 0) {
+    if (frac !== null && frac > 0) {
       const feetPerInch = 1 / frac;
       return `1 inch on paper = ${feetPerInch % 1 === 0 ? feetPerInch.toFixed(0) : feetPerInch.toFixed(1)} feet`;
     }
@@ -120,7 +127,7 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
   }, [setTool, onClose]);
 
   const persistScale = useCallback(
-    (cal: { pixelsPerUnit: number; unit: 'ft' | 'in' | 'm' | 'mm'; label: string; source: 'manual' }) => {
+    (cal: { pixelsPerUnit: number; unit: 'ft' | 'in' | 'm' | 'cm' | 'mm'; label: string; source: 'manual' }) => {
       if (!projectId) return;
       const pageNumber = currentPage >= 1 ? currentPage : 1;
       void fetch(`/api/projects/${projectId}/scale`, {
@@ -181,12 +188,19 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
     setView('manual');
   }, []);
 
+  // BUG-A7-4-014: resolve unit via ARCH_RATIOS_FT lookup instead of hardcoding 'ft'
   const handleManualSave = useCallback(
     (label: string) => {
       const ppu = labelToPixelsPerUnit(label);
+      const ratioMatch = label.match(/^1\s*:\s*(\d+)$/);
+      let unit: 'ft' | 'in' | 'm' | 'mm' = 'ft';
+      if (ratioMatch) {
+        const ratio = parseInt(ratioMatch[1], 10);
+        unit = ARCH_RATIOS_FT.has(ratio) ? 'ft' : 'm';
+      }
       const cal = {
         pixelsPerUnit: ppu,
-        unit: 'ft' as const,
+        unit,
         label,
         source: 'manual' as const,
       };
@@ -213,7 +227,6 @@ export default function ScaleCalibration({ onClose }: ScaleCalibrationProps) {
       <div onClick={(e) => e.stopPropagation()}>
         {view === 'presets' ? (
           <ScalePanel
-            currentPage={currentPage}
             selectedScale={selectedLabel}
             autoDetected={isAutoDetected}
             scalePreview={scalePreview}

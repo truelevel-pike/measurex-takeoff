@@ -85,6 +85,8 @@ export function snapToGrid(
   y: number,
   gridSize: number,
 ): { x: number; y: number } {
+  // BUG-A7-4-004: guard against zero/negative gridSize producing NaN
+  if (gridSize <= 0) return { x, y };
   return {
     x: Math.round(x / gridSize) * gridSize,
     y: Math.round(y / gridSize) * gridSize,
