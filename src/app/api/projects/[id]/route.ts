@@ -126,6 +126,7 @@ export const DELETE = withCache({ noStore: true }, async function DELETE(_req: R
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
     const ok = await deleteProject(id);
+    if (!ok) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ ok });
   } catch (err: unknown) {
     console.error("[project route]", err);
