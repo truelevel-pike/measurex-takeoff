@@ -11,11 +11,17 @@ CREATE OR REPLACE FUNCTION _exec_sql(sql_text text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   EXECUTE sql_text;
 END;
 $$;
+
+-- R-A8-001 fix: revoke PUBLIC execute on _exec_sql to prevent unauthenticated
+-- arbitrary SQL execution via the Supabase API. Only service_role may call it.
+REVOKE EXECUTE ON FUNCTION _exec_sql(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _exec_sql(text) TO service_role;
 
 -- Record this bootstrap migration as applied
 INSERT INTO _migrations (name) VALUES ('000_bootstrap.sql')
