@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getScale, setScale, initDataDir } from '@/server/project-store';
+import { getScale, setScale, listScales, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
 
@@ -33,8 +33,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       : [];
 
     if (pageNumbers.length === 0) {
-      // Return all scales — caller didn't specify pages
-      return NextResponse.json({ scales: {} });
+      // BUG-A5-5-010: return all scales when no pages param provided
+      const allScales = await listScales(id);
+      const scalesMap: Record<number, unknown> = {};
+      for (const s of allScales) {
+        if (s.pageNumber) scalesMap[s.pageNumber] = s;
+      }
+      return NextResponse.json({ scales: scalesMap });
     }
 
     const results: Record<number, unknown> = {};

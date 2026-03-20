@@ -25,13 +25,10 @@ export async function POST(req: NextRequest) {
     console.log('[Perf Event]', parsed.data);
   }
 
-  // Prod: optionally persist — graceful if table doesn't exist
+  // BUG-A5-5-013: use singleton getSupabase() instead of fresh client per request
   try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const { getSupabase } = await import('@/lib/supabase');
+    const supabase = getSupabase();
     await supabase.from('mx_perf_events').insert(parsed.data);
   } catch {
     // Table may not exist yet — that's OK

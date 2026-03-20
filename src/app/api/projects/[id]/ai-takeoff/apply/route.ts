@@ -56,8 +56,10 @@ const APPLY_SYNONYM_GROUPS: string[][] = [
 function canonicalName(name: string): string {
   const normalized = name.trim().toLowerCase().replace(/[\/\-]+/g, ' ').replace(/\s+/g, ' ');
   const words = normalized.split(' ').filter((w) => w.length > 0);
-  for (const w of words) {
-    // Exact group match
+  // BUG-A5-5-012: only apply synonym substitution when entire name is a single word
+  // Multi-word names like "Bathroom Space" should NOT be collapsed to "room"
+  if (words.length === 1) {
+    const w = words[0];
     for (const group of APPLY_SYNONYM_GROUPS) {
       if (group.includes(w)) return group[0];
     }

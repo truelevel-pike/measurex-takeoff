@@ -99,7 +99,11 @@ export async function POST(
           return NextResponse.json({ error: 'No entity ID' }, { status: 400 });
         }
         const ok = await deletePolygon(projectId, polygonId);
-        if (ok) broadcastToProject(projectId, 'polygon:deleted', { id: polygonId });
+        // BUG-A5-5-011: return 404 when polygon was already gone
+        if (!ok) {
+          return NextResponse.json({ restored: false, action: 'deleted', ok: false, error: 'Polygon not found' }, { status: 404 });
+        }
+        broadcastToProject(projectId, 'polygon:deleted', { id: polygonId });
         return NextResponse.json({ restored: true, action: 'deleted', ok });
       }
 
