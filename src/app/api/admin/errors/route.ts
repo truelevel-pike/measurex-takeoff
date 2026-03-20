@@ -21,6 +21,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const errors = getErrors();
-  return NextResponse.json({ errors, count: errors.length });
+  // BUG-A5-6-122: paginate error log with limit/offset query params
+  const url = new URL(req.url);
+  const limit = Math.max(1, Math.min(1000, Number(url.searchParams.get("limit")) || 100));
+  const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+
+  const allErrors = getErrors();
+  const errors = allErrors.slice(offset, offset + limit);
+  return NextResponse.json({ errors, count: allErrors.length, limit, offset });
 }

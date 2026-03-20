@@ -43,6 +43,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 }
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-100: add rate limiting to POST handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
