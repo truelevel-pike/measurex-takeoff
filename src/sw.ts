@@ -17,9 +17,17 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// BUG-A8-4-L009: defer skipWaiting until the page explicitly requests it
+// via a "SKIP_WAITING" message, so in-progress operations are not disrupted.
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true,
+  skipWaiting: false,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
