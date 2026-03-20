@@ -956,7 +956,9 @@ export const useStore = create<Store>()(
   // ─── Calibration ───
   calibrationMode: false,
   calibrationPoints: [],
-  setCalibrationMode: (active) => set((s) => ({ calibrationMode: active, calibrationPoints: active ? [] : s.calibrationPoints })),
+  // BUG-A7-5-017 fix: always clear calibrationPoints when activating OR deactivating
+  setCalibrationMode: (active) => set({ calibrationMode: active, calibrationPoints: [] }),
+  // BUG-A7-5-018 fix: return boolean indicating whether the point was added
   addCalibrationPoint: (p) => {
     const pts = get().calibrationPoints;
     if (pts.length >= 2) return;
@@ -1183,7 +1185,8 @@ export const useStore = create<Store>()(
       }),
       // BUG-A7-5-006 fix: version the persist schema to handle future migrations
       version: 1,
-      migrate: (persisted: Record<string, unknown>, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
+        const persisted = (persistedState ?? {}) as Record<string, unknown>;
         if (version === 0) {
           // v0 → v1: ensure markups/showMarkups exist
           return { ...persisted, markups: persisted.markups ?? [], showMarkups: persisted.showMarkups ?? true };

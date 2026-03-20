@@ -14,7 +14,8 @@ export default function CutTool() {
   const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const pagePolygons = polygons.filter((p) => p.pageNumber === currentPage);
+  // BUG-A7-5-030 fix: memoize pagePolygons to avoid recompute on every render
+  const pagePolygons = useMemo(() => polygons.filter((p) => p.pageNumber === currentPage), [polygons, currentPage]);
 
   // BUG-A7-5-029 fix: auto-focus on mount so keyboard (Escape) works immediately
   useEffect(() => {

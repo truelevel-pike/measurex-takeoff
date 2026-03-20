@@ -5,6 +5,8 @@ import { useStore } from '@/lib/store';
 import ScalePanel from '@/components/ScalePanel';
 import ManualCalibration from '@/components/ManualCalibration';
 import { useToast } from '@/components/Toast';
+// BUG-A7-5-044 fix: static import instead of dynamic import()
+import { getNotificationPrefs } from '@/components/NotificationSettings';
 
 const DPI = 72;
 

@@ -16,6 +16,7 @@ export function createAuditEntry(
   resource: string,
   resourceId: string,
   metadata?: Record<string, unknown>,
+  userId?: string,
 ): AuditEntry {
   const entry: AuditEntry = {
     id: crypto.randomUUID(),
@@ -23,6 +24,7 @@ export function createAuditEntry(
     action,
     resource,
     resourceId,
+    userId,
     metadata,
   };
 
@@ -48,7 +50,7 @@ export function createAuditEntry(
   fetch('/api/audit-log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, resource, resourceId, metadata }),
+    body: JSON.stringify({ action, resource, resourceId, metadata, userId }),
   }).catch(() => {
     // Silently ignore network errors
   });
