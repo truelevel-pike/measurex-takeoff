@@ -63,9 +63,12 @@ export function checkRateLimit(
  * or null if the request is allowed.
  */
 export function rateLimitResponse(req: Request, max?: number, windowMs?: number): Response | null {
+  // BUG-A5-6-188: prefer x-real-ip (typically set by reverse proxy and harder to spoof)
+  // over x-forwarded-for (easily spoofable by clients). Note: neither header is fully
+  // trustworthy without a trusted proxy configuration.
   const ip =
+    req.headers.get('x-real-ip')?.trim() ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
     '127.0.0.1';
 
   const { allowed, retryAfterSec } = checkRateLimit(ip, max, windowMs);
