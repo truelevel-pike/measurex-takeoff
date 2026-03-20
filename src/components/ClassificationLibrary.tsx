@@ -23,14 +23,14 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
 
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) {
-      setActiveTab('RESIDENTIAL');
-      setSelectedKeys(new Set());
-    }
-  }
+
+  // BUG-A6-002 fix: replace the render-body setState pattern (getDerivedStateFromProps
+  // anti-pattern) with a useEffect that resets state when the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    setActiveTab('RESIDENTIAL');
+    setSelectedKeys(new Set());
+  }, [open]);
 
   const byId = useMemo(
     () => new Map(CLASSIFICATION_PRESET_COLLECTIONS.map((collection) => [collection.id, collection])),
