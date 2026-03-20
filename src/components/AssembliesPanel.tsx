@@ -89,6 +89,14 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   const [formulaMap, setFormulaMap] = useState<Record<string, string>>({});
   const costDebounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // BUG-A6-004 fix: clear all pending debounce timers on unmount so that
+  // in-flight API callbacks don't fire against an unmounted component.
+  useEffect(() => {
+    return () => {
+      Object.values(costDebounceTimers.current).forEach(clearTimeout);
+    };
+  }, []);
+
   // Compute quantities per classification from polygons + scale (mirrors QuantitiesPanel logic)
   const quantitiesByClass = useMemo(() => {
     const ppu = scale?.pixelsPerUnit || 1;
