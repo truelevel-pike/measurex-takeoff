@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPage, updateProject, initDataDir } from '@/server/project-store';
+import { getProject, createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF, renderPageAsImage } from '@/server/pdf-processor';
 import { savePDF } from '@/server/pdf-storage';
 import { extractSheetName } from '@/lib/sheet-namer';
@@ -13,6 +13,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     // Filename sanitization is not needed — the uploaded file's original name is
     // never used in the file path. We save as `${id}.pdf` where `id` is validated
     // as a UUID by ProjectIdSchema above, preventing path traversal.
