@@ -10,8 +10,14 @@ interface LogEntry {
   message: string;
   timestamp: Date;
   icon: string;
-  /** Hex color of the classification (for the color dot). */
+  /**
+   * Hex color for the color dot. For classification-linked events this is
+   * stored as a stable value captured at event time; the component re-resolves
+   * colors reactively via classificationId when rendering (BUG-A6-008 fix).
+   */
   color?: string;
+  /** Classification ID — used by the component to reactively re-resolve color. */
+  classificationId?: string;
   /** Short detail like "area" / "linear" / "count". */
   detail?: string;
 }
@@ -20,12 +26,10 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-/** Look up classification color from the store by ID. */
-function getClassificationColor(classificationId: string | undefined): string | undefined {
-  if (!classificationId) return undefined;
-  const cls = useStore.getState().classifications.find((c) => c.id === classificationId);
-  return cls?.color;
-}
+// BUG-A6-008 fix: removed module-level getClassificationColor that called
+// useStore.getState() non-reactively. Classification color lookup is now
+// done in the component with a reactive selector (see below), so log entries
+// that reference a classificationId will always reflect the current store state.
 
 /** Type label for the polygon detail. */
 function typeLabel(type: unknown): string | undefined {
@@ -46,7 +50,9 @@ function eventToLogEntry(event: string, data: Record<string, unknown>): LogEntry
       return { id, timestamp, icon: '\u2705', message: 'AI takeoff complete' };
     case 'polygon:created': {
       const label = (data.label as string) || (data.id as string)?.slice(0, 8) || 'unknown';
-      const color = getClassificationColor(data.classificationId as string);
+      // BUG-A6-008 fix: store classificationId on the entry instead of resolving
+      // the color here. The component resolves color reactively from the store.
+      const classificationId = data.classificationId as string | undefined;
       const detail = typeLabel(data.type);
       let message: string;
       if (data.type === 'area' && data.area != null) {
@@ -60,7 +66,7 @@ function eventToLogEntry(event: string, data: Record<string, unknown>): LogEntry
       } else {
         message = `Shape detected: ${label}`;
       }
-      return { id, timestamp, icon: '\u{1F916}', message, color, detail };
+      return { id, timestamp, icon: '\u{1F916}', message, classificationId, detail };
     }
     case 'polygon:updated': {
       const label = (data.label as string);
@@ -126,6 +132,8 @@ export default function AIActivityLog() {
   const [entries, setEntries] = useState<LogEntry[]>(persistedEntries);
   const [collapsed, setCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // BUG-A6-008 fix: subscribe reactively so classification color updates are reflected.
+  const classifications = useStore((s) => s.classifications);
 
   // Start the module-level SSE listener and sync persistent entries into component state.
   useEffect(() => {
@@ -180,15 +188,21 @@ export default function AIActivityLog() {
               No activity yet
             </div>
           ) : (
-            entries.map((entry) => (
+            entries.map((entry) => {
+              // BUG-A6-008 fix: resolve color reactively from classifications selector
+              // so that color updates are reflected without re-parsing events.
+              const resolvedColor = entry.classificationId
+                ? classifications.find((c) => c.id === entry.classificationId)?.color ?? entry.color
+                : entry.color;
+              return (
               <div
                 key={entry.id}
                 className="flex items-start gap-2 py-1.5 border-b border-[rgba(255,255,255,0.04)] last:border-0"
               >
-                {entry.color ? (
+                {resolvedColor ? (
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                    style={{ backgroundColor: entry.color }}
+                    style={{ backgroundColor: resolvedColor }}
                     aria-hidden="true"
                   />
                 ) : (
@@ -208,7 +222,8 @@ export default function AIActivityLog() {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
