@@ -2092,7 +2092,8 @@
         "required": true,
         "schema": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+$"
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         },
         "description": "Project UUID"
       }
