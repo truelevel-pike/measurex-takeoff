@@ -979,7 +979,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       {currentTool === 'select' && singleSelectedPoly && floatingToolbarPos && (() => {
         const svgEl = wrapperRef.current?.querySelector('svg');
         const svgRect = svgEl?.getBoundingClientRect();
-        if (!svgRect || baseDims.width === 0) return null;
+        if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;
         const scaleY = svgRect.height / baseDims.height;
         const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
@@ -1061,7 +1061,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       {showFloatingReclassify && singleSelectedPoly && floatingToolbarPos && (() => {
         const svgEl = wrapperRef.current?.querySelector('svg');
         const svgRect = svgEl?.getBoundingClientRect();
-        if (!svgRect || baseDims.width === 0) return null;
+        if (!svgRect || svgRect.width === 0 || svgRect.height === 0 || baseDims.width === 0) return null;
         const scaleX = svgRect.width / baseDims.width;
         const scaleY = svgRect.height / baseDims.height;
         const screenX = svgRect.left + floatingToolbarPos.centX * scaleX;
