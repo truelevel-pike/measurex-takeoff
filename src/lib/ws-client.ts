@@ -62,13 +62,13 @@ function handleSSEMessage(raw: MessageEvent) {
     }
   }
 
-  const store = useStore.getState();
-
   switch (parsed.event) {
     case 'connected':
       reconnectAttempt = 0;
       break;
     case 'polygon:created': {
+      // Re-fetch fresh state per-case to avoid stale snapshot from rapid SSE bursts
+      const store = useStore.getState();
       const poly = parsed.data as Polygon;
       if (store.polygons.some((p) => p.id === poly.id)) break;
       useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
@@ -76,9 +76,12 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'polygon:updated': {
+      // Re-fetch fresh state; use direct setState (no undo-tracked action) so remote
+      // edits from other users don't pollute the local undo stack (BUG-A7-011).
+      const store = useStore.getState();
       const poly = parsed.data as Polygon;
       if (store.polygons.some((p) => p.id === poly.id)) {
-        store.updatePolygon(poly.id, poly);
+        useStore.setState((s) => ({ polygons: s.polygons.map((p) => (p.id === poly.id ? { ...p, ...poly } : p)) }));
       } else {
         // Upsert: treat as created if not found locally
         useStore.setState((s) => ({ polygons: [...s.polygons, poly] }));
@@ -88,14 +91,20 @@ function handleSSEMessage(raw: MessageEvent) {
     }
     case 'polygon:deleted': {
       const { id } = parsed.data as { id: string };
-      store.deletePolygon(id);
+      // Use direct setState to avoid pushing remote delete onto local undo stack
+      useStore.setState((s) => ({
+        polygons: s.polygons.filter((p) => p.id !== id),
+        selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
+        selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
+        selectedPolygons: s.selectedPolygons.filter((pid) => pid !== id),
+      }));
       emitActivity('polygon:deleted', parsed.data as unknown as Record<string, unknown>);
       break;
     }
     case 'classification:created': {
+      // Re-fetch fresh state; BUG-R6-001: always emit so AI Activity Log stays current
+      const store = useStore.getState();
       const cls = parsed.data as Classification;
-      // BUG-R6-001: Always emit activity so the AI Activity Log shows the event,
-      // even if the classification already exists locally (optimistic add).
       emitActivity('classification:created', parsed.data as unknown as Record<string, unknown>);
       if (!store.classifications.some((c) => c.id === cls.id)) {
         useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
@@ -103,9 +112,13 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'classification:updated': {
+      // Re-fetch fresh state; use direct setState to avoid polluting undo stack
+      const store = useStore.getState();
       const cls = parsed.data as Classification;
       if (store.classifications.some((c) => c.id === cls.id)) {
-        store.updateClassification(cls.id, cls);
+        useStore.setState((s) => ({
+          classifications: s.classifications.map((c) => (c.id === cls.id ? { ...c, ...cls } : c)),
+        }));
       } else {
         // Upsert: treat as created if not found locally
         useStore.setState((s) => ({ classifications: [...s.classifications, cls] }));
@@ -123,7 +136,9 @@ function handleSSEMessage(raw: MessageEvent) {
       break;
     }
     case 'scale:updated': {
-      store.setScale(parsed.data as ScaleCalibration);
+      // Apply remote scale directly (no undo-stack entry) so Ctrl+Z doesn't undo
+      // another user's calibration change (BUG-A7-011).
+      useStore.setState({ scale: parsed.data as ScaleCalibration });
       emitActivity('scale:updated', parsed.data as unknown as Record<string, unknown>);
       break;
     }
