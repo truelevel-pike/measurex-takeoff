@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'mx-first-run-tooltips-shown';
 
@@ -34,16 +34,16 @@ export default function FirstRunTooltips() {
     return () => clearTimeout(timer);
   }, []);
 
+  const dismiss = useCallback(() => {
+    setVisible(false);
+    localStorage.setItem(STORAGE_KEY, 'true');
+  }, []);
+
   useEffect(() => {
     if (!visible) return;
     const autoHide = setTimeout(() => dismiss(), 8000);
     return () => clearTimeout(autoHide);
-  }, [visible]);
-
-  const dismiss = () => {
-    setVisible(false);
-    localStorage.setItem(STORAGE_KEY, 'true');
-  };
+  }, [visible, dismiss]);
 
   if (!visible) return null;
 

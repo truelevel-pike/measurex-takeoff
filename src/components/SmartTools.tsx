@@ -91,9 +91,18 @@ export default function SmartTools() {
     setHasLastAction(true);
   }, []);
 
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+    };
+  }, []);
+
   const showStatus = useCallback((msg: string) => {
     setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(''), 3000);
+    if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+    statusTimeoutRef.current = setTimeout(() => setStatusMsg(''), 3000);
   }, []);
 
   // --- Derived state ---

@@ -55,6 +55,16 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
   const [deleteConfirmSetId, setDeleteConfirmSetId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const activeIntervalsRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  const activeTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  // Cleanup all active intervals and timeouts on unmount
+  useEffect(() => {
+    return () => {
+      activeIntervalsRef.current.forEach(clearInterval);
+      activeTimeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const selectedSet = sets.find((s) => s.id === selectedSetId);
 
@@ -130,6 +140,7 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
           if (progress >= 100) {
             progress = 100;
             clearInterval(interval);
+            activeIntervalsRef.current.delete(interval);
 
             // Add drawing to set
             const drawing: Drawing = {
@@ -145,12 +156,15 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
             );
 
             // Remove from uploads after a moment
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
               setUploads((prev) => prev.filter((u) => u.id !== upload.id));
+              activeTimeoutsRef.current.delete(timeout);
             }, 800);
+            activeTimeoutsRef.current.add(timeout);
           }
           setUploads((prev) => prev.map((u) => (u.id === upload.id ? { ...u, progress, done: progress >= 100 } : u)));
         }, 300);
+        activeIntervalsRef.current.add(interval);
       });
     },
     [selectedSetId]
