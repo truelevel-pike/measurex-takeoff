@@ -3,7 +3,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "regions": ["iad1"],
+  "regions": ["iad1", "sfo1"],
   "functions": {
     "src/app/api/ws/route.ts": {
       "maxDuration": 300
@@ -22,6 +22,9 @@
       "maxDuration": 60
     },
     "src/app/api/vision-search/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/share/[token]/export/route.ts": {
       "maxDuration": 60
     }
   },

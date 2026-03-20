@@ -30,14 +30,21 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
+              // R-A8-007 fix: gate 'unsafe-eval' to dev only (required by webpack HMR + pdf.js eval).
+              // In production only 'unsafe-inline' is kept (pdf.js inline worker init).
+              `script-src 'self' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} 'unsafe-inline' https://cdn.jsdelivr.net`,
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-              "img-src 'self' data: blob: https:",
+              // BUG-A8-4-L017 fix: narrow img-src from all HTTPS to specific trusted origins
+              "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
               // Narrowed: only self + Supabase domains + project-specific WebSocket host.
-              // Update NEXT_PUBLIC_APP_HOST at deploy time if your domain differs.
+              // BUG-A8-4-002: AI calls are exclusively server-proxied via /api/ai-takeoff,
+              // so no external AI API domains are needed in connect-src.
               `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co"} wss://${process.env.NEXT_PUBLIC_APP_HOST ?? "localhost:3000"} https://*.supabase.co`,
-              // blob: kept in worker-src for pdf.js worker (loaded as blob worker by pdfjs-dist)
+              // BUG-A8-4-003: blob: is in worker-src because pdfjs-dist dynamically creates
+              // a blob-URL Web Worker at runtime (via new Worker(URL.createObjectURL(blob))).
+              // blob: is intentionally NOT in script-src (removed in BUG-A8-010) because
+              // script-src blob: would also allow arbitrary script execution.
               "worker-src blob: 'self' https://cdn.jsdelivr.net",
               // script-src-elem: blob: removed (BUG-A8-010)
               "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
@@ -54,6 +61,8 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
           { key: "X-XSS-Protection", value: "1; mode=block" },
+          // R-A8-011 fix: add HSTS header to prevent SSL-stripping
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
         ],
       },
       {
