@@ -97,12 +97,18 @@ export default function LibraryPage() {
     setProjectsLoading(true);
     try {
       const res = await fetch('/api/projects');
-      const data = await res.json();
+      // BUG-A8-006 fix: check res.ok before parsing JSON so that 401/500
+      // error bodies don't get misinterpreted as valid project data.
+      if (!res.ok) {
+        throw new Error(`Failed to load projects (HTTP ${res.status})`);
+      }
+      const data = await res.json() as { projects?: Project[] };
       setProjects(data.projects ?? []);
-      if (data.projects?.length > 0) {
+      if (data.projects && data.projects.length > 0) {
         setSelectedProjectId(data.projects[0].id);
       }
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load projects');
       setProjects([]);
     } finally {
       setProjectsLoading(false);
@@ -600,7 +606,11 @@ function LibraryCard({
               <><Download size={10} /> Import</>
             )}
           </button>
-          {onDelete && (
+          {/* BUG-A8-007 fix: hide delete button for org-owned items.
+              The RLS policy (created_by = auth.uid()) will reject deletes
+              for seeded org templates (created_by = null), so showing the
+              button would create a silent-failure UX with optimistic UI. */}
+          {onDelete && !item.is_org && (
             <button
               onClick={() => onDelete(item.id)}
               className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity p-1"
