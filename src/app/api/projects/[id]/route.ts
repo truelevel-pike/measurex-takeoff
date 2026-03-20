@@ -5,8 +5,13 @@ import type { PageInfo, ProjectMeta } from '@/server/project-store';
 import { ProjectIdSchema, ProjectPutSchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 import { withCache } from '@/lib/with-cache';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-085: add rate limiting to project CRUD
+  const limited = rateLimitResponse(_req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -60,6 +65,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export const PUT = withCache({ noStore: true }, async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-085: add rate limiting to project CRUD
+  const limitedPut = rateLimitResponse(req);
+  if (limitedPut) return limitedPut;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -102,6 +111,10 @@ export const PUT = withCache({ noStore: true }, async function PUT(req: Request,
 });
 
 export const PATCH = withCache({ noStore: true }, async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-085: add rate limiting to project CRUD
+  const limitedPatch = rateLimitResponse(req);
+  if (limitedPatch) return limitedPatch;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -120,6 +133,10 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
 });
 
 export const DELETE = withCache({ noStore: true }, async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-085: add rate limiting to project CRUD
+  const limitedDelete = rateLimitResponse(_req);
+  if (limitedDelete) return limitedDelete;
+
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
