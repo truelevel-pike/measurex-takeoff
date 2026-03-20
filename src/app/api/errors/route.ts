@@ -17,8 +17,10 @@ interface LoggedErrorReport {
   userAgent?: string;
 }
 
+// Intentional in-memory storage: this serves as a short-lived error buffer
+// for recent error reports. Data is ephemeral and lost on restart by design.
+const MAX_ERRORS = 100;
 const loggedErrors: LoggedErrorReport[] = [];
-const MAX_LOGGED_ERRORS = 100;
 
 export async function POST(request: Request) {
   let payload: IncomingErrorReport;
