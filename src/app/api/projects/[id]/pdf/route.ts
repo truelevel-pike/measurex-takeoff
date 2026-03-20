@@ -26,6 +26,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
   } catch (err: unknown) {
+    // BUG-A5-5-021: log original error before returning generic message
+    console.error('[pdf route]', err);
     return NextResponse.json({ error: `Unable to load PDF — the file may be corrupted or too large (max 50MB)` }, { status: 500 });
   }
 }

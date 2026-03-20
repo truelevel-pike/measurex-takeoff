@@ -22,10 +22,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
-    // Validate MIME type — accept application/pdf or .pdf extension (case-insensitive)
+    // BUG-A5-5-020: require BOTH MIME type AND extension (AND not OR)
     const isPdfMime = file.type === 'application/pdf';
     const isPdfExt = file.name?.toLowerCase().endsWith('.pdf');
-    if (!isPdfMime && !isPdfExt) {
+    if (!isPdfMime || !isPdfExt) {
       return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 });
     }
 

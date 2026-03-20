@@ -45,10 +45,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!updated) {
       // Page doesn't exist yet — create it (upsert). This handles the race where
       // the client extracts text before the upload route has finished creating pages.
+      // BUG-A5-5-022: try to get existing page dimensions from nearby pages
+      const existingPages = await getPages(id);
+      const nearestPage = existingPages.find((p) => p.pageNum === pageNum) ?? existingPages[0];
       const page = await createPage(id, {
         pageNum,
-        width: 0,
-        height: 0,
+        width: nearestPage?.width ?? 0,
+        height: nearestPage?.height ?? 0,
         text: (text as string | undefined) ?? '',
         name: (sheet_name as string | undefined) ?? undefined,
       });

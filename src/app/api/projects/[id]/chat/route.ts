@@ -41,7 +41,8 @@ export async function POST(
     const [polygons, classifications, scale, assemblies] = await Promise.all([
       getPolygons(id),
       getClassifications(id),
-      getScale(id, 1),
+      // BUG-A5-5-019: use current page from request body, not always page 1
+      getScale(id, currentPage ?? 1),
       getAssemblies(id),
     ]);
 
