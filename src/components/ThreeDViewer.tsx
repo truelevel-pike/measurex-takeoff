@@ -277,12 +277,12 @@ export default function ThreeDViewer({
 
         {showGrid && <Grid
           args={[300, 300]}
-          sectionSize={20}
-          sectionThickness={1}
-          sectionColor="#00d4ff"
-          cellSize={4}
-          cellThickness={0.5}
-          cellColor="#223244"
+          sectionSize={snapEnabled ? 10 : 20}
+          sectionThickness={snapEnabled ? 1.5 : 1}
+          sectionColor={snapEnabled ? '#00ff88' : '#00d4ff'}
+          cellSize={snapEnabled ? 2 : 4}
+          cellThickness={snapEnabled ? 0.8 : 0.5}
+          cellColor={snapEnabled ? '#1a4433' : '#223244'}
           fadeDistance={250}
           fadeStrength={1}
           infiniteGrid
@@ -308,8 +308,9 @@ export default function ThreeDViewer({
           enablePan
           enableZoom
           enableRotate
+          enableDamping={!snapEnabled}
           dampingFactor={0.08}
-          rotateSpeed={0.7}
+          rotateSpeed={snapEnabled ? 0.3 : 0.7}
           zoomSpeed={0.9}
           panSpeed={0.8}
           minDistance={8}
@@ -344,7 +345,7 @@ export default function ThreeDViewer({
           <button
             onClick={() => {
               setSnapEnabled((prev) => !prev);
-              addToast(snapEnabled ? 'Grid snap disabled.' : 'Grid snap enabled — objects will snap to grid intersections. Coming soon!', 'info');
+              addToast(snapEnabled ? 'Grid snap off — free orbit restored.' : 'Grid snap on — fine 2×2 grid active, orbit damping disabled.', 'info');
             }}
             className={`relative h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition ${
               snapEnabled
@@ -353,7 +354,6 @@ export default function ThreeDViewer({
             }`}
           >
             Snap
-            <Clock size={8} className="absolute -top-1 -right-1 text-yellow-400" />
           </button>
           <div className="w-px h-6 bg-[#00d4ff]/20 mx-1"></div>
           <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[#8892a0] flex items-center gap-2">
