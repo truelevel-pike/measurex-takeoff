@@ -206,7 +206,10 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const isLinear = cls?.type === 'linear';
           const ppu = scaleRef.current?.pixelsPerUnit || 1;
           const area = calculatePolygonArea(prev);
-          const linearFeet = isLinear ? calculateLinearFeet(prev, ppu, false) : 0;
+          // BUG-A5-H03: recompute linearFeet for both linear (open path) and area (closed perimeter)
+          const linearFeet = isLinear
+            ? calculateLinearFeet(prev, ppu, false)
+            : calculateLinearFeet(prev, ppu, true);
           updatePolygon(dragging.polygonId, { points: prev, area, linearFeet });
         }
         return null;
