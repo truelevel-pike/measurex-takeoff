@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getScale, setScale, listScales, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const ScaleEntrySchema = z.object({
   pageNumber: z.number().int().positive(),
@@ -60,6 +61,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
  * Bulk set per-page scales.
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-113: add rate limiting to PUT handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
