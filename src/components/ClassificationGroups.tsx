@@ -27,6 +27,8 @@ export default function ClassificationGroups() {
   const addGroup = useStore((s) => s.addGroup);
   const updateGroup = useStore((s) => s.updateGroup);
   const deleteGroup = useStore((s) => s.deleteGroup);
+  // BUG-A6-009 fix: use the new reorderGroups store action.
+  const reorderGroups = useStore((s) => s.reorderGroups);
   const moveClassificationToGroup = useStore((s) => s.moveClassificationToGroup);
   const addBreakdown = useStore((s) => s.addBreakdown);
   const deleteBreakdown = useStore((s) => s.deleteBreakdown);
@@ -153,18 +155,15 @@ export default function ClassificationGroups() {
     setContextMenu(null);
   }
 
+  // BUG-A6-009 fix: handleMoveGroup now calls reorderGroups to actually persist the swap.
   function handleMoveGroup(groupId: string, direction: 'up' | 'down') {
     const idx = groups.findIndex((g) => g.id === groupId);
     if (idx < 0) return;
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= groups.length) return;
-    const reordered = [...groups];
+    const reordered = groups.map((g) => g.id);
     [reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]];
-    // We need to set all groups at once — use updateGroup won't work for reorder.
-    // Since we don't have a setGroups, we'll do individual updates to swap names/colors/etc.
-    // Actually, the simplest approach: update each group to match the reordered array.
-    // But we only have updateGroup(id, partial). Let's just swap by updating both.
-    // This is a limitation — for now, swap the two groups' data.
+    reorderGroups(reordered);
   }
 
   function handleDrop(e: React.DragEvent, targetGroupId: string) {

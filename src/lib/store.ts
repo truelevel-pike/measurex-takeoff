@@ -150,9 +150,13 @@ export interface Store extends ProjectState {
 
   // Classification Groups
   groups: ClassificationGroup[];
-  addGroup: (name: string, color: string) => void;
+  // BUG-A6-010 fix: addGroup returns the new group's ID so callers don't need
+  // a setTimeout(0) workaround to find the newly created group.
+  addGroup: (name: string, color: string) => string;
   updateGroup: (id: string, patch: Partial<ClassificationGroup>) => void;
   deleteGroup: (id: string) => void;
+  // BUG-A6-009 fix: add reorderGroups action to support move-up/move-down in ClassificationGroups UI.
+  reorderGroups: (ids: string[]) => void;
   moveClassificationToGroup: (classificationId: string, groupId: string) => void;
   addBreakdown: (groupId: string, name: string) => void;
   deleteBreakdown: (groupId: string, breakdownId: string) => void;
@@ -716,11 +720,14 @@ export const useStore = create<Store>()(
     { id: 'grp-framing', name: 'Framing', color: '#14b8a6', classificationIds: [], breakdowns: [] },
   ],
 
+  // BUG-A6-010 fix: return the new group's ID so callers can avoid the fragile
+  // setTimeout(0) pattern to find the newly created group.
   addGroup: (name, color) => {
     const id = crypto.randomUUID();
     set((s) => ({
       groups: [...s.groups, { id, name: name.trim(), color, classificationIds: [], breakdowns: [] }],
     }));
+    return id;
   },
 
   updateGroup: (id, patch) =>
@@ -732,6 +739,17 @@ export const useStore = create<Store>()(
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
     })),
+
+  // BUG-A6-009 fix: reorder groups by supplying an ordered array of IDs.
+  reorderGroups: (ids) =>
+    set((s) => {
+      const map = new Map(s.groups.map((g) => [g.id, g]));
+      const reordered = ids.map((id) => map.get(id)).filter(Boolean) as typeof s.groups;
+      // Append any groups not in the ids array (safety net).
+      const idSet = new Set(ids);
+      const rest = s.groups.filter((g) => !idSet.has(g.id));
+      return { groups: [...reordered, ...rest] };
+    }),
 
   moveClassificationToGroup: (classificationId, groupId) =>
     set((s) => ({
