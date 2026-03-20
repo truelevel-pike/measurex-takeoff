@@ -121,6 +121,9 @@ export default function FloorAreaMesh({
     ];
   }, [points, outlineY]);
 
+  // BUG-A7-5-034 fix: memoize outline color to avoid calling brighten() per render
+  const outlineColor = useMemo(() => (selected ? brighten(color) : color), [color, selected]);
+
   if (!geometry) return null;
 
   return (
@@ -149,7 +152,7 @@ export default function FloorAreaMesh({
       {/* Outline */}
       <Line
         points={outlinePoints}
-        color={selected ? brighten(color) : color}
+        color={outlineColor}
         lineWidth={selected ? 2.5 : 1.2}
         transparent
         opacity={selected ? 0.95 : 0.6}
