@@ -280,20 +280,16 @@ export default function LearnPage() {
           <h2 className="text-lg font-semibold mb-6">Tutorials</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {TUTORIALS.map((tut, i) => (
-              <button
+              <div
                 key={i}
-                className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4 hover:border-gray-600 transition-colors text-left group"
+                className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4 text-left"
               >
                 <span className="text-green-400 shrink-0">{tut.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-white">{tut.title}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{tut.time}</div>
                 </div>
-                <ArrowRight
-                  size={16}
-                  className="text-gray-600 group-hover:text-gray-400 shrink-0 transition-colors"
-                />
-              </button>
+              </div>
             ))}
           </div>
         </section>
@@ -305,11 +301,11 @@ export default function LearnPage() {
             {VIDEOS.map((vid, i) => (
               <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                 <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
-                  <button className="w-14 h-14 rounded-full bg-white/10 backdrop-blur flex items-center justify-center hover:bg-white/20 transition-colors">
-                    <Play size={24} className="text-white ml-1" />
-                  </button>
+                  <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
+                    <Play size={24} className="text-white/40 ml-1" />
+                  </div>
                   <span className="absolute bottom-2 right-2 bg-black/70 text-xs text-gray-300 px-2 py-0.5 rounded">
-                    {vid.duration}
+                    Coming soon
                   </span>
                 </div>
                 <div className="p-4">
@@ -348,12 +344,18 @@ export default function LearnPage() {
 
         {/* Bottom buttons */}
         <section className="flex items-center gap-4 pb-10">
-          <button className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+          <button
+            onClick={() => window.open('https://docs.measurex.io', '_blank', 'noopener,noreferrer')}
+            className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
             <HelpCircle size={16} /> Help Center
           </button>
-          <button className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+          <a
+            href="mailto:support@measurex.io"
+            className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
             <Mail size={16} /> Contact Support
-          </button>
+          </a>
         </section>
       </div>
     </div>
