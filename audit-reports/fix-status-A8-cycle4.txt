@@ -1,1 +1,54 @@
 DONE
+
+All 43 bugs from audit-A8-cycle4.md fixed and committed.
+
+CRITICAL regressions (3):
+  R-A8-001  revoke PUBLIC EXECUTE on _exec_sql
+  R-A8-002  replace USING(true) RLS with owner-scoped policies
+  R-A8-003  add owner_id column to mx_projects
+
+HIGH regressions (5):
+  R-A8-004  API key security — crypto.randomUUID, mask after first view
+  BUG-A8-4-014  PDF storage bucket RLS policies
+  BUG-A8-4-013  guard is_org promotion to service_role
+  BUG-A8-4-012  revoke GRANT SELECT TO anon on classification library
+  R-A8-007  gate unsafe-eval to development only
+
+MEDIUM regressions + bugs (19):
+  R-A8-005  persist defaultScale/applyToAll to localStorage
+  R-A8-006  wire Sign Out + Change Password buttons
+  R-A8-008  add sfo1 region for failover
+  R-A8-009  rename error.tsx to global-error.tsx with html/body wrapper
+  R-A8-010  maximumScale: 1 → 5 for WCAG compliance
+  R-A8-011  add Strict-Transport-Security header
+  BUG-A8-4-001  encode share token + noopener,noreferrer
+  BUG-A8-4-002  document server-proxied AI calls in CSP comment
+  BUG-A8-4-003  document worker-src blob: rationale
+  BUG-A8-4-004  remove hardcoded PII defaults
+  BUG-A8-4-005  fix svgScale stale ref with canvasDims state
+  BUG-A8-4-006  add maxDuration for share export route
+  BUG-A8-4-007  consolidate SW runtimeCaching arrays
+  BUG-A8-4-008  delete rollback on failure in library page
+  BUG-A8-4-009  cache projects list in import modal
+  BUG-A8-4-010  clamp context menu to viewport bounds
+  BUG-A8-4-011  encodeURIComponent on projectId in replaceState
+
+LOW bugs (18):
+  BUG-A8-4-L001  add OpenGraph images/url/siteName + twitter card
+  BUG-A8-4-L002  manifest.json add id/scope/lang/orientation/categories/maskable
+  BUG-A8-4-L003  show error.digest in global-error UI
+  BUG-A8-4-L004  add disabled state to Try Again button
+  BUG-A8-4-L005  wire Help Center + Contact Support, remove fake affordances
+  BUG-A8-4-L006  persist teamName to localStorage
+  BUG-A8-4-L007  validate localStorage data shape after JSON.parse
+  BUG-A8-4-L008  context menu role=menu + keyboard nav
+  BUG-A8-4-L009  defer SW skipWaiting until SKIP_WAITING message
+  BUG-A8-4-L010  update seed created_by from null to system UUID
+  BUG-A8-4-L011  document redundant migrations 011/012 as no-ops
+  BUG-A8-4-L012  fix lint script target path
+  BUG-A8-4-L013  add typecheck script
+  BUG-A8-4-L014  use tsx instead of node --experimental-strip-types
+  BUG-A8-4-L015  remove hardcoded "Shared by Contractor" byline
+  BUG-A8-4-L016  stabilize formattedDate for hydration
+  BUG-A8-4-L017  narrow img-src to specific domains
+  BUG-A8-4-L018  gate AI shortcut on aiLoading
