@@ -216,19 +216,25 @@ export async function POST(
         }
       }
 
-      const newPolygon = await createPolygon(id, {
-        points: element.points,
-        classificationId: classification.id,
-        pageNumber: page,
-        area: areaPixels,
-        linearFeet: linearPixels,
-        isComplete: true,
-        label: element.name,
-      });
-      broadcastToProject(id, 'polygon:created', newPolygon);
+      // BUG-A5-6-097: wrap polygon creation in try/catch to handle failures
+      // after deletePolygonsByPage has already removed existing polygons
+      try {
+        const newPolygon = await createPolygon(id, {
+          points: element.points,
+          classificationId: classification.id,
+          pageNumber: page,
+          area: areaPixels,
+          linearFeet: linearPixels,
+          isComplete: true,
+          label: element.name,
+        });
+        broadcastToProject(id, 'polygon:created', newPolygon);
 
-      existingPolygons.push(newPolygon); // track for dedup within batch
-      createdPolygons++;
+        existingPolygons.push(newPolygon); // track for dedup within batch
+        createdPolygons++;
+      } catch (createErr) {
+        console.error('[ai-apply] polygon creation failed after page delete:', createErr);
+      }
     }
 
     fireWebhook(id, 'takeoff.completed', {
