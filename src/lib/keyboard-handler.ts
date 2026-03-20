@@ -57,6 +57,7 @@ export function useKeyboardHandler(onShowShortcuts: () => void): void {
       }
 
       if (event.metaKey && lower === 'x') {
+        event.preventDefault(); // BUG-A5-6-180: prevent default cut behavior
         store.mergeLines?.();
         return;
       }
