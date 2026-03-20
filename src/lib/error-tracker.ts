@@ -12,6 +12,10 @@ export interface ErrorEntry {
   context: Record<string, unknown>;
 }
 
+// Intentionally module-level: this buffer is shared across server contexts so that
+// errors from any request handler accumulate in a single circular buffer for the
+// /api/debug/errors endpoint. getErrors() returns a shallow copy ([...buffer]) to
+// prevent external mutation.
 const buffer: ErrorEntry[] = [];
 
 /**
