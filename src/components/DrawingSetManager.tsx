@@ -91,15 +91,16 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
     };
   }, []);
 
-  // Close menus on outside click
+  // BUG-A6-5-025 fix: use mousedown instead of click for outside-click detection
+  // to avoid redundant close calls when a menu item synchronously re-renders.
   useEffect(() => {
     const handler = () => {
       setSetMenuId(null);
       setDrawingMenuId(null);
       setMoveSubmenuDrawingId(null);
     };
-    window.addEventListener('click', handler);
-    return () => window.removeEventListener('click', handler);
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
   }, []);
 
   const createSet = () => {
