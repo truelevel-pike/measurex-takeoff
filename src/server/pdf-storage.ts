@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { assertSafeId } from '@/lib/safe-id';
 
 const BUCKET = 'pdfs';
 
@@ -60,6 +61,7 @@ function storagePath(projectId: string): string {
  * In Supabase mode, also uploads to Supabase Storage for persistence.
  */
 export async function savePDF(projectId: string, buffer: Buffer): Promise<string> {
+  assertSafeId(projectId, 'projectId');
   // Always write locally so pdf-processor can read it during this request
   const uploadDir = path.resolve(process.cwd(), 'data', 'uploads');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -89,6 +91,7 @@ export async function savePDF(projectId: string, buffer: Buffer): Promise<string
  * In Supabase mode, tries local disk first (cache), then fetches from Supabase Storage.
  */
 export async function loadPDF(projectId: string): Promise<Buffer | null> {
+  assertSafeId(projectId, 'projectId');
   const localPath = path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
 
   // Try local file first (works in dev and as a cache on serverless)
@@ -132,6 +135,7 @@ export async function loadPDF(projectId: string): Promise<Buffer | null> {
  * Returns null if the PDF cannot be found.
  */
 export async function getPDFPath(projectId: string): Promise<string | null> {
+  assertSafeId(projectId, 'projectId');
   const localPath = path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
 
   // Check local file first

@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
+import { assertSafeId } from '@/lib/safe-id';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
 
 function projectDir(projectId: string): string {
+  assertSafeId(projectId, 'projectId');
   return path.join(PROJECTS_DIR, projectId);
 }
 
