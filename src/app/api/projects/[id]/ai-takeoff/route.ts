@@ -21,7 +21,13 @@ export async function POST(
     const { id } = paramsResult.data;
     const body = await req.json();
     const pageNum: number = body?.page;
-    const model: string | undefined = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
+    // BUG-A5-5-037: validate model against whitelist
+    const ALLOWED_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
+    const rawModel = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
+    if (rawModel && !ALLOWED_MODELS.includes(rawModel)) {
+      return NextResponse.json({ error: `Invalid model. Allowed: ${ALLOWED_MODELS.join(', ')}` }, { status: 400 });
+    }
+    const model = rawModel;
 
     if (!Number.isInteger(pageNum) || pageNum < 1) {
       return NextResponse.json({ error: 'page must be a positive integer' }, { status: 400 });

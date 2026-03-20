@@ -3,6 +3,7 @@ import { getPolygons, getClassifications, getScale, getAssemblies } from '@/serv
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const COST_RE = /cost|estimate|how much|price|budget|total/i;
@@ -11,6 +12,10 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // BUG-A5-5-035: apply rate limiting
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);

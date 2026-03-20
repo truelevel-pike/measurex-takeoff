@@ -1,6 +1,7 @@
 import { ChatBodySchema } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -10,6 +11,10 @@ interface ChatApiMessage {
 }
 
 export async function POST(req: Request) {
+  // BUG-A5-5-036: apply rate limiting
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     const raw = await req.json();
     const validated = validateBody(ChatBodySchema, raw);

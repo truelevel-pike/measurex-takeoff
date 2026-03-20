@@ -9,6 +9,9 @@ export async function aiSheetNamer(imageBase64: string): Promise<string | null> 
   const apiKey = getOpenAIKey();
   if (!apiKey) return null;
 
+  // BUG-A5-5-038: skip AI naming if image is too large (> 500KB base64)
+  if (imageBase64.length > 500_000) return null;
+
   const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
   try {
