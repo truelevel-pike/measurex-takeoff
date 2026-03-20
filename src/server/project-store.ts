@@ -76,6 +76,15 @@ function projectDir(projectId: string): string {
   return path.join(PROJECTS_DIR, projectId);
 }
 
+/**
+ * Read and parse a JSON file from disk, returning `fallback` if the file
+ * does not exist or cannot be parsed.  This is intentionally lenient so that
+ * missing data files (e.g. on first run or after a partial write failure) are
+ * treated as empty rather than fatal errors.
+ *
+ * @param filePath - Absolute path to the JSON file.
+ * @param fallback - Value returned when the file is absent or unparseable.
+ */
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   try {
     const raw = await fs.readFile(filePath, 'utf-8');
