@@ -33,7 +33,7 @@ export async function POST(
     }
 
     // Find the history entry
-    const history = await getHistory(projectId, 200);
+    const history = await getHistory(projectId, 1000);
     const entry = history.find((h) => h.id === entryId);
     if (!entry) {
       return NextResponse.json({ error: 'History entry not found' }, { status: 404 });

@@ -23,7 +23,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     if (!project) return new Response(JSON.stringify({ error: 'Project not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
 
-    const payload = { project, pages, classifications, polygons, scale };
+    // BUG-A5-6-055: strip internal-only fields from export payload
+    const INTERNAL_KEYS = ['_rev', '_seq', '_deleted', '_attachments', 'internalId', 'ownerId', 'webhookSecret'];
+    const stripInternal = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+      const cleaned = { ...obj };
+      for (const key of INTERNAL_KEYS) {
+        delete (cleaned as Record<string, unknown>)[key];
+      }
+      return cleaned;
+    };
+    const cleanedProject = stripInternal(project as unknown as Record<string, unknown>);
+    const payload = { project: cleanedProject, pages, classifications, polygons, scale };
     const json = JSON.stringify(payload, null, 2);
     const safeName = (project.name || 'project').replace(/[^a-zA-Z0-9-_]/g, '-');
 
