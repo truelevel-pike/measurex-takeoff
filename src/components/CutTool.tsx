@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 import { pointInPolygon } from '@/lib/polygon-utils';
@@ -10,15 +10,23 @@ export default function CutTool() {
   const currentPage = useStore((s) => s.currentPage);
   const cutPolygon = useStore((s) => s.cutPolygon);
   const setTool = useStore((s) => s.setTool);
+  const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
+  const baseDims = useMemo(() => rawBaseDims ?? { width: 1, height: 1 }, [rawBaseDims]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pagePolygons = polygons.filter((p) => p.pageNumber === currentPage);
 
+  // Normalize screen-space mouse position to PDF base-coordinate space so that
+  // hit-testing via pointInPolygon (which operates in base coords) works correctly
+  // at any zoom level. Matches the pattern used in DrawingTool and CanvasOverlay.
   const getCoords = useCallback((e: React.MouseEvent): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
+    if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+      y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+    };
+  }, [baseDims]);
 
   const findPolygonAt = useCallback(
     (pt: Point) => {

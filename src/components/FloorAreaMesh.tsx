@@ -1,7 +1,7 @@
 // src/components/FloorAreaMesh.tsx
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Shape, ShapeGeometry, Vector3, Color, DoubleSide } from 'three';
 import type { Event as ThreeEvent } from 'three';
 import { Line } from '@react-three/drei';
@@ -96,6 +96,15 @@ export default function FloorAreaMesh({
     geo.translate(0, 0.01, 0);
     return geo;
   }, [points]);
+
+  // Dispose GPU buffer memory when geometry is replaced or component unmounts.
+  // Three.js does not automatically GC GPU resources, so without this every
+  // points change (e.g. during AI takeoff) leaks vertex/index buffers.
+  useEffect(() => {
+    return () => {
+      geometry?.dispose();
+    };
+  }, [geometry]);
 
   if (!geometry) return null;
 
