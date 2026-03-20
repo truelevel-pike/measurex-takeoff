@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server';
 import { listProjects, createProject, initDataDir, getThumbnail, getProjectSummary } from '@/server/project-store';
 import { ProjectCreateSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET() {
+export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req: Request) {
+  // BUG-A5-6-074: add rate limiting to project listing
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+
   try {
     await initDataDir();
     const projects = await listProjects();

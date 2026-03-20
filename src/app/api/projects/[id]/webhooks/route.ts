@@ -28,6 +28,12 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // BUG-A5-6-108: require admin secret to prevent unauthenticated SSRF via webhook registration
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const paramsResult = ProjectIdSchema.safeParse(await params);
   if (!paramsResult.success) return validationError(paramsResult.error);
   const { id } = paramsResult.data;
