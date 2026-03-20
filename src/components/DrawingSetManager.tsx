@@ -265,6 +265,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
         drawings: s.drawings.map((d) => (d.id === drawingId ? { ...d, name: newName } : d)),
       }))
     );
+    // BUG-A7-5-001 fix: persist rename to API
+    fetch(`/api/projects/${projectId}/drawings/${drawingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    }).catch(() => {});
   };
 
   const deleteDrawing = (drawingId: string) => {
@@ -275,6 +281,26 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
       }))
     );
     setDrawingMenuId(null);
+    // BUG-A7-5-001 fix: persist delete to API
+    fetch(`/api/projects/${projectId}/drawings/${drawingId}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  };
+
+  // BUG-A7-5-002 fix: archive sets archived:true instead of deleting (data loss!)
+  const archiveDrawing = (drawingId: string) => {
+    setSets((prev) =>
+      prev.map((s) => ({
+        ...s,
+        drawings: s.drawings.map((d) => (d.id === drawingId ? { ...d, archived: true } : d)),
+      }))
+    );
+    setDrawingMenuId(null);
+    fetch(`/api/projects/${projectId}/drawings/${drawingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: true }),
+    }).catch(() => {});
   };
 
   const moveDrawing = (drawingId: string, targetSetId: string) => {
@@ -300,6 +326,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
     });
     setDrawingMenuId(null);
     setMoveSubmenuDrawingId(null);
+    // BUG-A7-5-001 fix: persist move to API
+    fetch(`/api/projects/${projectId}/drawings/${drawingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ setId: targetSetId }),
+    }).catch(() => {});
   };
 
   return (
