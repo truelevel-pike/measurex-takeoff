@@ -31,7 +31,7 @@ create table if not exists mx_scales (
   project_id uuid not null references mx_projects(id) on delete cascade,
   page_number int not null,
   pixels_per_unit float not null,
-  unit text not null check (unit in ('ft', 'in', 'm', 'mm')),
+  unit text not null check (unit in ('ft', 'in', 'm', 'cm', 'mm')),
   label text default 'Custom',
   source text not null check (source in ('manual', 'auto', 'ai')),
   confidence float,
