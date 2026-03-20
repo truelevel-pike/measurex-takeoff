@@ -163,6 +163,28 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       }
     }, [file]);
 
+    // BUG-A6-5-028 fix: shared helper used by both the initial load effect and retryLoad,
+    // eliminating ~30 lines of duplicated PDF load logic that could diverge.
+    const loadPdfFromFile = useCallback(
+      async (pdfFile: File, isCancelled: () => boolean): Promise<PDFDocumentProxy | null> => {
+        const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
+        if (isCancelled()) return null;
+        if (pdfjsLib.GlobalWorkerOptions) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        }
+        const arrayBuffer = await pdfFile.arrayBuffer();
+        if (isCancelled()) return null;
+        const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        if (isCancelled()) {
+          void doc.destroy();
+          return null;
+        }
+        return doc;
+      },
+      [],
+    );
+
     // Load PDF from file with pdfjs-dist only
     // ISSUE #2: Destroy prior doc on file change or unmount
     useEffect(() => {
@@ -176,19 +198,10 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       }
       setLoadError(null);
       initialFitDone.current = false;
-      const loadPdf = async () => {
+      const doLoad = async () => {
         try {
-          const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
-          if (pdfjsLib.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc =
-              `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-          }
-          const arrayBuffer = await file.arrayBuffer();
-          const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          if (cancelled) {
-            void doc.destroy();
-            return;
-          }
+          const doc = await loadPdfFromFile(file, () => cancelled);
+          if (!doc) return;
           loadedDoc = doc;
           pdfDocRef.current = doc;
           setPdfDoc(doc);
@@ -203,7 +216,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           console.error('PDF load error:', err);
         }
       };
-      loadPdf();
+      doLoad();
       return () => {
         cancelled = true;
         retryCancelRef.current?.();
@@ -218,7 +231,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           pdfDocRef.current = null;
         }
       };
-    }, [file]);
+    }, [file, loadPdfFromFile]);
 
     // actuallyRender uses refs so it's always current — no stale closure issues
     // ISSUE #4: render-version guard aborts stale renders after each await
@@ -691,32 +704,19 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       pinchInfo.current = null;
     }, []);
 
+    // BUG-A6-5-028 fix: retryLoad now uses shared loadPdfFromFile helper
     const retryLoad = useCallback(() => {
       setLoadError(null);
       setPdfDoc(null);
       setCurrentPage(1);
-      // Re-trigger load by forcing effect — toggle a render cycle
       if (file) {
         retryCancelRef.current?.();
         let cancelled = false;
         retryCancelRef.current = () => { cancelled = true; };
-        const isCancelled = () => cancelled;
-
-        const loadPdf = async () => {
+        const doRetry = async () => {
           try {
-            const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
-            if (isCancelled()) return;
-            if (pdfjsLib.GlobalWorkerOptions) {
-              pdfjsLib.GlobalWorkerOptions.workerSrc =
-                `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-            }
-            const arrayBuffer = await file.arrayBuffer();
-            if (isCancelled()) return;
-            const doc: PDFDocumentProxy = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            if (isCancelled()) {
-              void doc.destroy();
-              return;
-            }
+            const doc = await loadPdfFromFile(file, () => cancelled);
+            if (!doc) return;
             pdfDocRef.current = doc;
             setPdfDoc(doc);
             setTotalPages(doc.numPages);
@@ -724,14 +724,14 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
             setCurrentPage(1);
             onPageChangeRef.current?.(1, doc.numPages);
           } catch (err) {
-            if (isCancelled()) return;
+            if (cancelled) return;
             const msg = err instanceof Error ? err.message : 'Unknown error';
             setLoadError(msg);
           }
         };
-        void loadPdf();
+        void doRetry();
       }
-    }, [file]);
+    }, [file, loadPdfFromFile]);
 
     return (
       <div
