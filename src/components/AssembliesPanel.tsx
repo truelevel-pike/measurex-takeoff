@@ -383,9 +383,10 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
             if (!data) return;
             const serverId = data?.assembly?.id;
             if (typeof serverId === 'string' && serverId && serverId !== assembly.id) {
-              // BUG-A6-021 fix: use reactive `assemblies` instead of getState() in callback
+              // BUG-A6-5-002 fix: use functional updater to avoid stale `assemblies` closure.
+              // Rapid multi-assembly creation would otherwise drop most-recent additions.
               setAssemblies(
-                assemblies.map((a) =>
+                useStore.getState().assemblies.map((a) =>
                   a.id === assembly.id ? { ...a, id: serverId } : a,
                 ),
               );

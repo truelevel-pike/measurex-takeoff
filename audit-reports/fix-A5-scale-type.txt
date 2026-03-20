@@ -1,0 +1,11 @@
+Type error fix: ScaleCalibration unit type mismatch
+
+Problem: route.ts allows 'cm' but ScaleCalibration component restricts to Unit = 'ft' | 'in' | 'm' | 'mm'
+
+Solution: Add 'cm' to the Unit type in ScaleCalibration.tsx
+
+Files to update:
+1. src/components/ScaleCalibration.tsx - add 'cm' to Unit type
+2. Check other components that import unit types for consistency
+
+Build should pass after fixing the Unit type declaration.

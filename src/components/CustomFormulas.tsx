@@ -188,7 +188,9 @@ export default function CustomFormulas({ classification, onSave, onClose }: Cust
         if (c.type === 'area') {
           total += scale ? p.area / (scale.pixelsPerUnit * scale.pixelsPerUnit) : p.area;
         } else if (c.type === 'linear') {
-          total += scale ? p.linearFeet / scale.pixelsPerUnit : p.linearFeet;
+          // BUG-A6-5-017 fix: p.linearFeet is already stored in real-world units (feet).
+          // Do NOT divide by pixelsPerUnit — that would produce a double-conversion.
+          total += p.linearFeet;
         } else {
           total += 1; // count
         }

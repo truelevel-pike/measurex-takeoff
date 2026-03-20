@@ -579,11 +579,21 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
     }, [nextPage, prevPage]);
 
     // renderPageForCapture: navigate to a page, wait for render, return canvas
+    // BUG-A6-5-027 fix: use a queue keyed by a monotonically increasing call ID so
+    // concurrent callers (e.g. multi-page export loops) each get exactly one resolve.
+    // The previous single-ref approach overwrote the first caller's resolve, hanging it.
+    const captureQueueRef = useRef<Map<number, (canvas: HTMLCanvasElement | null) => void>>(new Map());
+    const captureCallIdRef = useRef(0);
     const renderPageForCapture = useCallback(
       (page: number): Promise<HTMLCanvasElement | null> => {
         return new Promise((resolve) => {
-          // Store the resolve callback — actuallyRender's finally block will call it
-          renderCompleteResolveRef.current = resolve;
+          const callId = ++captureCallIdRef.current;
+          captureQueueRef.current.set(callId, resolve);
+          // Patch renderCompleteResolveRef to drain all queued resolvers when the render finishes
+          renderCompleteResolveRef.current = (canvas) => {
+            captureQueueRef.current.forEach((r) => r(canvas));
+            captureQueueRef.current.clear();
+          };
           goToPage(page);
         });
       },

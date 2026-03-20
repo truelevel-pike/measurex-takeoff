@@ -90,7 +90,9 @@ export default function ActivityFeed() {
     a.href = url;
     a.download = `activity-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    // BUG-A6-5-001 fix: defer revokeObjectURL — click() is async on some browsers
+    // and revoking synchronously can race the download initiation, producing a broken file.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [events]);
 
   const filters: { key: FilterType; label: string }[] = [

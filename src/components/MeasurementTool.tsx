@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
 
-type Unit = 'ft' | 'in' | 'm' | 'mm';
+type Unit = 'ft' | 'in' | 'm' | 'mm' | 'cm';
 
 function formatDistance(distanceInUnit: number, unit: Unit): string {
   if (!Number.isFinite(distanceInUnit)) return `0 ${unit}`;
@@ -24,6 +24,9 @@ function formatDistance(distanceInUnit: number, unit: Unit): string {
 export default function MeasurementTool() {
   const scale = useStore((s) => s.scale);
   const setTool = useStore((s) => s.setTool);
+  // BUG-A6-5-021 fix: get base PDF dimensions to normalise mouse coords to PDF coordinate space
+  const rawBaseDims = useStore((s) => s.pageBaseDimensions[s.currentPage]);
+  const baseDims = rawBaseDims ?? { width: 1, height: 1 };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [start, setStart] = useState<Point | null>(null);
@@ -33,8 +36,14 @@ export default function MeasurementTool() {
   const getCoords = useCallback((e: React.MouseEvent): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
+    // BUG-A6-5-021 fix: normalise screen pixel offsets to base PDF coordinate space.
+    // Every other drawing tool (DrawingTool, CanvasOverlay, CropOverlay, CutTool) does this.
+    // Without it, at zoom ≠ 100% all measurements are in screen pixels, not real-world units.
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+      y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+    };
+  }, [baseDims]);
 
   const reset = useCallback(() => {
     setStart(null);

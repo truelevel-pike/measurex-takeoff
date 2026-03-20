@@ -1,0 +1,12 @@
+[
+  {
+    "agent": "admiral6",
+    "port": "9012",
+    "message": "CYCLE 4 AUDIT — src/components/ sector. Read EVERY file in src/components/ and subdirs. Find ALL bugs (type safety, performance, accessibility, React errors, styling issues, missing keys, etc). Write to audit-reports/audit-A6-cycle4-E16.md for E16, audit-A6-cycle4-E17.md for E17, audit-A6-cycle4-E18.md for E18, audit-A6-cycle4-E19.md for E19, audit-A6-cycle4-E20.md for E20. Format: BUG-A6-4-[NNN]: [file:line] [CRITICAL/HIGH/MEDIUM/LOW] [description]"
+  },
+  {
+    "agent": "admiral8", 
+    "port": "9011",
+    "message": "CYCLE 4 AUDIT — pages + config + infra. Read EVERY file in pages/, app/, src/config/, package.json, next.config.js, .env files, deployment configs. Find ALL bugs (security, routing, config errors, deployment issues, etc). Write to audit-reports/audit-A8-cycle4-E36.md, audit-A8-cycle4-E37.md, audit-A8-cycle4-E38.md, audit-A8-cycle4-E39.md, audit-A8-cycle4-E40.md. Same format as above."
+  }
+]

@@ -885,31 +885,36 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     // Client-side: reassign polygons + remove merged classifications
     mergeClassifications(mergeSurvivorId, idsToMerge);
 
-    // Server-side: reassign polygons then delete merged classifications
+    // BUG-A6-5-029 fix: fetch polygons ONCE, then PATCH all affected polygons concurrently
+    // instead of the prior O(N×M) sequential fetch-per-classification loop.
     if (projectId) {
       const removedIds = idsToMerge.filter((id) => id !== mergeSurvivorId);
-      for (const id of removedIds) {
-        try {
-          // Reassign polygons belonging to this classification to the survivor
-          const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
-          if (polyRes.ok) {
-            const polyData = await polyRes.json();
-            const polys = Array.isArray(polyData.polygons) ? polyData.polygons : [];
-            for (const p of polys) {
-              if (p.classificationId === id) {
-                await fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ classificationId: mergeSurvivorId }),
-                });
-              }
-            }
-          }
-          // Delete the merged classification
-          await fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' });
-        } catch {
-          // Best-effort — client state is already correct
-        }
+      try {
+        const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
+        const polys: Array<{ id: string; classificationId: string }> = polyRes.ok
+          ? ((await polyRes.json()).polygons ?? [])
+          : [];
+
+        // Batch all polygon reassignments concurrently
+        const patchPromises = polys
+          .filter((p) => removedIds.includes(p.classificationId))
+          .map((p) =>
+            fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ classificationId: mergeSurvivorId }),
+            }).catch(() => {}),
+          );
+        await Promise.all(patchPromises);
+
+        // Delete all merged classifications concurrently
+        await Promise.all(
+          removedIds.map((id) =>
+            fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' }).catch(() => {}),
+          ),
+        );
+      } catch {
+        // Best-effort — client state is already correct
       }
     }
 
@@ -928,31 +933,53 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
 
   const handleExecuteCleanUp = useCallback(async () => {
     const toExecute = cleanUpSuggestions.filter((_, i) => acceptedSuggestions.has(i));
+
+    // BUG-A6-5-030 fix: fetch polygons ONCE, then perform all reassignments + deletions
+    // concurrently instead of the prior O(N×M×suggestions) sequential loop.
+    // Apply all client-side merges first
     for (const suggestion of toExecute) {
       const allIds = [suggestion.survivor.id, ...suggestion.duplicates.map((d) => d.id)];
       mergeClassifications(suggestion.survivor.id, allIds);
-      if (projectId) {
-        const removedIds = suggestion.duplicates.map((d) => d.id);
-        for (const id of removedIds) {
-          try {
-            const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
-            if (polyRes.ok) {
-              const { polygons = [] } = await polyRes.json();
-              for (const p of polygons) {
-                if (p.classificationId === id) {
-                  await fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ classificationId: suggestion.survivor.id }),
-                  });
-                }
-              }
-            }
-            await fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' });
-          } catch { /* best effort */ }
-        }
-      }
     }
+
+    if (projectId && toExecute.length > 0) {
+      try {
+        const polyRes = await fetch(`/api/projects/${projectId}/polygons`);
+        const allPolys: Array<{ id: string; classificationId: string }> = polyRes.ok
+          ? ((await polyRes.json()).polygons ?? [])
+          : [];
+
+        // Build a flat map of classificationId -> survivorId across all accepted suggestions
+        const remapTable = new Map<string, string>();
+        const allRemovedIds: string[] = [];
+        for (const suggestion of toExecute) {
+          for (const dup of suggestion.duplicates) {
+            remapTable.set(dup.id, suggestion.survivor.id);
+            allRemovedIds.push(dup.id);
+          }
+        }
+
+        // Concurrently PATCH all affected polygons
+        const patchPromises = allPolys
+          .filter((p) => remapTable.has(p.classificationId))
+          .map((p) =>
+            fetch(`/api/projects/${projectId}/polygons/${p.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ classificationId: remapTable.get(p.classificationId) }),
+            }).catch(() => {}),
+          );
+        await Promise.all(patchPromises);
+
+        // Concurrently DELETE all merged classifications
+        await Promise.all(
+          allRemovedIds.map((id) =>
+            fetch(`/api/projects/${projectId}/classifications/${id}`, { method: 'DELETE' }).catch(() => {}),
+          ),
+        );
+      } catch { /* best effort — client state is already correct */ }
+    }
+
     setShowCleanUpDialog(false);
     setCleanUpSuggestions([]);
     setAcceptedSuggestions(new Set());
