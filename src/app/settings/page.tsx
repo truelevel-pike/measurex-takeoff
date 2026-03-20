@@ -15,6 +15,8 @@ import {
   saveMeasurementSettings,
 } from '@/lib/measurement-settings';
 import { type AiSettings, loadAiSettings, saveAiSettings } from '@/lib/ai-settings';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 type SettingsTab = 'profile' | 'measurements' | 'ai' | 'organization' | 'account' | 'api-keys';
 
@@ -51,26 +53,28 @@ const SCALE_OPTIONS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   // Profile state
+  // BUG-A8-4-004 fix: remove hardcoded PII defaults — use empty strings
   const PROFILE_KEY = 'mx-profile-settings';
   const [name, setName] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'Nathan Solis';
+    if (typeof window === 'undefined') return '';
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) return JSON.parse(raw).name ?? 'Nathan Solis';
+      if (raw) return JSON.parse(raw).name ?? '';
     } catch { /* ignore */ }
-    return 'Nathan Solis';
+    return '';
   });
-  const [email] = useState('nathan@measurex.io');
+  const [email] = useState('');
   const [orgName, setOrgName] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'MeasureX Inc.';
+    if (typeof window === 'undefined') return '';
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) return JSON.parse(raw).orgName ?? 'MeasureX Inc.';
+      if (raw) return JSON.parse(raw).orgName ?? '';
     } catch { /* ignore */ }
-    return 'MeasureX Inc.';
+    return '';
   });
   const [profileSaved, setProfileSaved] = useState(false);
 
@@ -82,9 +86,39 @@ export default function SettingsPage() {
     setTimeout(() => setProfileSaved(false), 2000);
   };
 
-  // Measurements state
-  const [defaultScale, setDefaultScale] = useState('1/4" = 1\'');
-  const [applyToAll, setApplyToAll] = useState(false);
+  // R-A8-005 fix: persist defaultScale and applyToAll to localStorage
+  const MEASURE_PREFS_KEY = 'mx-measure-prefs';
+  const [defaultScale, setDefaultScale] = useState<string>(() => {
+    if (typeof window === 'undefined') return '1/4" = 1\'';
+    try {
+      const raw = localStorage.getItem(MEASURE_PREFS_KEY);
+      if (raw) return JSON.parse(raw).defaultScale ?? '1/4" = 1\'';
+    } catch { /* ignore */ }
+    return '1/4" = 1\'';
+  });
+  const [applyToAll, setApplyToAll] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem(MEASURE_PREFS_KEY);
+      if (raw) return JSON.parse(raw).applyToAll ?? false;
+    } catch { /* ignore */ }
+    return false;
+  });
+
+  const updateDefaultScale = (v: string) => {
+    setDefaultScale(v);
+    if (typeof window !== 'undefined') {
+      const prev = JSON.parse(localStorage.getItem(MEASURE_PREFS_KEY) || '{}');
+      localStorage.setItem(MEASURE_PREFS_KEY, JSON.stringify({ ...prev, defaultScale: v }));
+    }
+  };
+  const updateApplyToAll = (v: boolean) => {
+    setApplyToAll(v);
+    if (typeof window !== 'undefined') {
+      const prev = JSON.parse(localStorage.getItem(MEASURE_PREFS_KEY) || '{}');
+      localStorage.setItem(MEASURE_PREFS_KEY, JSON.stringify({ ...prev, applyToAll: v }));
+    }
+  };
 
   // Measurement precision settings (persisted in localStorage)
   const [ms, setMs] = useState<MeasurementSettings | null>(() => loadMeasurementSettings());
@@ -106,8 +140,16 @@ export default function SettingsPage() {
     saveAiSettings(next);
   };
 
-  // Organization state
-  const [teamName, setTeamName] = useState('MeasureX Team');
+  // Organization state — BUG-A8-4-L006 fix: persist teamName to localStorage
+  const TEAM_KEY = 'mx-team-name';
+  const [teamName, setTeamName] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(TEAM_KEY) ?? '';
+  });
+  const updateTeamName = (v: string) => {
+    setTeamName(v);
+    if (typeof window !== 'undefined') localStorage.setItem(TEAM_KEY, v);
+  };
 
   // API Keys state
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -298,7 +340,7 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-300 mb-1.5">Default Scale</label>
                   <select
                     value={defaultScale}
-                    onChange={e => setDefaultScale(e.target.value)}
+                    onChange={e => updateDefaultScale(e.target.value)}
                     className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 w-64 transition-colors"
                   >
                     {SCALE_OPTIONS.map(s => (
@@ -312,7 +354,7 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={applyToAll}
-                    onChange={e => setApplyToAll(e.target.checked)}
+                    onChange={e => updateApplyToAll(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500"
                   />
                   <span className="text-sm text-gray-300">Apply to all new projects</span>
@@ -518,7 +560,7 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-300 mb-1.5">Team Name</label>
                   <input
                     value={teamName}
-                    onChange={e => setTeamName(e.target.value)}
+                    onChange={e => updateTeamName(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-green-500 transition-colors"
                   />
                 </div>
@@ -556,18 +598,36 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold mb-4">Account</h2>
 
               <div className="bg-gray-900 rounded-xl p-6 space-y-5 border border-gray-800">
-                {/* Change password */}
+                {/* R-A8-006 fix: wire Change Password to prompt + Supabase updateUser */}
                 <div>
                   <label className="block text-sm text-gray-300 mb-2">Password</label>
-                  <button className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  <button
+                    onClick={async () => {
+                      const newPw = window.prompt('Enter new password (min 8 characters):');
+                      if (!newPw || newPw.length < 8) {
+                        if (newPw !== null) window.alert('Password must be at least 8 characters.');
+                        return;
+                      }
+                      const { error: err } = await supabase.auth.updateUser({ password: newPw });
+                      if (err) window.alert(`Failed to change password: ${err.message}`);
+                      else window.alert('Password changed successfully.');
+                    }}
+                    className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
                     Change Password
                   </button>
                 </div>
 
-                {/* Sign out */}
+                {/* R-A8-006 fix: wire Sign Out to supabase.auth.signOut() */}
                 <div>
                   <label className="block text-sm text-gray-300 mb-2">Session</label>
-                  <button className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  <button
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      router.push('/login');
+                    }}
+                    className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
                     Sign Out
                   </button>
                 </div>
