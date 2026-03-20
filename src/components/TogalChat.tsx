@@ -54,6 +54,16 @@ export function TogalChat({ onClose }: TogalChatProps) {
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      readerRef.current?.cancel().catch(() => {/* ignore cancel errors on unmount */});
+      readerRef.current?.releaseLock();
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -87,10 +97,12 @@ export function TogalChat({ onClose }: TogalChatProps) {
         classifications: classifications.map((c) => c.name).slice(0, 10),
       };
 
+      abortRef.current = new AbortController();
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, context }),
+        signal: abortRef.current.signal,
       });
 
       if (!response.ok) {
@@ -101,6 +113,7 @@ export function TogalChat({ onClose }: TogalChatProps) {
       // Parse SSE stream from /api/chat
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response stream');
+      readerRef.current = reader;
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -150,9 +163,14 @@ export function TogalChat({ onClose }: TogalChatProps) {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      setError('Sorry, I could not connect to the AI right now.');
+    } catch (err) {
+      // Ignore abort errors — component unmounted intentionally
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError('Sorry, I could not connect to the AI right now.');
+      }
     } finally {
+      readerRef.current = null;
+      abortRef.current = null;
       setIsLoading(false);
     }
   }
