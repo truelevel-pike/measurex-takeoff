@@ -29,7 +29,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id, pid } = paramsResult.data;
     const ok = await deletePolygon(id, pid);
-    if (ok) broadcastToProject(id, 'polygon:deleted', { id: pid });
+    if (!ok) {
+      return NextResponse.json({ ok: false, error: 'Polygon not found' }, { status: 404 });
+    }
+    broadcastToProject(id, 'polygon:deleted', { id: pid });
     return NextResponse.json({ ok });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
