@@ -931,6 +931,7 @@ function PageInner() {
       } else if (e.key.toLowerCase() === 't') {
         setTool(currentTool === 'annotate' ? 'select' : 'annotate');
       } else if (e.key.toLowerCase() === 'a') {
+        if (aiLoading) return;
         handleAITakeoff();
       } else if (e.key === 'P' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
