@@ -19,7 +19,9 @@ export async function POST(
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
-    const body = await req.json();
+    // BUG-A5-6-095: catch JSON parse errors
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     const pageNum: number = body?.page;
     // BUG-A5-5-037: validate model against whitelist
     const ALLOWED_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
