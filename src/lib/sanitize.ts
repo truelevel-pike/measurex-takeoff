@@ -18,7 +18,7 @@ export function sanitizeName(input: unknown): string | null {
 
 export function validatePoints(input: unknown): { x: number; y: number }[] | null {
   if (!Array.isArray(input)) return null;
-  if (input.length < 3 || input.length > 500) return null;
+  if (input.length < 1 || input.length > 500) return null;
 
   const points: { x: number; y: number }[] = [];
 
