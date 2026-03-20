@@ -22,6 +22,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
+    // Validate MIME type — accept application/pdf or .pdf extension (case-insensitive)
+    const isPdfMime = file.type === 'application/pdf';
+    const isPdfExt = file.name?.toLowerCase().endsWith('.pdf');
+    if (!isPdfMime && !isPdfExt) {
+      return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 });
+    }
+
+    // Validate file size — max 50 MB
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'File too large — maximum size is 50MB' }, { status: 413 });
+    }
+
     // Save file to storage (local + Supabase Storage in prod), then process
     const buffer = Buffer.from(await file.arrayBuffer());
     const filePath = await savePDF(id, buffer);
