@@ -7,13 +7,10 @@ export async function GET(req: Request) {
   const limited = rateLimitResponse(req, 10, 60_000);
   if (limited) return limited;
 
-  // Auth check: require x-admin-key header if ADMIN_KEY is set
-  const adminKey = process.env.ADMIN_KEY;
-  if (adminKey) {
-    const provided = req.headers.get("x-admin-key");
-    if (provided !== adminKey) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // BUG-A5-5-016: require ADMIN_SECRET header auth before returning error data
+  const adminSecret = process.env.ADMIN_SECRET || process.env.ADMIN_KEY;
+  if (!adminSecret || req.headers.get("x-admin-secret") !== adminSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const errors = getErrors();

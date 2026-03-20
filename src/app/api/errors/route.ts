@@ -47,7 +47,12 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // BUG-A5-5-017: require ADMIN_SECRET header auth before returning stored errors
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || request.headers.get('x-admin-secret') !== adminSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   return NextResponse.json({ errors: loggedErrors.slice(-MAX_LOGGED_ERRORS) });
 }
 
