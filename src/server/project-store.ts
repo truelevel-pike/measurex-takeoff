@@ -94,6 +94,13 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * Serialize `data` as pretty-printed JSON and write it to `filePath`.
+ * The file is created (or overwritten) atomically via `fs.writeFile`.
+ *
+ * @param filePath - Absolute path to the destination JSON file.
+ * @param data     - Any JSON-serializable value to persist.
+ */
 async function writeJson(filePath: string, data: unknown): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
