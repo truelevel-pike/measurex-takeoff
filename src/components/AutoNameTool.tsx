@@ -31,9 +31,11 @@ const PROCESSING_DELAY_MS = 2800; // simulated AI processing time
 function ItemRow({
   item,
   onToggleAccept,
+  onReject,
 }: {
   item: RenameItem;
   onToggleAccept: (id: string) => void;
+  onReject: (id: string) => void;
 }) {
   const isAccepted = item.accepted === true;
   const isRejected = item.accepted === false;
@@ -136,13 +138,7 @@ function ItemRow({
           <Check size={12} />
         </button>
         <button
-          onClick={() => {
-            // Toggle to "rejected" state
-            if (!isRejected) {
-              // mark rejected: we reuse onToggleAccept but need a different state
-              // For simplicity, we call onToggleAccept only when not already rejected
-            }
-          }}
+          onClick={() => onReject(item.id)}
           aria-label={`Reject rename for ${item.originalName}`}
           title="Reject"
           style={{
@@ -297,6 +293,14 @@ export default function AutoNameTool() {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, accepted: !item.accepted } : item
+      )
+    );
+  }
+
+  function rejectItem(id: string) {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, accepted: false } : item
       )
     );
   }
@@ -542,7 +546,7 @@ export default function AutoNameTool() {
             {/* Items list */}
             <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 2 }}>
               {items.map((item) => (
-                <ItemRow key={item.id} item={item} onToggleAccept={toggleAccept} />
+                <ItemRow key={item.id} item={item} onToggleAccept={toggleAccept} onReject={rejectItem} />
               ))}
             </div>
 
