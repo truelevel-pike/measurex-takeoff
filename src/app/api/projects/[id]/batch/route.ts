@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createPolygon, deletePolygon as deletePolygonStore, createClassification, deleteClassification, initDataDir } from '@/server/project-store';
+import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, createClassification, deleteClassification, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-const PointSchema = z.object({ x: z.number(), y: z.number() });
+// BUG-A5-6-116: add .finite() to x and y to reject NaN/Infinity
+const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 
 const BatchOpSchema = z.discriminatedUnion('type', [
   z.object({
@@ -46,6 +48,9 @@ const BatchBodySchema = z.object({
  * Execute multiple operations in a single request to reduce round-trips.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-114: add rate limiting to batch handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -77,6 +82,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             break;
           }
           case 'deletePolygon': {
+            // BUG-A5-6-117: verify polygon belongs to project before deleting
+            const projectPolygons = await getPolygons(id);
+            const polygonExists = projectPolygons.some((p) => p.id === op.data.id);
+            if (!polygonExists) {
+              results.push({ type: op.type, ok: false, id: op.data.id, error: 'Polygon not found in this project' });
+              break;
+            }
             await deletePolygonStore(id, op.data.id);
             results.push({ type: op.type, ok: true, id: op.data.id });
             break;
@@ -103,7 +115,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    return NextResponse.json({ results });
+    // BUG-A5-6-115: report partial failures with 207 Multi-Status
+    const hasFailures = results.some((r) => !r.ok);
+    const allFailed = results.every((r) => !r.ok);
+    const status = allFailed ? 500 : hasFailures ? 207 : 200;
+
+    return NextResponse.json({ results }, { status });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
