@@ -205,6 +205,15 @@ export default function AutoNameTool() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // BUG-A6-001 fix: cleanup effect must be placed before any early return so it is
+  // always registered regardless of the aiSheetNaming flag value.
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   if (!aiSheetNaming) {
     return (
       <div
@@ -283,13 +292,6 @@ export default function AutoNameTool() {
     setItems([]);
     setAppliedCount(null);
   }
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
 
   function toggleAccept(id: string) {
     setItems((prev) =>
