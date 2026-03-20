@@ -10,7 +10,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const paramsResult = PolygonIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id, pid } = paramsResult.data;
-    const raw = await req.json();
+    const raw = await req.json().catch(() => null);
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     const validated = validateBody(PolygonUpdateSchema, raw);
     if ('error' in validated) return validated.error;
     const updated = await updatePolygon(id, pid, validated.data);
