@@ -1005,19 +1005,12 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         });
       }
     } else {
-      addGroup(trimmedName, groupColor);
-      // find the newly added group and assign classifications
-      // moveClassificationToGroup handles one at a time
-      // We'll assign after creation via a microtask
-      setTimeout(() => {
-        const latest = useStore.getState().groups;
-        const created = latest.find((g) => g.name === trimmedName && !groups.some((og) => og.id === g.id));
-        if (created) {
-          groupSelectedClassificationIds.forEach((cid) => {
-            useStore.getState().moveClassificationToGroup(cid, created.id);
-          });
-        }
-      }, 0);
+      // BUG-A6-010 fix: addGroup now returns the new group's ID synchronously, so
+      // we can assign classifications immediately without a fragile setTimeout(0).
+      const newGroupId = addGroup(trimmedName, groupColor);
+      groupSelectedClassificationIds.forEach((cid) => {
+        moveClassificationToGroup(cid, newGroupId);
+      });
     }
     setShowGroupModal(false);
   }, [groupName, groupColor, groupSelectedClassificationIds, editingGroupId, addGroup, updateGroup, groups, moveClassificationToGroup]);
