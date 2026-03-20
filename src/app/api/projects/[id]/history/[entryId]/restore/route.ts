@@ -50,8 +50,8 @@ export async function POST(
     switch (entry.actionType) {
       case 'delete': {
         // Polygon was deleted — recreate from beforeData
-        const snapshot = entry.beforeData as Record<string, unknown> | null;
-        if (!snapshot) {
+        const snapshot = entry.beforeData as Record<string, unknown> | null | undefined;
+        if (snapshot == null) {
           return NextResponse.json({ error: 'No snapshot data to restore' }, { status: 400 });
         }
         const polygon = await createPolygon(projectId, {
@@ -70,8 +70,8 @@ export async function POST(
 
       case 'update': {
         // Polygon was updated — revert to beforeData
-        const before = entry.beforeData as Record<string, unknown> | null;
-        if (!before) {
+        const before = entry.beforeData as Record<string, unknown> | null | undefined;
+        if (before == null) {
           return NextResponse.json({ error: 'No before-data to restore' }, { status: 400 });
         }
         const polygonId = entry.entityId;
