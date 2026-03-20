@@ -39,12 +39,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const MAX_FIELD_LENGTH = 500;
+    const actionStr = String(action);
+    const resourceStr = String(resource);
+    const resourceIdStr = String(resourceId);
+    if (
+      actionStr.length > MAX_FIELD_LENGTH ||
+      resourceStr.length > MAX_FIELD_LENGTH ||
+      resourceIdStr.length > MAX_FIELD_LENGTH
+    ) {
+      return NextResponse.json(
+        { error: `action, resource, and resourceId must be under ${MAX_FIELD_LENGTH} characters` },
+        { status: 400 },
+      );
+    }
+
     const entry: AuditEntry = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      action: String(action),
-      resource: String(resource),
-      resourceId: String(resourceId),
+      action: actionStr,
+      resource: resourceStr,
+      resourceId: resourceIdStr,
       metadata: metadata && typeof metadata === 'object' ? metadata : undefined,
     };
 
