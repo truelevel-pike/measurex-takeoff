@@ -549,8 +549,9 @@ export const useStore = create<Store>()(
 
   // Scale per page
   setScale: (scale) => {
-    const before = snapshot(get());
-    set({ scale, undoStack: [...get().undoStack, before], redoStack: [] });
+    const s = get();
+    const before = snapshot(s);
+    set({ scale, undoStack: pushUndo(s.undoStack, before), redoStack: [] });
   },
   setScaleForPage: (page, scale) => {
     const s = get();
@@ -687,7 +688,7 @@ export const useStore = create<Store>()(
   // ─── Calibration ───
   calibrationMode: false,
   calibrationPoints: [],
-  setCalibrationMode: (active) => set({ calibrationMode: active, calibrationPoints: active ? [] : get().calibrationPoints }),
+  setCalibrationMode: (active) => set((s) => ({ calibrationMode: active, calibrationPoints: active ? [] : s.calibrationPoints })),
   addCalibrationPoint: (p) => {
     const pts = get().calibrationPoints;
     if (pts.length >= 2) return;
