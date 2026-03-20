@@ -22,6 +22,8 @@ interface CollaborationPanelProps {
 }
 
 // --- Sample data ---
+// FIXME(prod): Replace SAMPLE_COLLABORATORS and FAKE_SHARE_URL with real API data
+// before production release. These are hardcoded stubs for demo/development only.
 const SAMPLE_COLLABORATORS: Collaborator[] = [
   { id: 'c1', name: 'Sarah Kim',      email: 'sarah.kim@firm.com',       role: 'admin',  type: 'internal', initials: 'SK', color: '#6366f1' },
   { id: 'c2', name: 'Marcus Webb',    email: 'marcus.webb@firm.com',     role: 'edit',   type: 'internal', initials: 'MW', color: '#22c55e' },
@@ -31,6 +33,7 @@ const SAMPLE_COLLABORATORS: Collaborator[] = [
   { id: 'c6', name: 'MEP Consultant', email: 'mep@engpartners.com',      role: 'edit',   type: 'external', initials: 'ME', color: '#a855f7' },
 ];
 
+// TODO(prod): Generate real share URL from API (/api/projects/:id/share)
 const FAKE_SHARE_URL = 'https://measurex.app/share/proj_8fq2k7?token=abc123';
 
 // --- Helpers ---
