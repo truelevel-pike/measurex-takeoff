@@ -4,7 +4,7 @@ import { getPages, getPolygons, getClassifications, initDataDir } from '@/server
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 
 const SearchBodySchema = z.object({
-  query: z.string(),
+  query: z.string().min(1).max(500),
 });
 
 export interface TextSearchResult {
