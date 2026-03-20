@@ -62,9 +62,10 @@ export default function AutoScalePopup({
     return () => clearInterval(id);
   }, [autoDismissEnabled, onDismiss]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+  // BUG-A7-5-069 fix: keyboard shortcuts handled via onKeyDown on dialog div
+  // instead of window listener (which steals events from other components)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleAccept();
@@ -72,10 +73,9 @@ export default function AutoScalePopup({
         e.preventDefault();
         handleIgnore();
       }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleAccept, handleIgnore]);
+    },
+    [handleAccept, handleIgnore]
+  );
 
   const confidenceMeta =
     confidence >= 0.9
@@ -101,7 +101,9 @@ export default function AutoScalePopup({
       role="dialog"
       aria-modal="true"
       aria-label="Scale auto-detected"
-      className="fixed top-20 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 w-80 shadow-2xl text-gray-100 overflow-hidden"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      className="fixed top-20 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 w-80 shadow-2xl text-gray-100 overflow-hidden outline-none"
     >
       {/* Countdown timer bar — only shown when auto-dismiss is active (high confidence) */}
       <div className="absolute top-0 left-0 h-1 bg-cyan-500/30 w-full">

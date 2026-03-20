@@ -13,7 +13,9 @@ export function loadUnitCosts(projectId: string): UnitCostMap {
   try {
     const raw = localStorage.getItem(storageKey(projectId));
     if (!raw) return {};
-    return JSON.parse(raw) as UnitCostMap;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    return parsed as UnitCostMap;
   } catch {
     return {};
   }
