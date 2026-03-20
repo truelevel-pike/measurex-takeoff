@@ -83,7 +83,14 @@ export type PerfMonitorOptions = {
   tags?: Record<string, string>;
 };
 
+// BUG-A6-006 fix: module-level guard so web-vitals listeners are only registered once,
+// regardless of how many times initPerfMonitor is called (StrictMode double-mount, hot-reload).
+let _perfMonitorInitialized = false;
+
 export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
+  if (_perfMonitorInitialized) return;
+  _perfMonitorInitialized = true;
+
   const { reportUrl, logToConsole = process.env.NODE_ENV !== 'production', tags = {} } = options;
 
   type WebVitalMetric = CLSMetric | FCPMetric | INPMetric | LCPMetric | TTFBMetric;
