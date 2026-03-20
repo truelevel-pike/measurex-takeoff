@@ -9,6 +9,18 @@ const DEFAULT_WINDOW_MS = 60_000; // 60 seconds
 // IP -> list of request timestamps (ms)
 const hits: Map<string, number[]> = new Map();
 
+// REG-002 fix (BUG-A5-3-406): Prune stale IP entries every 5 minutes to prevent unbounded memory growth.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, timestamps] of hits) {
+    // Remove IPs whose entire timestamp history is older than the longest possible window (10 min).
+    // Using a generous 10-minute TTL so entries survive any reasonable window size.
+    if (timestamps.every((t) => now - t >= 10 * 60_000)) {
+      hits.delete(ip);
+    }
+  }
+}, 5 * 60_000);
+
 interface RateLimitResult {
   allowed: boolean;
   /** Seconds until the oldest entry in the window expires (for Retry-After header) */
@@ -29,17 +41,21 @@ export function checkRateLimit(
 
   // Prune entries older than the window
   const valid = timestamps.filter((t) => now - t < windowMs);
-  valid.push(now);
-  hits.set(ip, valid);
 
-  if (valid.length <= max) {
-    return { allowed: true, retryAfterSec: 0 };
+  // REG-001 fix (BUG-A5-3-407): Check the limit BEFORE recording the current timestamp.
+  // Previously, the timestamp was pushed first, so a request at the exact limit boundary
+  // would reset the window instead of being rejected.
+  if (valid.length >= max) {
+    // Oldest entry determines when the window resets
+    const oldest = valid[0];
+    const retryAfterSec = Math.ceil((oldest + windowMs - now) / 1000);
+    return { allowed: false, retryAfterSec };
   }
 
-  // Oldest entry determines when the window resets
-  const oldest = valid[0];
-  const retryAfterSec = Math.ceil((oldest + windowMs - now) / 1000);
-  return { allowed: false, retryAfterSec };
+  // Request is within limits — now record it.
+  valid.push(now);
+  hits.set(ip, valid);
+  return { allowed: true, retryAfterSec: 0 };
 }
 
 /**
