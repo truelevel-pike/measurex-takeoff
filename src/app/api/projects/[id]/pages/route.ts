@@ -55,16 +55,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // Page doesn't exist yet — create it (upsert). This handles the race where
       // the client extracts text before the upload route has finished creating pages.
       // BUG-A5-5-022: try to get existing page dimensions from nearby pages
-      const existingPages = await getPages(id);
-      const nearestPage = existingPages.find((p) => p.pageNum === pageNum) ?? existingPages[0];
-      const page = await createPage(id, {
-        pageNum,
-        width: nearestPage?.width ?? 0,
-        height: nearestPage?.height ?? 0,
-        text: (text as string | undefined) ?? '',
-        name: (sheet_name as string | undefined) ?? undefined,
-      });
-      updated = page;
+      // BUG-A5-6-090: wrap createPage in try/catch to handle race condition where
+      // concurrent requests both try to create the same page. If creation fails
+      // (e.g. unique constraint), retry the update.
+      try {
+        const existingPages = await getPages(id);
+        const nearestPage = existingPages.find((p) => p.pageNum === pageNum) ?? existingPages[0];
+        const page = await createPage(id, {
+          pageNum,
+          width: nearestPage?.width ?? 0,
+          height: nearestPage?.height ?? 0,
+          text: (text as string | undefined) ?? '',
+          name: (sheet_name as string | undefined) ?? undefined,
+        });
+        updated = page;
+      } catch {
+        // Race: another request created the page between our update and create.
+        // Retry the update which should now succeed.
+        updated = await updatePage(id, pageNum, patch);
+      }
     }
     return NextResponse.json({ page: updated });
   } catch (err: unknown) {
