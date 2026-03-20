@@ -15,6 +15,14 @@ function isEditableElement(element: Element | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable;
 }
 
+/**
+ * Registers global keyboard shortcuts (undo, redo, tool switching, etc.).
+ *
+ * @param onShowShortcuts — Called when the user presses '?'. **Must be a
+ *   stable reference** (wrap with `useCallback` in the caller). An unstable
+ *   inline arrow function causes the internal `useEffect` to re-register the
+ *   global `keydown` listener on every parent render. (BUG-A7-2-016)
+ */
 export function useKeyboardHandler(onShowShortcuts: () => void): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
