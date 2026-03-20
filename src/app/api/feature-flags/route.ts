@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getFlags } from '@/lib/feature-flags';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const limited = rateLimitResponse(req);
+    if (limited) return limited;
+
     return NextResponse.json({ flags: getFlags() });
   } catch (err) {
     console.error('Feature flags error:', err);

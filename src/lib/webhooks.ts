@@ -53,7 +53,7 @@ export function getWebhooksForProject(projectId: string): WebhookRegistration[] 
 }
 
 // BUG-A5-5-005: block localhost/private IPs to prevent SSRF
-function isPrivateUrl(urlStr: string): boolean {
+export function isPrivateUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
     const hostname = parsed.hostname.toLowerCase();
