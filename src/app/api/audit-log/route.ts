@@ -11,7 +11,7 @@ interface AuditEntry {
   metadata?: Record<string, unknown>;
 }
 
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 500;
 const entries: AuditEntry[] = [];
 
 export async function GET(request: Request) {
