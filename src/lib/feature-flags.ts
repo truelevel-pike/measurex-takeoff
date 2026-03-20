@@ -2,6 +2,14 @@
  * Feature flags — check env vars (server + client) and localStorage (client only).
  */
 
+// NOTE: There are two flag systems in this file:
+// 1. Legacy flags (DEFAULT_FLAGS / isEnabled / getFlags) — used by older code paths,
+//    reads from FEATURE_FLAGS env var as a JSON blob. Kept for backwards compatibility.
+// 2. Wave 12 typed flags (FlagName / getFlag / setFlag / getAllFlags) — the current system,
+//    reads per-flag env vars (NEXT_PUBLIC_*), server overrides, and localStorage.
+// New code should use the Wave 12 API (getFlag/setFlag). Legacy flags are frozen and
+// will be migrated or removed in a future cleanup pass.
+
 const DEFAULT_FLAGS = {
   "ai-takeoff": true,
   "3d-view": true,
