@@ -123,6 +123,12 @@ export async function POST(
     }
 
     let classifications = await getClassifications(id);
+
+    // Delete all existing polygons for this page before inserting the new batch.
+    // This prevents duplicates when AI takeoff is re-run on a page that already
+    // has polygons (re-run / second-pass scenario).
+    await deletePolygonsByPage(id, page);
+
     const existingPolygons = await getPolygons(id);
 
     let createdClassifications = 0;

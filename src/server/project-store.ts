@@ -824,7 +824,13 @@ export async function createPolygon(
   const filePath = path.join(projectDir(projectId), 'polygons.json');
   const list = await readJson<Polygon[]>(filePath, []);
   const poly: Polygon = { id, ...data };
-  list.push(poly);
+  // Upsert: replace existing entry with same id instead of pushing a duplicate.
+  const existingIdx = list.findIndex((p) => p.id === id);
+  if (existingIdx !== -1) {
+    list[existingIdx] = poly;
+  } else {
+    list.push(poly);
+  }
   await writeJson(filePath, list);
   await recordHistory({ projectId, actionType: 'create', entityType: 'polygon', entityId: id, beforeData: null, afterData: poly });
   return poly;
