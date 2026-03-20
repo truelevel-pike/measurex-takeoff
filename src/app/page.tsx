@@ -810,7 +810,7 @@ function PageInner() {
     } finally {
       setAiLoading(false);
     }
-  }, [addToast, projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
+  }, [addToast, aiModel, projectId, reloadProjectPolygonsAndClassifications, safeGoToPage]);
 
   // Keyboard shortcuts (ignore when focused in inputs)
   useEffect(() => {
@@ -1460,7 +1460,7 @@ function PageInner() {
       setAiPageStatuses([]);
       addToast(`Takeoff cancelled after ${totalPagesCompleted} pages — ${totalPolygons} polygons found`, 'success');
     }
-  }, [projectId, reloadProjectPolygonsAndClassifications, safeGoToPage, addToast]);
+  }, [aiModel, projectId, reloadProjectPolygonsAndClassifications, safeGoToPage, addToast]);
 
   const handleCancelTakeoff = useCallback(() => {
     aiCancelRef.current = true;
