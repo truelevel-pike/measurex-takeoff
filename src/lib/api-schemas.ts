@@ -142,7 +142,7 @@ export const ChatBodySchema = z.object({
 export const DrawingBodySchema = z.object({
   name: z.string().min(1).optional(),
   url: z.string().optional(),
-}).passthrough();
+}).strict();
 
 // AI Takeoff body
 export const AiTakeoffBodySchema = z.object({
