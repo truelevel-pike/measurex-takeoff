@@ -189,13 +189,22 @@ function extractOpenAIText(content: unknown): string {
 }
 
 function parseDetectedElements(raw: string, pageWidth: number, pageHeight: number): DetectedElement[] {
-  const jsonStart = raw.indexOf('[');
-  const jsonEnd = raw.lastIndexOf(']');
-  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-    throw new Error('No JSON array in OpenAI response');
+  // BUG-A5-6-128: Try JSON.parse on the full response first; fall back to
+  // bracket-extraction with validation.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Full parse failed — try extracting the outermost JSON array.
+    const jsonStart = raw.indexOf('[');
+    const jsonEnd = raw.lastIndexOf(']');
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      throw new Error('No JSON array in OpenAI response');
+    }
+    const extracted = raw.slice(jsonStart, jsonEnd + 1);
+    // Validate the extracted substring is actually valid JSON.
+    parsed = JSON.parse(extracted);
   }
-
-  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
   if (!Array.isArray(parsed)) {
     throw new Error('Parsed response is not an array');
   }

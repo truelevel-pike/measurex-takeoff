@@ -250,12 +250,15 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
     }
   };
 
+  // BUG-A7-5-002 fix: filter out archived drawings so they don't appear in the list
   const sortedDrawings = selectedSet
-    ? [...selectedSet.drawings].sort((a, b) => {
-        if (sortBy === 'name') return a.name.localeCompare(b.name);
-        if (sortBy === 'date') return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
-        return (a.sheetNumber ?? '').localeCompare(b.sheetNumber ?? '');
-      })
+    ? [...selectedSet.drawings]
+        .filter((d) => !d.archived)
+        .sort((a, b) => {
+          if (sortBy === 'name') return a.name.localeCompare(b.name);
+          if (sortBy === 'date') return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+          return (a.sheetNumber ?? '').localeCompare(b.sheetNumber ?? '');
+        })
     : [];
 
   const renameDrawing = (drawingId: string, newName: string) => {
@@ -633,7 +636,8 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
                       </button>
                       <button
                         onClick={() => {
-                          deleteDrawing(d.id);
+                          // BUG-A7-5-002 fix: archive instead of delete to prevent data loss
+                          archiveDrawing(d.id);
                         }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#2a2a3e] text-neutral-400 flex items-center gap-2"
                       >
