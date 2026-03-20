@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getAssemblies, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const UnitCostSchema = z.object({
   classificationId: z.string().uuid(),
@@ -18,6 +19,9 @@ const EstimateBodySchema = z.object({
  * Compute a cost estimate based on polygon quantities and optional unit costs.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-118: add rate limiting to GET handler
+  const limited = rateLimitResponse(_req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -70,6 +74,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
  * Compute a cost estimate with provided unit costs.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // BUG-A5-6-119: add rate limiting to POST handler
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
