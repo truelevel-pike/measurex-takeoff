@@ -19,7 +19,17 @@ export function loadAiSettings(): AiSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return { ...DEFAULT_SETTINGS };
+    }
+    // Validate individual fields against expected types
+    return {
+      defaultModel: typeof parsed.defaultModel === 'string' ? parsed.defaultModel : DEFAULT_SETTINGS.defaultModel,
+      defaultScaleUnit: parsed.defaultScaleUnit === 'ft' || parsed.defaultScaleUnit === 'm' ? parsed.defaultScaleUnit : DEFAULT_SETTINGS.defaultScaleUnit,
+      autoRunScaleDetection: typeof parsed.autoRunScaleDetection === 'boolean' ? parsed.autoRunScaleDetection : DEFAULT_SETTINGS.autoRunScaleDetection,
+      openaiApiKey: typeof parsed.openaiApiKey === 'string' ? parsed.openaiApiKey : DEFAULT_SETTINGS.openaiApiKey,
+    };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
