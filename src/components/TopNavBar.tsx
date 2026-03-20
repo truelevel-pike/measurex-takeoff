@@ -126,6 +126,9 @@ export default function TopNavBar({
     };
   }, []);
   const [isShared, setIsShared] = React.useState(false);
+  // BUG-A6-5-024: useViewerPresence likely sets up a WebSocket/polling interval.
+  // Cleanup depends on the hook's internal implementation — verify it unsubscribes
+  // on unmount or when TopNavBar is conditionally removed (e.g. print mode).
   const { viewerCount } = useViewerPresence(projectId, isShared);
   const [isEditingPage, setIsEditingPage] = React.useState(false);
   const [pageInputValue, setPageInputValue] = React.useState('');
