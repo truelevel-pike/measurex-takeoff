@@ -23,8 +23,8 @@ export async function POST(
     const pageNum: number = body?.page;
     const model: string | undefined = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
 
-    if (!pageNum || typeof pageNum !== 'number') {
-      return NextResponse.json({ error: 'page (number) is required' }, { status: 400 });
+    if (!Number.isInteger(pageNum) || pageNum < 1) {
+      return NextResponse.json({ error: 'page must be a positive integer' }, { status: 400 });
     }
 
     const project = await getProject(id);
