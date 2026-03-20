@@ -382,7 +382,7 @@ function PageInner() {
   const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
   const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
   const [aiPageStatuses, setAiPageStatuses] = useState<PageStatus[]>([]);
-  const [aiModel, setAiModel] = useState<string>(() => {
+  const [aiModel, setAiModel] = useState<string>(() => { // persisted via localStorage: "measurex_ai_model"
     if (typeof window !== "undefined") {
       return localStorage.getItem("measurex_ai_model") ?? "gpt-5.4";
     }

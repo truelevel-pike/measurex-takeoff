@@ -72,6 +72,7 @@ export default function DrawingTool() {
 
   // Convert click coordinates to base (scale=1) PDF page coordinate space
   // so polygon points are zoom-independent, then snap to nearest vertex/midpoint.
+  // DrawingTool sits inside the PDF pan/zoom transform, so rect already reflects the translated position — no need to subtract pan or divide by zoom.
   // Uses cachedRectRef (updated on resize) to avoid stale/zero rect reads during
   // rapid clicks while React is mid-render (fixes BUG-DRAW-002 coordinate drift).
   const getCoords = useCallback((e: React.MouseEvent): Point => {
