@@ -29,7 +29,8 @@ function apiSync(url: string, options: RequestInit): void {
   }).catch((err) => console.error(`[store] API sync failed: ${options.method} ${url}`, err));
 }
 
-// History snapshot limited to core state we need to restore
+// History snapshot — includes all user-editable data so undo/redo is complete
+// BUG-A5-H06: added groups, assemblies, markups to undo snapshots
 interface HistorySnapshot {
   classifications: Classification[];
   polygons: Polygon[];
@@ -41,6 +42,9 @@ interface HistorySnapshot {
   selectedPolygonId: string | null;
   selectedPolygons: string[];
   repeatingGroups: RepeatingGroup[];
+  groups: ClassificationGroup[];
+  assemblies: Assembly[];
+  markups: Markup[];
 }
 
 export type Tool =
@@ -222,6 +226,9 @@ function snapshot(state: Store): HistorySnapshot {
     selectedPolygonId: state.selectedPolygonId,
     selectedPolygons: structuredClone(state.selectedPolygons),
     repeatingGroups: structuredClone(state.repeatingGroups),
+    groups: structuredClone(state.groups),
+    assemblies: structuredClone(state.assemblies),
+    markups: structuredClone(state.markups),
   };
 }
 
@@ -701,6 +708,9 @@ export const useStore = create<Store>()(
       selectedPolygonId: prev.selectedPolygonId,
       selectedPolygons: prev.selectedPolygons,
       repeatingGroups: prev.repeatingGroups,
+      groups: prev.groups,
+      assemblies: prev.assemblies,
+      markups: prev.markups,
       undoStack: rest,
       redoStack: [...s.redoStack, now],
     });
@@ -722,6 +732,9 @@ export const useStore = create<Store>()(
       selectedPolygonId: next.selectedPolygonId,
       selectedPolygons: next.selectedPolygons,
       repeatingGroups: next.repeatingGroups,
+      groups: next.groups,
+      assemblies: next.assemblies,
+      markups: next.markups,
       redoStack: rest,
       undoStack: [...s.undoStack, now],
     });
