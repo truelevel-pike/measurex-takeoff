@@ -54,9 +54,33 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   // Profile state
-  const [name, setName] = useState('Nathan Solis');
+  const PROFILE_KEY = 'mx-profile-settings';
+  const [name, setName] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'Nathan Solis';
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (raw) return JSON.parse(raw).name ?? 'Nathan Solis';
+    } catch { /* ignore */ }
+    return 'Nathan Solis';
+  });
   const [email] = useState('nathan@measurex.io');
-  const [orgName, setOrgName] = useState('MeasureX Inc.');
+  const [orgName, setOrgName] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'MeasureX Inc.';
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (raw) return JSON.parse(raw).orgName ?? 'MeasureX Inc.';
+    } catch { /* ignore */ }
+    return 'MeasureX Inc.';
+  });
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  const handleSaveProfile = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, orgName }));
+    }
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  };
 
   // Measurements state
   const [defaultScale, setDefaultScale] = useState('1/4" = 1\'');
@@ -213,8 +237,11 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pt-2">
-                  <button className="bg-green-600 hover:bg-green-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                    <Check size={14} /> Save Changes
+                  <button
+                    onClick={handleSaveProfile}
+                    className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${profileSaved ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-green-600 hover:bg-green-500'} text-white`}
+                  >
+                    <Check size={14} /> {profileSaved ? 'Saved!' : 'Save Changes'}
                   </button>
                 </div>
               </div>
