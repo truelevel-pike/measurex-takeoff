@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { getAllFlags, setServerFlag, FLAG_NAMES, type FlagName } from '@/lib/feature-flags';
 
 export async function GET() {
@@ -8,8 +9,14 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     // BUG-A5-5-003: require ADMIN_SECRET header auth for flag mutation
+    // BUG-A5-6-022: use constant-time comparison to prevent timing attacks
     const adminSecret = process.env.ADMIN_SECRET;
-    if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
+    if (!adminSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const secretBuffer = Buffer.from(adminSecret);
+    const headerBuffer = Buffer.from(req.headers.get('x-admin-secret') ?? '');
+    if (secretBuffer.length !== headerBuffer.length || !timingSafeEqual(secretBuffer, headerBuffer)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
