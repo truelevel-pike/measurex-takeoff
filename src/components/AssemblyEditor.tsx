@@ -61,10 +61,12 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
       id: assembly?.id ?? crypto.randomUUID(),
       name: name.trim(),
       classificationId,
+      // BUG-A6-5-006 fix: only apply global formula to materials that don't have
+      // their own per-material formula. This preserves per-material values.
       materials: materials.map((m) => ({
         ...m,
         id: m.id || crypto.randomUUID(),
-        formula: formula || m.formula,
+        formula: m.formula || formula || undefined,
       })),
       isLibrary,
     };
