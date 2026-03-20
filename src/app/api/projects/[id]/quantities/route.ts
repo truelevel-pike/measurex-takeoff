@@ -46,7 +46,11 @@ export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_re
         count,
         area: Math.round(totalArea * 100) / 100,
         linearFeet: Math.round(totalLinear * 100) / 100,
-        unit: c.type === 'area' ? 'SF' : c.type === 'linear' ? 'FT' : 'EA',
+        unit: c.type === 'area'
+          ? (unit === 'metric' ? 'SM' : 'SF')
+          : c.type === 'linear'
+            ? (unit === 'metric' ? 'M' : 'FT')
+            : 'EA',
       };
     });
 
