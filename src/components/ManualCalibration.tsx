@@ -43,7 +43,12 @@ export default function ManualCalibration({
   const setScaleForPage = useStore((s) => s.setScaleForPage);
   const setScale = useStore((s) => s.setScale);
 
-  // Auto-start calibration mode when component mounts in draw-line mode
+  // Auto-start calibration mode when component mounts in draw-line mode.
+  // BUG-A7-2-006: Intentionally run only on mount (empty deps):
+  //   - mode: always 'draw-line' at initial render (useState default)
+  //   - calibrationMode / calibrationPoints: read once to gate the call
+  //   - setCalibrationMode: stable Zustand action (never changes identity)
+  // Re-running on every change would fight with the user switching modes.
   useEffect(() => {
     if (mode === 'draw-line' && !calibrationMode && calibrationPoints.length === 0) {
       setCalibrationMode(true);
