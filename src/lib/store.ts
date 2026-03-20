@@ -21,18 +21,32 @@ const trimLower = (s: string) => s.trim().toLowerCase();
 
 // BUG-A5-C3 fix: fire-and-forget API sync helper.
 // Mutations update local state optimistically, then persist to the API in the background.
+// BUG-A5-6-181: added single retry with exponential back-off on failure.
+const API_SYNC_MAX_RETRIES = 1;
+const API_SYNC_RETRY_DELAY_MS = 1000;
+
 function apiSync(url: string, options: RequestInit): void {
   if (typeof fetch === 'undefined') return; // SSR guard
-  fetch(url, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-  }).catch((err) => {
-    // BUG-A5-5-042: notify user when apiSync fails
-    console.error(`[store] API sync failed: ${options.method} ${url}`, err);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('mx:sync-error', { detail: { method: options.method, url, error: String(err) } }));
-    }
-  });
+
+  const attempt = (retryCount: number) => {
+    fetch(url, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+    }).catch((err) => {
+      if (retryCount < API_SYNC_MAX_RETRIES) {
+        console.warn(`[store] API sync failed, retrying (${retryCount + 1}/${API_SYNC_MAX_RETRIES}): ${options.method} ${url}`);
+        setTimeout(() => attempt(retryCount + 1), API_SYNC_RETRY_DELAY_MS * Math.pow(2, retryCount));
+        return;
+      }
+      // BUG-A5-5-042: notify user when apiSync fails after all retries
+      console.error(`[store] API sync failed after ${API_SYNC_MAX_RETRIES + 1} attempts: ${options.method} ${url}`, err);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mx:sync-error', { detail: { method: options.method, url, error: String(err) } }));
+      }
+    });
+  };
+
+  attempt(0);
 }
 
 // History snapshot — includes all user-editable data so undo/redo is complete
