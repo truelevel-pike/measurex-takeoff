@@ -145,7 +145,9 @@ function buildSvgOverlay(
     .map((poly) => {
       const cls = classifications.find((c) => c.id === poly.classificationId);
       if (!cls || poly.points.length < 2) return '';
-      const color = cls.color;
+      // BUG-A5-6-059: sanitize color to prevent SVG injection
+      const SAFE_COLOR_RE = /^#[0-9a-fA-F]{3,8}$|^[a-zA-Z]+$/;
+      const color = SAFE_COLOR_RE.test(cls.color) ? cls.color : '#888888';
       const pts = poly.points.map((p) => `${p.x / pageWidth},${p.y / pageHeight}`).join(' ');
       if (cls.type === 'linear') {
         return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="0.003" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -167,8 +169,10 @@ function buildPageSection(
 ): string {
   const title = pageName ? `${escapeHtml(pageName)} (Page ${pageNum})` : `Page ${pageNum}`;
 
+  // BUG-A5-6-060: validate thumbnail src to prevent injection — only allow data: URIs or relative paths
+  const isSafeThumbnail = thumbnail !== null && (thumbnail.startsWith('data:') || thumbnail.startsWith('/'));
   const imageSection =
-    thumbnail !== null
+    isSafeThumbnail
       ? `
       <figure style="position:relative;display:inline-block;width:100%;max-width:860px;margin:0 0 20px">
         <img src="${thumbnail}" style="width:100%;height:auto;display:block;border:1px solid #e2e8f0;border-radius:6px" alt="Page ${pageNum}" />
