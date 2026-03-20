@@ -134,9 +134,13 @@ export default function DrawingTool() {
       typeof performance.mark === 'function' &&
       typeof performance.measure === 'function';
     if (canMeasurePerf) performance.mark('polygon-draw-start');
-    const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
     const ppu = scale?.pixelsPerUnit || 1;
-    const linearFeet = linear ? calculateLinearFeet(currentPoints, ppu, false) : 0;
+    // BUG-A5-H02: compute both area and linearFeet for all polygon types.
+    // Area polygons get perimeter (closed=true), linear polygons get path length (closed=false).
+    const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
+    const linearFeet = linear
+      ? calculateLinearFeet(currentPoints, ppu, false)
+      : calculateLinearFeet(currentPoints, ppu, true);
     addPolygon({
       points: currentPoints,
       classificationId: cls.id,
