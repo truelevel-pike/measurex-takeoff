@@ -1,9 +1,12 @@
 'use client';
 
+// BUG-A8-001 / BUG-A8-004 fix: use isolated local state — never hydrate or
+// mutate the global Zustand store from the share view.  The global store
+// belongs to the main editor; overwriting it would silently discard unsaved
+// work and contaminate the auto-save loop with a foreign project ID.
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { useStore } from '@/lib/store';
-import QuantitiesPanel from '@/components/QuantitiesPanel';
 import { ToastProvider } from '@/components/Toast';
 import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2, FileText, Printer, Download } from 'lucide-react';
 
@@ -66,9 +69,8 @@ export default function SharedViewPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
-  const hydrateState = useStore((s) => s.hydrateState);
-  const setCurrentPage = useStore((s) => s.setCurrentPage);
-  const setProjectId = useStore((s) => s.setProjectId);
+  // BUG-A8-001 / BUG-A8-004: no global store access — share view is fully
+  // self-contained using local React state only.
 
   // Fetch shared project data
   useEffect(() => {
@@ -87,18 +89,9 @@ export default function SharedViewPage() {
 
         const proj = data.project as SharedProject;
         setProject(proj);
-        setProjectId(proj.id);
-
-        // Hydrate the Zustand store so QuantitiesPanel works
-        hydrateState({
-          classifications: proj.state.classifications,
-          polygons: proj.state.polygons,
-          scale: proj.state.scale as Parameters<typeof hydrateState>[0]['scale'],
-          scales: (proj.state.scales ?? {}) as Parameters<typeof hydrateState>[0]['scales'],
-          currentPage: 1,
-          totalPages: proj.state.totalPages,
-          annotations: [],
-        });
+        // NOTE: do NOT call setProjectId or hydrateState on the global store.
+        // The share view renders entirely from local `project` state to avoid
+        // overwriting the editor's in-progress work.
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load shared project');
       } finally {
@@ -108,42 +101,45 @@ export default function SharedViewPage() {
 
     void load();
     return () => { cancelled = true; };
-  }, [token, hydrateState, setProjectId]);
+  }, [token]);
 
   const totalPages = project?.state.totalPages ?? 1;
 
   const handlePrev = useCallback(() => {
-    setPageIndex((p) => {
-      const next = Math.max(0, p - 1);
-      setCurrentPage(next + 1, totalPages);
-      return next;
-    });
-  }, [totalPages, setCurrentPage]);
+    setPageIndex((p) => Math.max(0, p - 1));
+  }, []);
 
   const handleNext = useCallback(() => {
-    setPageIndex((p) => {
-      const next = Math.min(totalPages - 1, p + 1);
-      setCurrentPage(next + 1, totalPages);
-      return next;
-    });
-  }, [totalPages, setCurrentPage]);
+    setPageIndex((p) => Math.min(totalPages - 1, p + 1));
+  }, [totalPages]);
 
   const handlePrint = useCallback(() => window.print(), []);
 
+  // BUG-A8-002 fix: check res.ok before consuming the body; surface errors
+  // instead of silently creating a corrupt download from a 401/403 body.
   const handleExport = useCallback(async (format: 'excel' | 'json' | 'pdf') => {
     setShowExportMenu(false);
     if (format === 'json' || format === 'pdf') {
       window.open(`/api/share/${token}/export?format=${format}`, '_blank');
     } else {
-      const res = await fetch(`/api/share/${token}/export?format=excel`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `measurex-${project?.name?.replace(/[^a-zA-Z0-9-_]/g, '-') || 'export'}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      try {
+        const res = await fetch(`/api/share/${token}/export?format=excel`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          const msg = body?.error || `Export failed (HTTP ${res.status})`;
+          setError(msg);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `measurex-${project?.name?.replace(/[^a-zA-Z0-9-_]/g, '-') || 'export'}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Export failed');
+      }
     }
   }, [token, project?.name]);
 
@@ -234,7 +230,12 @@ export default function SharedViewPage() {
     ? `${sheetName} \u00b7 ${pageIndex + 1}/${totalPages}`
     : `Page ${pageIndex + 1} of ${totalPages}`;
 
-  const formattedDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // BUG-A8-030 fix: stable value prevents SSR/client hydration mismatch if date
+  // ticks over midnight between server render and client hydration.
+  const formattedDate = useMemo(
+    () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    [],
+  );
 
   if (loading) {
     return (
@@ -677,17 +678,24 @@ export default function SharedViewPage() {
           </div>
         </div>
 
-        {/* Quantities panel (read-only) */}
-        <div
-          className="no-print hidden md:flex flex-col border-l overflow-y-auto"
-          style={{
-            width: 360,
-            background: 'rgba(10,10,15,0.95)',
-            borderColor: 'rgba(0,212,255,0.15)',
-          }}
-        >
-          <QuantitiesPanel />
-        </div>
+        {/* Quantities panel (read-only) — rendered inline from local state;
+            we do NOT use the global QuantitiesPanel (BUG-A8-001 fix). */}
+        {allPageQuantities.length > 0 && (
+          <div
+            className="no-print hidden md:flex flex-col border-l overflow-y-auto"
+            style={{
+              width: 360,
+              background: 'rgba(10,10,15,0.95)',
+              borderColor: 'rgba(0,212,255,0.15)',
+              padding: '16px 12px',
+            }}
+          >
+            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#7a8a94', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              All Pages — Totals
+            </h3>
+            {renderQuantitiesTable(groupByTrade(allPageQuantities), false)}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
