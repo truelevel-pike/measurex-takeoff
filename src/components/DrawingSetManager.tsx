@@ -168,42 +168,68 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
       }));
       setUploads((prev) => [...prev, ...newUploads]);
 
-      // Simulate progress for each file
-      newUploads.forEach((upload) => {
+      // Upload each file with progress simulation + real API call
+      newUploads.forEach((upload, idx) => {
+        const file = fileArray[idx];
         let progress = 0;
         const interval = setInterval(() => {
           progress += Math.random() * 25 + 10;
+          // BUG-A7-5-020 fix: clamp progress to 100 before conditional
+          if (progress > 100) progress = 100;
+          setUploads((prev) => prev.map((u) => (u.id === upload.id ? { ...u, progress, done: progress >= 100 } : u)));
           if (progress >= 100) {
-            progress = 100;
             clearInterval(interval);
             // Remove from tracked intervals ref
             uploadIntervalsRef.current = uploadIntervalsRef.current.filter((id) => id !== interval);
 
-            // Add drawing to set
+            // Add drawing to set optimistically
             const drawing: Drawing = {
               id: crypto.randomUUID(),
               name: upload.fileName.replace('.pdf', ''),
               setId: selectedSetId,
-              pageCount: Math.ceil(Math.random() * 10) + 1,
+              pageCount: 1,
               uploadedAt: new Date().toISOString(),
-              sheetNumber: `S-${String(Math.ceil(Math.random() * 50)).padStart(3, '0')}`,
             };
             setSets((prev) =>
               prev.map((s) => (s.id === selectedSetId ? { ...s, drawings: [...s.drawings, drawing] } : s))
             );
+
+            // BUG-A7-5-001 fix: real API upload with FormData
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('setId', selectedSetId);
+            formData.append('drawingId', drawing.id);
+            fetch(`/api/projects/${projectId}/drawings`, {
+              method: 'POST',
+              body: formData,
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((data) => {
+                if (data?.drawing) {
+                  // Update with server-side data (pageCount, sheetNumber, etc.)
+                  setSets((prev) =>
+                    prev.map((s) => ({
+                      ...s,
+                      drawings: s.drawings.map((d) =>
+                        d.id === drawing.id ? { ...d, ...data.drawing } : d
+                      ),
+                    }))
+                  );
+                }
+              })
+              .catch(() => {}); // optimistic — local state already updated
 
             // Remove from uploads after a moment
             setTimeout(() => {
               setUploads((prev) => prev.filter((u) => u.id !== upload.id));
             }, 800);
           }
-          setUploads((prev) => prev.map((u) => (u.id === upload.id ? { ...u, progress, done: progress >= 100 } : u)));
         }, 300);
         // Track the interval ID so it can be cleared on unmount (BUG-A6-003).
         uploadIntervalsRef.current.push(interval);
       });
     },
-    [selectedSetId]
+    [selectedSetId, projectId]
   );
 
   const handleDrop = useCallback(

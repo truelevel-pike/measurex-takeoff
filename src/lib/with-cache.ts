@@ -24,12 +24,12 @@ export function withCache<C = any>(
     if (options.noStore) {
       parts.push('no-store');
     } else {
-      parts.push('public');
+      parts.push('private');
       if (options.maxAge !== undefined) parts.push(`max-age=${options.maxAge}`);
       if (options.sMaxAge !== undefined) parts.push(`s-maxage=${options.sMaxAge}`);
       if (options.staleWhileRevalidate !== undefined)
         parts.push(`stale-while-revalidate=${options.staleWhileRevalidate}`);
-      if (parts.length === 1) parts.push('no-cache'); // only 'public' means no directives
+      if (parts.length === 1) parts.push('no-cache'); // only 'private' means no directives
     }
 
     const headers = new Headers(res.headers);
