@@ -104,7 +104,7 @@ export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
     if (reportUrl) {
       const body = JSON.stringify({ ...metric, ...tags, timestamp: Date.now() });
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(reportUrl, body);
+        navigator.sendBeacon(reportUrl, new Blob([body], { type: 'application/json' }));
       } else {
         fetch(reportUrl, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
       }
