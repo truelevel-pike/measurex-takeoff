@@ -21,6 +21,6 @@ export async function POST() {
         'Plugin registration is done programmatically via src/lib/plugin-system.ts. ' +
         'Import registerPlugin and call it with a MeasureXPlugin object.',
     },
-    { status: 200 },
+    { status: 405 },
   );
 }

@@ -66,7 +66,8 @@ export async function POST(
         quantityMap[c.id] = { name: c.name, type: c.type, quantity: classPolygons.length, unitLabel: 'count', count: classPolygons.length };
       } else {
         const totalRaw = classPolygons.reduce((sum, p) => {
-          return sum + (c.type === 'linear' ? calculateLinearFeet(p.points, ppu, false) : p.area / (ppu * ppu));
+          // BUG-A5-6-084: guard against null/undefined p.area
+          return sum + (c.type === 'linear' ? calculateLinearFeet(p.points, ppu, false) : (p.area ?? 0) / (ppu * ppu));
         }, 0);
         const unitLabel = c.type === 'linear' ? unit : `sq ${unit}`;
         quantityMap[c.id] = { name: c.name, type: c.type, quantity: totalRaw, unitLabel, count: classPolygons.length };
