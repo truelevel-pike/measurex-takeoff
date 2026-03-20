@@ -113,6 +113,23 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const [showFloatingReclassify, setShowFloatingReclassify] = useState(false);
   const [hoveredPoly, setHoveredPoly] = useState<{ id: string; clientX: number; clientY: number } | null>(null);
 
+  // Convert a mouse event's screen position to SVG/base-coordinate space.
+  //
+  // WHY pan and zoom are NOT manually subtracted here:
+  //   - The overlay wrapper (wrapperRef) sits inside the PDFViewer pan/zoom div which
+  //     applies only a CSS `translate(pan.x, pan.y)` — there is NO CSS `scale()` transform.
+  //   - The PDF canvas is rendered at (zoom * 1.5) resolution, but its CSS display size
+  //     equals that pixel size exactly (no further scaling), so the element's physical
+  //     screen width IS (rawPDFWidth * zoom * 1.5).
+  //   - `getBoundingClientRect()` always returns the element's actual screen rect,
+  //     already accounting for any ancestor transforms (pan translation in this case).
+  //   - Dividing (clientX - rect.left) by rect.width normalises to [0,1] in screen space.
+  //     Multiplying by baseDims.width converts to base PDF coordinates (scale=1 space).
+  //   - The zoom * 1.5 factor cancels cleanly: it is present in both rect.width
+  //     (denominator) and the physical pixel position (numerator), so it has zero net
+  //     effect on the result.
+  //   - Conclusion: this formula is correct and zoom/pan-invariant without any manual
+  //     offset arithmetic. See DrawingTool.tsx getCoords() for the same pattern.
   const toSvgCoords = useCallback(
     (e: React.MouseEvent | MouseEvent): Point => {
       const rect = wrapperRef.current?.getBoundingClientRect();
