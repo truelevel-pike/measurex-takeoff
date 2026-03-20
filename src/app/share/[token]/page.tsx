@@ -124,7 +124,8 @@ export default function SharedViewPage() {
       window.open(`/api/share/${encodeURIComponent(token)}/export?format=${format}`, '_blank', 'noopener,noreferrer');
     } else {
       try {
-        const res = await fetch(`/api/share/${token}/export?format=excel`);
+        // BUG-A8-5-045 fix: use encodeURIComponent consistently (json/pdf already do this)
+        const res = await fetch(`/api/share/${encodeURIComponent(token)}/export?format=excel`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           const msg = body?.error || `Export failed (HTTP ${res.status})`;
@@ -559,8 +560,11 @@ export default function SharedViewPage() {
             <Download size={14} />
             Download PDF
           </button>
+          {/* BUG-A8-5-044 fix: use share token in the link instead of the internal project UUID
+              to avoid leaking the UUID to unauthenticated viewers. The main app resolves
+              the share token and redirects to the project if the viewer is authenticated. */}
           <a
-            href={`/?project=${project.id}`}
+            href={`/?share=${encodeURIComponent(token)}`}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
             style={{
               background: '#12121a',
@@ -653,9 +657,10 @@ export default function SharedViewPage() {
           )}
 
           {/* Open in MeasureX CTA */}
+          {/* BUG-A8-5-044 fix: use share token instead of internal project UUID */}
           <div style={{ maxWidth: 600, width: '100%', marginTop: 32 }}>
             <a
-              href={`/?project=${project.id}`}
+              href={`/?share=${encodeURIComponent(token)}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',

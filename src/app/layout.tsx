@@ -4,6 +4,7 @@ import "./globals.css";
 import KeyboardShortcutsPortal from "@/components/KeyboardShortcutsPortal";
 import OfflineBanner from "@/components/OfflineBanner";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import SWUpdateBanner from "@/components/SWUpdateBanner"; // BUG-A8-5-024 fix
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { PerfMonitor } from "@/components/PerfMonitor";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
@@ -71,6 +72,7 @@ export default function RootLayout({
         <PerfMonitor />
         <OfflineIndicator />
         <ServiceWorkerRegister />
+        <SWUpdateBanner />
         <PWAInstallBanner />
       </body>
     </html>

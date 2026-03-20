@@ -1185,7 +1185,7 @@ function PageInner() {
       setProjectId(project.id);
       setProjectName(project.name || name);
       localStorage.setItem('measurex_project_id', project.id);
-      window.history.replaceState({}, '', `/?project=${encodeURIComponent(project.id)}`);
+      window.history.replaceState(null, '', `/?project=${encodeURIComponent(project.id)}`);
 
       // GAP-006: Upload PDF to server and check for auto-detected scale
       // BUG-A8-5-013 fix: clean up the newly-created project if PDF upload fails
@@ -1206,7 +1206,7 @@ function PageInner() {
           setProjectId('');
           setProjectName('');
           localStorage.removeItem('measurex_project_id');
-          window.history.replaceState({}, '', '/');
+          window.history.replaceState(null, '', '/');
           addToast('PDF upload failed. Please try again.', 'error');
           return;
         }
@@ -1349,7 +1349,7 @@ function PageInner() {
         setProjectId(data.project.id);
         setProjectName(data.project.name || name);
         localStorage.setItem('measurex_project_id', data.project.id);
-        window.history.replaceState({}, '', `/?project=${encodeURIComponent(data.project.id)}`);
+        window.history.replaceState(null, '', `/?project=${encodeURIComponent(data.project.id)}`);
         persistSaveStatus('Saved!');
         addToast('Project saved', 'success');
       } else {
