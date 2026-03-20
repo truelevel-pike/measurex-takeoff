@@ -229,6 +229,11 @@ export function connectToProject(projectId: string): void {
 
   const isProjectSwitch = currentProjectId !== null && currentProjectId !== projectId;
   disconnectFromProject(isProjectSwitch);
+  // Always reset lastEventId when connecting to a different project to prevent
+  // stale event IDs from one project being sent to another (BUG-A5-6-172).
+  if (isProjectSwitch || (currentProjectId === null && lastEventId > 0)) {
+    lastEventId = 0;
+  }
   currentProjectId = projectId;
 
   const url = lastEventId > 0
