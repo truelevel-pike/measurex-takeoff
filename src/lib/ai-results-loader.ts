@@ -21,6 +21,8 @@ export function loadAIResults(
   const stats = { areas: 0, lines: 0, counts: 0 };
   if (!results?.length) return stats;
 
+  // BUG-A5-5-047: readState uses store.getState() (zustand's getState) to avoid stale closure.
+  // Falls back to direct store properties only if getState is not available.
   const readState = () => store.getState?.() ?? {
     classifications: store.classifications,
     scale: store.scale,

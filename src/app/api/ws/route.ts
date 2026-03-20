@@ -35,6 +35,11 @@ export async function GET(request: NextRequest) {
 
       const encoder = new TextEncoder();
 
+      // BUG-A5-5-043: send connected event first, then replay buffered events, then viewer:count
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ event: 'connected', data: { projectId } })}\n\n`)
+      );
+
       if (lastEventId > 0) {
         const buffered = projectEventBuffer.get(projectId) ?? [];
         for (const bufferedEvent of buffered) {
@@ -51,11 +56,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Send initial connection event
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ event: 'connected', data: { projectId } })}\n\n`)
-      );
-
       // Send current viewer count to this client
       controller.enqueue(
         encoder.encode(`data: ${JSON.stringify({ event: 'viewer:count', data: { viewerId, viewerCount } })}\n\n`)
@@ -65,9 +65,10 @@ export async function GET(request: NextRequest) {
       broadcastToProject(projectId, 'viewer:joined', { viewerId, viewerCount });
 
       // 15-second keepalive to prevent proxy/load-balancer timeouts
+      // BUG-A5-5-044: reuse existing encoder instead of new TextEncoder() per tick
       keepaliveInterval = setInterval(() => {
         try {
-          controller.enqueue(new TextEncoder().encode(': keepalive\n\n'));
+          controller.enqueue(encoder.encode(': keepalive\n\n'));
         } catch {
           // Client disconnected mid-keepalive — clear interval
           if (keepaliveInterval !== null) {

@@ -62,13 +62,16 @@ function currency(n: number): string {
 }
 
 function buildSummarySheet(projectName: string, totalCostEstimate: number): XLSX.WorkSheet {
+  // BUG-A5-5-048: write totalCostEstimate as a number so Excel can format it, not a currency string
   const aoa: Array<Array<string | number>> = [
     ['Project Name', projectName],
     ['Date', new Date().toISOString()],
-    ['Total Cost Estimate', currency(totalCostEstimate)],
+    ['Total Cost Estimate', round2(totalCostEstimate)],
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 24 }, { wch: 40 }];
+  // Apply currency format to the cost cell (B3)
+  if (ws['B3']) ws['B3'].z = '$#,##0.00';
   return ws;
 }
 
