@@ -38,6 +38,14 @@ const sections: ShortcutSection[] = [
     ],
   },
   {
+    title: 'View',
+    rows: [
+      { description: 'Fit to page', keys: ['F'] },
+      { description: 'Zoom in', keys: ['+'] },
+      { description: 'Zoom out', keys: ['-'] },
+    ],
+  },
+  {
     title: 'General',
     rows: [
       { description: 'Cancel / Deselect', keys: ['Esc'] },
