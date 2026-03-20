@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 interface AuditEntry {
   id: string;
@@ -14,6 +15,8 @@ const MAX_ENTRIES = 200;
 const entries: AuditEntry[] = [];
 
 export async function GET(request: Request) {
+  const rlResp = rateLimitResponse(request);
+  if (rlResp) return rlResp;
   // BUG-A5-5-018: require auth before exposing audit log data
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret || request.headers.get('x-admin-secret') !== adminSecret) {

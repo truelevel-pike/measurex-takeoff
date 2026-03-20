@@ -6,6 +6,9 @@ export function isConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
+/** Alias for isConfigured — used by perf routes and other consumers expecting this name. */
+export const isSupabaseConfigured = isConfigured;
+
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
