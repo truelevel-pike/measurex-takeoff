@@ -11,6 +11,7 @@ import {
   getProject,
   restoreSnapshot,
 } from '@/server/project-store';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,6 +22,8 @@ const SnapshotRestoreSchema = z.object({
 
 // Restore a project from either a full export object or a snapshot ID.
 export async function POST(req: Request) {
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const body = await req.json().catch(() => null);
@@ -66,9 +69,12 @@ export async function POST(req: Request) {
     }
 
     for (const p of polygons) {
+      const mappedClassificationId = classificationIdMap.get(p.classificationId as string);
+      // BUG-A5-6-053: skip polygon if classification mapping fails instead of using stale ID
+      if (!mappedClassificationId) continue;
       await createPolygon(created.id, {
         points: p.points as Array<{ x: number; y: number }>,
-        classificationId: classificationIdMap.get(p.classificationId as string) || (p.classificationId as string),
+        classificationId: mappedClassificationId,
         pageNumber: (p.pageNumber as number) ?? 1,
         area: (p.area as number) ?? 0,
         linearFeet: (p.linearFeet as number) ?? 0,
