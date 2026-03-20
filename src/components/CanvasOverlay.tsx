@@ -75,6 +75,10 @@ function getPolygonFillOpacity(
   return opacity;
 }
 
+// BUG-A6-005 audit note: all hooks in this component are called unconditionally at
+// the top level, before any early returns. The IIFE patterns used in JSX (e.g.
+// `(() => { if (!poly) return null; ... })()`) are plain functions, not hooks, so
+// they do not violate React's Rules of Hooks. No hook reordering is required.
 function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedPolygonId }: CanvasOverlayProps = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
