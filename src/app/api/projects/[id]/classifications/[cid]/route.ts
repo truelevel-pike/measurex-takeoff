@@ -10,7 +10,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id, cid } = paramsResult.data;
     const ok = await deleteClassification(id, cid);
-    if (ok) broadcastToProject(id, 'classification:deleted', { id: cid });
+    if (!ok) {
+      return NextResponse.json({ ok: false, error: 'Classification not found' }, { status: 404 });
+    }
+    broadcastToProject(id, 'classification:deleted', { id: cid });
     return NextResponse.json({ ok });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
