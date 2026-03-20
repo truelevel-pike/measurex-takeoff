@@ -44,6 +44,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Image is required.' }, { status: 400 });
     }
 
+    // BUG-A5-6-044: validate base64 image sizes (max 10MB)
+    const MAX_IMAGE_SIZE = 10_000_000;
+    if (image.length > MAX_IMAGE_SIZE) {
+      return NextResponse.json({ error: 'Image exceeds maximum size of 10MB.' }, { status: 400 });
+    }
+    if (selectionImage && selectionImage.length > MAX_IMAGE_SIZE) {
+      return NextResponse.json({ error: 'Selection image exceeds maximum size of 10MB.' }, { status: 400 });
+    }
+
     const guard = checkOpenAIKey();
     if (guard) return guard;
     const apiKey = getOpenAIKey()!;
