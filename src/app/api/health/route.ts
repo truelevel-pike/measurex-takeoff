@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isConfigured, getSupabase } from '@/lib/supabase';
 
-// Read version once at module load
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { version } = require('../../../../package.json');
-
 const startTime = Date.now();
 
 export async function GET() {
@@ -25,6 +21,5 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     uptime: Math.floor((Date.now() - startTime) / 1000),
     supabaseConnected,
-    version,
   });
 }

@@ -7,9 +7,12 @@ import {
   initDataDir,
 } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const rlResp = rateLimitResponse(_req);
+    if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
