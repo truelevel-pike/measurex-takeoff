@@ -287,14 +287,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
 
       e.preventDefault();
       e.stopPropagation();
+      // BUG-A7-5-039 fix: store.deletePolygon already handles API sync via apiSync()
+      // — removed duplicate raw fetch() DELETE that caused double-delete
       deletePolygon(selectedPolygonId);
-      if (projectId) {
-        const idToDelete = selectedPolygonId;
-        inFlightDeleteIds.current.add(idToDelete);
-        fetch(`/api/projects/${projectId}/polygons/${idToDelete}`, { method: 'DELETE' })
-          .catch((err) => console.error('API deletePolygon failed:', err))
-          .finally(() => inFlightDeleteIds.current.delete(idToDelete));
-      }
     };
 
     wrapper.addEventListener('keydown', handleKeyDown);
@@ -482,15 +477,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     return { centX, centY };
   }, [singleSelectedPoly]);
 
+  // BUG-A7-5-039 fix: store.deletePolygon already handles API sync — removed
+  // duplicate raw fetch() DELETE that caused double-delete
   const handleFloatingDelete = useCallback(() => {
     if (!singleSelectedPoly) return;
     deletePolygon(singleSelectedPoly.id);
-    if (projectId) {
-      fetch(`/api/projects/${projectId}/polygons/${singleSelectedPoly.id}`, { method: 'DELETE' }).catch((err) =>
-        console.error('API deletePolygon failed:', err)
-      );
-    }
-  }, [singleSelectedPoly, deletePolygon, projectId]);
+  }, [singleSelectedPoly, deletePolygon]);
 
   // BUG-A7-4-057: use baseDims-relative offset instead of hardcoded +20
   const handleFloatingDuplicate = useCallback(() => {
@@ -787,10 +779,11 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   <g
                     pointerEvents={isSelected ? 'all' : 'none'}
                     style={{ cursor: isSelected ? 'pointer' : undefined }}
-                    onDoubleClick={isSelected ? (e) => {
+                    // BUG-A6-5-009 fix: handler unconditional; pointerEvents already blocks non-selected
+                    onDoubleClick={(e) => {
                       e.stopPropagation();
                       setShowFloatingReclassify(true);
-                    } : undefined}
+                    }}
                   >
                     <rect
                       x={rectX}
