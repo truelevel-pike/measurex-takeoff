@@ -92,28 +92,52 @@ export function mergePolygons(poly1: Point[], poly2: Point[]): Point[] {
   }
 }
 
-// Split polygon by a line: buffer the line slightly then difference
+// Split polygon by a line: buffer the line slightly then difference.
+//
+// IMPORTANT: Turf operates in WGS-84 geographic space. Polygon points live in
+// base PDF coordinate space (pixel units). Passing raw pixel values (e.g. x=1400)
+// as if they were lon/lat coordinates produces nonsensical buffering and always
+// returns null/degenerate results (BUG-A7-010).
+//
+// Fix: normalise all coordinates to a [0, 1] unit square before calling Turf
+// (dividing by the polygon's own bounding-box extent), use a dimensionless buffer
+// distance relative to that unit square, then map the result back to pixel space.
 export function splitPolygonByLine(polygon: Point[], lineStart: Point, lineEnd: Point): [Point[], Point[]] {
   try {
-    const ring: [number, number][] = polygon.map(p => [p.x, p.y]);
-    ring.push([polygon[0].x, polygon[0].y]);
+    // Compute bounding box to normalise coordinates
+    const xs = polygon.map((p) => p.x);
+    const ys = polygon.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+
+    const norm = (p: Point): [number, number] => [(p.x - minX) / rangeX, (p.y - minY) / rangeY];
+    const denorm = (c: number[]): Point => ({ x: c[0] * rangeX + minX, y: c[1] * rangeY + minY });
+
+    const ring: [number, number][] = polygon.map(norm);
+    ring.push(ring[0]); // close
     const poly = turf.polygon([ring]);
-    const line = turf.lineString([[lineStart.x, lineStart.y], [lineEnd.x, lineEnd.y]]);
-    const buffered = turf.buffer(line, 0.001, { units: 'meters' });
+    const line = turf.lineString([norm(lineStart), norm(lineEnd)]);
+    // Buffer is now in the [0,1] normalised space — 0.001 units is ~0.1% of the
+    // polygon extent, appropriate for splitting without eating significant area.
+    const buffered = turf.buffer(line, 0.001, { units: 'degrees' });
     if (!buffered) return [polygon, []];
     const fc = turf.featureCollection([poly, buffered]);
     const diff = turf.difference(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
     if (!diff) return [polygon, []];
     if (diff.geometry.type === 'Polygon') {
       const coords = diff.geometry.coordinates[0];
-      const a = coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
+      const a = coords.slice(0, -1).map(denorm);
       return [a, []];
     }
     // MultiPolygon → return two largest pieces
     const multiCoords = (diff.geometry as GeoJSON.MultiPolygon).coordinates;
     const parts: Point[][] = multiCoords.map((rings) => {
-      const ring = rings[0];
-      return ring.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
+      const r = rings[0];
+      return r.slice(0, -1).map(denorm);
     });
     parts.sort((a, b) => calculatePolygonArea(b) - calculatePolygonArea(a));
     return [parts[0] || [], parts[1] || []];
