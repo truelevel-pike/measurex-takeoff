@@ -30,6 +30,14 @@ export const metadata: Metadata = {
     title: "MeasureX",
     description: "AI-powered construction takeoff - measure, count, and estimate from blueprints",
     type: "website",
+    url: "https://app.measurex.io",
+    siteName: "MeasureX",
+    images: [{ url: "https://app.measurex.io/og-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MeasureX",
+    description: "AI-powered construction takeoff - measure, count, and estimate from blueprints",
   },
 };
 
@@ -38,7 +46,7 @@ export function generateViewport(): Viewport {
     themeColor: "#1a1a2e",
     width: "device-width",
     initialScale: 1,
-    maximumScale: 1,
+    maximumScale: 5,
   };
 }
 
