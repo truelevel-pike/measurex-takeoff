@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense, Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
@@ -11,6 +12,37 @@ import {
   formatLinear,
   formatCount,
 } from '@/lib/measurement-settings';
+
+// BUG-A8-014 fix: error boundary for Suspense rejections
+class PrintErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[PrintPage] Error boundary caught:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-white gap-4">
+          <p className="text-red-600 text-lg">Failed to load print view.</p>
+          <p className="text-gray-500 text-sm">{this.state.error.message}</p>
+          <button
+            onClick={() => window.close()}
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded"
+          >
+            Close
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,31 +98,71 @@ function PrintViewInner() {
 
   const settings = useMemo(() => loadMeasurementSettings(), []);
 
-  // Load state from localStorage (same Zustand store the main app uses)
+  // BUG-A8-005 fix: prefer BroadcastChannel / postMessage handshake for
+  // cross-tab state transfer (works in Firefox strict / Safari ITP where
+  // localStorage is partitioned).  Fall back to localStorage only if no
+  // channel message arrives within 500 ms (e.g. same-tab open or legacy).
+  // Also add explicit null guard before accessing state.classifications.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('measurex-state');
-      if (!raw) {
-        setError('No project data found. Open a project first.');
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      const storeState = parsed.state || parsed;
+    let settled = false;
 
+    function applyStoreState(storeState: Record<string, unknown>) {
+      if (settled) return;
+      settled = true;
+      // BUG-A8-005 null guard: ensure we have classifications before computing quantityRows
+      const classifications = Array.isArray(storeState.classifications) ? storeState.classifications as Classification[] : [];
+      const allPolygons = Array.isArray(storeState.polygons) ? storeState.polygons as Polygon[] : [];
       setState({
         projectName,
         currentPage: pageNum,
-        classifications: storeState.classifications || [],
-        polygons: (storeState.polygons || []).filter(
-          (p: Polygon) => p.pageNumber === pageNum,
-        ),
-        scale: storeState.scale || null,
-        scales: storeState.scales || {},
-        pageDims: storeState.pageBaseDimensions?.[pageNum] || { width: 612, height: 792 },
+        classifications,
+        polygons: allPolygons.filter((p) => p.pageNumber === pageNum),
+        scale: (storeState.scale as ScaleCalibration | null) ?? null,
+        scales: (storeState.scales as Record<number, ScaleCalibration>) ?? {},
+        pageDims: (storeState.pageBaseDimensions as Record<number, { width: number; height: number }>)?.[pageNum] ?? { width: 612, height: 792 },
       });
-    } catch {
-      setError('Failed to load project data.');
     }
+
+    // 1. Try BroadcastChannel — works when localStorage is partitioned
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('measurex-print-state');
+      channel.onmessage = (ev: MessageEvent) => {
+        if (ev.data?.type === 'print-state' && ev.data.state) {
+          applyStoreState(ev.data.state as Record<string, unknown>);
+        }
+      };
+      // Request state from the opener
+      channel.postMessage({ type: 'print-state-request' });
+    } catch {
+      // BroadcastChannel not available; fall through to localStorage
+    }
+
+    // 2. Fallback: localStorage (may be empty under ITP/Firefox strict mode)
+    const fallbackTimer = setTimeout(() => {
+      if (settled) return;
+      try {
+        const raw = localStorage.getItem('measurex-state');
+        if (!raw) {
+          setError('No project data found. Please re-open the print view from within the editor.');
+          settled = true;
+          return;
+        }
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const storeState = (parsed.state as Record<string, unknown>) ?? parsed;
+        applyStoreState(storeState);
+      } catch {
+        if (!settled) {
+          setError('Failed to load project data. Please re-open the print view from within the editor.');
+          settled = true;
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(fallbackTimer);
+      channel?.close();
+    };
   }, [projectName, pageNum]);
 
   // Render the PDF page onto the canvas
@@ -381,12 +453,16 @@ function PrintViewInner() {
   );
 }
 
-// ── Page wrapper with Suspense ───────────────────────────────────────────────
+// ── Page wrapper with Suspense + Error Boundary ──────────────────────────────
 
 export default function PrintPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-white"><p className="text-gray-500">Loading...</p></div>}>
-      <PrintViewInner />
-    </Suspense>
+    // BUG-A8-014 fix: wrap Suspense in an error boundary to catch suspense
+    // rejections (e.g. missing searchParams) and show a recoverable UI.
+    <PrintErrorBoundary>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-white"><p className="text-gray-500">Loading...</p></div>}>
+        <PrintViewInner />
+      </Suspense>
+    </PrintErrorBoundary>
   );
 }
