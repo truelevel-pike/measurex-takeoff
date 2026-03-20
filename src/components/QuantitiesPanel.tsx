@@ -209,7 +209,7 @@ interface QuantitiesPanelProps {
   onClassificationZoom?: (classificationId: string) => void;
 }
 
-export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading, onClassificationZoom }: QuantitiesPanelProps) {
+export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading: externalLoading = false, onClassificationZoom }: QuantitiesPanelProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies' | 'estimate'>('quantities');
@@ -251,10 +251,15 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [showImportFromLibrary, setShowImportFromLibrary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(externalLoading);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setProjectId(params.get('project') || localStorage.getItem('measurex_project_id'));
   }, []);
+  useEffect(() => {
+    setIsLoading(externalLoading);
+  }, [externalLoading]);
+  const showLoadingSkeletons = externalLoading || isLoading;
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<ClassificationType>('area');
   const [newColorHex, setNewColorHex] = useState('#3b82f6');
@@ -1622,17 +1627,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       )}
 
       <div className={`flex-1 overflow-y-auto px-1${filtered.length > 20 ? ' max-h-[400px]' : ''}`} data-classification-list style={{ contain: 'layout style' }}>
-        {isLoading && (
+        {showLoadingSkeletons && (
           <div className="py-2 px-1.5 space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-2 px-2 rounded animate-pulse">
-                <div className="w-3/4 h-3 bg-gray-700 rounded" />
-                <div className="w-12 h-3 bg-gray-700 rounded" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between py-2 px-2 rounded border border-[#2b3240]/60 bg-[#171c24]">
+                <div className="h-3 rounded quantities-skeleton-shimmer" style={{ width: `${72 - (i * 7)}%` }} />
+                <div className="w-12 h-3 rounded quantities-skeleton-shimmer" />
               </div>
             ))}
           </div>
         )}
-        {!isLoading && orderedListItems.length === 0 && polygons.length === 0 && !search && (
+        {!showLoadingSkeletons && orderedListItems.length === 0 && polygons.length === 0 && !search && (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <Layers size={28} className="text-gray-600 mb-3" aria-hidden="true" />
             <p className="text-[13px] text-gray-400 leading-relaxed">
@@ -2254,6 +2259,17 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           </div>
         </>
       )}
+      <style jsx>{`
+        @keyframes quantities-skeleton-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .quantities-skeleton-shimmer {
+          background: linear-gradient(90deg, #303742 10%, #4a5566 45%, #303742 80%);
+          background-size: 200% 100%;
+          animation: quantities-skeleton-shimmer 1.2s ease-in-out infinite;
+        }
+      `}</style>
       </>
       )}
     </>

@@ -398,6 +398,7 @@ function PageInner() {
 
   // BUG-R5-002: Track whether the auto-fetched PDF is loading during hydration.
   const [pdfFetching, setPdfFetching] = useState(false);
+  const [quantitiesLoading, setQuantitiesLoading] = useState(true);
 
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -416,6 +417,7 @@ function PageInner() {
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const hydrateAbortRef = useRef<AbortController | null>(null);
+  const hydrateRequestIdRef = useRef(0);
   const isCreatingProjectRef = useRef(false);
   const thumbnailCapturedRef = useRef(false);
 
@@ -538,27 +540,30 @@ function PageInner() {
 
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
   const hydrateProject = useCallback(async (pid: string) => {
+    const requestId = ++hydrateRequestIdRef.current;
+    setQuantitiesLoading(true);
+
     // Demo project: load from localStorage, skip all API calls
-    if (isDemoProject(pid)) {
-      saveDemoProject(); // ensure it exists in localStorage
-      const demo = loadDemoProject();
-      const state = demo?.state ?? DEMO_PROJECT_STATE;
-      const normalized = normalizeProjectState(state);
-      useStore.getState().hydrateState(normalized);
-      setCurrentPageNum(normalized.currentPage || 1);
-      setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
-      setProjectId(DEMO_PROJECT_ID);
-      setProjectName(demo?.meta?.name ?? 'Demo Project');
-      localStorage.setItem('measurex_project_id', DEMO_PROJECT_ID);
-      return;
-    }
-
-    // Cancel any in-flight hydration to prevent stale data from overwriting newer requests
-    hydrateAbortRef.current?.abort();
-    const controller = new AbortController();
-    hydrateAbortRef.current = controller;
-
     try {
+      if (isDemoProject(pid)) {
+        saveDemoProject(); // ensure it exists in localStorage
+        const demo = loadDemoProject();
+        const state = demo?.state ?? DEMO_PROJECT_STATE;
+        const normalized = normalizeProjectState(state);
+        useStore.getState().hydrateState(normalized);
+        setCurrentPageNum(normalized.currentPage || 1);
+        setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+        setProjectId(DEMO_PROJECT_ID);
+        setProjectName(demo?.meta?.name ?? 'Demo Project');
+        localStorage.setItem('measurex_project_id', DEMO_PROJECT_ID);
+        return;
+      }
+
+      // Cancel any in-flight hydration to prevent stale data from overwriting newer requests
+      hydrateAbortRef.current?.abort();
+      const controller = new AbortController();
+      hydrateAbortRef.current = controller;
+
       // Try full project endpoint first (returns all state in one call)
       const res = await fetch(`/api/projects/${pid}`, { signal: controller.signal });
       if (controller.signal.aborted) return;
@@ -655,13 +660,20 @@ function PageInner() {
       // Ignore AbortError — it means a newer hydration superseded this one
       if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Hydration failed:', err);
+    } finally {
+      if (hydrateRequestIdRef.current === requestId) {
+        setQuantitiesLoading(false);
+      }
     }
   }, [setCurrentPage, setSheetName]);
 
   // Load project by URL param or localStorage on mount
   useEffect(() => {
     const pid = search.get('project') || localStorage.getItem('measurex_project_id');
-    if (!pid) return;
+    if (!pid) {
+      setQuantitiesLoading(false);
+      return;
+    }
     hydrateProject(pid);
   }, [search, hydrateProject]);
 
@@ -1896,7 +1908,7 @@ function PageInner() {
             <QuantitiesPanel
               showTakeoffSearch={showTakeoffSearch}
               onTakeoffSearchSelect={handleTakeoffSearchSelect}
-              isLoading={aiLoading}
+              isLoading={quantitiesLoading}
               onClassificationZoom={handleClassificationZoom}
             />
           </ErrorBoundary>
