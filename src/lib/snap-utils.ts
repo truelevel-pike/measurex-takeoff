@@ -102,6 +102,8 @@ function getGridSnapPoints(
   gridSize: number,
   snapRadius: number,
 ): Array<{ x: number; y: number }> {
+  // BUG-A5-6-186: guard against infinite loop when gridSize <= 0
+  if (gridSize <= 0) return [];
   const base = snapToGrid(x, y, gridSize);
   const range = Math.max(1, Math.ceil(snapRadius / gridSize));
   const points: Array<{ x: number; y: number }> = [];
