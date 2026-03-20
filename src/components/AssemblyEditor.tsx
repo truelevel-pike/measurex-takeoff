@@ -87,6 +87,7 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Interior Wall Type A"
+              aria-label="Assembly name"
               className="w-full px-3 py-1.5 rounded border border-[#00d4ff]/20 bg-[#0a0a0f] text-[#e5e7eb] text-[13px] outline-none focus:border-[#00d4ff]/50"
               autoFocus
             />

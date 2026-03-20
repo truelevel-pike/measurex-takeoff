@@ -102,7 +102,7 @@ export default function LeftToolbar() {
           const mobileLabel = b.label === 'Draw Area' ? 'Draw' : b.label;
           return (
             <button
-              key={b.label}
+              key={'tool' in b ? (b as { tool: string }).tool : b.label}
               aria-label={`${b.label} (${b.shortcut})`}
               aria-pressed={'tool' in b ? active : undefined}
               title={`${b.label} (${b.shortcut})`}
@@ -165,7 +165,7 @@ export default function LeftToolbar() {
             const active = 'tool' in b && currentTool === (b as { tool: string }).tool;
             return (
               <button
-                key={b.label}
+                key={'tool' in b ? (b as { tool: string }).tool : b.label}
                 aria-label={`${b.label} (${b.shortcut})`}
                 aria-pressed={'tool' in b ? active : undefined}
                 title={`${b.label} (${b.shortcut})`}

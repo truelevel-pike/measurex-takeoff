@@ -115,11 +115,13 @@ export default function AnnotationTool() {
                 }
               }}
               placeholder="Add annotation"
+              aria-label="Annotation text"
               className="w-44 rounded border border-white/20 bg-black/40 px-2 py-1 text-xs text-white outline-none focus:border-cyan-300/60"
             />
             <button
               type="button"
               onClick={commit}
+              aria-label="Submit annotation"
               className="rounded bg-cyan-500 px-2 py-1 text-xs font-medium text-black hover:bg-cyan-400"
             >
               Add

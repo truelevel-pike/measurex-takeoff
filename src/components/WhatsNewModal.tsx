@@ -105,8 +105,8 @@ export default function WhatsNewModal({ onClose }: { onClose: () => void }) {
 
         {/* Entries */}
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {CHANGELOG.map((entry, i) => (
-            <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          {CHANGELOG.map((entry) => (
+            <div key={entry.title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div
                 style={{
                   marginTop: 4,

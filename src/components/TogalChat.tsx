@@ -328,7 +328,7 @@ export function TogalChat({ onClose }: TogalChatProps) {
             >
               {[0, 1, 2].map((i) => (
                 <span
-                  key={i}
+                  key={`dot-${i}`}
                   style={{
                     width: 6,
                     height: 6,

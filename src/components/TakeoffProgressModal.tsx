@@ -322,7 +322,7 @@ function TakeoffSummaryOverlay({
             <p className="text-xs text-white/30 mb-2 uppercase tracking-wider">Classifications Found</p>
             <div className="flex flex-wrap gap-1.5">
               {summary.classifications.slice(0, 12).map((cls, i) => (
-                <span key={i} className="text-xs px-2 py-0.5 rounded-full"
+                <span key={cls || `cls-${i}`} className="text-xs px-2 py-0.5 rounded-full"
                   style={{
                     background: 'rgba(0,212,255,0.08)',
                     color: 'rgba(0,212,255,0.7)',

@@ -3,6 +3,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Ruler, CheckCircle } from 'lucide-react';
 
+// BUG-A6-045 fix: typed custom event declaration
+declare global {
+  interface WindowEventMap {
+    'calibration-line-complete': CustomEvent<{ lengthPx: number }>;
+  }
+}
+
 type Step = 'intro' | 'drawing' | 'dimension' | 'done';
 
 interface ScaleCalibrationPanelProps {
@@ -26,9 +33,8 @@ export default function ScaleCalibrationPanel({ onClose, onCalibrated }: ScaleCa
   }, [setTool]);
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ lengthPx: number }>;
-      setLineLengthPx(ce.detail.lengthPx);
+    const handler = (e: CustomEvent<{ lengthPx: number }>) => {
+      setLineLengthPx(e.detail.lengthPx);
       setStep('dimension');
       setTool('select');
     };

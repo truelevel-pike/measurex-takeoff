@@ -110,6 +110,7 @@ export default function ActivityFeed() {
           <button
             key={key}
             onClick={() => setFilter(key)}
+            aria-label={`Filter by ${label}`}
             className={`px-2 py-0.5 rounded text-xs transition-colors ${
               filter === key
                 ? 'bg-blue-600 text-white'

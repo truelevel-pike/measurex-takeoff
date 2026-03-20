@@ -1,5 +1,12 @@
 'use client';
 
+// BUG-A6-046 fix: typed custom event declaration
+declare global {
+  interface WindowEventMap {
+    'open-pattern-search': CustomEvent;
+  }
+}
+
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { LucideIcon } from 'lucide-react';

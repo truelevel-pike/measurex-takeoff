@@ -70,14 +70,14 @@ function PageThumbnailSidebar({
 
   // Classification color breakdown per page for color strip bars
   const polygonClassBreakdownByPage = useMemo(() => {
-    const m = new Map<number, { color: string; count: number }[]>();
+    const m = new Map<number, { color: string; count: number; classificationId: string }[]>();
     for (const [page, pagePolys] of polygonsByPage) {
       const counts = new Map<string, number>();
       for (const p of pagePolys) {
         counts.set(p.classificationId, (counts.get(p.classificationId) ?? 0) + 1);
       }
       const breakdown = Array.from(counts.entries())
-        .map(([classId, count]) => ({ color: classColorMap.get(classId) ?? '#00d4ff', count }))
+        .map(([classId, count]) => ({ color: classColorMap.get(classId) ?? '#00d4ff', count, classificationId: classId }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
       m.set(page, breakdown);
@@ -271,7 +271,7 @@ function PageThumbnailSidebar({
               {colorBreakdown && colorBreakdown.length > 0 && (
                 <div className="flex flex-row overflow-hidden rounded-b-sm w-full h-[3px] absolute bottom-0 left-0 right-0">
                   {colorBreakdown.map((seg, i) => (
-                    <div key={i} style={{ backgroundColor: seg.color, flex: seg.count }} />
+                    <div key={seg.classificationId ?? `seg-${i}`} style={{ backgroundColor: seg.color, flex: seg.count }} />
                   ))}
                 </div>
               )}
