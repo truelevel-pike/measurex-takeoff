@@ -48,9 +48,13 @@ const nextConfig: NextConfig = {
               "worker-src blob: 'self' https://cdn.jsdelivr.net",
               // script-src-elem: blob: removed (BUG-A8-010)
               "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+              // BLOCKER-002 fix: allow same-origin framing so OpenClaw sandbox browser can load the app.
+              // X-Frame-Options: DENY (below) is removed in favor of CSP frame-ancestors which is more flexible.
+              "frame-ancestors 'self'",
             ].join("; "),
           },
-          { key: "X-Frame-Options", value: "DENY" },
+          // BLOCKER-001 fix: removed X-Frame-Options: DENY — was blocking OpenClaw sandbox iframe.
+          // Framing is now controlled by CSP frame-ancestors 'self' above (more precise, supersedes XFO).
           { key: "X-Content-Type-Options", value: "nosniff" },
           {
             key: "Referrer-Policy",
