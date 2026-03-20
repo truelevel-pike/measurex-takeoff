@@ -22,12 +22,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MeasureX — AI Construction Takeoff",
-  description: "AI-powered construction takeoff — measure areas, count elements, estimate costs from blueprints.",
+  title: "MeasureX",
+  description: "AI-powered construction takeoff for contractors.",
   manifest: "/manifest.json",
   openGraph: {
-    title: "MeasureX — AI Construction Takeoff",
-    description: "AI-powered construction takeoff — measure areas, count elements, estimate costs from blueprints.",
+    title: "MeasureX",
+    description: "AI-powered construction takeoff for contractors.",
     type: "website",
   },
 };
