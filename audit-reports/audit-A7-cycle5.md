@@ -820,3 +820,277 @@ this in Project Settings."
 
 *Report updated by Admiral 7 — 2026-03-20 (E26–E30 dispatch)*  
 *Total across full Cycle 5: 38 new bugs (1 CRITICAL, 4 HIGH, 13 MEDIUM, 20 LOW) + 2 regressions + 38 confirmed fixes.*
+
+---
+
+# CYCLE 5 DISPATCH E31–E35 — ADDITIONAL DRAWING COMPONENTS
+**Auditor:** Admiral 7  
+**Date:** 2026-03-20  
+**Scope:** CanvasOverlay.tsx, MeasurementTool.tsx, MergeSplitTool.tsx, ScaleCalibration.tsx, RepeatingGroupTool.tsx  
+**Method:** Every file read in full; new bugs reported, prior cycle fixes verified.
+
+---
+
+## Summary Table (E31–E35 Additions)
+
+| Severity | New Bugs |
+|----------|----------|
+| HIGH     | 2        |
+| MEDIUM   | 7        |
+| LOW      | 8        |
+| **TOTAL**| **17**   |
+
+---
+
+## NEW HIGH BUGS (E31–E35)
+
+### BUG-A7-5-039 (HIGH) — CanvasOverlay.tsx: Delete key handler fires a second raw fetch DELETE alongside store.deletePolygon — double-delete race condition
+**File:** src/components/CanvasOverlay.tsx (handleKeyDown, ~line 220)  
+**Description:** When the user presses Delete/Backspace with a single polygon selected, the handler calls both `deletePolygon(selectedPolygonId)` (which internally calls `apiSync` to DELETE the polygon) **and** fires a separate `fetch(\`/api/projects/${projectId}/polygons/${selectedPolygonId}\`, { method: 'DELETE' })` directly. This results in two concurrent DELETE requests to the same endpoint. The same double-delete pattern appears in `handleFloatingDelete`. If the API is not idempotent, the second request may return 404 and trigger an unhandled error or, worse, succeed on a different polygon that was re-assigned the same ID by a concurrent write. The `store.deletePolygon` already calls `apiSync` — the extra manual fetch is redundant and harmful.  
+**Fix:** Remove the raw `fetch(...)` calls in `handleKeyDown` and `handleFloatingDelete`. The store's `deletePolygon` action already handles API persistence. If additional error feedback is needed, call `apiSync` once with an error toast on failure rather than duplicating the call.
+
+### BUG-A7-5-040 (HIGH) — MeasurementTool.tsx: measurements use raw screen-pixel coordinates — results wrong at any zoom level other than 1×
+**File:** src/components/MeasurementTool.tsx:36–39  
+**Description:** `getCoords` returns `{ x: e.clientX - rect.left, y: e.clientY - rect.top }` — raw CSS pixel offsets. The tool then divides the pixel distance by `scale.pixelsPerUnit`. However `scale.pixelsPerUnit` is defined in terms of **base PDF coordinates** (the same coordinate space used by all polygons in the store), not in terms of screen pixels. At zoom level 2×, the PDF canvas is rendered at 2× its base size, so screen pixels are 2× larger than base-coordinate pixels. The measurement result will be half the correct value at 2× zoom, double the correct value at 0.5× zoom, etc. Only at exactly 1× zoom are the results correct. Every real-world measurement in the tool is therefore zoom-dependent and systematically incorrect.  
+**Fix:** Convert screen pixels to base PDF coordinates before computing distance, using the same `toBaseCoords` pattern as `CanvasOverlay` and `DrawingTool`:
+```ts
+const getCoords = useCallback((e: React.MouseEvent): Point => {
+  const rect = containerRef.current?.getBoundingClientRect();
+  if (!rect || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+  const baseDims = useStore.getState().pageBaseDimensions[useStore.getState().currentPage]
+    ?? { width: 1, height: 1 };
+  return {
+    x: ((e.clientX - rect.left) / rect.width) * baseDims.width,
+    y: ((e.clientY - rect.top) / rect.height) * baseDims.height,
+  };
+}, []);
+```
+Then use `Math.hypot(dx, dy)` in base-coordinate space; `scale.pixelsPerUnit` applies to base-coordinate pixels, so the division is correct.
+
+---
+
+## NEW MEDIUM BUGS (E31–E35)
+
+### BUG-A7-5-041 (MEDIUM) — MergeSplitTool.tsx: findPolygonAt uses un-memoised polygons array and ignores currentPage — merges polygons from other pages
+**File:** src/components/MergeSplitTool.tsx:56–62  
+**Description:** `findPolygonAt` iterates `polygons` (all polygons, all pages) without filtering by `currentPage`. If pages share overlapping polygon bounding areas in PDF coordinate space (common with multi-page documents where pages share a coordinate origin at 0,0), clicking a position on page 2 can hit a polygon that belongs to page 1 and invoke `merge(firstPolyId, hit)` across pages. `store.mergePolygons` guards that `p1.classificationId === p2.classificationId` but does NOT guard `p1.pageNumber === p2.pageNumber`, so the merge proceeds and creates a polygon with `pageNumber` from the first polygon on the wrong page. Additionally, `polygons` is not memoised — the O(n) reverse-iteration runs on every re-render.  
+**Fix:**  
+1. Filter by page: `polygons.filter(p => p.pageNumber === currentPage)` (memoised with `useMemo`).  
+2. Add a `pageNumber` guard in `store.mergePolygons`: reject if `p1.pageNumber !== p2.pageNumber`.
+
+### BUG-A7-5-042 (MEDIUM) — MergeSplitTool.tsx: MergeSplitTool getCoords uses raw screen pixels — split line in wrong position at zoom ≠ 1×
+**File:** src/components/MergeSplitTool.tsx:65–69  
+**Description:** `getCoords` returns `{ x: e.clientX - rect.left, y: e.clientY - rect.top }` — raw CSS pixel offsets, same anti-pattern as BUG-A7-5-040 in `MeasurementTool`. The split line points are passed to `store.splitPolygon(splitPolyId, line[0], line[1])` which calls `splitPolygonByLine` in base coordinates. At zoom ≠ 1×, the split line is in the wrong position relative to the polygon vertices, producing incorrect splits. This is the most severe practical manifestation of the raw-pixel pattern because it mutates stored polygon data.  
+**Fix:** Same as BUG-A7-5-040 — convert to base PDF coordinates using the `baseDims`/`rect` ratio pattern. `getCoords` must read `pageBaseDimensions[currentPage]` from the store and normalise.
+
+### BUG-A7-5-043 (MEDIUM) — CanvasOverlay.tsx: floating toolbar and reclassify dropdown use IIFE-rendered positions that depend on wrapperRef SVG child query — breaks when SVG is absent
+**File:** src/components/CanvasOverlay.tsx (floatingToolbarPos render, ~line 580)  
+**Description:** The floating toolbar position is computed with:
+```ts
+const svgEl = wrapperRef.current?.querySelector('svg');
+const svgRect = svgEl?.getBoundingClientRect();
+if (!svgRect || svgRect.width === 0 || ...) return null;
+```
+This queries the SVG child via DOM traversal on every render. In React Concurrent Mode or StrictMode, the render can execute in a context where the DOM is not yet committed (e.g. during an offscreen render). `querySelector` on a non-committed ref returns `null`, causing the toolbar to disappear silently. A dedicated `svgRef` forwarded directly to the `<svg>` element would be stable and avoid the DOM query.  
+**Fix:** Assign `const svgRef = useRef<SVGSVGElement>(null)` and attach it to the `<svg>` element. Replace `wrapperRef.current?.querySelector('svg')` with `svgRef.current`.
+
+### BUG-A7-5-044 (MEDIUM) — ScaleCalibration.tsx: handleSelectScale calls `import()` inside an async callback — dynamic import on every scale selection
+**File:** src/components/ScaleCalibration.tsx:166  
+**Description:**
+```ts
+const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+```
+This dynamic `import()` is inside `handleSelectScale` which fires every time the user picks a scale from the preset list. On first call it loads the `NotificationSettings` module chunk; on subsequent calls the module is cached by the bundler, so it's fast. However the `await` causes the scale confirmation toast to be deferred until after the dynamic import resolves (~0–50ms). More critically, if bundler code splitting has not correctly resolved `getNotificationPrefs` as a named export (e.g. if the export is changed), this silently swallows the import error and the toast never shows. The pattern also means `handleSelectScale` returns a `Promise` but is typed as `async (label: string) => void` — callers discard the promise, hiding any thrown errors.  
+**Fix:** Import `getNotificationPrefs` statically at the top of the file. There is no code-size benefit to lazy-loading this small utility function, and the async flow adds latency and fragility.
+
+### BUG-A7-5-045 (MEDIUM) — RepeatingGroupTool.tsx: mousemove/mouseup handlers attached to the overlay div — drag breaks when mouse leaves overlay boundary
+**File:** src/components/RepeatingGroupTool.tsx:63–76  
+**Description:** `handleMouseMove` and `handleMouseUp` are wired to the overlay `<div>`'s `onMouseMove` and `onMouseUp` props. When the user drags to define the bounding box and moves the cursor outside the overlay div (e.g. above the toolbar), the div stops receiving `mousemove` events and the rubber-band rectangle freezes. When they release the mouse outside, `handleMouseUp` never fires, leaving `isDragging = true` permanently. The component becomes stuck: the overlay cursor stays crosshair, the drag cannot be committed or cancelled, and only the keyboard Escape clears it.  
+**Compare:** `CropOverlay.tsx` (BUG-A7-5-033, same issue) already has this pattern diagnosed; `RepeatingGroupTool` has the same bug independently.  
+**Fix:** Mirror the fix from `CropOverlay.tsx` — add a `useEffect` that attaches `mousemove`/`mouseup` to `window` when `isDragging === true` and removes them on cleanup:
+```ts
+useEffect(() => {
+  if (!isDragging) return;
+  const onMove = (e: MouseEvent) => { ... };
+  const onUp = (e: MouseEvent) => { ... };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  return () => { window.removeEventListener(...); window.removeEventListener(...); };
+}, [isDragging, baseDims, ...]);
+```
+
+### BUG-A7-5-046 (MEDIUM) — CanvasOverlay.tsx: handlePolygonClick casts polyline onClick as unknown — TypeScript safety loss, may misfire on non-polygon SVG elements
+**File:** src/components/CanvasOverlay.tsx (linear polygon render, ~line 490)  
+**Description:**
+```tsx
+onClick={handlePolygonClick as unknown as React.MouseEventHandler<SVGPolylineElement>}
+onContextMenu={handlePolygonContextMenu as unknown as React.MouseEventHandler<SVGPolylineElement>}
+```
+These casts bypass TypeScript's type checking. `handlePolygonClick` reads `e.currentTarget.dataset.polygonId` to get the polygon ID. If the cast is applied to a wrong element or the `data-polygon-id` attribute is missing, `polygonId` is `undefined` and the handler silently no-ops. The real risk: the `as unknown as` double-cast is a sign that the handler signatures are misaligned. A properly typed `React.MouseEventHandler<SVGPolylineElement | SVGPolygonElement>` union would expose the mismatch at compile time.  
+**Fix:** Create a properly typed handler that accepts both SVG element types:
+```ts
+type SvgPolyHandler = React.MouseEventHandler<SVGPolygonElement | SVGPolylineElement>;
+const handlePolygonClick: SvgPolyHandler = useCallback((e) => { ... }, [...]);
+```
+
+### BUG-A7-5-047 (MEDIUM) — ScaleCalibration.tsx: handleManualSave does not call addToast notification — inconsistent UX vs handleSelectScale
+**File:** src/components/ScaleCalibration.tsx:186–201  
+**Description:** `handleSelectScale` calls `addToast(\`Scale set to ${label}\`, 'success', 3000)` (conditional on notification prefs). `handleManualSave` calls `setScale`, `setScaleForPage`, `persistScale`, and `handleClose` — but never shows any toast. A user who sets scale manually via the Draw Line or Enter Number flow gets no visual confirmation that the scale was accepted. This is a UX inconsistency that can lead users to repeat the calibration workflow thinking it did not work.  
+**Fix:** Add the toast notification to `handleManualSave`:
+```ts
+const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+if (getNotificationPrefs().scaleChanged) {
+  addToast(`Scale set: ${label}`, 'success', 3000);
+}
+```
+(Once BUG-A7-5-044 is fixed, use the static import instead.)
+
+---
+
+## NEW LOW BUGS (E31–E35)
+
+### BUG-A7-5-048 (LOW) — MeasurementTool.tsx: measurement result label renders at screen-pixel midpoint — position shifts with zoom
+**File:** src/components/MeasurementTool.tsx:105–115  
+**Description:** The measurement label `<div>` is positioned at `{ left: midpoint.x, top: midpoint.y - 18 }` where `midpoint` is in raw screen pixels. After fixing BUG-A7-5-040 (base-coord conversion), the midpoint will be in base coordinates. The label positioning must also be converted back to screen coordinates for CSS `left/top`. Currently both the SVG line and the HTML label use the same raw-pixel values which happen to align — but the SVG has no `viewBox`/`preserveAspectRatio`, so it scales with the container while the HTML div is absolutely positioned in screen space. At zoom ≠ 1×, these drift apart.  
+**Fix:** After fixing BUG-A7-5-040, the label position must be re-projected: convert base coords back to percentage-based positioning matching the SVG viewBox, or use a `<text>` element inside the SVG instead of a floating `<div>`.
+
+### BUG-A7-5-049 (LOW) — MeasurementTool.tsx: `formatDistance` for 'mm' and 'cm' falls through to the default `toFixed(2) + unit` branch — inconsistent decimal precision
+**File:** src/components/MeasurementTool.tsx:10–20  
+**Description:** `formatDistance` has explicit branches for `'ft'`, `'in'`, and `'m'`. Both `'mm'` and `'cm'` fall through to the final `return \`${distanceInUnit.toFixed(2)} ${unit}\`` fallback. Millimetre measurements displayed to 2 decimal places (e.g. `"2342.56 mm"`) are unusual — typically millimetres are displayed as whole numbers or 1 decimal place. The fallback label is technically correct but inconsistent with expected construction industry precision conventions.  
+**Fix:** Add explicit cases for `'mm'` (`toFixed(0)`) and `'cm'` (`toFixed(1)`) matching typical construction usage.
+
+### BUG-A7-5-050 (LOW) — RepeatingGroupTool.tsx: repeatCount allows non-integer input via free text — NaN stored
+**File:** src/components/RepeatingGroupTool.tsx:130  
+**Description:**
+```ts
+onChange={(e) => setRepeatCount(parseInt(e.target.value, 10) || 1)}
+```
+`parseInt('1.5', 10)` returns `1` ✓. `parseInt('abc', 10)` returns `NaN`, and `NaN || 1` returns `1` ✓. So far fine. However `parseInt('', 10)` returns `NaN` → stored as `1` (ok). Edge case: `parseInt('0', 10)` returns `0`, and `0 || 1` returns `1` — the user cannot set `repeatCount` to `0` (by design, `Math.max(1, repeatCount)` in `handleConfirm` guards this). The actual concern: the input has `type="number"` and `min={1}`, but browser validation only fires on form submit. The user can still type `0` and see `1` displayed inconsistently (the input shows `0`, but `repeatCount` state is `1`). This is confusing.  
+**Fix:** Clamp inside the `onChange` handler: `Math.max(1, parseInt(e.target.value, 10) || 1)` and keep the `value` prop in sync with `repeatCount` so the input always shows the true stored value.
+
+### BUG-A7-5-051 (LOW) — RepeatingGroupTool.tsx: boundingBox min size check uses raw base units (< 10) — too small for high-res PDFs, too large for low-res
+**File:** src/components/RepeatingGroupTool.tsx:87–90  
+**Description:**
+```ts
+if (width < 10 || height < 10) {
+  setStartPoint(null); setCurrentPoint(null); return;
+}
+```
+The `10` unit threshold is in base PDF coordinates. For a low-resolution PDF scanned at 72 DPI with small rooms, 10 base units might be a meaningful region. For a large-format architectural PDF at 300 DPI, 10 base units is an invisible speck. The threshold should be proportional to `baseDims` — e.g. `< baseDims.width * 0.02` (2% of page width) — matching the proportional offset used in `handleFloatingDuplicate` in `CanvasOverlay`.  
+**Fix:** Replace absolute `10` with a `baseDims`-proportional threshold:
+```ts
+const minSize = Math.max(10, baseDims.width * 0.01);
+if (width < minSize || height < minSize) { ... }
+```
+
+### BUG-A7-5-052 (LOW) — CanvasOverlay.tsx: batchMenuPosition centroid calculation uses only the last selected polygon — misleading toolbar placement for multi-polygon selections spanning the canvas
+**File:** src/components/CanvasOverlay.tsx (batchMenuPosition useMemo)  
+**Description:** The batch action toolbar is positioned at the centroid of `lastSelectedOnPage` (the last polygon in the selection, not the centroid of all selected polygons). When the user selects polygons spread across the canvas (top-left and bottom-right), the toolbar appears near the last-selected polygon in the bottom-right rather than near the middle of the group. This is UX-only but can make the toolbar feel disconnected from the selection.  
+**Fix:** Compute the centroid across all `selectedPolygonsOnPage`:
+```ts
+const allPoints = selectedPolygonsOnPage.flatMap((p) => p.points);
+const centX = allPoints.reduce((s, p) => s + p.x, 0) / allPoints.length;
+const centY = allPoints.reduce((s, p) => s + p.y, 0) / allPoints.length;
+```
+
+### BUG-A7-5-053 (LOW) — CanvasOverlay.tsx: polygon label `linearReal` uses `calculateLinearFeet(poly.points, ppu, false)` — ignores per-page scale, uses active page ppu
+**File:** src/components/CanvasOverlay.tsx (polygon label render, ~line 540)  
+**Description:** Inside the `prefs.showPolygonLabels` IIFE, the label for linear polygons computes:
+```ts
+const pageScale = scales[poly.pageNumber] ?? scale;
+const ppu = pageScale?.pixelsPerUnit || 1;
+const linearReal = calculateLinearFeet(poly.points, ppu, false);
+```
+This correctly uses the per-polygon page scale. However the hover tooltip code path (the `hoveredPoly` IIFE at the bottom of the component) also computes `linearReal` the same way. The **label inside the SVG** path uses the per-page scale correctly. But BUG is: the `closed=false` arg means linear perimeters are open-path, while `calculateLinearFeet` for a closed polygon would use `closed=true`. If a user manually sets a "linear" classification but draws a closed polygon with 10+ points, the displayed length will miss the closing segment. This is the same open/closed ambiguity as was partially addressed in prior cycles for polygon storage.  
+**Fix:** Derive `closed` from the classification type: area polygons should pass `closed=true` for their perimeter label; linear polygons pass `closed=false`. Currently all labels use `closed=false`, undercounting closed-polygon perimeters.
+
+### BUG-A7-5-054 (LOW) — ScaleCalibration.tsx: labelToPixelsPerUnit fallback returns `DPI * 0.125` for unrecognised formats — silent wrong scale
+**File:** src/components/ScaleCalibration.tsx:30–52  
+**Description:** `labelToPixelsPerUnit` returns `DPI * 0.125` (= 9 pixels per unit at 72 DPI) when no regex matches the label string. This is the "1/8" = 1'" architectural scale fallback. If a user types an unrecognised label in the manual panel (e.g. `"custom"`, or a metric format not matching the regexes), the function silently applies a `1/8" = 1'` scale instead of returning an error. The user receives no warning and their polygon measurements will be off by an arbitrary factor.  
+**Fix:** Return `null` from `labelToPixelsPerUnit` when the input is unrecognised. Callers should validate the return value and show an error toast / disable the save button rather than applying a fallback scale.
+
+### BUG-A7-5-055 (LOW) — MergeSplitTool.tsx: split preview SVG has no `viewBox` — line drawn in screen pixels, misaligns with polygon at zoom ≠ 1×
+**File:** src/components/MergeSplitTool.tsx:120–126  
+**Description:** The split line preview SVG:
+```tsx
+<svg className="absolute inset-0 w-full h-full pointer-events-none">
+  <line x1={splitPts[0].x} y1={splitPts[0].y} x2={cursor.x} y2={cursor.y} ... />
+</svg>
+```
+has no `viewBox` attribute and no `preserveAspectRatio`. The `<line>` coordinates are in raw screen pixels (from `getCoords`). Since the SVG element fills the container 100%×100% but uses the default viewBox (matching the SVG element's pixel dimensions), this happens to align at 1× zoom where screen pixels ≈ SVG coordinates. After fixing BUG-A7-5-042, `getCoords` will return base PDF coordinates. At that point the `<line>` must use `viewBox={\`0 0 ${baseDims.width} ${baseDims.height}\`} preserveAspectRatio="none"` to align with the canvas overlay SVG.  
+**Fix:** Add `viewBox` and `preserveAspectRatio="none"` to the split-preview SVG, matching the pattern in `DrawingTool.tsx` and `CanvasOverlay.tsx`. Apply this fix in tandem with BUG-A7-5-042.
+
+---
+
+## CONFIRMED FIXES (E31–E35 — Cycle 4 bugs verified in these files)
+
+| Bug ID | Description | Status |
+|--------|-------------|--------|
+| BUG-A7-4-054 | CanvasOverlay touch handlers for vertex drag | ✅ FIXED — touchmove/touchend window listeners confirmed |
+| BUG-A7-4-055 | CanvasOverlay selectedSet O(n) lookup per polygon | ✅ FIXED — `selectedSet = useMemo(() => new Set(selectedPolygons))` confirmed |
+| BUG-A7-4-056 | CanvasOverlay polygon hover callbacks re-created per render | ✅ FIXED — stable `handleGroupPointerEnter/Move/Leave` callbacks confirmed |
+| BUG-A7-4-057 | CanvasOverlay duplicate offset hardcoded +20 | ✅ FIXED — `baseDims.width * 0.01` offset confirmed |
+| BUG-A7-4-058 | MergeSplitTool: merge with deleted first polygon | ✅ FIXED — `polygons.some((p) => p.id === firstPolyId)` guard confirmed |
+| BUG-A7-4-008 | CanvasOverlay toSvgCoords zero-rect guard | ✅ FIXED — guard present in toSvgCoords |
+| BUG-A7-4-009 | CanvasOverlay vertex drag RAF coalescing | ✅ FIXED — rafRef + cancelAnimationFrame confirmed |
+
+---
+
+## UPDATED SUMMARY TABLE (Full Cycle 5, E1–E35)
+
+| Severity | E1–E25 | E26–E30 | E31–E35 | Total New | Regressions | Fixes |
+|----------|--------|---------|---------|-----------|-------------|-------|
+| CRITICAL | 1      | 0       | 0       | 1         | 0           | —     |
+| HIGH     | 3      | 1       | 2       | 6         | 0           | —     |
+| MEDIUM   | 8      | 5       | 7       | 20        | 1           | —     |
+| LOW      | 11     | 9       | 8       | 28        | 1           | —     |
+| **TOTAL**| **23** | **15**  | **17**  | **55**    | **2**       | **45**|
+
+---
+
+## PRIORITISED FIX ORDER ADDENDUM (E31–E35)
+
+1. **BUG-A7-5-040** — MeasurementTool raw screen pixels → all measurements wrong at zoom ≠ 1× (HIGH)
+2. **BUG-A7-5-039** — CanvasOverlay double-delete race condition on Delete key / floating toolbar (HIGH)
+3. **BUG-A7-5-042** — MergeSplitTool getCoords raw pixels → split line in wrong position at zoom ≠ 1× (MEDIUM)
+4. **BUG-A7-5-041** — MergeSplitTool findPolygonAt includes all pages → cross-page merges (MEDIUM)
+5. **BUG-A7-5-045** — RepeatingGroupTool drag breaks when cursor leaves overlay (MEDIUM)
+6. **BUG-A7-5-044** — ScaleCalibration dynamic import of NotificationSettings on every scale select (MEDIUM)
+7. **BUG-A7-5-047** — ScaleCalibration manual save has no toast notification (MEDIUM)
+8. **BUG-A7-5-043** — CanvasOverlay floatingToolbar uses DOM querySelector for SVG ref (MEDIUM)
+9. **BUG-A7-5-046** — CanvasOverlay polyline onClick double-cast bypasses TypeScript (MEDIUM)
+10. **BUG-A7-5-048 / BUG-A7-5-055** — MeasurementTool label drift + MergeSplitTool SVG no viewBox (LOW, dependent on zoom fixes)
+11. **BUG-A7-5-049 / BUG-A7-5-050 / BUG-A7-5-051** — formatDistance precision, repeatCount NaN, boundingBox min size (LOW)
+12. **BUG-A7-5-052 / BUG-A7-5-053 / BUG-A7-5-054** — Batch toolbar centroid, polygon label closed/open, labelToPixelsPerUnit silent fallback (LOW)
+
+---
+
+## Appendix: Files Audited in Cycle 5 (Full, E1–E35)
+
+| File | Lines | Issues Found |
+|------|-------|-------------|
+| src/lib/store.ts | 1132 | R-C5-001, R-C5-002, BUG-A7-5-005, BUG-A7-5-006, BUG-A7-5-007, BUG-A7-5-016, BUG-A7-5-017, BUG-A7-5-018 |
+| src/hooks/use-feature-flag.ts | 40 | BUG-A7-5-004, BUG-A7-5-015 |
+| src/hooks/use-text-search.ts | 65 | BUG-A7-5-013, BUG-A7-5-014 |
+| src/hooks/useRealtimeSync.ts | 28 | BUG-A7-5-008 |
+| src/hooks/useViewerPresence.ts | 40 | BUG-A7-5-009 |
+| src/components/DrawingTool.tsx | ~295 | BUG-A7-5-011, BUG-A7-5-023 |
+| src/components/DrawingSetManager.tsx | ~400 | BUG-A7-5-001, BUG-A7-5-002, BUG-A7-5-003, BUG-A7-5-010, BUG-A7-5-019, BUG-A7-5-020 |
+| src/components/DrawingComparison.tsx | ~440 | BUG-A7-5-012, BUG-A7-5-021, BUG-A7-5-022 |
+| src/components/AnnotationTool.tsx | ~115 | BUG-A7-5-025, BUG-A7-5-032, BUG-A7-5-037 |
+| src/components/CutTool.tsx | ~65 | BUG-A7-5-029, BUG-A7-5-030, BUG-A7-5-031 |
+| src/components/CropOverlay.tsx | ~130 | BUG-A7-5-028, BUG-A7-5-033 |
+| src/components/FloorAreaMesh.tsx | ~155 | BUG-A7-5-034 |
+| src/components/MarkupTools.tsx | ~160 | BUG-A7-5-024 |
+| src/components/ManualCalibration.tsx | ~310 | BUG-A7-5-026, BUG-A7-5-027, BUG-A7-5-036 |
+| src/components/AutoScalePopup.tsx | ~120 | BUG-A7-5-035, BUG-A7-5-038 |
+| src/components/CanvasOverlay.tsx | ~700 | BUG-A7-5-039, BUG-A7-5-043, BUG-A7-5-046, BUG-A7-5-052, BUG-A7-5-053 |
+| src/components/MeasurementTool.tsx | ~130 | BUG-A7-5-040, BUG-A7-5-048, BUG-A7-5-049 |
+| src/components/MergeSplitTool.tsx | ~135 | BUG-A7-5-041, BUG-A7-5-042, BUG-A7-5-055 |
+| src/components/ScaleCalibration.tsx | ~220 | BUG-A7-5-044, BUG-A7-5-047, BUG-A7-5-054 |
+| src/components/RepeatingGroupTool.tsx | ~155 | BUG-A7-5-045, BUG-A7-5-050, BUG-A7-5-051 |
+
+---
+
+*Report finalised by Admiral 7 — 2026-03-20 (E31–E35 dispatch, full cycle 5 complete)*  
+*Grand total: 55 new bugs (1 CRITICAL, 6 HIGH, 20 MEDIUM, 28 LOW) + 2 regressions + 45 confirmed fixes.*
