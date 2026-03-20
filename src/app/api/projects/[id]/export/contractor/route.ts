@@ -137,6 +137,10 @@ function buildSvgOverlay(
   pageWidth: number,
   pageHeight: number,
 ): string {
+  // BUG-A5-5-025: guard against zero pageWidth/pageHeight
+  if (!pageWidth || !pageHeight || !Number.isFinite(pageWidth) || !Number.isFinite(pageHeight)) {
+    return '';
+  }
   const paths = pagePolygons
     .map((poly) => {
       const cls = classifications.find((c) => c.id === poly.classificationId);

@@ -49,13 +49,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!textLower.includes(queryLower)) continue;
 
       // Count occurrences
+      // BUG-A5-5-024: cap at 1000 iterations and advance by queryLower.length
       let matchCount = 0;
       let searchFrom = 0;
-      while (true) {
+      const MAX_ITERATIONS = 1000;
+      while (matchCount < MAX_ITERATIONS) {
         const idx = textLower.indexOf(queryLower, searchFrom);
         if (idx === -1) break;
         matchCount++;
-        searchFrom = idx + 1;
+        searchFrom = idx + queryLower.length;
       }
 
       // Extract a snippet around the first match

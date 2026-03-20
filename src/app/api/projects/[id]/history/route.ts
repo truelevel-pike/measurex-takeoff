@@ -12,7 +12,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const url = new URL(req.url);
-    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 1), 200);
+    // BUG-A5-5-023: fix limit=0 parsing — use explicit NaN check instead of || 50
+    const rawLimit = parseInt(url.searchParams.get('limit') || '', 10);
+    const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
     const history = await getHistory(id, limit);
 
     return NextResponse.json({ history }, {
