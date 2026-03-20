@@ -14,8 +14,11 @@ import {
   updateProject,
 } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
