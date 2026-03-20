@@ -350,7 +350,11 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
     if (entry.isCurrent) return;
     const idx = mockEntries.indexOf(entry);
     if (idx > 0 && idx <= undoStack.length) {
-      for (let i = 0; i < idx; i++) undo();
+      // BUG-A6-5-037 fix: batch N undo() calls so they produce a single re-render
+      // instead of N re-renders that cause visible UI thrashing on large undo stacks.
+      React.startTransition(() => {
+        for (let i = 0; i < idx; i++) undo();
+      });
       addToast(`Restored to "${entry.description}"`, 'success');
     } else {
       addToast(`Restore to "${entry.description}" is not available.`, 'info');

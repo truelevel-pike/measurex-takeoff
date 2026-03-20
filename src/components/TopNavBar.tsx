@@ -118,6 +118,13 @@ export default function TopNavBar({
   const { addToast } = useToast();
 
   const [shareLoading, setShareLoading] = React.useState(false);
+  // BUG-A6-5-035 fix: max-wait timeout so share button never stays loading indefinitely
+  const shareLoadingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    return () => {
+      if (shareLoadingTimeoutRef.current) clearTimeout(shareLoadingTimeoutRef.current);
+    };
+  }, []);
   const [isShared, setIsShared] = React.useState(false);
   const { viewerCount } = useViewerPresence(projectId, isShared);
   const [isEditingPage, setIsEditingPage] = React.useState(false);
@@ -175,6 +182,9 @@ export default function TopNavBar({
       }
 
       setShareLoading(true);
+      // BUG-A6-5-035 fix: safety timeout to unstick the loading state after 15s
+      if (shareLoadingTimeoutRef.current) clearTimeout(shareLoadingTimeoutRef.current);
+      shareLoadingTimeoutRef.current = setTimeout(() => setShareLoading(false), 15000);
       // Generate (or retrieve) a share token via the API
       const res = await fetch(`/api/projects/${pid}/share`, { method: 'POST' });
       if (!res.ok) {
@@ -213,6 +223,7 @@ export default function TopNavBar({
       console.error('Failed to copy share link:', error);
       addToast('Failed to copy share link', 'error');
     } finally {
+      if (shareLoadingTimeoutRef.current) clearTimeout(shareLoadingTimeoutRef.current);
       setShareLoading(false);
     }
   }, [addToast]);

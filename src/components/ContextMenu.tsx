@@ -56,8 +56,13 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
 
   const handleCopy = useCallback(() => {
     if (!polygon) return;
+    // BUG-A6-5-014 fix: offset duplicate polygon in base-coordinate space (proportional),
+    // not hardcoded 20 screen pixels which produces zoom-dependent visual offsets.
+    const baseDimsRaw = useStore.getState().pageBaseDimensions[polygon.pageNumber];
+    const offsetX = (baseDimsRaw?.width ?? 1000) * 0.01;
+    const offsetY = (baseDimsRaw?.height ?? 1000) * 0.01;
     addPolygon({
-      points: polygon.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })),
+      points: polygon.points.map((p) => ({ x: p.x + offsetX, y: p.y + offsetY })),
       classificationId: polygon.classificationId,
       pageNumber: polygon.pageNumber,
       area: polygon.area,

@@ -161,34 +161,42 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
       };
     }
 
+    // BUG-A6-5-003 fix: seed default templates concurrently instead of sequentially.
+    // The previous for-await loop issued N serial POSTs; Promise.all fires all at once.
     async function seedDefaults(pid: string): Promise<Assembly[]> {
-      const seeded: Assembly[] = [];
-      for (const tpl of DEFAULT_TEMPLATES) {
-        const totalUnitCost = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
-        const res = await fetch(`/api/projects/${pid}/assemblies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: tpl.name,
-            unit: tpl.unit,
-            unitCost: totalUnitCost,
-            quantityFormula: tpl.quantityFormula,
-          }),
-        });
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (data?.assembly) {
-          // Merge server ID with full template materials for rich UI display
-          seeded.push({
-            id: data.assembly.id,
-            name: tpl.name,
-            classificationId: '',
-            isLibrary: false,
-            materials: tpl.materials.map((m) => ({ ...m, id: crypto.randomUUID() })),
-          });
-        }
-      }
-      return seeded;
+      const results = await Promise.all(
+        DEFAULT_TEMPLATES.map(async (tpl, idx) => {
+          const totalUnitCost = tpl.materials.reduce((s, m) => s + m.unitCost, 0);
+          try {
+            const res = await fetch(`/api/projects/${pid}/assemblies`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: tpl.name,
+                unit: tpl.unit,
+                unitCost: totalUnitCost,
+                quantityFormula: tpl.quantityFormula,
+              }),
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (!data?.assembly) return null;
+            return {
+              assembly: {
+                id: data.assembly.id,
+                name: tpl.name,
+                classificationId: '',
+                isLibrary: false,
+                materials: tpl.materials.map((m) => ({ ...m, id: crypto.randomUUID() })),
+              } as Assembly,
+              idx,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      return results.filter(Boolean).map((r) => r!.assembly);
     }
 
     fetch(`/api/projects/${projectId}/assemblies`)

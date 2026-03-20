@@ -1352,15 +1352,18 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             <span className="text-[10px] font-mono text-[#00d4ff]/70 tracking-wider">REPEATING GROUPS</span>
           </div>
           {repeatingGroups.map((rg) => {
-            // Find polygons on this group's page whose any point falls within the bounding box
+            // BUG-A6-5-033 fix: use centroid-in-bounding-box check instead of any-point-inside.
+            // The old check was incorrect for polygons spanning the box without a vertex inside,
+            // and for polygons that fully enclosed the box.
             const containedPolygons = polygons.filter((p) => {
-              if (p.pageNumber !== rg.pageNumber) return false;
-              return p.points.some(
-                (pt) =>
-                  pt.x >= rg.boundingBox.x &&
-                  pt.x <= rg.boundingBox.x + rg.boundingBox.width &&
-                  pt.y >= rg.boundingBox.y &&
-                  pt.y <= rg.boundingBox.y + rg.boundingBox.height
+              if (p.pageNumber !== rg.pageNumber || !p.isComplete || p.points.length === 0) return false;
+              const cx = p.points.reduce((s, pt) => s + pt.x, 0) / p.points.length;
+              const cy = p.points.reduce((s, pt) => s + pt.y, 0) / p.points.length;
+              return (
+                cx >= rg.boundingBox.x &&
+                cx <= rg.boundingBox.x + rg.boundingBox.width &&
+                cy >= rg.boundingBox.y &&
+                cy <= rg.boundingBox.y + rg.boundingBox.height
               );
             });
             // Sum area for contained polygons

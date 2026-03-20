@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/Toast';
 
 interface ContractorReportButtonProps {
   projectId?: string | null;
@@ -15,6 +16,7 @@ export default function ContractorReportButton({
   label = 'Contractor Report',
 }: ContractorReportButtonProps) {
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
 
   if (!projectId) return null;
 
@@ -40,7 +42,9 @@ export default function ContractorReportButton({
       document.body.removeChild(anchor);
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch (error) {
+      // BUG-A6-5-016 fix: surface export failures to user via toast
       console.error(error);
+      addToast('Failed to export contractor report. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
