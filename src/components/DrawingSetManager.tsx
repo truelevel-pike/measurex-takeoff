@@ -127,6 +127,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
     const name = editingSetName.trim();
     if (name) {
       setSets((prev) => prev.map((s) => (s.id === setId ? { ...s, name } : s)));
+      // BUG-A7-5-001 fix: persist rename to API
+      fetch(`/api/projects/${projectId}/drawing-sets/${setId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }).catch(() => {});
     }
     setEditingSetId(null);
   };
