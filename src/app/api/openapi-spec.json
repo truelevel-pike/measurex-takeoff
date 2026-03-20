@@ -2098,6 +2098,14 @@
         "description": "Project UUID"
       }
     },
+    "securitySchemes": {
+      "AdminSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-admin-secret",
+        "description": "Admin secret key for privileged endpoints (errors, metrics)"
+      }
+    },
     "schemas": {
       "Project": {
         "type": "object",
