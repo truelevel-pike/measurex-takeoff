@@ -7,7 +7,7 @@ export async function GET() {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MeasureX Takeoff API — v1.0.0</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" integrity="sha384-F7uqyyVZgBbuOv+8gNy6ZGJB8Rf12CczPWm130Pxrau0cyZlj1Dl18cDOWpQSrGh" crossorigin="anonymous" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0f0f1a; font-family: system-ui, -apple-system, sans-serif; }
@@ -66,7 +66,7 @@ export async function GET() {
     <span class="subtitle">Construction Takeoff API Documentation</span>
   </div>
   <div id="swagger-ui"></div>
-  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" integrity="sha384-SlhRXPBpOIwNajIYH/STl3rsa6P/qCR82bZVQk1pDmWr/+Mh9g/RhaUJ1JBmM99R" crossorigin="anonymous"></script>
   <script>
     SwaggerUIBundle({
       url: '/api/openapi.json',
@@ -79,7 +79,7 @@ export async function GET() {
       docExpansion: 'list',
       filter: true,
       showExtensions: true,
-      tryItOutEnabled: true,
+      tryItOutEnabled: false, // BUG-A5-6-062: disable try-it-out to prevent unintended API calls
     });
   </script>
 </body>
