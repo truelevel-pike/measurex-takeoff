@@ -432,7 +432,7 @@ export default function SharedViewPage() {
             <div className="truncate" style={{ color: '#ffffff', fontSize: 15, fontWeight: 600, maxWidth: 300 }}>{project.name}</div>
           </div>
           <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '3px 10px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
-            Shared by Contractor
+            Shared View
           </span>
         </div>
 
