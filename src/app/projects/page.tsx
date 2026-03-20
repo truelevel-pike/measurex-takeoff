@@ -644,9 +644,12 @@ export default function ProjectsPage() {
             {/* Starred */}
             <button
               onClick={() => setActiveSection('starred')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors ${activeSection === 'starred' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-700/60 transition-colors ${activeSection === 'starred' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
             >
-              <Star size={15} aria-hidden /> Starred
+              <span className="flex items-center gap-2"><Star size={15} aria-hidden /> Starred</span>
+              {starredIds.size > 0 && (
+                <span className="text-xs text-zinc-500 bg-zinc-700 px-1.5 py-0.5 rounded">{starredIds.size}</span>
+              )}
             </button>
 
             {/* My Projects */}
@@ -998,52 +1001,80 @@ export default function ProjectsPage() {
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="flex flex-col items-center py-16">
-              <div
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center transition-colors ${
-                  dragOver
-                    ? 'border-blue-400 bg-blue-600/10'
-                    : 'border-zinc-600 bg-zinc-800/50 hover:border-zinc-500'
-                }`}
-              >
-                <Upload size={40} className={`mx-auto mb-3 ${dragOver ? 'text-blue-400' : 'text-zinc-500'}`} aria-hidden />
-                <div className={`text-lg font-medium mb-1 ${dragOver ? 'text-blue-300' : 'text-zinc-300'}`}>
-                  {dragOver ? 'Drop PDF here' : 'Drag & drop a PDF'}
+              {/* No search/filter results vs no projects at all */}
+              {projects.length > 0 ? (
+                <div className="text-center">
+                  <Search size={40} className="text-zinc-600 mx-auto mb-3" aria-hidden />
+                  <div className="text-lg font-medium text-zinc-300 mb-1">No matching projects</div>
+                  <div className="text-sm text-zinc-500 mb-4">
+                    {searchQuery ? `No projects match "${searchQuery}"` : 'No projects in this view'}
+                  </div>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                    >
+                      Clear search
+                    </button>
+                  )}
                 </div>
-                <div className="text-sm text-zinc-500 mb-5">or upload to create your first project</div>
-                <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.pdf';
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) handlePdfUpload(file);
-                    };
-                    input.click();
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors inline-flex items-center gap-2"
-                >
-                  <Upload size={14} /> Upload PDF
-                </button>
-              </div>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="mt-4 text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
-              >
-                or create a blank project
-              </button>
-              <button
-                onClick={() => {
-                  saveDemoProject();
-                  router.push(`/?project=${DEMO_PROJECT_ID}`);
-                }}
-                className="mt-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors border border-zinc-600"
-              >
-                <Play size={14} /> Try Demo
-              </button>
+              ) : (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="bg-blue-600/10 rounded-full p-4 inline-block mb-4">
+                      <FileSpreadsheet size={40} className="text-blue-400" aria-hidden />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white mb-1">Ready to start your first takeoff?</h3>
+                    <p className="text-sm text-zinc-400">Upload a PDF blueprint and let MeasureX do the heavy lifting.</p>
+                  </div>
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center transition-colors ${
+                      dragOver
+                        ? 'border-blue-400 bg-blue-600/10'
+                        : 'border-zinc-600 bg-zinc-800/50 hover:border-zinc-500'
+                    }`}
+                  >
+                    <Upload size={40} className={`mx-auto mb-3 ${dragOver ? 'text-blue-400' : 'text-zinc-500'}`} aria-hidden />
+                    <div className={`text-lg font-medium mb-1 ${dragOver ? 'text-blue-300' : 'text-zinc-300'}`}>
+                      {dragOver ? 'Drop PDF here' : 'Drag & drop a PDF'}
+                    </div>
+                    <div className="text-sm text-zinc-500 mb-5">or click to browse your files</div>
+                    <button
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.pdf';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) handlePdfUpload(file);
+                        };
+                        input.click();
+                      }}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors inline-flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                    >
+                      <Upload size={14} /> Upload PDF
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="mt-4 text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
+                  >
+                    or create a blank project
+                  </button>
+                  <button
+                    onClick={() => {
+                      saveDemoProject();
+                      router.push(`/?project=${DEMO_PROJECT_ID}`);
+                    }}
+                    className="mt-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors border border-zinc-600"
+                  >
+                    <Play size={14} /> Try Demo
+                  </button>
+                </>
+              )}
             </div>
           ) : viewMode === 'grid' ? (
             /* Grid view */
