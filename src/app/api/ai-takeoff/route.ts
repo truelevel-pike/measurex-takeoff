@@ -356,24 +356,21 @@ export async function POST(req: Request) {
         }
         // rendered is a data URL: `data:image/png;base64,...`
         imageBase64 = rendered;
-        // CRITICAL: Override pageWidth/pageHeight to match rendered image dimensions
-        // renderPageAsImage scales the viewport by RENDER_SCALE, so the rendered image
-        // is RENDER_SCALE × larger than the PDF's native dimensions.
-        // Gemini will return pixel coords in the rendered image space, so we must
-        // pass the rendered dimensions (not PDF dims) to normalizePoint.
-        if (pageWidth) pageWidth = Math.round(pageWidth * RENDER_SCALE);
-        if (pageHeight) pageHeight = Math.round(pageHeight * RENDER_SCALE);
+        // NOTE: Do NOT multiply pageWidth/Height by RENDER_SCALE here.
+        // Gemini intelligently returns coordinates relative to the document's
+        // natural coordinate space (612×792 for letter) regardless of image render scale.
+        // We pass the native PDF dimensions to the prompt so Gemini aligns correctly.
 
         // Derive page dimensions from the PDF viewport if not provided by the caller
-        // IMPORTANT: multiply by RENDER_SCALE since the image is rendered at 2x
+        // Derive page dimensions from native PDF viewport (NOT scaled)
         if (!pageWidth || !pageHeight) {
           try {
             const { processPDF } = await import('@/server/pdf-processor');
             const info = await processPDF(tmpPdfPath, projectId);
             const pageInfo = info.pages.find((p) => p.pageNum === pageNumber);
             if (pageInfo) {
-              pageWidth = pageWidth ?? Math.round(pageInfo.width * RENDER_SCALE);
-              pageHeight = pageHeight ?? Math.round(pageInfo.height * RENDER_SCALE);
+              pageWidth = pageWidth ?? pageInfo.width;
+              pageHeight = pageHeight ?? pageInfo.height;
             }
           } catch {
             // Non-fatal — dimensions will fall back to defaults below
@@ -634,8 +631,7 @@ Return null pixels_per_unit if you cannot calculate it — just return the scale
             existingClassifications.push({ id: classificationId, name: el.classification, type: el.type });
           }
 
-          // Pass activeRenderScale so coordinates are converted from rendered image space to native PDF space
-          const persistPoints = toPersistablePoints(el, activeRenderScale);
+          const persistPoints = toPersistablePoints(el);
           if (!persistPoints) continue;
 
           resolvedElements.push({ el, classificationId, persistPoints });
