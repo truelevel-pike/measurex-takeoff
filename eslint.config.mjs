@@ -15,6 +15,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored/minified files and build output — never lint these:
+    "public/pdf.worker.min.mjs",
+    "public/pdf.worker.js",
+    "public/sw.js",
+    "storybook-static/**",
   ]),
   ...storybook.configs["flat/recommended"]
 ]);
