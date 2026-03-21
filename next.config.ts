@@ -15,6 +15,11 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   turbopack: {},
   devIndicators: false,
+  // Prevent Turbopack/webpack from bundling pdfjs-dist for server routes.
+  // pdfjs-dist uses dynamic import() of its worker internally (path: ./pdf.worker.mjs)
+  // which breaks when the module is bundled because the import context changes.
+  // Marking it external lets Node resolve it natively at runtime.
+  serverExternalPackages: ['pdfjs-dist', 'canvas'],
   async headers() {
     return [
       {
@@ -34,7 +39,8 @@ const nextConfig: NextConfig = {
               // BUG-A8-5-008 fix: remove 'unsafe-inline' from production script-src.
               // Per-request nonces are injected by src/middleware.ts for HTML pages;
               // this static header is only a fallback for non-HTML assets.
-              `script-src 'self' ${process.env.NODE_ENV === "development" ? "'unsafe-eval' 'unsafe-inline'" : ""} https://cdn.jsdelivr.net`,
+              // cdn.jsdelivr.net removed from script-src — pdfjs worker now self-hosted at /pdf.worker.min.mjs
+              `script-src 'self' ${process.env.NODE_ENV === "development" ? "'unsafe-eval' 'unsafe-inline'" : ""}`,
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               // BUG-A8-4-L017 fix: narrow img-src from all HTTPS to specific trusted origins
               "img-src 'self' data: blob: https://*.supabase.co",
