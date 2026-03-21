@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, createPolygon, deletePolygonsByPage, initDataDir } from '@/server/project-store';
+import { getPolygons, createPolygon, deletePolygonsByPage, getProject, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
@@ -14,6 +14,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     const polygons = await getPolygons(id);
     return NextResponse.json({ polygons });
   } catch (err: unknown) {

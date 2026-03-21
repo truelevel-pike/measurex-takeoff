@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAssemblies, createAssembly, initDataDir } from '@/server/project-store';
+import { getAssemblies, createAssembly, getProject, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -20,6 +20,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     const assemblies = await getAssemblies(id);
     return NextResponse.json({ assemblies });
   } catch (err: unknown) {

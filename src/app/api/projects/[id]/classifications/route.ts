@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getClassifications, createClassification, initDataDir } from '@/server/project-store';
+import { getClassifications, createClassification, getProject, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, ClassificationCreateSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
@@ -22,6 +22,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     const classifications = await getClassifications(id);
     return NextResponse.json({ classifications });
   } catch (err: unknown) {
