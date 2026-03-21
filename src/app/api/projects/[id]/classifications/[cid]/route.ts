@@ -1,7 +1,27 @@
 import { NextResponse } from 'next/server';
-import { deleteClassification, updateClassification, initDataDir } from '@/server/project-store';
+import { deleteClassification, updateClassification, getClassifications, getProject, initDataDir } from '@/server/project-store';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ClassificationIdSchema, ClassificationUpdateSchema, validationError } from '@/lib/api-schemas';
+import { rateLimitResponse } from '@/lib/rate-limit';
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {
+  const limited = rateLimitResponse(req);
+  if (limited) return limited;
+  try {
+    await initDataDir();
+    const paramsResult = ClassificationIdSchema.safeParse(await params);
+    if (!paramsResult.success) return validationError(paramsResult.error);
+    const { id, cid } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    const classifications = await getClassifications(id);
+    const classification = classifications.find(c => c.id === cid);
+    if (!classification) return NextResponse.json({ error: 'Classification not found' }, { status: 404 });
+    return NextResponse.json({ classification });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+  }
+}
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {
   try {
