@@ -637,7 +637,7 @@ export default function ProjectsPage() {
           </button>
           <button aria-label="New Project"
             onClick={() => setShowCreate(true)}
-            className="text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono flex items-center gap-1.5 transition-colors hover:bg-[#00d4ff]/10"
+            className="border border-[#00d4ff]/60 text-[#00d4ff] px-3 py-1.5 rounded text-sm font-mono flex items-center gap-1.5 transition-colors hover:bg-[#00d4ff]/15 hover:border-[#00d4ff]"
             style={{ touchAction: 'manipulation' }}>
             <Plus size={14} aria-hidden /> New Project
           </button>
@@ -876,7 +876,7 @@ export default function ProjectsPage() {
 
           {/* Section header + view toggle */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">{sectionLabel}</h2>
+            <h2 className="text-base font-mono text-[#00d4ff] tracking-wider">[ {sectionLabel.toUpperCase()} ]</h2>
             <div className="flex items-center gap-2">
               <button
                 aria-label="Grid view"
@@ -1120,20 +1120,19 @@ export default function ProjectsPage() {
                       </div>
                     ) : (
                       <div
-                        className="h-28 flex items-center justify-center"
-                        style={{ backgroundColor: thumbColor(p.name) + '22' }}
+                        className="h-28 flex items-center justify-center border-b border-[#00d4ff]/10"
+                        style={{ backgroundColor: '#050508' }}
                       >
                         <span
-                          className="text-2xl font-bold rounded-full w-14 h-14 flex items-center justify-center"
-                          style={{ backgroundColor: thumbColor(p.name), color: '#fff' }}
+                          className="text-lg font-mono font-bold text-[#00d4ff]/80 tracking-widest"
                         >
-                          {thumbInitials(p.name)}
+                          [ {thumbInitials(p.name)} ]
                         </span>
                       </div>
                     )}
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
-                        <span className="font-medium text-sm text-white truncate flex-1">{p.name}</span>
+                        <span className="font-mono text-sm text-[#00d4ff] truncate flex-1">{p.name}</span>
                         <div className="flex items-center gap-1 ml-2 shrink-0">
                           <button
                             aria-label={starredIds.has(p.id) ? `Unstar ${p.name}` : `Star ${p.name}`}
@@ -1151,7 +1150,7 @@ export default function ProjectsPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-zinc-400">
+                      <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
                         <span className="flex items-center gap-1"><Clock size={11} aria-hidden />{fmtDate(p)}</span>
                         {(p.pageCount || p.state?.totalPages || 0) > 0 && (
                           <span className="flex items-center gap-1"><FileText size={11} aria-hidden />{p.pageCount || p.state?.totalPages} pages</span>
@@ -1162,7 +1161,7 @@ export default function ProjectsPage() {
                       {p.tags && p.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {p.tags.map(tag => (
-                            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/20">
+                            <span key={tag} className="text-[10px] px-1.5 py-0.5 font-mono bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/20">
                               {tag}
                             </span>
                           ))}
