@@ -307,7 +307,7 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(t.key)}
               className={`w-full text-left px-4 py-2.5 rounded-lg text-sm flex items-center gap-3 transition-colors ${
                 activeTab === t.key
-                  ? 'bg-gray-800 text-white font-medium'
+                  ? 'border-l-2 border-[#00d4ff] text-[#00d4ff] font-medium bg-[#00d4ff]/5'
                   : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
               }`}
             >
@@ -326,7 +326,7 @@ export default function SettingsPage() {
               {/* Avatar */}
               <div className="flex items-center gap-4 mb-6">
                 {/* BUG-A8-5-004 fix: derive initials from name state */}
-                <div className="w-16 h-16 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xl font-bold text-green-400">
+                <div className="w-16 h-16 rounded-full bg-[#00d4ff]/20 border border-[#00d4ff]/30 flex items-center justify-center text-xl font-bold text-[#00d4ff]">
                   {name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || 'ME'}
                 </div>
                 <div>
@@ -356,7 +356,7 @@ export default function SettingsPage() {
                     />
                     <button
                       onClick={() => { setEmailChangePending(v => !v); setEmailChangeStatus(null); }}
-                      className="text-sm text-green-400 hover:text-green-300 whitespace-nowrap transition-colors"
+                      className="text-sm text-[#00d4ff] hover:text-[#00d4ff]/80 whitespace-nowrap transition-colors"
                     >
                       Change Email
                     </button>
@@ -373,7 +373,7 @@ export default function SettingsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={handleChangeEmail}
-                          className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                          className="border border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/15 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                           Send Confirmation
                         </button>
@@ -385,7 +385,7 @@ export default function SettingsPage() {
                         </button>
                       </div>
                       {emailChangeStatus && (
-                        <p className={`text-xs mt-1 ${emailChangeStatus.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+                        <p className={`text-xs mt-1 ${emailChangeStatus.startsWith('Error') ? 'text-red-400' : 'text-[#00d4ff]'}`}>
                           {emailChangeStatus}
                         </p>
                       )}
@@ -405,7 +405,7 @@ export default function SettingsPage() {
                 <div className="pt-2">
                   <button
                     onClick={handleSaveProfile}
-                    className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${profileSaved ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-green-600 hover:bg-green-500'} text-white`}
+                    className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${profileSaved ? 'border border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/15' : 'border border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/15'}`}
                   >
                     <Check size={14} /> {profileSaved ? 'Saved!' : 'Save Changes'}
                   </button>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                         }}
                         className={`px-6 py-2.5 text-sm font-medium capitalize transition-colors ${
                           ms.unit === u
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                       >
@@ -485,7 +485,7 @@ export default function SettingsPage() {
                         onClick={() => updateSetting({ areaUnit: u })}
                         className={`px-5 py-2.5 text-sm font-medium transition-colors ${
                           ms.areaUnit === u
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                       >
@@ -505,7 +505,7 @@ export default function SettingsPage() {
                         onClick={() => updateSetting({ linearUnit: u })}
                         className={`px-5 py-2.5 text-sm font-medium transition-colors ${
                           ms.linearUnit === u
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                       >
@@ -525,7 +525,7 @@ export default function SettingsPage() {
                         onClick={() => updateSetting({ decimals: d })}
                         className={`px-6 py-2.5 text-sm font-medium transition-colors ${
                           ms.decimals === d
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                       >
@@ -549,7 +549,7 @@ export default function SettingsPage() {
                         onClick={() => updateSetting({ scaleDisplayFormat: opt.value })}
                         className={`px-5 py-2.5 text-sm font-medium transition-colors ${
                           ms.scaleDisplayFormat === opt.value
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                         title={opt.example}
@@ -597,7 +597,7 @@ export default function SettingsPage() {
                         onClick={() => updateAi({ defaultScaleUnit: u })}
                         className={`px-6 py-2.5 text-sm font-medium transition-colors ${
                           ai.defaultScaleUnit === u
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/60'
                             : 'bg-gray-800 text-gray-400 hover:text-white'
                         }`}
                       >
@@ -613,7 +613,7 @@ export default function SettingsPage() {
                     <div
                       onClick={() => updateAi({ autoRunScaleDetection: !ai.autoRunScaleDetection })}
                       className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
-                        ai.autoRunScaleDetection ? 'bg-green-600' : 'bg-gray-700'
+                        ai.autoRunScaleDetection ? 'bg-[#00d4ff]' : 'bg-gray-700'
                       }`}
                     >
                       <div
@@ -683,7 +683,7 @@ export default function SettingsPage() {
                       <div className="text-sm font-medium text-white">Free Plan</div>
                       <div className="text-xs text-gray-400 mt-0.5">5 projects, 1 team member</div>
                     </div>
-                    <button className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <button className="border border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/15 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                       Upgrade to Pro
                     </button>
                   </div>
@@ -694,7 +694,7 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-300 mb-2">Team Members</label>
                   <div className="flex items-center gap-3">
                     <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white">
-                      <span className="text-green-400 font-semibold">1</span> / 1 members
+                      <span className="text-[#00d4ff] font-semibold">1</span> / 1 members
                     </div>
                     <Bell size={16} className="text-gray-500" />
                   </div>
@@ -769,7 +769,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setShowNewKey(v => !v)}
-                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  className="border border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/15 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                 >
                   <Plus size={14} /> Add Key
                 </button>
@@ -777,7 +777,7 @@ export default function SettingsPage() {
 
               {/* Add new key form */}
               {showNewKey && (
-                <div className="bg-gray-900 border border-green-600/30 rounded-xl p-5 space-y-4">
+                <div className="bg-gray-900 border border-[#00d4ff]/30 rounded-xl p-5 space-y-4">
                   <h3 className="text-sm font-semibold text-white">New API Key</h3>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1.5">Label</label>
@@ -803,7 +803,7 @@ export default function SettingsPage() {
                     <button
                       onClick={addApiKey}
                       disabled={!newKeyLabel.trim() || !newKeyValue.trim()}
-                      className="bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      className="border border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/15 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                     >
                       <Check size={14} /> Save Key
                     </button>
@@ -837,7 +837,7 @@ export default function SettingsPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-4">
-                          <Key size={16} className="text-green-400 shrink-0" />
+                          <Key size={16} className="text-[#00d4ff] shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-white">{k.label}</div>
                             <div className="text-xs text-gray-500 font-mono mt-0.5">
@@ -855,7 +855,7 @@ export default function SettingsPage() {
                                 className="text-yellow-400 hover:text-yellow-300 p-2 transition-colors"
                                 title="Copy key (one-time)"
                               >
-                                {copiedKeyId === k.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                                {copiedKeyId === k.id ? <Check size={14} className="text-[#00d4ff]" /> : <Copy size={14} />}
                               </button>
                             )}
                             {isNew && (
