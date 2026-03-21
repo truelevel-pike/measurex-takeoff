@@ -301,6 +301,7 @@ export default function TopNavBar({
           {!isMobile && onSave && (
             <button
               aria-label={saving ? 'Saving project, please wait' : 'Save project'}
+              data-testid="save-project-btn"
               onClick={onSave}
               disabled={saving}
               className="ml-2"
@@ -668,7 +669,7 @@ export default function TopNavBar({
                 ariaPressed={show3D}
               />
               )}
-              <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" />
+              <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" testId="tab-quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
               <NavIconButton ariaLabel="Print Blueprint" srLabel="Print Blueprint" icon={<Printer size={17} aria-hidden="true" />} tooltip="Print Blueprint" onClick={onPrintBlueprint} />
@@ -831,9 +832,10 @@ interface NavIconButtonProps {
   srLabel: string;
   ariaExpanded?: boolean;
   ariaPressed?: boolean;
+  testId?: string;
 }
 
-function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed }: NavIconButtonProps) {
+function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed, testId }: NavIconButtonProps) {
   const isActive = ariaPressed === true;
   return (
     <button
@@ -842,6 +844,7 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpande
       onClick={onClick}
       aria-expanded={ariaExpanded}
       aria-pressed={ariaPressed}
+      data-testid={testId}
       style={{
         background: isActive ? 'rgba(0,212,255,0.15)' : '#12121a',
         border: isActive ? '1px solid rgba(0,212,255,0.5)' : '1px solid rgba(0,212,255,0.15)',

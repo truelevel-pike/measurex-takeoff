@@ -1553,6 +1553,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               className="w-full px-2 py-1 border rounded text-[13px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
               autoFocus
               aria-label="Classification name"
+              data-testid="classification-name-input"
             />
           </div>
 
@@ -1570,6 +1571,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             onChange={(event) => setNewType(event.target.value as ClassificationType)}
             className="w-full border rounded px-2 py-1 text-[12px] mb-2 bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
             aria-label="Classification type"
+            data-testid="classification-type-select"
           >
             {TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -1588,7 +1590,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             >
               Cancel
             </button>
-            <button type="submit" className="text-[#00d4ff] font-medium text-xs">
+            <button type="submit" className="text-[#00d4ff] font-medium text-xs" aria-label="Create classification" data-testid="save-classification-btn">
               Create
             </button>
           </div>

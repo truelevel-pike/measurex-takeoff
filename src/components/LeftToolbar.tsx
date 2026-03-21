@@ -192,6 +192,7 @@ export default function LeftToolbar() {
                 aria-pressed={'tool' in b ? active : undefined}
                 title={`${b.label} (${b.shortcut})`}
                 onClick={() => onClick(b as (typeof GROUPS)[number][number])}
+                data-testid={'tool' in b ? `tool-${'tool' in b ? (b as { tool: string }).tool : ''}` : undefined}
                 style={{
                   width: 36,
                   height: 36,

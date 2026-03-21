@@ -922,6 +922,7 @@ export default function ProjectsPage() {
                 <div className="flex gap-3">
                   <input
                     aria-label="Project name"
+                    data-testid="project-name-input"
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
                     placeholder="Project name (e.g., 123 Main St Addition)"
@@ -929,7 +930,7 @@ export default function ProjectsPage() {
                     onKeyDown={e => e.key === 'Enter' && handleCreate()}
                     autoFocus
                   />
-                  <button aria-label="Create project" onClick={handleCreate}
+                  <button aria-label="Create project" data-testid="create-project-btn" onClick={handleCreate}
                     disabled={creating || !newName.trim()}
                     className="bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:text-zinc-400 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors">
                     {creating ? (pdfFile ? 'Uploading...' : 'Creating...') : (pdfFile ? 'Create & Upload' : 'Create')}
