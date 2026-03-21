@@ -198,8 +198,10 @@ export default function ProjectsPage() {
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/projects');
+      if (res.status === 429) throw new Error('Too many requests. Please wait a moment and try again.');
       if (!res.ok) throw new Error(`Failed to load projects (${res.status})`);
       const data = await res.json();
       const projectTags = loadProjectTags();
@@ -211,6 +213,10 @@ export default function ProjectsPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load projects';
       setError(message);
+      // Auto-retry after 5 seconds on rate limit
+      if (message.includes('Too many requests')) {
+        setTimeout(() => loadProjects(), 5000);
+      }
     } finally {
       setLoading(false);
     }
