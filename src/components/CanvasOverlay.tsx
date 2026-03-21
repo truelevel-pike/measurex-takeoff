@@ -337,6 +337,177 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     return map;
   }, [polygons]);
   const polygonIds = useMemo(() => new Set(allPolygons.map((polygon) => polygon.id)), [allPolygons]);
+
+  // fix(canvas): smart label deduplication for dense polygon clusters
+  //
+  // labelDecisions pre-computes per-polygon label visibility before the render loop:
+  //   1. COUNT polygons: if >3 of the same classification are within 100px of each
+  //      other, suppress individual labels and nominate ONE summary badge at the group
+  //      centroid. The nominated polygon's entry carries { summaryLabel, summaryCentroid }.
+  //   2. AREA polygons: skip the label when the rendered polygon area < 3000px².
+  //   3. Generic deduplication: if two labels would render within 60px of each other,
+  //      suppress the smaller/lower-confidence one.
+  //
+  // All distances are in SVG-viewBox units (baseDims space). We convert the pixel
+  // thresholds using the ratio baseDims.width / wrapperWidth so the behaviour is
+  // zoom-invariant. Because the wrapper DOM size may not be known during SSR or before
+  // first paint, we fall back to baseDims.width / 1000 as a reasonable estimate.
+  const labelDecisions = useMemo(() => {
+    const wrapperEl = wrapperRef.current;
+    const wrapperW = wrapperEl ? wrapperEl.getBoundingClientRect().width : 0;
+    const wrapperH = wrapperEl ? wrapperEl.getBoundingClientRect().height : 0;
+    // pixels-per-baseDim unit in each axis
+    const pxPerUnitX = wrapperW > 0 ? wrapperW / baseDims.width : 1000 / baseDims.width;
+    const pxPerUnitY = wrapperH > 0 ? wrapperH / baseDims.height : 1000 / baseDims.height;
+
+    // threshold in baseDim units
+    const cluster100px = 100 / Math.min(pxPerUnitX, pxPerUnitY);
+    const dedup60px   = 60  / Math.min(pxPerUnitX, pxPerUnitY);
+    const minArea3000px2 = 3000 / (pxPerUnitX * pxPerUnitY);
+
+    type LabelDecision = {
+      show: boolean;
+      // For the nominated COUNT summary:
+      summaryLabel?: string;
+      summaryCentroid?: { x: number; y: number };
+    };
+    const decisions = new Map<string, LabelDecision>();
+
+    // Helper: centroid of a polygon's points
+    const centroid = (pts: Point[]) => ({
+      x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+      y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+    });
+
+    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+    // ── STEP 1: COUNT polygon clustering ────────────────────────────────────────
+    // Group count polygons by classificationId and cluster them spatially.
+    const countPolygons = polygons.filter(
+      (p) => (classificationById.get(p.classificationId)?.type ?? 'area') === 'count'
+    );
+
+    // Simple greedy clustering: O(n²) is fine for typical polygon counts (<1000).
+    const visited = new Set<string>();
+    for (const anchor of countPolygons) {
+      if (visited.has(anchor.id)) continue;
+      const anchorCent = centroid(anchor.points.length > 0 ? anchor.points : [{ x: 0, y: 0 }]);
+      // Find all same-classification polygons within 100px
+      const cluster = countPolygons.filter(
+        (p) =>
+          p.classificationId === anchor.classificationId &&
+          dist(anchorCent, centroid(p.points.length > 0 ? p.points : [{ x: 0, y: 0 }])) <= cluster100px
+      );
+      cluster.forEach((p) => visited.add(p.id));
+
+      if (cluster.length > 3) {
+        // Suppress all individual labels; nominate the first one to carry the summary.
+        const groupCentX = cluster.reduce((s, p) => {
+          const c = centroid(p.points.length > 0 ? p.points : [{ x: 0, y: 0 }]);
+          return s + c.x;
+        }, 0) / cluster.length;
+        const groupCentY = cluster.reduce((s, p) => {
+          const c = centroid(p.points.length > 0 ? p.points : [{ x: 0, y: 0 }]);
+          return s + c.y;
+        }, 0) / cluster.length;
+        const cls = classificationById.get(anchor.classificationId);
+        const rawLabel = (anchor.label ?? cls?.name ?? '').trim();
+        const summaryLabel = rawLabel
+          ? `${rawLabel}: ${cluster.length} EA`
+          : `${cluster.length} EA`;
+        const nominee = cluster[0];
+        cluster.forEach((p) => {
+          decisions.set(p.id, {
+            show: p.id === nominee.id,
+            summaryLabel: p.id === nominee.id ? summaryLabel : undefined,
+            summaryCentroid: p.id === nominee.id ? { x: groupCentX, y: groupCentY } : undefined,
+          });
+        });
+      } else {
+        // Small cluster — show individual labels normally (dedup pass below may still suppress)
+        cluster.forEach((p) => {
+          if (!decisions.has(p.id)) decisions.set(p.id, { show: true });
+        });
+      }
+    }
+
+    // ── STEP 2: AREA polygon minimum-size guard ──────────────────────────────────
+    const areaPolygons = polygons.filter(
+      (p) => (classificationById.get(p.classificationId)?.type ?? 'area') === 'area'
+    );
+    for (const p of areaPolygons) {
+      if (decisions.has(p.id)) continue; // already decided
+      // Approximate rendered pixel area of the polygon
+      const pts = p.points;
+      if (pts.length < 3) {
+        decisions.set(p.id, { show: false });
+        continue;
+      }
+      // Shoelace in baseDim units → convert to px²
+      let shoelace = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const j = (i + 1) % pts.length;
+        shoelace += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+      }
+      const areaPx2 = Math.abs(shoelace / 2) * pxPerUnitX * pxPerUnitY;
+      decisions.set(p.id, { show: areaPx2 >= minArea3000px2 });
+    }
+
+    // Default all remaining (linear) polygons to show
+    for (const p of polygons) {
+      if (!decisions.has(p.id)) decisions.set(p.id, { show: true });
+    }
+
+    // ── STEP 3: Generic 60px deduplication ──────────────────────────────────────
+    // Collect centroids of all polygons whose labels are still visible after steps 1-2.
+    // Sort by descending area (area polys) or descending confidence for others, so the
+    // most prominent label wins when two overlap.
+    type Candidate = {
+      id: string;
+      cx: number;
+      cy: number;
+      priority: number; // higher = more prominent
+    };
+    const candidates: Candidate[] = [];
+    for (const p of polygons) {
+      const d = decisions.get(p.id);
+      if (!d?.show) continue;
+      const pts = p.points;
+      if (pts.length === 0) continue;
+      const cx = pts.reduce((s, pt) => s + pt.x, 0) / pts.length;
+      const cy = pts.reduce((s, pt) => s + pt.y, 0) / pts.length;
+      // Use summary centroid for nominated COUNT summary labels
+      const finalCx = d.summaryCentroid ? d.summaryCentroid.x : cx;
+      const finalCy = d.summaryCentroid ? d.summaryCentroid.y : cy;
+      const clsType = classificationById.get(p.classificationId)?.type ?? 'area';
+      // Priority: area polygons rank by rendered area; others by confidence
+      const priority = clsType === 'area'
+        ? p.area * pxPerUnitX * pxPerUnitY
+        : (p.confidence ?? 0.5) * 1000;
+      candidates.push({ id: p.id, cx: finalCx, cy: finalCy, priority });
+    }
+    // Sort descending by priority
+    candidates.sort((a, b) => b.priority - a.priority);
+
+    const placed: { x: number; y: number }[] = [];
+    for (const cand of candidates) {
+      const tooClose = placed.some((p) => dist(p, { x: cand.cx, y: cand.cy }) < dedup60px);
+      if (tooClose) {
+        // Suppress this label
+        const existing = decisions.get(cand.id);
+        if (existing) decisions.set(cand.id, { ...existing, show: false });
+      } else {
+        placed.push({ x: cand.cx, y: cand.cy });
+      }
+    }
+
+    return decisions;
+    // Re-compute when polygons, classifications, or wrapper size changes.
+    // We intentionally depend on baseDims (which changes with page/zoom) instead of
+    // reading wrapperRef.current inside the deps array (refs are not reactive).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polygons, classificationById, baseDims]);
   const annotations = useMemo(
     () => (allAnnotations ?? []).filter((a) => a.page === currentPage),
     [allAnnotations, currentPage]
@@ -764,13 +935,22 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               })()}
               {/* Polygon label: measurement annotation (area/length/count) */}
               {prefs.showPolygonLabels && (() => {
+                // fix(canvas): check smart label deduplication decision
+                const labelDecision = labelDecisions.get(poly.id);
+                if (labelDecision && !labelDecision.show) return null;
+
                 const pts = displayPoints;
                 const clsType = cls?.type ?? 'area';
                 // Count markers have 1 point, linear can have 2 — allow labels for those
                 const minPts = clsType === 'count' ? 1 : clsType === 'linear' ? 2 : 3;
                 if (pts.length < minPts) return null;
-                const centX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
-                const centY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+
+                // For COUNT summary labels, use the pre-computed group centroid; otherwise use polygon centroid
+                const defaultCentX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+                const defaultCentY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+                const centX = labelDecision?.summaryCentroid ? labelDecision.summaryCentroid.x : defaultCentX;
+                const centY = labelDecision?.summaryCentroid ? labelDecision.summaryCentroid.y : defaultCentY;
+
                 if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
                 const pageScale = scales[poly.pageNumber] ?? scale;
                 const ppu = pageScale?.pixelsPerUnit || 1;
@@ -783,14 +963,84 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 // area polygons are closed so their perimeter includes the closing segment.
                 const linearReal = calculateLinearFeet(poly.points, ppu, clsType !== 'linear');
                 const rawLabel = (poly.label ?? cls?.name ?? '').trim();
-                const measureStr =
-                  clsType === 'linear'
-                    ? `${linearReal.toFixed(1)} LF`
-                    : clsType === 'count'
-                    ? `${countForClass} EA`
-                    : `${areaReal.toFixed(1)} SF`;
-                const displayStr = rawLabel ? `${rawLabel}: ${measureStr}` : measureStr;
+
+                // If this is a COUNT polygon summary (nominated for a dense cluster), use the
+                // pre-computed summary label; otherwise build the label normally.
+                let displayStr: string;
+                let isCountSummary = false;
+                if (clsType === 'count' && labelDecision?.summaryLabel) {
+                  displayStr = labelDecision.summaryLabel;
+                  isCountSummary = true;
+                } else {
+                  const measureStr =
+                    clsType === 'linear'
+                      ? `${linearReal.toFixed(1)} LF`
+                      : clsType === 'count'
+                      ? `${countForClass} EA`
+                      : `${areaReal.toFixed(1)} SF`;
+                  displayStr = rawLabel ? `${rawLabel}: ${measureStr}` : measureStr;
+                }
+
                 const labelColor = cls?.color ?? '#00d4ff';
+
+                // For COUNT polygons (dots/markers) render a compact badge when not a summary;
+                // for dense summaries render a slightly larger pill badge.
+                if (clsType === 'count') {
+                  // Badge dimensions — tighter than full text labels
+                  const badgeText = isCountSummary ? displayStr : `${countForClass}`;
+                  const badgeW = Math.max(isCountSummary ? 80 : 26, badgeText.length * 7 + 10);
+                  const badgeH = isCountSummary ? 20 : 18;
+                  const badgeX = centX - badgeW / 2;
+                  const badgeY = centY - badgeH / 2 - (isCountSummary ? 0 : 10); // nudge dot badge above marker
+                  return (
+                    <g
+                      pointerEvents={isSelected ? 'all' : 'none'}
+                      style={{ cursor: isSelected ? 'pointer' : undefined }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setShowFloatingReclassify(true);
+                      }}
+                    >
+                      {/* Colored dot */}
+                      {!isCountSummary && (
+                        <circle
+                          cx={centX}
+                          cy={centY}
+                          r={5}
+                          fill={labelColor}
+                          stroke="#fff"
+                          strokeWidth={1}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )}
+                      {/* Count badge / summary pill */}
+                      <rect
+                        x={badgeX}
+                        y={badgeY}
+                        width={badgeW}
+                        height={badgeH}
+                        fill={isCountSummary ? 'rgba(0,0,0,0.80)' : hexToRgba(labelColor, 0.85)}
+                        rx={badgeH / 2}
+                        stroke={isCountSummary ? labelColor : undefined}
+                        strokeWidth={isCountSummary ? 1 : undefined}
+                      />
+                      <text
+                        x={centX}
+                        y={badgeY + badgeH / 2 + 4}
+                        fontSize={isCountSummary ? '10' : '9'}
+                        fill={isCountSummary ? labelColor : '#fff'}
+                        textAnchor="middle"
+                        fontFamily="sans-serif"
+                        fontWeight="700"
+                        style={{ userSelect: 'none' }}
+                      >
+                        {badgeText}
+                      </text>
+                    </g>
+                  );
+                }
+
+                // Standard text label for area / linear polygons
                 const longestLen = displayStr.length;
                 const labelW = Math.max(60, longestLen * 7 + 14);
                 const labelH = 20;
