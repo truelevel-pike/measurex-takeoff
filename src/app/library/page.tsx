@@ -35,9 +35,9 @@ interface Project {
 }
 
 const TYPE_BADGE_STYLES: Record<string, string> = {
-  area: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  linear: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  count: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  area: 'border border-[#00d4ff]/40 text-[#00d4ff]/80',
+  linear: 'border border-[#00d4ff]/40 text-[#00d4ff]/80',
+  count: 'border border-[#00d4ff]/40 text-[#00d4ff]/80',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -213,7 +213,7 @@ export default function LibraryPage() {
     <div
       className="min-h-screen"
       style={{
-        background: '#0a0a0f',
+        background: '#000',
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
         color: '#e0e0e0',
       }}
@@ -283,7 +283,7 @@ export default function LibraryPage() {
             <section className="mb-10">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 size={18} className="text-[#00d4ff]" />
-                <h2 className="font-mono tracking-wider text-[#00d4ff] text-sm">ORGANIZATION LIBRARY</h2>
+                <h2 className="font-mono tracking-wider text-[#00d4ff] text-sm">[ ORGANIZATION LIBRARY ]</h2>
                 <span className="text-xs text-[#8892a0]">({orgItems.length})</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -307,7 +307,7 @@ export default function LibraryPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <User size={18} className="text-[#00d4ff]" />
-                  <h2 className="font-mono tracking-wider text-[#00d4ff] text-sm">MY TEMPLATES</h2>
+                  <h2 className="font-mono tracking-wider text-[#00d4ff] text-sm">[ MY TEMPLATES ]</h2>
                   <span className="text-xs text-[#8892a0]">({myItems.length})</span>
                 </div>
                 <button
@@ -572,27 +572,23 @@ function LibraryCard({
 }) {
   return (
     <div
-      className="rounded-xl border p-3 flex items-start gap-3 group transition-colors"
-      style={{
-        background: '#12121a',
-        borderColor: 'rgba(0,212,255,0.15)',
-      }}
+      className="rounded-xl bg-[#0a0a0f] border border-[#00d4ff]/20 p-3 flex items-start gap-3 group transition-all hover:border-[#00d4ff]/60 hover:shadow-[0_0_12px_rgba(0,212,255,0.1)]"
     >
-      {/* Color swatch */}
+      {/* Color dot indicator */}
       <div
-        className="w-8 h-8 rounded-lg flex-shrink-0 mt-0.5"
+        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
         style={{ backgroundColor: item.color }}
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-white truncate">{item.name}</span>
+          <span className="text-sm font-medium text-[#00d4ff] truncate">{item.name}</span>
           <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${TYPE_BADGE_STYLES[item.type] ?? ''}`}
+            className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs uppercase tracking-wider ${TYPE_BADGE_STYLES[item.type] ?? ''}`}
           >
             {item.type}
           </span>
         </div>
-        <div className="text-xs text-[#8892a0] mt-1">
+        <div className="text-sm text-zinc-400 mt-1">
           ${item.unit_cost.toFixed(2)} / {TYPE_LABELS[item.type]?.split(' ')[1]?.replace('(', '').replace(')', '') ?? 'unit'}
         </div>
 
@@ -601,12 +597,11 @@ function LibraryCard({
           <button
             onClick={() => onImport(item)}
             disabled={importingId === item.id}
-            className="flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
-            style={{
-              borderColor: importSuccess === item.id ? 'rgba(16,185,129,0.5)' : 'rgba(0,212,255,0.3)',
-              color: importSuccess === item.id ? '#10b981' : '#00d4ff',
-              background: importSuccess === item.id ? 'rgba(16,185,129,0.1)' : 'transparent',
-            }}
+            className={`flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium transition-all disabled:opacity-50 ${
+              importSuccess === item.id
+                ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10'
+                : 'border-[#00d4ff]/60 text-[#00d4ff] bg-transparent hover:bg-[#00d4ff]/10'
+            }`}
             aria-label={`Import ${item.name} to project`}
           >
             {importSuccess === item.id ? (
