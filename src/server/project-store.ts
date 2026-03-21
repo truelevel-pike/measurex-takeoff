@@ -1025,14 +1025,18 @@ export async function recordHistory(
   try {
     if (isSupabaseMode()) {
       const sb = getClient();
-      await sb.from('mx_history').insert({
+      // mx_history_action_type_check requires UPPERCASE (CREATE/UPDATE/DELETE)
+      const { error } = await sb.from('mx_history').insert({
         project_id: entry.projectId,
-        action_type: entry.actionType,
+        action_type: entry.actionType.toUpperCase(),
         entity_type: entry.entityType,
         entity_id: entry.entityId ?? null,
         before_data: entry.beforeData ?? null,
         after_data: entry.afterData ?? null,
       });
+      if (error) {
+        console.error('[recordHistory] insert failed:', error.message, '|', error.details, '|', error.hint);
+      }
     } else {
       const filePath = path.join(projectDir(entry.projectId), 'history.json');
       const list = await readJson<HistoryEntry[]>(filePath, []);
@@ -1065,7 +1069,8 @@ export async function getHistory(
     return (data || []).map((row: Record<string, unknown>): HistoryEntry => ({
       id: row.id as string,
       projectId: row.project_id as string,
-      actionType: row.action_type as HistoryEntry['actionType'],
+      // DB stores action_type in UPPERCASE; normalize back to lowercase for TypeScript consumers
+      actionType: (row.action_type as string).toLowerCase() as HistoryEntry['actionType'],
       entityType: row.entity_type as HistoryEntry['entityType'],
       entityId: (row.entity_id as string | null) ?? null,
       beforeData: row.before_data ?? null,
