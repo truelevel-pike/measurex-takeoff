@@ -26,25 +26,22 @@ export interface PDFProcessResult {
  * Lazily import pdfjs-dist legacy build for Node (no canvas dependency).
  * Returns the library module.
  *
- * The fake-worker path in pdfjs-dist does `await import(workerSrc)` which fails
- * inside Turbopack/Next.js bundles where module resolution context is a compiled
- * chunk rather than the project root.  The workaround is to pre-load the worker
- * module ourselves and expose it via globalThis.pdfjsWorker — pdfjs checks that
- * first and skips the dynamic import entirely.
+ * Every getDocument() call on the server uses disableWorker:true, so the worker
+ * module is never actually executed.  We must still set a non-empty workerSrc
+ * string to satisfy pdfjs's internal guard, but we must NOT dynamically import
+ * the worker file — that import fails inside Vercel's serverless bundling context
+ * even with serverExternalPackages set, because the massive worker chunk cannot be
+ * resolved at Lambda runtime.  Using a sentinel string avoids the import entirely.
  */
 async function getPdfjs(): Promise<typeof import('pdfjs-dist')> {
-  // Pre-register the worker handler on globalThis so pdfjs never has to
-  // dynamic-import workerSrc (which breaks in bundled/Turbopack contexts).
-  if (!(globalThis as Record<string, unknown>).pdfjsWorker) {
-    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs' as string) as { WorkerMessageHandler: unknown };
-    (globalThis as Record<string, unknown>).pdfjsWorker = worker;
-  }
   // Use the legacy build which has broader Node.js compat
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs') as unknown as typeof import('pdfjs-dist');
-  // workerSrc must be a non-empty string to pass the guard, even though we
-  // will override with disableWorker:true in every getDocument() call.
+  // workerSrc must be a non-empty string to satisfy the pdfjs internal guard.
+  // The actual worker is never loaded because every getDocument() call on the
+  // server passes disableWorker:true.  Do NOT import the worker here — dynamic
+  // imports of large .mjs files fail in Vercel Lambda serverless bundles.
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'unused-server-side-sentinel';
   }
   return pdfjsLib;
 }
