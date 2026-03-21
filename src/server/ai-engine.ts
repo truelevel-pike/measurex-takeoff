@@ -57,7 +57,16 @@ RULES:
 5. Be thorough — a typical residential plan has 8-20 doors, 10-20 windows, 5-15 rooms
 
 Return ONLY a valid JSON array, no markdown fences, no prose:
-[{"name":"Living Room","type":"area","classification":"Room Area","points":[{"x":145,"y":203},{"x":445,"y":203},{"x":445,"y":521},{"x":145,"y":521}],"confidence":0.92,"color":"#3B82F6"},{"name":"Single Swing Door","type":"count","classification":"Single Swing Door","points":[{"x":287,"y":341}],"confidence":0.88,"color":"#F59E0B"}]`;
+[{"name":"Living Room","type":"area","classification":"Room Area","points":[{"x":145,"y":203},{"x":445,"y":203},{"x":445,"y":521},{"x":145,"y":521}],"confidence":0.92,"color":"#3B82F6"},{"name":"Single Swing Door","type":"count","classification":"Single Swing Door","points":[{"x":287,"y":341}],"confidence":0.88,"color":"#F59E0B"}]
+
+ALSO DETECT SCALE: If you see a scale indicator on the drawing (e.g., '1/4" = 1'', '1" = 10'', '3/32" = 1'', scale bar, or written scale note), extract it and return it as one special entry:
+{"name":"_scale","type":"count","classification":"_scale","points":[{"x":0,"y":0}],"scale_text":"1/4\\" = 1'","pixels_per_unit":18,"unit":"ft","confidence":0.95}
+
+The pixels_per_unit should be calculated from the scale and the image dimensions.
+For 1/4" = 1ft at 72dpi: 72px/in * 0.25in/ft = 18px/ft
+For 1" = 20ft at 72dpi: 72px/in / 20ft = 3.6px/ft
+For 1/8" = 1ft: 72 * 0.125 = 9px/ft
+Return null pixels_per_unit if you cannot calculate it — just return the scale_text.`;
 
 /**
  * Analyze a blueprint page image using Gemini 3.1 Pro Preview vision.

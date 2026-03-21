@@ -437,7 +437,16 @@ Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'c
 
 AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.
 
-FINAL CHECK before returning JSON: For each area element, verify that max(x) - min(x) > 0.05 AND max(y) - min(y) > 0.05. If not, you have returned a marker dot instead of a real polygon — go back and trace the actual room boundary.`;
+FINAL CHECK before returning JSON: For each area element, verify that max(x) - min(x) > 0.05 AND max(y) - min(y) > 0.05. If not, you have returned a marker dot instead of a real polygon — go back and trace the actual room boundary.
+
+ALSO DETECT SCALE: If you see a scale indicator on the drawing (e.g., '1/4" = 1'', '1" = 10'', '3/32" = 1'', scale bar, or written scale note), extract it and return it as one special entry:
+{"name":"_scale","type":"count","classification":"_scale","points":[{"x":0,"y":0}],"scale_text":"1/4\\" = 1'","pixels_per_unit":18,"unit":"ft","confidence":0.95}
+
+The pixels_per_unit should be calculated from the scale and the image dimensions.
+For 1/4" = 1ft at 72dpi: 72px/in * 0.25in/ft = 18px/ft
+For 1" = 20ft at 72dpi: 72px/in / 20ft = 3.6px/ft
+For 1/8" = 1ft: 72 * 0.125 = 9px/ft
+Return null pixels_per_unit if you cannot calculate it — just return the scale_text.`;
 
     // Build Gemini request — extract base64 data from data URL
     const base64Match = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
@@ -482,7 +491,54 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
     // Filter out any elements with empty points arrays before returning; the client schema
     // (DetectedElementSchema) requires points.length >= 1 and would reject the entire response
     // if any element has an empty points array.
-    const results = parseDetectedElements(raw, resolvedPageWidth, resolvedPageHeight).filter((el) => el.points.length > 0);
+    const allParsed = parseDetectedElements(raw, resolvedPageWidth, resolvedPageHeight).filter((el) => el.points.length > 0);
+
+    // Extract scale detection entry (if any) before further processing
+    const scaleEntry = allParsed.find((el) => el.name?.startsWith('_scale'));
+    const results = allParsed.filter((el) => !el.name?.startsWith('_scale'));
+
+    if (scaleEntry && projectId) {
+      const rawEl = (() => {
+        // Re-parse from raw JSON to get scale_text and pixels_per_unit which aren't in DetectedElement
+        try {
+          let parsed: unknown;
+          try { parsed = JSON.parse(raw); } catch { const s = raw.indexOf('['), e = raw.lastIndexOf(']'); if (s !== -1 && e !== -1) parsed = JSON.parse(raw.slice(s, e + 1)); }
+          if (Array.isArray(parsed)) return (parsed as Array<Record<string, unknown>>).find((el) => String(el.name || '').startsWith('_scale'));
+        } catch { /* ignore */ }
+        return undefined;
+      })();
+
+      const scaleText = rawEl?.scale_text ? String(rawEl.scale_text) : undefined;
+      const pixelsPerUnit = typeof rawEl?.pixels_per_unit === 'number' && rawEl.pixels_per_unit > 0 ? rawEl.pixels_per_unit as number : undefined;
+
+      if (pixelsPerUnit) {
+        const page = pageNumber ?? 1;
+        const apiBase = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        try {
+          const scaleRes = await fetch(`${apiBase}/api/projects/${projectId}/scale`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pixelsPerUnit,
+              unit: typeof rawEl?.unit === 'string' ? rawEl.unit : 'ft',
+              pageNumber: page,
+              label: scaleText || 'AI-detected',
+              source: 'ai',
+              scaleValue: scaleText,
+            }),
+          });
+          if (scaleRes.ok) {
+            console.log(`[AI Takeoff] Auto-detected scale: ${scaleText} (${pixelsPerUnit} px/ft)`);
+          } else {
+            console.warn(`[AI Takeoff] Scale POST failed (${scaleRes.status}):`, await scaleRes.text().catch(() => ''));
+          }
+        } catch (scaleErr) {
+          console.warn('[AI Takeoff] Scale POST error:', scaleErr);
+        }
+      } else if (scaleText) {
+        console.log(`[AI Takeoff] Auto-detected scale text: ${scaleText} (no valid pixels_per_unit — skipping POST)`);
+      }
+    }
 
     let persistedPolygons = 0;
     if (projectId) {
