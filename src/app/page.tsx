@@ -524,7 +524,12 @@ function PageInner() {
       else persistSaveStatus('Auto-saved', 1200);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Save failed';
-      persistSaveStatus(`Error: ${message}`, 3500);
+      // Don't show error toast for rate limit — silently retry later
+      if (message.includes('429')) {
+        setTimeout(() => void flushSave(false), 5000);
+      } else {
+        persistSaveStatus(`Error: ${message}`, 3500);
+      }
     } finally {
       isSavingRef.current = false;
       setSaving(false);

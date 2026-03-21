@@ -67,7 +67,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export const PUT = withCache({ noStore: true }, async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-085: add rate limiting to project CRUD
-  const limitedPut = rateLimitResponse(req);
+  const limitedPut = rateLimitResponse(req, 30, 60_000); // 30 saves/min
   if (limitedPut) return limitedPut;
 
   try {
