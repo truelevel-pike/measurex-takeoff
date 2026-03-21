@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!bodyResult.success) return validationError(bodyResult.error);
 
     const snapshot = await createSnapshot(id, bodyResult.data.description);
-    return NextResponse.json(snapshot, { status: 201 });
+    return NextResponse.json({ snapshot }, { status: 201 });
   } catch (err: unknown) {
     console.error('[POST /snapshots]', err);
     return NextResponse.json({ error: (err instanceof Error ? err.message : 'Internal error') }, { status: 500 });

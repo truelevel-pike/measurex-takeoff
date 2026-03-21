@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: Params) {
     const snapshot = await getSnapshot(id, sid);
     if (!snapshot) return NextResponse.json({ error: 'Snapshot not found' }, { status: 404 });
 
-    return NextResponse.json(snapshot);
+    return NextResponse.json({ snapshot });
   } catch (err: unknown) {
     console.error('[GET /snapshots/:sid]', err);
     return NextResponse.json({ error: (err instanceof Error ? err.message : 'Internal error') }, { status: 500 });
