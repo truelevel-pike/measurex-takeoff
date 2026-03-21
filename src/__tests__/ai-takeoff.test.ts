@@ -17,6 +17,10 @@ jest.mock('@/lib/polygon-utils', () => ({
   calculateLinearFeet: jest.fn(() => 400),
 }));
 
+jest.mock('@/server/project-store', () => ({
+  deletePolygonsByPage: jest.fn(() => Promise.resolve()),
+}));
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -96,7 +100,7 @@ describe('AI Takeoff route tests', () => {
   it('creates classifications and polygons from AI-detected elements', async () => {
     process.env.OPENAI_API_KEY = 'test-key';
     const projectId = '22222222-2222-4222-8222-222222222222';
-    const polygonPosts: Array<Record<string, unknown>> = [];
+    let batchOperations: Array<Record<string, unknown>> = [];
     const classificationPosts: Array<Record<string, unknown>> = [];
 
     const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -146,10 +150,12 @@ describe('AI Takeoff route tests', () => {
         });
       }
 
-      if (url.endsWith(`/api/projects/${projectId}/polygons`) && method === 'POST') {
+      if (url.endsWith(`/api/projects/${projectId}/batch`) && method === 'POST') {
         const body = JSON.parse(String(init?.body || '{}'));
-        polygonPosts.push(body as Record<string, unknown>);
-        return jsonResponse({ polygon: body });
+        batchOperations = Array.isArray(body.operations) ? body.operations : [];
+        return jsonResponse({
+          results: batchOperations.map(() => ({ type: 'createPolygon', ok: true, id: crypto.randomUUID() })),
+        });
       }
 
       return new Response('unexpected fetch', { status: 500 });
@@ -178,14 +184,14 @@ describe('AI Takeoff route tests', () => {
       expect.arrayContaining(['Rooms', 'Doors']),
     );
 
-    // 2 polygons persisted
-    expect(polygonPosts).toHaveLength(2);
+    // 2 polygons persisted via batch
+    expect(batchOperations).toHaveLength(2);
   });
 
   it('denormalizes points from 0-1 range to pixel coordinates', async () => {
     process.env.OPENAI_API_KEY = 'test-key';
     const projectId = '33333333-3333-4333-8333-333333333333';
-    const polygonPosts: Array<Record<string, unknown>> = [];
+    let batchOperations: Array<Record<string, unknown>> = [];
 
     const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -224,10 +230,12 @@ describe('AI Takeoff route tests', () => {
         });
       }
 
-      if (url.endsWith('/polygons') && method === 'POST') {
+      if (url.endsWith('/batch') && method === 'POST') {
         const body = JSON.parse(String(init?.body || '{}'));
-        polygonPosts.push(body as Record<string, unknown>);
-        return jsonResponse({ polygon: body });
+        batchOperations = Array.isArray(body.operations) ? body.operations : [];
+        return jsonResponse({
+          results: batchOperations.map(() => ({ type: 'createPolygon', ok: true, id: crypto.randomUUID() })),
+        });
       }
 
       return new Response('unexpected', { status: 500 });
@@ -248,9 +256,9 @@ describe('AI Takeoff route tests', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(polygonPosts).toHaveLength(1);
+    expect(batchOperations).toHaveLength(1);
 
-    const points = polygonPosts[0].points as Array<{ x: number; y: number }>;
+    const points = (batchOperations[0].data as Record<string, unknown>).points as Array<{ x: number; y: number }>;
     // (0,0) -> (0,0), (1,0) -> (2000,0), (1,1) -> (2000,1000)
     expect(points[0]).toEqual({ x: 0, y: 0 });
     expect(points[1]).toEqual({ x: 2000, y: 0 });
