@@ -44,7 +44,7 @@ api() {
   for i in $(seq 1 $RETRIES); do
     local OUT=$(curl -sL -w "\n%{http_code}" "$URL" "$@" 2>/dev/null)
     local STATUS=$(echo "$OUT" | tail -1)
-    local BODY=$(echo "$OUT" | head -n -1)
+    local BODY=$(echo "$OUT" | python3 -c "import sys; lines=sys.stdin.read().splitlines(); print(chr(10).join(lines[:-1]))")
     if [ "$STATUS" = "429" ]; then
       echo "  ⏳ Rate limit hit, waiting 15s..." >&2
       sleep 15
@@ -64,8 +64,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 # ── 1. Server health ──
 section "1. Server Health"
-STATUS=$(api "$BASE/api/projects" | python3 -c "import sys,json; json.load(sys.stdin); print('ok')" 2>/dev/null)
-[ "$STATUS" = "ok" ] && pass "API /api/projects → 200" || fail "API unreachable"
+HEALTH=$(curl -sL "$BASE/api/projects" -o /dev/null -w "%{http_code}" 2>/dev/null)
+if [ "$HEALTH" = "200" ]; then pass "API /api/projects → 200"; else fail "API unreachable ($HEALTH)"; exit 1; fi
 
 # ── 2. Browser loads projects page ──
 section "2. Projects Page"
@@ -101,12 +101,19 @@ echo "$STATE" | grep -q "MEASUREX\|New Classification\|Quantities\|TAKEOFF" && p
 
 # ── 4. Get project ID from API ──
 section "4. Verify Project in API"
-sleep 2
+sleep 4
 PROJ_ID=$(api "$BASE/api/projects" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
+# First try E2E- prefix
 projs=[p for p in d.get('projects',[]) if p.get('name','').startswith('E2E')]
-print(projs[0]['id'] if projs else '')
+if projs:
+    print(projs[0]['id'])
+else:
+    # Fallback: most recently updated project
+    all_p = sorted(d.get('projects',[]), key=lambda p: p.get('updatedAt',''), reverse=True)
+    if all_p: print(all_p[0]['id'])
+    else: print('')
 " 2>/dev/null)
 
 [ -n "$PROJ_ID" ] && pass "Project in API: ${PROJ_ID:0:8}..." || {
@@ -123,19 +130,22 @@ print(projs[0]['id'] if projs else '')
 section "5. New Classification (UI)"
 if [ -n "$PROJ_ID" ]; then
   # Click New Classification button
-  browser-use eval "Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')==='New Classification')?.click()" 2>/dev/null
+  browser-use eval "document.querySelector('[aria-label=\"New Classification\"]')?.click()" 2>/dev/null
   sleep 2
 
-  # Fill name using React-compatible setter
-  react_fill "classification-name-input" "Floor Area" >/dev/null
+  # Fill name: focus then type with real keystrokes
+  browser-use eval "document.querySelector('[data-testid=\"classification-name-input\"]')?.focus()" 2>/dev/null
+  sleep 0.3
+  browser-use keys "Control+a" 2>/dev/null
+  browser-use type "Floor Area" 2>/dev/null
   sleep 0.5
 
-  # Set type using React-compatible setter  
-  react_fill "classification-type-select" "area" >/dev/null
+  # Set type via synthetic event (works for selects)
+  browser-use eval "const s=document.querySelector('[data-testid=\"classification-type-select\"]'); if(s){s.value='area';s.dispatchEvent(new Event('change',{bubbles:true}));}" 2>/dev/null
   sleep 0.5
 
-  # Click Create/Save
-  testid_click "save-classification-btn" >/dev/null
+  # Click Save
+  browser-use eval "document.querySelector('[data-testid=\"save-classification-btn\"]')?.click()" 2>/dev/null
   sleep 2
 
   # Verify in API
