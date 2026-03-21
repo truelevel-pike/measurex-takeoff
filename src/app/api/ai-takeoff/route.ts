@@ -274,21 +274,26 @@ function parseDetectedElements(raw: string, pageWidth: number, pageHeight: numbe
   return expanded.filter((el) => el.points.length > 0);
 }
 
-function toPersistablePoints(el: DetectedElement): Array<{ x: number; y: number }> | null {
+function toPersistablePoints(el: DetectedElement, renderScale = 1.0): Array<{ x: number; y: number }> | null {
+  // If the image was rendered at 2x scale, Gemini returns coords in rendered space.
+  // Divide back to native PDF coordinate space for storage.
+  const downscale = (pts: Array<{ x: number; y: number }>) =>
+    renderScale === 1.0 ? pts : pts.map(p => ({ x: Math.round(p.x / renderScale), y: Math.round(p.y / renderScale) }));
+
   if (el.type === 'count') {
     if (el.points.length === 0) return null;
-    return toCountMarker(el.points[0]);
+    return toCountMarker(downscale([el.points[0]])[0]);
   }
   if (el.type === 'linear') {
     if (el.points.length < 2) return null;
-    if (el.points.length === 2) {
-      // Polygon API requires at least 3 points; duplicate endpoint to keep shape degenerate as a line.
-      return [el.points[0], el.points[1], el.points[1]];
+    const scaled = downscale(el.points);
+    if (scaled.length === 2) {
+      return [scaled[0], scaled[1], scaled[1]];
     }
-    return el.points;
+    return scaled;
   }
   if (el.points.length < 3) return null;
-  return el.points;
+  return downscale(el.points);
 }
 
 export async function POST(req: Request) {
@@ -301,6 +306,7 @@ export async function POST(req: Request) {
     const validated = validateBody(AiTakeoffBodySchema, body);
     if ('error' in validated) return validated.error;
     let { imageBase64, pageWidth, pageHeight, projectId, pageNumber, model } = validated.data;
+    let activeRenderScale = 1.0; // tracks render scale if PDF is server-side rendered
 
     // E10: server-side rendering path verified
     //
@@ -337,7 +343,11 @@ export async function POST(req: Request) {
       const tmpPdfPath = path.join(tmpDir, `${projectId}.pdf`);
       try {
         await fs.writeFile(tmpPdfPath, pdfBuffer);
-        const rendered = await renderPageAsImage(tmpPdfPath, pageNumber, 2.0);
+        // Render at scale 2.0 for better detail — BUT we must tell the AI the RENDERED dimensions
+        // not the original PDF dimensions, otherwise coordinates will be off by 2x
+        const RENDER_SCALE = 2.0;
+        activeRenderScale = RENDER_SCALE; // track for coordinate conversion later
+        const rendered = await renderPageAsImage(tmpPdfPath, pageNumber, RENDER_SCALE);
         if (!rendered) {
           return NextResponse.json(
             { error: 'Failed to render PDF page — ensure the PDF is valid and not password-protected' },
@@ -345,18 +355,25 @@ export async function POST(req: Request) {
           );
         }
         // rendered is a data URL: `data:image/png;base64,...`
-        // This is directly usable as image_url.url in the OpenAI vision payload.
         imageBase64 = rendered;
+        // CRITICAL: Override pageWidth/pageHeight to match rendered image dimensions
+        // renderPageAsImage scales the viewport by RENDER_SCALE, so the rendered image
+        // is RENDER_SCALE × larger than the PDF's native dimensions.
+        // Gemini will return pixel coords in the rendered image space, so we must
+        // pass the rendered dimensions (not PDF dims) to normalizePoint.
+        if (pageWidth) pageWidth = Math.round(pageWidth * RENDER_SCALE);
+        if (pageHeight) pageHeight = Math.round(pageHeight * RENDER_SCALE);
 
         // Derive page dimensions from the PDF viewport if not provided by the caller
+        // IMPORTANT: multiply by RENDER_SCALE since the image is rendered at 2x
         if (!pageWidth || !pageHeight) {
           try {
             const { processPDF } = await import('@/server/pdf-processor');
             const info = await processPDF(tmpPdfPath, projectId);
             const pageInfo = info.pages.find((p) => p.pageNum === pageNumber);
             if (pageInfo) {
-              pageWidth = pageWidth ?? pageInfo.width;
-              pageHeight = pageHeight ?? pageInfo.height;
+              pageWidth = pageWidth ?? Math.round(pageInfo.width * RENDER_SCALE);
+              pageHeight = pageHeight ?? Math.round(pageInfo.height * RENDER_SCALE);
             }
           } catch {
             // Non-fatal — dimensions will fall back to defaults below
@@ -617,7 +634,8 @@ Return null pixels_per_unit if you cannot calculate it — just return the scale
             existingClassifications.push({ id: classificationId, name: el.classification, type: el.type });
           }
 
-          const persistPoints = toPersistablePoints(el);
+          // Pass activeRenderScale so coordinates are converted from rendered image space to native PDF space
+          const persistPoints = toPersistablePoints(el, activeRenderScale);
           if (!persistPoints) continue;
 
           resolvedElements.push({ el, classificationId, persistPoints });
