@@ -31,6 +31,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    const body = await req.json().catch(() => null);
+    const customName = body?.name?.trim();
+    const sourceName = sourceProject.name?.trim() || 'Untitled Project';
+    const finalName = customName || `Copy of ${sourceName}`;
+
     const [classifications, polygons, scale, pages] = await Promise.all([
       getClassifications(id),
       getPolygons(id),
@@ -38,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       getPages(id),
     ]);
 
-    const duplicated = await createProject(`Copy of ${sourceProject.name}`);
+    const duplicated = await createProject(finalName);
 
     try {
       const classificationIdMap = new Map<string, string>();
