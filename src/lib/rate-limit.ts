@@ -67,6 +67,12 @@ export function checkRateLimit(
  * or null if the request is allowed.
  */
 export function rateLimitResponse(req: Request, max?: number, windowMs?: number): Response | null {
+  // Allow bypass in test/dev mode via env var (e.g. for E2E test suites that make many rapid calls).
+  // Set DISABLE_RATE_LIMIT=true in your test environment or .env.test to skip rate limiting.
+  if (process.env.DISABLE_RATE_LIMIT === 'true' || process.env.NODE_ENV === 'test') {
+    return null; // no rate limiting
+  }
+
   // BUG-A5-6-188: prefer x-real-ip (typically set by reverse proxy and harder to spoof)
   // over x-forwarded-for (easily spoofable by clients). Note: neither header is fully
   // trustworthy without a trusted proxy configuration.
