@@ -367,8 +367,9 @@ export default function ProjectsPage() {
       if (folder) list = list.filter(p => folder.projectIds.includes(p.id));
     }
     // Workspace filter — only show projects in the active workspace (empty = show all)
-    const ws = getActiveWorkspace();
-    if (ws.projectIds.length > 0) {
+    // Guard against SSR where window/localStorage is unavailable (prevents React #310)
+    const ws = typeof window !== 'undefined' ? getActiveWorkspace() : null;
+    if (ws && ws.projectIds.length > 0) {
       list = list.filter(p => ws.projectIds.includes(p.id));
     }
     // Search filter

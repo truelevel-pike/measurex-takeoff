@@ -9,7 +9,7 @@ const MetricSchema = z.object({
   delta: z.number(),
   id: z.string(),
   timestamp: z.number().optional(),
-}).strict();
+}).passthrough(); // allow extra web-vitals fields without rejecting
 
 export async function POST(req: NextRequest) {
   const limited = rateLimitResponse(req, 30, 60_000);

@@ -49,9 +49,9 @@ export default function RecentProjectsSection({ projects = [] }: RecentProjectsS
   const router = useRouter();
   const [recents, setRecents] = React.useState<RecentEntry[]>([]);
   React.useEffect(() => { setRecents(loadRecentProjects().slice(0, 3)); }, []);
-  if (recents.length === 0) return null;
 
   // Build lookup for updatedAt from API data
+  // NOTE: must be called unconditionally before any early return (Rules of Hooks)
   const updatedAtMap = React.useMemo(() => {
     const map: Record<string, string> = {};
     for (const p of projects) {
@@ -60,6 +60,9 @@ export default function RecentProjectsSection({ projects = [] }: RecentProjectsS
     }
     return map;
   }, [projects]);
+
+  if (recents.length === 0) return null;
+
   return (
     <section className="mb-6">
       <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3 flex items-center gap-2">

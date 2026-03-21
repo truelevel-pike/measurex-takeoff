@@ -102,7 +102,18 @@ export async function initPerfMonitor(options: PerfMonitorOptions = {}) {
     }
 
     if (reportUrl) {
-      const body = JSON.stringify({ ...metric, ...tags, timestamp: Date.now() });
+      // Only send the fields the server schema expects (name, value, rating, delta, id + optional timestamp).
+      // Spreading the full web-vitals Metric object includes extra fields like `entries` and `navigationType`
+      // which are rejected by the strict Zod schema on the server, causing HTTP 400 on every page load.
+      const body = JSON.stringify({
+        name: metric.name,
+        value: metric.value,
+        rating: metric.rating,
+        delta: metric.delta,
+        id: metric.id,
+        timestamp: Date.now(),
+        ...tags,
+      });
       if (navigator.sendBeacon) {
         navigator.sendBeacon(reportUrl, new Blob([body], { type: 'application/json' }));
       } else {
