@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
+import { z } from 'zod';
 import { getAllFlags, setServerFlag, FLAG_NAMES, type FlagName } from '@/lib/feature-flags';
 import { rateLimitResponse } from '@/lib/rate-limit';
+
+const SetFlagSchema = z.object({
+  flag: z.enum(FLAG_NAMES as [FlagName, ...FlagName[]]),
+  value: z.boolean(),
+});
 
 export async function GET(req: Request) {
   const rlResponse = rateLimitResponse(req);
@@ -27,17 +33,16 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 
-    const { flag, value } = body as { flag: string; value: boolean };
-
-    if (!flag || typeof value !== 'boolean') {
-      return NextResponse.json({ error: 'Body must have { flag: string, value: boolean }' }, { status: 400 });
+    const parsed = SetFlagSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    if (!FLAG_NAMES.includes(flag as FlagName)) {
-      return NextResponse.json({ error: `Unknown flag: ${flag}` }, { status: 400 });
-    }
-
-    setServerFlag(flag as FlagName, value);
+    const { flag, value } = parsed.data;
+    setServerFlag(flag, value);
     return NextResponse.json({ flag, value });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
