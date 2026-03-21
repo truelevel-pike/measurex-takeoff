@@ -380,25 +380,19 @@ export async function POST(req: Request) {
     const resolvedPageWidth = pageWidth ?? 1000;
     const resolvedPageHeight = pageHeight ?? 1000;
 
-    // BUG-A5-6-124: Only use server-configured OPENAI_API_KEY — ignore user-supplied keys
-    // to prevent credential theft / proxy abuse.
-    const serverKey = getOpenAIKey();
-    if (!serverKey) {
-      const guard = checkOpenAIKey();
-      if (guard) return guard;
+    // Use Google Gemini 3.1 Pro Preview — best vision model for blueprint analysis
+    const googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!googleApiKey) {
+      return NextResponse.json({ error: 'Google API key not configured — set GOOGLE_API_KEY in .env.local' }, { status: 503 });
     }
-    const apiKey = serverKey!;
 
-    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+    const resolvedModel = (model?.trim() && !model.startsWith('gpt-') && !model.startsWith('openai/'))
+      ? model.trim()
+      : 'gemini-3.1-pro-preview';
 
-    // If model is provided and not an openai model, route through OpenRouter
-    const useOpenRouter = model && !model.startsWith("openai/") && !model.startsWith("gpt-");
-    // BUG-A5-6-126: Strip "openai/" prefix before passing to OpenAI — the prefix is a
-    // routing hint, not part of the actual model name.
-    const rawModel = model ?? "gpt-4o";
-    const resolvedModel = rawModel.startsWith("openai/") ? rawModel.slice("openai/".length) : rawModel;
-    const resolvedApiKey = useOpenRouter ? (process.env.OPENROUTER_API_KEY ?? "") : apiKey;
-    const resolvedUrl = useOpenRouter ? OPENROUTER_URL : OPENAI_URL;
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${googleApiKey}`;
+    const resolvedUrl = GEMINI_URL;
+    const resolvedApiKey = googleApiKey;
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
@@ -446,34 +440,35 @@ AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the el
 
 FINAL CHECK before returning JSON: For each area element, verify that max(x) - min(x) > 0.05 AND max(y) - min(y) > 0.05. If not, you have returned a marker dot instead of a real polygon — go back and trace the actual room boundary.`;
 
-    const content = [
-      { type: 'text', text: 'Analyze this blueprint and return JSON array only. No prose.' },
-      { type: 'image_url', image_url: { url: imageBase64, detail: 'high' } },
-    ];
+    // Build Gemini request — extract base64 data from data URL
+    const base64Match = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+    const mimeType = base64Match ? `image/${base64Match[1]}` : 'image/png';
+    const imageData = base64Match ? base64Match[2] : imageBase64;
+
+    const geminiBody = {
+      contents: [{
+        parts: [
+          { text: `${system}\n\nAnalyze this blueprint (${resolvedPageWidth}x${resolvedPageHeight}px). Return ONLY a JSON array. Use ACTUAL PIXEL COORDINATES.` },
+          { inline_data: { mime_type: mimeType, data: imageData } },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
+    };
 
     const resp = await fetch(resolvedUrl, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resolvedApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: resolvedModel,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content },
-        ],
-        temperature: 0.2,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geminiBody),
     });
 
     if (!resp.ok) {
-      // BUG-A5-3-005: Do NOT pass upstream error body to the client — it can leak
-      // rate-limit headers, partial API key info, or internal routing details.
-      // Log the full error server-side only and return a sanitized message.
       const text = await resp.text();
       const requestId = crypto.randomUUID();
-      console.error(`[AI Takeoff] Upstream error ${resp.status} (requestId=${requestId}):`, text);
+      console.error(`[AI Takeoff] Gemini error ${resp.status} (requestId=${requestId}):`, text);
       return NextResponse.json(
         { error: "AI service unavailable. Please try again later.", requestId },
         { status: 502 },
@@ -481,9 +476,9 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
     }
 
     const data = await resp.json();
-    const raw = extractOpenAIText(data?.choices?.[0]?.message?.content);
-    console.log("[AI Takeoff] Raw AI response (first 2000 chars):", raw.slice(0, 2000));
-    if (!raw) throw new Error('No content in OpenAI response');
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    console.log("[AI Takeoff] Gemini response (first 2000 chars):", raw.slice(0, 2000));
+    if (!raw) throw new Error('No content in Gemini response');
 
     // Filter out any elements with empty points arrays before returning; the client schema
     // (DetectedElementSchema) requires points.length >= 1 and would reject the entire response

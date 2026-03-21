@@ -1,11 +1,7 @@
 /**
- * Server-side OpenAI vision wrapper for AI takeoff.
- * Calls gpt-4o-mini to detect construction elements in blueprint images.
+ * Server-side Gemini vision wrapper for AI takeoff.
+ * Uses Gemini 3.1 Pro Preview — best vision model for blueprint analysis.
  */
-
-import { getOpenAIKey } from '@/lib/openai-guard';
-
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 export interface AIDetectedElement {
   name: string;
@@ -15,9 +11,6 @@ export interface AIDetectedElement {
   color: string;
 }
 
-/**
- * Generate a deterministic hex color from a string (element name).
- */
 function nameToColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -26,42 +19,52 @@ function nameToColor(name: string): string {
   const r = (hash >> 0) & 0xff;
   const g = (hash >> 8) & 0xff;
   const b = (hash >> 16) & 0xff;
-  // Keep colors vivid by ensuring minimum brightness
   const clamp = (v: number) => Math.max(40, Math.min(220, v));
   return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
 }
 
-const SYSTEM_PROMPT = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
+const DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 
-COUNT items (type: "count") — return a single center point for each instance detected:
-- "Single Swing Door": a door with one leaf that swings on hinges (shown as an arc on blueprints)
-- "Double Swing Door": a door with two leaves that swing open from the center
-- "Window": all window types (casement, sliding, awning, fixed, double-hung) — shown as parallel lines in walls
-- "Electrical Outlet": wall-mounted power outlets, switches, and junction boxes (shown as circles or symbols on walls)
-- "Plumbing Fixture": toilets, sinks, kitchen sinks, bathtubs, showers, urinals, floor drains
-- "Column": structural columns, pillars, posts (shown as filled rectangles or circles in the plan)
-- "Parking Space": each individual parking stall (shown as lined rectangles in parking areas)
-- Other furniture: "Chair", "Table", "Desk" if visible
+const buildSystemPrompt = (pageWidth: number, pageHeight: number) => `You are an expert construction estimator performing a quantity takeoff from a blueprint image.
+The image is ${pageWidth}x${pageHeight} pixels. Use ACTUAL PIXEL COORDINATES — not normalized 0-1 values.
 
-AREA items (type: "area") — return polygon points tracing the boundary:
-- Rooms, spaces (living room, bedroom, bathroom, kitchen, etc.)
-- Slabs, foundations, roof areas
+Your task: identify every construction element visible and return their locations with precise pixel coordinates.
 
-LINEAR items (type: "linear") — return two endpoints:
-- Walls, beams, fences, roads
+ELEMENT TYPES:
 
-For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
+COUNT (type: "count") — one center point per individual instance:
+- Doors: single swing (arc symbol), double swing, pocket, sliding, bifold — count EACH door
+- Windows: all types (casement, sliding, double-hung, fixed, awning) — count EACH window unit
+- Plumbing: toilets, sinks, bathtubs, showers, water heaters, floor drains
+- Electrical: outlets, switches, panels, fixtures
+- Structural: columns, posts, pilasters
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...] as pixel coordinates relative to the image dimensions (0,0 = top-left), color: string (hex), confidence: number (0-1) }. No prose, no markdown fences.`;
+AREA (type: "area") — polygon boundary tracing the exact room/space perimeter:
+- Rooms: living room, bedroom, bathroom, kitchen, dining, garage, entry, hallway, closet, laundry, office, family room
+- Outdoor: deck, patio, porch, balcony, pool
+- Structural: slab, foundation, roof section
 
-const DEFAULT_MODEL = 'gpt-4o-mini';
+LINEAR (type: "linear") — two endpoints only:
+- Exterior walls (perimeter, thick lines)
+- Interior walls (room dividers, thinner)
+- Beams, headers
+
+RULES:
+1. Coordinates MUST be pixel values within (0,0) to (${pageWidth},${pageHeight})
+2. For AREA elements: trace the actual boundary — minimum 4 points, be precise
+3. For COUNT elements: one center point per instance — if there are 8 doors, return 8 separate entries
+4. Confidence: 0.0-1.0 based on how certain you are
+5. Be thorough — a typical residential plan has 8-20 doors, 10-20 windows, 5-15 rooms
+
+Return ONLY a valid JSON array, no markdown fences, no prose:
+[{"name":"Living Room","type":"area","classification":"Room Area","points":[{"x":145,"y":203},{"x":445,"y":203},{"x":445,"y":521},{"x":145,"y":521}],"confidence":0.92,"color":"#3B82F6"},{"name":"Single Swing Door","type":"count","classification":"Single Swing Door","points":[{"x":287,"y":341}],"confidence":0.88,"color":"#F59E0B"}]`;
 
 /**
- * Analyze a blueprint page image using OpenAI vision and return detected elements.
- * @param imageBase64DataUrl - Base64-encoded PNG data URL of the page image.
+ * Analyze a blueprint page image using Gemini 3.1 Pro Preview vision.
+ * @param imageBase64DataUrl - Base64-encoded PNG/JPEG data URL of the page image.
  * @param pageWidth - Width of the page in pixels.
  * @param pageHeight - Height of the page in pixels.
- * @param model - Optional OpenAI model to use (defaults to gpt-4o-mini).
+ * @param model - Optional model override (defaults to gemini-3.1-pro-preview).
  */
 export async function analyzePageImage(
   imageBase64DataUrl: string,
@@ -69,68 +72,83 @@ export async function analyzePageImage(
   pageHeight: number,
   model?: string,
 ): Promise<AIDetectedElement[]> {
-  const apiKey = getOpenAIKey();
-  if (!apiKey) throw new Error('OpenAI API key not configured — set OPENAI_API_KEY in your environment or .env.local');
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Google API key not configured — set GOOGLE_API_KEY in .env.local');
 
-  const resolvedModel = model && typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_MODEL;
+  // Extract mime type and base64 data from data URL
+  const base64Match = imageBase64DataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!base64Match) throw new Error('Invalid image data URL format');
+  const mimeType = `image/${base64Match[1]}`;
+  const imageData = base64Match[2];
 
-  const content = [
-    {
-      type: 'text' as const,
-      text: `Analyze this blueprint (${pageWidth}x${pageHeight}px) and return JSON array only. No prose.`,
-    },
-    {
-      type: 'image_url' as const,
-      image_url: { url: imageBase64DataUrl, detail: 'high' as const },
-    },
-  ];
+  const resolvedModel = model?.trim() || DEFAULT_MODEL;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
 
-  const resp = await fetch(OPENAI_URL, {
+  const resp = await fetch(apiUrl, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: resolvedModel,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content },
-      ],
-      temperature: 0.2,
+      contents: [{
+        parts: [
+          {
+            text: buildSystemPrompt(pageWidth, pageHeight),
+          },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: imageData,
+            },
+          },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
     }),
   });
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`OpenAI API error ${resp.status}: ${text}`);
+    throw new Error(`Gemini API error ${resp.status}: ${text.slice(0, 500)}`);
   }
 
   const data = await resp.json();
-  const raw: string | undefined = data?.choices?.[0]?.message?.content;
-  if (!raw) throw new Error('No content in OpenAI response');
-
-  const jsonStart = raw.indexOf('[');
-  const jsonEnd = raw.lastIndexOf(']');
-  if (jsonStart === -1 || jsonEnd === -1) {
-    throw new Error('No JSON array found in AI response');
+  const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) {
+    // Log finish reason if available
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    throw new Error(`No content in Gemini response. Finish reason: ${finishReason ?? 'unknown'}`);
   }
 
-  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-  if (!Array.isArray(parsed)) throw new Error('Parsed AI response is not an array');
+  // Parse JSON array from response
+  const jsonStart = raw.indexOf('[');
+  const jsonEnd = raw.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON array found in Gemini response');
 
-  type ParsedElement = { name?: string; classification?: string; type?: string; points?: unknown; confidence?: unknown; color?: string };
-  const results: AIDetectedElement[] = (parsed as ParsedElement[])
+  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+  if (!Array.isArray(parsed)) throw new Error('Parsed Gemini response is not an array');
+
+  type ParsedElement = {
+    name?: string;
+    classification?: string;
+    type?: string;
+    points?: unknown;
+    confidence?: unknown;
+    color?: string;
+  };
+
+  return (parsed as ParsedElement[])
     .filter((el) => Array.isArray(el?.points) && el?.type)
     .map((el) => ({
       name: String(el.name || el.classification || 'Unknown'),
       type: el.type as AIDetectedElement['type'],
       points: el.points as Array<{ x: number; y: number }>,
       confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
-      color: typeof el.color === 'string' && el.color.startsWith('#')
-        ? el.color
-        : nameToColor(String(el.name || el.classification || 'Unknown')),
+      color:
+        typeof el.color === 'string' && el.color.startsWith('#')
+          ? el.color
+          : nameToColor(String(el.name || el.classification || 'Unknown')),
     }));
-
-  return results;
 }
