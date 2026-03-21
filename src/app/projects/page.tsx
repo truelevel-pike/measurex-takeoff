@@ -10,7 +10,6 @@ import {
   Clock,
   FileSpreadsheet,
   GitCompare,
-  Share2,
   FileText,
   X,
   Star,
@@ -163,7 +162,7 @@ export default function ProjectsPage() {
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
-  const [showCollab, setShowCollab] = useState(false);
+  const [showCollab, setShowCollab] = useState<string | null>(null);
   const [showAutoName, setShowAutoName] = useState(false);
   const whatsNew = useWhatsNew();
 
@@ -621,10 +620,7 @@ export default function ProjectsPage() {
             className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
             <GitCompare size={14} aria-hidden /> Compare
           </button>
-          <button aria-label="Share Project" onClick={() => setShowCollab(true)}
-            className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
-            <Share2 size={14} aria-hidden /> Share
-          </button>
+          {/* Share is available via right-click context menu on individual projects */}
           <button aria-label="Auto-Name Drawings" onClick={() => setShowAutoName(true)}
             className="hidden lg:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
             <FileText size={14} aria-hidden /> Auto-Name
@@ -1284,6 +1280,10 @@ export default function ProjectsPage() {
               ))}
             </>
           )}
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
+            onClick={() => { setShowCollab(contextMenu.projectId); setContextMenu(null); }}
+          >Share</button>
           <div className="border-t border-zinc-700 my-1" />
           <button
             className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
@@ -1307,7 +1307,11 @@ export default function ProjectsPage() {
       )}
 
       {showCollab && (
-        <CollaborationPanel onClose={() => setShowCollab(false)} />
+        <CollaborationPanel
+          projectId={showCollab}
+          projectName={projects.find(p => p.id === showCollab)?.name}
+          onClose={() => setShowCollab(null)}
+        />
       )}
 
       {duplicateTarget && (
