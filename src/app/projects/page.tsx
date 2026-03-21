@@ -553,7 +553,7 @@ export default function ProjectsPage() {
 
   return (
     <div
-      className="min-h-screen bg-zinc-900 text-white flex flex-col"
+      className="min-h-screen bg-[#000000] text-white flex flex-col"
       onClick={() => contextMenu && setContextMenu(null)}
       onDragEnter={handlePageDragEnter}
       onDragLeave={handlePageDragLeave}
@@ -561,15 +561,15 @@ export default function ProjectsPage() {
       onDrop={handlePageDrop}
     >
       {/* Hero section */}
-      <header className="bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 shrink-0">
+      <header className="bg-[#000000] border-b border-[#00d4ff]/40 shrink-0">
         <div className="px-4 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600/20 p-2.5 rounded-xl">
+            <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/30 p-2.5 rounded-xl">
               <FileSpreadsheet size={32} className="text-blue-400" aria-hidden />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">MeasureX</h1>
-              <p className="text-sm text-zinc-400">AI-Powered Construction Takeoff</p>
+              <p className="text-sm text-[#00d4ff]/70 font-mono tracking-wider">AI-POWERED CONSTRUCTION TAKEOFF</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -588,7 +588,7 @@ export default function ProjectsPage() {
                 };
                 input.click();
               }}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-5 sm:px-6 py-2.5 rounded-lg font-semibold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20 min-h-[44px]"
+              className="border border-[#00d4ff]/60 hover:border-[#00d4ff] text-[#00d4ff] hover:bg-[#00d4ff]/10 bg-transparent px-5 sm:px-6 py-2.5 rounded-lg font-mono font-semibold text-sm flex items-center gap-2 transition-all min-h-[44px] tracking-wider"
               style={{ touchAction: 'manipulation' }}
             >
               <Upload size={16} aria-hidden /> Upload PDF
@@ -604,14 +604,14 @@ export default function ProjectsPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="bg-zinc-700 border border-zinc-600 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-zinc-400 outline-none focus:border-blue-500 w-32 sm:w-56"
+              className="bg-[#0a0a0f] border border-zinc-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-zinc-500 outline-none focus:border-[#00d4ff]/60 w-32 sm:w-56 font-mono"
             />
           </div>
           <select
             aria-label="Sort projects"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'az' | 'za')}
-            className="bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+            className="bg-[#0a0a0f] text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#00d4ff]/60 font-mono"
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
@@ -619,25 +619,25 @@ export default function ProjectsPage() {
             <option value="za">Z-A</option>
           </select>
           <button aria-label="Classification Library" onClick={() => router.push('/library')}
-            className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            className="hidden md:flex bg-transparent hover:bg-[#00d4ff]/10 text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono items-center gap-1.5 transition-colors border border-zinc-700 hover:border-[#00d4ff]/40">
             <BookOpen size={14} aria-hidden /> Library
           </button>
           <button aria-label="Compare Drawings" onClick={() => setShowCompare(true)}
-            className="hidden md:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            className="hidden md:flex bg-transparent hover:bg-[#00d4ff]/10 text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono items-center gap-1.5 transition-colors border border-zinc-700 hover:border-[#00d4ff]/40">
             <GitCompare size={14} aria-hidden /> Compare
           </button>
           {/* Share is available via right-click context menu on individual projects */}
           <button aria-label="Auto-Name Drawings" onClick={() => setShowAutoName(true)}
-            className="hidden lg:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            className="hidden lg:flex bg-transparent hover:bg-[#00d4ff]/10 text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono items-center gap-1.5 transition-colors border border-zinc-700 hover:border-[#00d4ff]/40">
             <FileText size={14} aria-hidden /> Auto-Name
           </button>
           <button aria-label="What's New" onClick={whatsNew.open}
-            className="hidden lg:flex bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium items-center gap-1.5 transition-colors border border-zinc-600">
+            className="hidden lg:flex bg-transparent hover:bg-[#00d4ff]/10 text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono items-center gap-1.5 transition-colors border border-zinc-700 hover:border-[#00d4ff]/40">
             <Star size={14} aria-hidden /> What&apos;s New
           </button>
           <button aria-label="New Project"
             onClick={() => setShowCreate(true)}
-            className="text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors hover:bg-zinc-700"
+            className="text-zinc-400 hover:text-[#00d4ff] px-3 py-1.5 rounded-lg text-sm font-mono flex items-center gap-1.5 transition-colors hover:bg-[#00d4ff]/10"
             style={{ touchAction: 'manipulation' }}>
             <Plus size={14} aria-hidden /> New Project
           </button>
@@ -646,47 +646,47 @@ export default function ProjectsPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar — hidden on mobile */}
-        <aside className="hidden md:flex w-56 bg-zinc-800/80 border-r border-zinc-700 flex-col shrink-0 overflow-y-auto">
+        <aside className="hidden md:flex w-56 bg-[#000000] border-r border-[#00d4ff]/20 flex-col shrink-0 overflow-y-auto">
           <nav className="flex-1 py-3">
             {/* All Projects */}
             <button
               onClick={() => setActiveSection('all')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-700/60 transition-colors ${activeSection === 'all' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-[#00d4ff]/5 transition-colors ${activeSection === 'all' ? 'border-l-2 border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/5' : 'text-zinc-400 hover:text-[#00d4ff]'}`}
             >
               <span className="flex items-center gap-2"><Folder size={15} aria-hidden /> All Projects</span>
-              <span className="text-xs text-zinc-500 bg-zinc-700 px-1.5 py-0.5 rounded">{projects.length}</span>
+              <span className="text-xs text-[#00d4ff]/70 font-mono">{projects.length}</span>
             </button>
 
             {/* Starred */}
             <button
               onClick={() => setActiveSection('starred')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-700/60 transition-colors ${activeSection === 'starred' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-[#00d4ff]/5 transition-colors ${activeSection === 'starred' ? 'border-l-2 border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/5' : 'text-zinc-400 hover:text-[#00d4ff]'}`}
             >
               <span className="flex items-center gap-2"><Star size={15} aria-hidden /> Starred</span>
               {starredIds.size > 0 && (
-                <span className="text-xs text-zinc-500 bg-zinc-700 px-1.5 py-0.5 rounded">{starredIds.size}</span>
+                <span className="text-xs text-[#00d4ff]/70 font-mono">{starredIds.size}</span>
               )}
             </button>
 
             {/* My Projects */}
             <button
               onClick={() => setActiveSection('my-projects')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-700/60 transition-colors ${activeSection === 'my-projects' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-[#00d4ff]/5 transition-colors ${activeSection === 'my-projects' ? 'border-l-2 border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/5' : 'text-zinc-400 hover:text-[#00d4ff]'}`}
             >
               <span className="flex items-center gap-2"><FileSpreadsheet size={15} aria-hidden /> My Projects</span>
-              <span className="text-xs text-zinc-500 bg-zinc-700 px-1.5 py-0.5 rounded">{projects.length}</span>
+              <span className="text-xs text-[#00d4ff]/70 font-mono">{projects.length}</span>
             </button>
 
             {/* Shared with Me */}
             <button
               onClick={() => setActiveSection('shared')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors ${activeSection === 'shared' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-[#00d4ff]/5 transition-colors ${activeSection === 'shared' ? 'border-l-2 border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/5' : 'text-zinc-400 hover:text-[#00d4ff]'}`}
             >
               <Users size={15} aria-hidden /> Shared with Me
             </button>
 
             {/* Divider */}
-            <div className="border-t border-zinc-700 my-2" />
+            <div className="border-t border-[#00d4ff]/20 my-2" />
 
             {/* Folders header */}
             <div className="px-4 py-1.5 flex items-center justify-between">
@@ -743,7 +743,7 @@ export default function ProjectsPage() {
                     ) : (
                       <button
                         onClick={() => setActiveSection(f.id)}
-                        className={`flex-1 text-left px-4 py-1.5 pl-7 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors ${activeSection === f.id ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+                        className={`flex-1 text-left px-4 py-1.5 pl-7 text-sm flex items-center gap-2 hover:bg-[#00d4ff]/5 transition-colors ${activeSection === f.id ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
                       >
                         <Folder size={13} aria-hidden /> {f.name}
                         <span className="text-xs text-zinc-500 ml-auto">{f.projectIds.length}</span>
@@ -763,23 +763,23 @@ export default function ProjectsPage() {
             )}
 
             {/* Divider */}
-            <div className="border-t border-zinc-700 my-2" />
+            <div className="border-t border-[#00d4ff]/20 my-2" />
 
             {/* Archived */}
             <button
               onClick={() => setActiveSection('archived')}
-              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors ${activeSection === 'archived' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-[#00d4ff]/5 transition-colors ${activeSection === 'archived' ? 'bg-zinc-700/80 text-white' : 'text-zinc-300'}`}
             >
               <Archive size={15} aria-hidden /> Archived
             </button>
 
             {/* Divider */}
-            <div className="border-t border-zinc-700 my-2" />
+            <div className="border-t border-[#00d4ff]/20 my-2" />
 
             {/* Library */}
             <button
               onClick={() => router.push('/library')}
-              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors text-zinc-300"
+              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-[#00d4ff]/5 transition-colors text-zinc-300"
             >
               <BookOpen size={15} aria-hidden /> Library
             </button>
@@ -787,7 +787,7 @@ export default function ProjectsPage() {
             {/* Learn */}
             <button
               onClick={() => router.push('/learn')}
-              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-zinc-700/60 transition-colors text-zinc-300"
+              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-[#00d4ff]/5 transition-colors text-zinc-300"
             >
               <GraduationCap size={15} aria-hidden /> Learn
             </button>
@@ -807,7 +807,7 @@ export default function ProjectsPage() {
 
           {/* Onboarding checklist */}
           {showOnboarding && (
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-5 mb-5">
+            <div className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl p-5 mb-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-base">Your First Takeoff</h3>
                 <button aria-label="Dismiss onboarding" onClick={dismissOnboarding} className="text-zinc-400 hover:text-white"><X size={16} /></button>
@@ -893,7 +893,7 @@ export default function ProjectsPage() {
 
           {/* Create project inline */}
           {showCreate && (
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-5 mb-5">
+            <div className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl p-5 mb-5">
               <h3 className="font-semibold text-sm mb-3">Create New Project</h3>
               <div className="flex flex-col gap-3">
                 <div>
@@ -952,7 +952,7 @@ export default function ProjectsPage() {
           {!loading && projects.length === 0 && showOnboarding ? (
             <div className="flex-1 flex flex-col items-center justify-center py-20">
               <div className="flex flex-col items-center gap-6 max-w-md text-center">
-                <div className="bg-blue-600/20 p-5 rounded-2xl">
+                <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/20 p-5 rounded-2xl">
                   <FileSpreadsheet size={56} className="text-blue-400" />
                 </div>
                 <div>
@@ -970,7 +970,7 @@ export default function ProjectsPage() {
                     };
                     input.click();
                   }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 transition-colors shadow-lg shadow-blue-600/25"
+                  className="border border-[#00d4ff]/60 hover:border-[#00d4ff] text-[#00d4ff] hover:bg-[#00d4ff]/10 bg-transparent px-8 py-4 rounded-xl font-mono font-semibold text-lg flex items-center gap-3 transition-all"
                 >
                   <Upload size={22} /> Upload Blueprint
                 </button>
@@ -994,7 +994,7 @@ export default function ProjectsPage() {
           ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden animate-pulse">
+                <div key={i} className="bg-[#0a0a0f] border border-[#00d4ff]/10 rounded-xl overflow-hidden animate-pulse">
                   <div className="h-28 bg-gray-800 rounded-t" />
                   <div className="p-4 space-y-3">
                     <div className="h-4 bg-gray-800 rounded w-3/4" />
@@ -1010,7 +1010,7 @@ export default function ProjectsPage() {
               <div className="text-sm text-zinc-500 mb-4">Please try again.</div>
               <button
                 onClick={() => { setError(null); loadProjects(); }}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+                className="border border-[#00d4ff]/60 hover:border-[#00d4ff] text-[#00d4ff] hover:bg-[#00d4ff]/10 bg-transparent px-5 py-2 rounded-lg font-mono font-medium text-sm transition-all"
               >
                 Retry
               </button>
@@ -1036,7 +1036,7 @@ export default function ProjectsPage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-6 max-w-lg text-center">
-                  <div className="bg-blue-600/20 p-5 rounded-2xl">
+                  <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/20 p-5 rounded-2xl">
                     <FileSpreadsheet size={56} className="text-blue-400" />
                   </div>
                   <div>
@@ -1054,7 +1054,7 @@ export default function ProjectsPage() {
                       };
                       input.click();
                     }}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 transition-colors shadow-lg shadow-blue-600/25"
+                    className="border border-[#00d4ff]/60 hover:border-[#00d4ff] text-[#00d4ff] hover:bg-[#00d4ff]/10 bg-transparent px-8 py-4 rounded-xl font-mono font-semibold text-lg flex items-center gap-3 transition-all"
                   >
                     <Upload size={22} /> Upload PDF Blueprint
                   </button>
@@ -1103,7 +1103,7 @@ export default function ProjectsPage() {
                 return (
                   <div
                     key={p.id}
-                    className="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden hover:border-zinc-500 transition-colors cursor-pointer group"
+                    className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden hover:border-[#00d4ff]/60 transition-all cursor-pointer group hover:shadow-[0_0_12px_rgba(0,212,255,0.12)]"
                     onClick={() => handleOpen(p.id)}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
                   >
@@ -1175,7 +1175,7 @@ export default function ProjectsPage() {
             </div>
           ) : (
             /* List view */
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden">
+            <div className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-700 text-zinc-400 text-left">
