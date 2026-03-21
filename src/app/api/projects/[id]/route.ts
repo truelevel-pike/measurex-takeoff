@@ -131,7 +131,12 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
       }
       patch.thumbnail = body.thumbnail;
     }
-    if (typeof body.name === 'string') patch.name = body.name;
+    if (typeof body.name === 'string') {
+      if (body.name.trim().length === 0 || body.name.length > 200) {
+        return NextResponse.json({ error: 'name must be between 1 and 200 characters' }, { status: 400 });
+      }
+      patch.name = body.name;
+    }
     const updated = await updateProject(id, patch);
     if (!updated) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ project: updated });
