@@ -187,19 +187,22 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
   return readJson<ProjectMeta | null>(path.join(projectDir(projectId), 'project.json'), null);
 }
 
-export async function listProjects(): Promise<ProjectMeta[]> {
+export async function listProjects(): Promise<(ProjectMeta & { polygonCount: number; scaleCount: number })[]> {
   if (isSupabaseMode()) {
     const sb = getClient();
+    // Single query with embedded counts — eliminates N+1 pattern
     const { data, error } = await sb
       .from('mx_projects')
-      .select('*')
+      .select('*, mx_polygons(count), mx_scales(count)')
       .order('updated_at', { ascending: false });
     if (error) throw new Error(`listProjects: ${error.message}`);
-    return (data || []).map((row: Record<string, unknown>): ProjectMeta => ({
+    return (data || []).map((row: Record<string, unknown>) => ({
       id: row.id as string,
       name: row.name as string,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
+      polygonCount: (row.mx_polygons as Array<{ count: number }>)?.[0]?.count ?? 0,
+      scaleCount: (row.mx_scales as Array<{ count: number }>)?.[0]?.count ?? 0,
     }));
   }
 
@@ -210,13 +213,21 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   } catch {
     return [];
   }
-  const projects: ProjectMeta[] = [];
+  const projects: (ProjectMeta & { polygonCount: number; scaleCount: number })[] = [];
   for (const entry of entries) {
     const meta = await readJson<ProjectMeta | null>(
       path.join(PROJECTS_DIR, entry, 'project.json'),
       null,
     );
-    if (meta) projects.push(meta);
+    if (meta) {
+      const dir = path.join(PROJECTS_DIR, entry);
+      const [polygons, dirEntries] = await Promise.all([
+        readJson<unknown[]>(path.join(dir, 'polygons.json'), []),
+        fs.readdir(dir).catch(() => [] as string[]),
+      ]);
+      const scaleCount = dirEntries.filter((f: string) => /^scale-\d+\.json$/.test(f)).length;
+      projects.push({ ...meta, polygonCount: polygons.length, scaleCount });
+    }
   }
   projects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   return projects;

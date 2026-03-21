@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listProjects, createProject, initDataDir, getThumbnail, getProjectSummary } from '@/server/project-store';
+import { listProjects, createProject, initDataDir } from '@/server/project-store';
 import { ProjectCreateSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -11,17 +11,11 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req
 
   try {
     await initDataDir();
+    // listProjects() returns polygon/scale counts inline — no N+1 queries needed.
+    // Thumbnails are intentionally omitted here; they are large and not shown
+    // until hover, so they load lazily via the individual project endpoint.
     const projects = await listProjects();
-    const withThumbnails = await Promise.all(
-      projects.map(async (p) => {
-        const [thumbnail, summary] = await Promise.all([
-          getThumbnail(p.id).catch(() => null),
-          getProjectSummary(p.id).catch(() => ({ polygonCount: 0, scaleCount: 0 })),
-        ]);
-        return { ...p, thumbnail, polygonCount: summary.polygonCount, scaleCount: summary.scaleCount };
-      })
-    );
-    return NextResponse.json({ projects: withThumbnails });
+    return NextResponse.json({ projects });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
