@@ -396,13 +396,12 @@ export async function POST(req: Request) {
 
     const system = `You are a construction takeoff AI. Analyze this blueprint image and identify all measurable elements. Be thorough — count every individual instance of each element type.
 
-COORDINATE FORMAT: All x,y values must be 0-1 (normalized to page width/height). x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom.
+COORDINATE FORMAT: Use ACTUAL PIXEL coordinates. x ranges 0 to page width, y ranges 0 to page height.
 
 COUNT items (type: "count") — return a single center point for each instance detected (a small position marker is correct for count elements):
 - "Single Swing Door": a door with one leaf that swings on hinges (shown as an arc on blueprints)
 - "Double Swing Door": a door with two leaves that swing open from the center
 - "Window": all window types (casement, sliding, awning, fixed, double-hung) — shown as parallel lines in walls
-- "Electrical Outlet": wall-mounted power outlets, switches, and junction boxes (shown as circles or symbols on walls)
 - "Plumbing Fixture": toilets, sinks, kitchen sinks, bathtubs, showers, urinals, floor drains
 - "Column": structural columns, pillars, posts (shown as filled rectangles or circles in the plan)
 - "Parking Space": each individual parking stall (shown as lined rectangles in parking areas)
@@ -430,11 +429,11 @@ AREA POLYGON EXAMPLES:
 LINEAR items (type: "linear") — return two endpoints:
 - Walls, beams, fences, roads
 
-For count items, set the "quantity" field to the number of that element detected. Group identical elements under the same classification name.
+For count items, return ONE entry per individual instance. Do NOT group — if there are 7 doors, return 7 separate entries.
 
 Please include a confidence field (0.0-1.0) for each element you detect. This represents your confidence in the detection accuracy — use lower values for ambiguous or partially occluded elements.
 
-Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, quantity: number (for count items — total instances of this classification), points: [{x, y}...], color: string (hex), confidence: number (0.0-1.0) }. No prose, no markdown fences.
+Return ONLY a JSON array. Each element: { name: string, type: 'area'|'linear'|'count', classification: string, points: [{x, y}...] as pixel coordinates, color: string (hex), confidence: number (0.0-1.0) }. No quantity field. No prose. No markdown.
 
 AREA POLYGON REMINDER: Area polygons MUST trace the true full boundary of the element. A room that occupies 15% of the floor plan should have polygon vertices spanning roughly 0.15 of the page width and height — never a tiny 0.01×0.01 cluster. Minimum 4 vertices; use more for complex shapes.
 
