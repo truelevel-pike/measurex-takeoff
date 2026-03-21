@@ -167,7 +167,10 @@ describe('handleSSEMessage via connectToProject', () => {
     connectToProject('test-proj');
     const es = (global as unknown as { _lastES?: MockEventSource })._lastES!;
     es.onmessage?.(makeMessageEvent({ event: 'polygon:deleted', data: { id: 'poly-del' } }));
-    expect(useStore.getState().deletePolygon).toHaveBeenCalledWith('poly-del');
+    // ws-client uses setState directly (not deletePolygon) to avoid pushing remote deletes onto the undo stack
+    expect(useStore.setState).toHaveBeenCalled();
+    const remaining = useStore.getState().polygons as { id: string }[];
+    expect(remaining.find((p) => p.id === 'poly-del')).toBeUndefined();
     disconnectFromProject();
   });
 

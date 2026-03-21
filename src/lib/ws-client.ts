@@ -101,7 +101,7 @@ function handleSSEMessage(raw: MessageEvent) {
         polygons: s.polygons.filter((p) => p.id !== id),
         selectedPolygon: s.selectedPolygon === id ? null : s.selectedPolygon,
         selectedPolygonId: s.selectedPolygonId === id ? null : s.selectedPolygonId,
-        selectedPolygons: s.selectedPolygons.filter((pid) => pid !== id),
+        selectedPolygons: (s.selectedPolygons ?? []).filter((pid) => pid !== id),
       }));
       emitActivity('polygon:deleted', parsed.data as unknown as Record<string, unknown>);
       break;
