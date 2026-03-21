@@ -18,6 +18,8 @@ const BatchOpSchema = z.discriminatedUnion('type', [
       area: z.number().optional(),
       linearFeet: z.number().optional(),
       label: z.string().optional(),
+      confidence: z.number().min(0).max(1).optional(),
+      detectedByModel: z.string().optional(),
     }),
   }),
   z.object({
@@ -77,6 +79,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               linearFeet: op.data.linearFeet ?? 0,
               isComplete: true,
               label: op.data.label,
+              confidence: op.data.confidence,
+              detectedByModel: op.data.detectedByModel,
             });
             results.push({ type: op.type, ok: true, id: p.id });
             break;

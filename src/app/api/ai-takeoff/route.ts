@@ -521,9 +521,11 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
       // already has polygons (Re-Togal / second run scenario).
       await deletePolygonsByPage(projectId, page);
 
-      // BUG-A5-6-129: Wrap polygon creation in try/catch so failures after
-      // deletePolygonsByPage are logged rather than silently losing data.
+      // Resolve classification IDs for all detected elements (create missing ones),
+      // then persist all polygons in a single batch call to avoid per-polygon rate limits.
       try {
+        // Step 1: resolve / create classifications (one POST per NEW classification only)
+        const resolvedElements: Array<{ el: DetectedElement; classificationId: string; persistPoints: Array<{ x: number; y: number }> }> = [];
         for (const el of results) {
           const clsKey = `${el.type.toLowerCase()}::${el.classification.toLowerCase()}`;
           let classificationId = classMap.get(clsKey);
@@ -568,10 +570,15 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
           const persistPoints = toPersistablePoints(el);
           if (!persistPoints) continue;
 
-          const polyRes = await fetch(`${apiBase}/api/projects/${projectId}/polygons`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          resolvedElements.push({ el, classificationId, persistPoints });
+        }
+
+        // Step 2: persist all polygons in ONE batch request to avoid the per-polygon
+        // rate limit on /api/projects/:id/polygons (fixes rate-limit mid-batch failure).
+        if (resolvedElements.length > 0) {
+          const operations = resolvedElements.map(({ el, classificationId, persistPoints }) => ({
+            type: 'createPolygon' as const,
+            data: {
               id: crypto.randomUUID(),
               classificationId,
               points: persistPoints,
@@ -579,13 +586,35 @@ FINAL CHECK before returning JSON: For each area element, verify that max(x) - m
               label: el.name,
               confidence: el.confidence ?? 0.85,
               detectedByModel: resolvedModel,
-            }),
+            },
+          }));
+
+          const batchRes = await fetch(`${apiBase}/api/projects/${projectId}/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ operations }),
           });
-          if (!polyRes.ok) {
-            const polyError = await polyRes.text();
-            throw new Error(`Failed to persist polygon "${el.name}": ${polyError}`);
+
+          if (!batchRes.ok && batchRes.status !== 207) {
+            const batchError = await batchRes.text();
+            throw new Error(`Batch polygon creation failed: ${batchError}`);
           }
-          persistedPolygons += 1;
+
+          const batchData = await batchRes.json();
+          const batchResults: Array<{ type: string; ok: boolean; id?: string; error?: string }> =
+            Array.isArray(batchData?.results) ? batchData.results : [];
+
+          for (let i = 0; i < batchResults.length; i++) {
+            const r = batchResults[i];
+            if (r.ok) {
+              persistedPolygons += 1;
+            } else {
+              console.error(
+                `[AI Takeoff] Batch polygon creation partial failure (project=${projectId}, page=${page}, index=${i}, label=${resolvedElements[i]?.el.name}):`,
+                r.error,
+              );
+            }
+          }
         }
       } catch (createErr) {
         console.error(`[AI Takeoff] Polygon creation failed after page delete (project=${projectId}, page=${page}, persisted=${persistedPolygons}):`, createErr);
