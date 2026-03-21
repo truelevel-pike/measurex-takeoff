@@ -74,7 +74,7 @@ function seedStore() {
     selectedPolygon: null,
     selectedPolygonId: null,
     selectedPolygons: [],
-    projectId: 'proj-123',
+    projectId: '00000000-0000-0000-0000-000000000001',
     pageBaseDimensions: { 1: { width: 1000, height: 1000 } },
   });
 }
@@ -148,14 +148,14 @@ describe('draw tool integration', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/projects/proj-123/polygons',
+        '/api/projects/00000000-0000-0000-0000-000000000001/polygons',
         expect.objectContaining({ method: 'POST' })
       );
     });
 
     const postCall = fetchMock.mock.calls.find(
       ([url, init]) =>
-        url === '/api/projects/proj-123/polygons' &&
+        url === '/api/projects/00000000-0000-0000-0000-000000000001/polygons' &&
         typeof init === 'object' &&
         init !== null &&
         'method' in init &&
@@ -175,7 +175,7 @@ describe('draw tool integration', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/projects/proj-123/polygons/${polygon.id}`,
+      `/api/projects/00000000-0000-0000-0000-000000000001/polygons/${polygon.id}`,
       expect.objectContaining({ method: 'DELETE' })
     );
   });
