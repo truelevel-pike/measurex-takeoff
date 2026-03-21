@@ -46,14 +46,14 @@ function PageThumbnailSidebar({
   const renderSessionRef = useRef(0);
   const drawingSets = useStore((s) => s.drawingSets);
   const setDrawingSet = useStore((s) => s.setDrawingSet);
-  const polygons = useStore((s) => s.polygons);
-  const classifications = useStore((s) => s.classifications);
-  const pageBaseDimensions = useStore((s) => s.pageBaseDimensions);
+  const polygons = useStore((s) => s.polygons ?? []);
+  const classifications = useStore((s) => s.classifications ?? []);
+  const pageBaseDimensions = useStore((s) => s.pageBaseDimensions ?? {});
 
   // Pre-compute a classificationId → color map for thumbnail overlays
   const classColorMap = useMemo(() => {
     const m = new Map<string, string>();
-    for (const c of classifications) m.set(c.id, c.color);
+    for (const c of classifications ?? []) m.set(c.id, c.color);
     return m;
   }, [classifications]);
 
@@ -142,16 +142,41 @@ function PageThumbnailSidebar({
 
     setThumbnails(Array(totalPages).fill(null));
     setFailedPages(new Set());
+    // Pages are queued lazily via IntersectionObserver on the page buttons.
+  }, [pdfDoc, totalPages]);
 
-    // Queue ALL pages eagerly — thumbnails are small and must always be visible.
-    for (let i = 1; i <= totalPages; i++) {
-      if (!queuedPagesRef.current.has(i)) {
-        queuedPagesRef.current.add(i);
-        renderQueueRef.current.push(i);
-      }
-    }
-    processThumbnailQueue();
-  }, [pdfDoc, totalPages, currentPage, processThumbnailQueue]);
+  // Use IntersectionObserver to lazily queue thumbnails only for visible pages.
+  useEffect(() => {
+    if (!pdfDoc || totalPages <= 0) return;
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let enqueued = false;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const pageNumber = Number((entry.target as HTMLElement).dataset.pageNumber ?? '0');
+          if (!pageNumber) continue;
+          if (!queuedPagesRef.current.has(pageNumber) && !thumbnails[pageNumber - 1]) {
+            queuedPagesRef.current.add(pageNumber);
+            renderQueueRef.current.push(pageNumber);
+            enqueued = true;
+          }
+        }
+        if (enqueued) processThumbnailQueue();
+      },
+      { root: container, rootMargin: '200px' }
+    );
+
+    // Observe all page-button elements that have data-page-number.
+    const pageEls = container.querySelectorAll<HTMLElement>('[data-page-number]');
+    for (const el of pageEls) observer.observe(el);
+
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdfDoc, totalPages, processThumbnailQueue]);
 
   // Group pages by drawing set
   const groupedPages = useMemo(() => {
