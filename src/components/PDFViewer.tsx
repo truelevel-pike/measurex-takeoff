@@ -170,8 +170,7 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         const pdfjsLib = await import('pdfjs-dist') as unknown as PdfJsLib;
         if (isCancelled()) return null;
         if (pdfjsLib.GlobalWorkerOptions) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc =
-            `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         }
         const arrayBuffer = await pdfFile.arrayBuffer();
         if (isCancelled()) return null;

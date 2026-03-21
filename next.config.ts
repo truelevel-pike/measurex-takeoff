@@ -62,9 +62,10 @@ const nextConfig: NextConfig = {
               // a blob-URL Web Worker at runtime (via new Worker(URL.createObjectURL(blob))).
               // blob: is intentionally NOT in script-src (removed in BUG-A8-010) because
               // script-src blob: would also allow arbitrary script execution.
-              "worker-src blob: 'self' https://cdn.jsdelivr.net",
-              // script-src-elem: blob: removed (BUG-A8-010)
-              "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+              // cdn.jsdelivr.net removed: pdf.js worker is now self-hosted at /pdf.worker.min.mjs
+              "worker-src blob: 'self'",
+              // script-src-elem: cdn.jsdelivr.net removed — pdf.js worker now self-hosted
+              "script-src-elem 'self' 'unsafe-inline'",
               // BLOCKER-002 fix: allow same-origin framing so OpenClaw sandbox browser can load the app.
               // X-Frame-Options: DENY (below) is removed in favor of CSP frame-ancestors which is more flexible.
               "frame-ancestors 'self'",
