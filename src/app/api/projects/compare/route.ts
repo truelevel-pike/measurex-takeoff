@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getPolygons, getClassifications } from '@/server/project-store';
 import type { Polygon } from '@/lib/types';
 import { rateLimitResponse } from '@/lib/rate-limit';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const CompareSchema = z.object({
+  projectIdA: z.string().regex(UUID_REGEX, 'projectIdA must be a valid UUID'),
+  projectIdB: z.string().regex(UUID_REGEX, 'projectIdB must be a valid UUID'),
+});
 
 export async function POST(req: Request) {
   // Rate limit: 10 req/min per IP
@@ -9,16 +17,18 @@ export async function POST(req: Request) {
   if (limited) return limited;
 
   try {
-    const { projectIdA, projectIdB } = await req.json();
-    if (!projectIdA || !projectIdB) {
-      return NextResponse.json({ error: 'Missing projectIdA or projectIdB' }, { status: 400 });
+    const rawBody = await req.json().catch(() => null);
+    if (!rawBody) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+
+    const parsed = CompareSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    // BUG-A5-5-007: UUID validation for projectIds
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!UUID_RE.test(projectIdA) || !UUID_RE.test(projectIdB)) {
-      return NextResponse.json({ error: 'projectIdA and projectIdB must be valid UUIDs' }, { status: 400 });
-    }
+    const { projectIdA, projectIdB } = parsed.data;
 
     const [polygonsA, polygonsB, classificationsA, classificationsB] = await Promise.all([
       getPolygons(projectIdA),
