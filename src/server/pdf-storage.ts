@@ -130,6 +130,17 @@ export async function loadPDF(projectId: string): Promise<Buffer | null> {
 }
 
 /**
+ * Get the public Supabase Storage URL for a project's PDF.
+ * Returns null when not in Supabase mode or if the URL cannot be constructed.
+ */
+export function getPDFPublicUrl(projectId: string): string | null {
+  if (!isSupabaseMode()) return null;
+  const client = getClient();
+  const { data } = client.storage.from(BUCKET).getPublicUrl(storagePath(projectId));
+  return data?.publicUrl ?? null;
+}
+
+/**
  * Get a local file path for the PDF, downloading from Supabase Storage if needed.
  * This is useful for functions that require a file path (like pdf-processor).
  * Returns null if the PDF cannot be found.

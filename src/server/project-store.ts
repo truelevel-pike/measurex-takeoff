@@ -22,6 +22,7 @@ export interface ProjectMeta {
   updatedAt: string;
   totalPages?: number;
   thumbnail?: string;
+  pdfUrl?: string;
 }
 
 export interface PageInfo {
@@ -172,15 +173,21 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
       .maybeSingle();
     if (error) throw new Error(`getProject: ${error.message}`);
     if (!data) return null;
-    // totalPages is stored in the `description` column as JSON: {"totalPages":7}
+    // totalPages and pdfUrl are stored in the `description` column as JSON
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
+    let pdfUrl: string | undefined;
+    try {
+      const desc = data.description ? JSON.parse(data.description) : {};
+      totalPages = desc?.totalPages;
+      pdfUrl = desc?.pdfUrl;
+    } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       totalPages,
+      pdfUrl,
     };
   }
 
@@ -276,7 +283,7 @@ export async function saveThumbnail(projectId: string, dataUrl: string): Promise
 
 export async function updateProject(
   projectId: string,
-  patch: Partial<Pick<ProjectMeta, 'name' | 'totalPages' | 'thumbnail'>>,
+  patch: Partial<Pick<ProjectMeta, 'name' | 'totalPages' | 'thumbnail' | 'pdfUrl'>>,
 ): Promise<ProjectMeta | null> {
   const now = new Date().toISOString();
 
@@ -290,9 +297,17 @@ export async function updateProject(
     const sb = getClient();
     const updatePayload: Record<string, unknown> = { updated_at: now };
     if (patch.name !== undefined) updatePayload.name = patch.name;
-    // Persist totalPages in description as JSON (no schema migration needed)
-    if (patch.totalPages !== undefined) {
-      updatePayload.description = JSON.stringify({ totalPages: patch.totalPages });
+    // Persist totalPages and pdfUrl in description as JSON (no schema migration needed)
+    if (patch.totalPages !== undefined || patch.pdfUrl !== undefined) {
+      // Merge with any existing description to avoid overwriting fields
+      let existing: Record<string, unknown> = {};
+      try {
+        const { data: existing_row } = await sb.from('mx_projects').select('description').eq('id', projectId).maybeSingle();
+        if (existing_row?.description) existing = JSON.parse(existing_row.description);
+      } catch { /* ignore parse errors */ }
+      if (patch.totalPages !== undefined) existing.totalPages = patch.totalPages;
+      if (patch.pdfUrl !== undefined) existing.pdfUrl = patch.pdfUrl;
+      updatePayload.description = JSON.stringify(existing);
     }
     const { data, error } = await sb
       .from('mx_projects')
@@ -303,13 +318,19 @@ export async function updateProject(
     if (error) throw new Error(`updateProject: ${error.message}`);
     if (!data) return null;
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
+    let pdfUrl: string | undefined;
+    try {
+      const desc = data.description ? JSON.parse(data.description) : {};
+      totalPages = desc?.totalPages;
+      pdfUrl = desc?.pdfUrl;
+    } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       totalPages,
+      pdfUrl,
     };
   }
 

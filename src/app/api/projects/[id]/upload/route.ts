@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProject, createPage, updateProject, initDataDir } from '@/server/project-store';
 import { processPDF, renderPageAsImage } from '@/server/pdf-processor';
-import { savePDF } from '@/server/pdf-storage';
+import { savePDF, getPDFPublicUrl } from '@/server/pdf-storage';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { aiSheetNamer } from '@/lib/ai-sheet-namer';
 import { detectScaleFromText } from '@/lib/auto-scale';
@@ -49,10 +49,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const filePath = await savePDF(id, buffer);
+
+    // Store public Supabase Storage URL on the project record (for client-side PDF loading on Vercel)
+    const pdfUrl = getPDFPublicUrl(id);
+    if (pdfUrl) {
+      await updateProject(id, { pdfUrl }).catch(() => null);
+    }
+
+    // On Vercel, node-canvas is unavailable so renderPageAsImage will always fail.
+    // Skip AI sheet naming (image fallback) and use text-only extraction instead.
+    const isVercel = process.env.VERCEL === '1';
+
     const result = await processPDF(filePath, id);
 
     // GAP-001: Extract sheet names and store pages
     // For image-only PDFs (no text layer), fall back to AI vision to read the title block.
+    // Skipped on Vercel (no canvas available).
     const resolvedNames: Record<number, string> = {};
     const aiNamingPromises: Promise<void>[] = [];
 
@@ -60,8 +72,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const sheetName = extractSheetName(page.text ?? '');
       if (sheetName) {
         resolvedNames[page.pageNum] = sheetName;
-      } else {
+      } else if (!isVercel) {
         // Queue AI fallback — non-blocking per page, we'll await all at end
+        // Skipped on Vercel because renderPageAsImage requires node-canvas
         aiNamingPromises.push(
           renderPageAsImage(filePath, page.pageNum, 1.0)
             .then((imageBase64) => imageBase64 ? aiSheetNamer(imageBase64) : null)
@@ -97,6 +110,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       pages: result.pages.length,
       dimensions: result.pages.map((p) => ({ page: p.pageNum, width: p.width, height: p.height })),
       sheetNames,
+      ...(pdfUrl ? { pdfUrl } : {}),
     };
 
     if (scaleResult) {

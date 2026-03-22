@@ -23,7 +23,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const project = await getProject(id);
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     const pages = await getPages(id);
-    return NextResponse.json({ pages });
+    // Remap pageNum → pageNumber so agents receive a consistent, documented shape:
+    // { pages: [ { pageNumber, width, height, text?, name? } ] }
+    const mapped = pages.map((p) => ({
+      pageNumber: p.pageNum,
+      width: p.width,
+      height: p.height,
+      ...(p.text !== undefined ? { text: p.text } : {}),
+      ...(p.name !== undefined ? { name: p.name } : {}),
+    }));
+    return NextResponse.json({ pages: mapped });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

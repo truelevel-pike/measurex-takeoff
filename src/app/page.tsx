@@ -2246,6 +2246,8 @@ function PageInner() {
         data-project-id={projectId || ''}
         data-scale={scale ? String(scale.pixelsPerUnit) : ''}
         data-scale-unit={scale?.unit || ''}
+        data-canvas-width={String(pageBaseDimensions[currentPage]?.width || '')}
+        data-canvas-height={String(pageBaseDimensions[currentPage]?.height || '')}
         style={{ display: 'none' }}
       />
     </div>
