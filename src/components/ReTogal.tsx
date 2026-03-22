@@ -88,6 +88,23 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
       }
     }
 
+    // In agent mode, POST a webhook event instead of calling the AI takeoff API.
+    if (agentMode) {
+      try {
+        const pid = useStore.getState().projectId;
+        await fetch(`/api/projects/${pid}/webhooks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button' }),
+        });
+      } catch (err) {
+        console.error('Re-Togal: agent webhook failed:', err);
+      }
+      setRunning(false);
+      setToast('Agent takeoff triggered — watching for results...');
+      return;
+    }
+
     // Delegate to the real AI takeoff handler which captures the current page,
     // sends it to the AI endpoint, and loads results into the store.
     try {
@@ -99,14 +116,30 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
     setRunning(false);
     const newCount = useStore.getState().polygons.filter((p) => p.pageNumber === currentPage).length;
     setToast(`Re-Togal complete — ${newCount} items on page`);
-  }, [currentPage, preserveManual, onRunTakeoff]);
+  }, [currentPage, preserveManual, onRunTakeoff, agentMode]);
+
+  // Agent-mode handler for the initial (pre-takeoff) button paths.
+  const handleAgentWebhook = useCallback(async () => {
+    try {
+      const pid = useStore.getState().projectId;
+      await fetch(`/api/projects/${pid}/webhooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button' }),
+      });
+    } catch (err) {
+      console.error('ReTogal: agent webhook failed:', err);
+    }
+    setToast('Agent takeoff triggered — watching for results...');
+  }, [currentPage]);
 
   // Determine button mode
   if (!hasScale) {
     return (
       <button
         aria-label="Set scale"
-        onClick={onRunTakeoff}
+        data-testid="retogal-btn"
+        onClick={agentMode ? handleAgentWebhook : onRunTakeoff}
         className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-all"
         style={{
           background: '#059669',
@@ -124,7 +157,8 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
     return (
       <button
         aria-label="Run Togal AI"
-        onClick={onRunTakeoff}
+        data-testid="retogal-btn"
+        onClick={agentMode ? handleAgentWebhook : onRunTakeoff}
         className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-all"
         style={{
           background: '#059669',
@@ -144,6 +178,7 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
       {/* Re-Togal button */}
       <button
         aria-label={running ? 'Re-Togal running' : 'Re-Togal'}
+        data-testid="retogal-btn"
         onClick={() => !running && setOpen((v) => !v)}
         disabled={running}
         className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-all"

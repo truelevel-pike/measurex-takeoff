@@ -56,6 +56,7 @@ import ProjectSettingsPanel from '@/components/ProjectSettingsPanel';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import QuickTakeoffMode from '@/components/QuickTakeoffMode';
+import ReTogal from '@/components/ReTogal';
 import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
 import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
