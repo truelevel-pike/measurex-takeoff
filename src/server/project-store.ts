@@ -453,13 +453,19 @@ export async function getProjectByShareToken(token: string): Promise<ProjectMeta
     if (error) throw new Error(`getProjectByShareToken: ${error.message}`);
     if (!data) return null;
     let totalPages: number | undefined;
-    try { totalPages = data.description ? JSON.parse(data.description)?.totalPages : undefined; } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
+    let pdfUrl: string | undefined;
+    try {
+      const desc = data.description ? JSON.parse(data.description) : {};
+      totalPages = desc?.totalPages;
+      pdfUrl = desc?.pdfUrl;
+    } catch (e) { console.warn('[project-store] Failed to parse description JSON:', e); }
     return {
       id: data.id,
       name: data.name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       totalPages,
+      pdfUrl,
     };
   }
 
