@@ -2012,6 +2012,19 @@ function PageInner() {
       {/* Quick Takeoff Mode HUD */}
       <QuickTakeoffMode />
 
+      {/* Agent mode: Togal button fires webhook instead of AI takeoff */}
+      {agentMode && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 60 }}>
+          <ReTogal
+            currentPage={currentPageNum}
+            hasScale={!!scale}
+            hasRunTakeoff={polygons.some((p) => p.pageNumber === currentPageNum)}
+            onRunTakeoff={handleAITakeoff}
+            agentMode={agentMode}
+          />
+        </div>
+      )}
+
       {/* Mobile/Tablet bottom toolbar */}
       <MobileToolbar />
 

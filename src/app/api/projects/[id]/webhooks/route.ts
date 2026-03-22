@@ -29,22 +29,41 @@ export async function GET(
   return NextResponse.json({ webhooks });
 }
 
+// Schema for internal agent events (no url/events — just an event name + metadata)
+const AgentEventSchema = z.object({
+  event: z.string().min(1),
+  page: z.number().int().optional(),
+  source: z.string().optional(),
+});
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // BUG-A5-6-108: require admin secret to prevent unauthenticated SSRF via webhook registration
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const paramsResult = ProjectIdSchema.safeParse(await params);
   if (!paramsResult.success) return validationError(paramsResult.error);
   const { id } = paramsResult.data;
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+
+  // Internal agent event path: body has 'event' but no 'url'.
+  // These are fire-and-forget signals from the UI (e.g. togal_button in agent mode).
+  if (body.event && !body.url) {
+    const eventResult = AgentEventSchema.safeParse(body);
+    if (!eventResult.success) return validationError(eventResult.error);
+    const { event, page, source } = eventResult.data;
+    // Log for server-side observability; downstream agents can poll or subscribe.
+    console.log(`[webhooks] agent event: project=${id} event=${event} page=${page ?? 'n/a'} source=${source ?? 'n/a'}`);
+    return NextResponse.json({ ok: true, event, page, source });
+  }
+
+  // Webhook registration path: requires admin secret (SSRF protection).
+  // BUG-A5-6-108: require admin secret to prevent unauthenticated SSRF via webhook registration
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   const bodyResult = WebhookCreateSchema.safeParse(body);
   if (!bodyResult.success) return validationError(bodyResult.error);
