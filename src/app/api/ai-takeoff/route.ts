@@ -297,8 +297,8 @@ function toPersistablePoints(el: DetectedElement, renderScale = 1.0): Array<{ x:
 }
 
 export async function POST(req: Request) {
-  // Rate limit: 10 req/min per IP
-  const limited = rateLimitResponse(req);
+  // Rate limit: 50 req/min per IP (increased from 10 to support multi-page full takeoffs)
+  const limited = rateLimitResponse(req, 50, 60_000);
   if (limited) return limited;
 
   try {
