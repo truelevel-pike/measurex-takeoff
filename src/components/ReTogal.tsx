@@ -9,9 +9,11 @@ interface ReTogalProps {
   hasScale: boolean;
   hasRunTakeoff: boolean;
   onRunTakeoff: () => void | Promise<void>;
+  agentMode?: boolean;
 }
 
-export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTakeoff }: ReTogalProps) {
+export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTakeoff, agentMode }: ReTogalProps) {
+  const projectId = useStore((s) => s.projectId);
   const [open, setOpen] = useState(false);
   const [preserveManual, setPreserveManual] = useState(true);
   const [running, setRunning] = useState(false);
