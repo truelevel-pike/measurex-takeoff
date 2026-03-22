@@ -126,6 +126,7 @@ export default function TopNavBar({
     };
   }, []);
   const [isShared, setIsShared] = React.useState(false);
+  const [shareUrl, setShareUrl] = React.useState<string | null>(null);
   // BUG-A6-5-024: useViewerPresence likely sets up a WebSocket/polling interval.
   // Cleanup depends on the hook's internal implementation — verify it unsubscribes
   // on unmount or when TopNavBar is conditionally removed (e.g. print mode).
@@ -205,23 +206,38 @@ export default function TopNavBar({
       const { token } = await res.json();
 
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const shareUrl = `${origin}/share/${token}`;
+      const generatedShareUrl = `${origin}/share/${token}`;
+      // BUG-MX-002: store URL in state so users can manually copy if clipboard fails
+      setShareUrl(generatedShareUrl);
+
+      // Attempt clipboard copy with fallback to execCommand for non-secure / permission-denied contexts
+      let clipboardSuccess = false;
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = shareUrl;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        const copied = document.execCommand('copy');
-        document.body.removeChild(ta);
-        if (!copied) throw new Error('Clipboard unavailable');
+        try {
+          await navigator.clipboard.writeText(generatedShareUrl);
+          clipboardSuccess = true;
+        } catch {
+          // Fall through to textarea fallback
+        }
+      }
+      if (!clipboardSuccess) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = generatedShareUrl;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const copied = document.execCommand('copy');
+          document.body.removeChild(ta);
+          clipboardSuccess = copied;
+        } catch {
+          // clipboard completely unavailable — URL is visible in the input below
+        }
       }
       setIsShared(true);
-      addToast('Copied! Share link is ready to paste.', 'success');
+      addToast(clipboardSuccess ? 'Copied! Share link is ready to paste.' : 'Share link ready — copy it below.', 'success');
     } catch (error) {
       console.error('Failed to copy share link:', error);
       addToast('Failed to copy share link', 'error');
@@ -402,6 +418,30 @@ export default function TopNavBar({
                 Shared
               </span>
             )
+          )}
+          {/* BUG-MX-002: fallback URL input — visible when clipboard copy may have failed or user wants to manually copy */}
+          {isShared && shareUrl && !isMobile && (
+            <input
+              readOnly
+              value={shareUrl}
+              aria-label="Share link URL"
+              title="Share link — click to select all"
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              style={{
+                fontSize: 10,
+                color: '#a1a1aa',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 6,
+                padding: '2px 6px',
+                width: 160,
+                outline: 'none',
+                cursor: 'text',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            />
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
           <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />

@@ -851,11 +851,29 @@ export async function deletePolygonsByPage(projectId: string, pageNumber: number
  *                    specific UUID (e.g. when restoring from a snapshot).
  * @returns The persisted {@link Polygon} with its resolved `id`.
  */
+/** Shoelace formula — returns pixel area for a polygon defined by {x,y} points. */
+function shoelaceAreaPixels(points: Array<{ x: number; y: number }>): number {
+  const n = points.length;
+  if (n < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    sum += points[i].x * points[j].y;
+    sum -= points[j].x * points[i].y;
+  }
+  return Math.abs(sum) / 2;
+}
+
 export async function createPolygon(
   projectId: string,
   data: Omit<Polygon, 'id'> & { id?: string },
 ): Promise<Polygon> {
   const id = data.id || crypto.randomUUID();
+  // BUG-MX-001: compute area from points if caller did not supply a non-zero value
+  const computedArea =
+    (data.area == null || data.area === 0) && data.points?.length >= 3
+      ? shoelaceAreaPixels(data.points as Array<{ x: number; y: number }>)
+      : (data.area ?? 0);
 
   if (isSupabaseMode()) {
     const sb = getClient();
@@ -865,7 +883,7 @@ export async function createPolygon(
       classification_id: data.classificationId,
       page_number: data.pageNumber ?? 1,
       points: data.points,
-      area_pixels: data.area ?? 0,
+      area_pixels: computedArea,
       linear_pixels: data.linearFeet ?? 0,
       is_complete: data.isComplete ?? true,
       label: data.label ?? null,
@@ -894,7 +912,8 @@ export async function createPolygon(
 
   const filePath = path.join(projectDir(projectId), 'polygons.json');
   const list = await readJson<Polygon[]>(filePath, []);
-  const poly: Polygon = { id, ...data };
+  // BUG-MX-001: ensure computed area is stored even in file mode
+  const poly: Polygon = { id, ...data, area: computedArea };
   // Upsert: replace existing entry with same id instead of pushing a duplicate.
   const existingIdx = list.findIndex((p) => p.id === id);
   if (existingIdx !== -1) {
