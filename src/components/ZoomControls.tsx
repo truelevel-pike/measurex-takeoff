@@ -46,6 +46,7 @@ export default function ZoomControls({ onFitToPage }: ZoomControlsProps) {
         onClick={handleZoomOut}
         className="h-8 w-8 rounded-md border border-[#00d4ff]/45 text-[#00d4ff] transition hover:bg-[#00d4ff]/15"
         aria-label="Zoom out"
+        data-testid="zoom-out-btn"
       >
         -
       </button>
@@ -57,6 +58,7 @@ export default function ZoomControls({ onFitToPage }: ZoomControlsProps) {
         onClick={handleZoomIn}
         className="h-8 w-8 rounded-md border border-[#00d4ff]/45 text-[#00d4ff] transition hover:bg-[#00d4ff]/15"
         aria-label="Zoom in"
+        data-testid="zoom-in-btn"
       >
         +
       </button>
