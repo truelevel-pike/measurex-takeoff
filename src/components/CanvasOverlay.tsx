@@ -508,6 +508,53 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     // reading wrapperRef.current inside the deps array (refs are not reactive).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polygons, classificationById, baseDims]);
+
+  // BUG-MX-004 fix: label collision-avoidance offsets.
+  // For labels that survive the deduplication pass above, run a single collision sweep:
+  // if two visible labels are within 40px vertically AND 80px horizontally (in screen space),
+  // offset the later one by +24px on Y. One pass is sufficient for typical densities.
+  const labelYOffsets = useMemo(() => {
+    const offsets = new Map<string, number>(); // polygonId → extra Y offset in baseDim units
+    const wrapperEl = wrapperRef.current;
+    const wrapperW = wrapperEl ? wrapperEl.getBoundingClientRect().width : 0;
+    const wrapperH = wrapperEl ? wrapperEl.getBoundingClientRect().height : 0;
+    const pxPerUnitX = wrapperW > 0 ? wrapperW / baseDims.width : 1000 / baseDims.width;
+    const pxPerUnitY = wrapperH > 0 ? wrapperH / baseDims.height : 1000 / baseDims.height;
+    // Thresholds in baseDim units
+    const thresh40pxY = 40 / pxPerUnitY;
+    const thresh80pxX = 80 / pxPerUnitX;
+    const shift24pxY = 24 / pxPerUnitY;
+
+    // Collect visible label centroids in order (polygon render order)
+    type LabelPos = { id: string; cx: number; cy: number };
+    const visible: LabelPos[] = [];
+    for (const p of polygons) {
+      const d = labelDecisions.get(p.id);
+      if (!d?.show) continue;
+      if (!p.points || p.points.length === 0) continue;
+      const cx = d.summaryCentroid ? d.summaryCentroid.x : p.points.reduce((s, pt) => s + pt.x, 0) / p.points.length;
+      const cy = d.summaryCentroid ? d.summaryCentroid.y : p.points.reduce((s, pt) => s + pt.y, 0) / p.points.length;
+      visible.push({ id: p.id, cx, cy });
+    }
+
+    // Single forward pass: compare each label against all previously placed ones
+    const placed: LabelPos[] = [];
+    for (const label of visible) {
+      let yOff = 0;
+      for (const prior of placed) {
+        const dx = Math.abs(label.cx - prior.cx);
+        const dy = Math.abs((label.cy + yOff) - prior.cy);
+        if (dy < thresh40pxY && dx < thresh80pxX) {
+          // Collision — shift this label down
+          yOff += shift24pxY;
+        }
+      }
+      if (yOff !== 0) offsets.set(label.id, yOff);
+      placed.push({ ...label, cy: label.cy + yOff });
+    }
+    return offsets;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polygons, labelDecisions, baseDims]);
   const annotations = useMemo(
     () => (allAnnotations ?? []).filter((a) => a.page === currentPage),
     [allAnnotations, currentPage]
@@ -949,7 +996,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 const defaultCentX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
                 const defaultCentY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
                 const centX = labelDecision?.summaryCentroid ? labelDecision.summaryCentroid.x : defaultCentX;
-                const centY = labelDecision?.summaryCentroid ? labelDecision.summaryCentroid.y : defaultCentY;
+                // BUG-MX-004 fix: apply collision-avoidance Y offset when labels are too close
+                const centY = (labelDecision?.summaryCentroid ? labelDecision.summaryCentroid.y : defaultCentY)
+                  + (labelYOffsets.get(poly.id) ?? 0);
 
                 if (centX < 0 || centY < 0 || centX > baseDims.width || centY > baseDims.height) return null;
                 const pageScale = scales[poly.pageNumber] ?? scale;
@@ -1073,6 +1122,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                       fontFamily="sans-serif"
                       fontWeight="600"
                       style={{ userSelect: 'none' }}
+                      data-testid="polygon-label"
+                      data-polygon-id={poly.id}
+                      data-value={displayStr}
                     >
                       {displayStr}
                     </text>

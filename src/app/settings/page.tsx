@@ -91,6 +91,20 @@ export default function SettingsPage() {
   });
   const [profileSaved, setProfileSaved] = useState(false);
 
+  // BUG-MX-003 fix: on mount, read profile fields from flat localStorage keys as fallback.
+  // These keys (measurex_profile_name / email / org) are the canonical cross-component keys;
+  // the mx-profile-settings JSON blob is the settings-page-internal store.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedName = localStorage.getItem('measurex_profile_name');
+    if (storedName) setName((prev) => prev || storedName);
+    const storedOrg = localStorage.getItem('measurex_profile_org');
+    if (storedOrg) setOrgName((prev) => prev || storedOrg);
+    // email fallback: used only until Supabase resolves
+    const storedEmail = localStorage.getItem('measurex_profile_email');
+    if (storedEmail) setEmail((prev) => prev || storedEmail);
+  }, []);
+
   // BUG-A8-5-005 fix: populate email from Supabase auth on mount
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -118,7 +132,11 @@ export default function SettingsPage() {
 
   const handleSaveProfile = () => {
     if (typeof window !== 'undefined') {
+      // BUG-MX-003 fix: persist to both the internal JSON blob and the flat canonical keys
       localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, orgName }));
+      localStorage.setItem('measurex_profile_name', name);
+      localStorage.setItem('measurex_profile_org', orgName);
+      if (email) localStorage.setItem('measurex_profile_email', email);
     }
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2000);

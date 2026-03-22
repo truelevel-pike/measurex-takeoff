@@ -181,6 +181,7 @@ function ColorPickerField({
           className="flex-1 px-2 py-1 border rounded text-[12px] outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
           placeholder="#3b82f6"
           aria-label="Custom hex color"
+          data-testid="classification-color-picker"
         />
       </div>
     </div>
@@ -1154,7 +1155,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       {activeTab === 'assemblies' ? (
         <AssembliesPanel onSwitchToQuantities={handleSwitchToQuantities} onSwitchToEstimate={handleSwitchToEstimate} />
       ) : activeTab === 'estimate' ? (
-        <aside className="bg-[rgba(18,18,26,0.8)] flex flex-col h-full text-[13px]" aria-label="Estimate panel">
+        <aside className="bg-[rgba(18,18,26,0.8)] flex flex-col h-full text-[13px]" aria-label="Estimate panel" data-testid="quantities-panel">
           <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
             <button type="button" onClick={handleSwitchToQuantities} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Quantities</button>
             <button type="button" onClick={handleSwitchToAssemblies} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Assemblies</button>
@@ -1522,6 +1523,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
           onClick={handleToggleNewClassification}
           className="flex-1 border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           aria-label="New Classification"
+          data-testid="new-classification-btn"
         >
           <Plus size={13} aria-hidden="true" />
           New Classification

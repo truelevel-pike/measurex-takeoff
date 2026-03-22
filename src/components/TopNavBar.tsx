@@ -444,9 +444,10 @@ export default function TopNavBar({
             />
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
-          <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} />
-          <NavIconButton ariaLabel="Next sheet" srLabel="Next sheet" icon={<ChevronRight size={16} aria-hidden="true" />} tooltip="Next Sheet" onClick={onNext} />
+          <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} testId="page-prev-btn" />
+          <NavIconButton ariaLabel="Next sheet" srLabel="Next sheet" icon={<ChevronRight size={16} aria-hidden="true" />} tooltip="Next Sheet" onClick={onNext} testId="page-next-btn" />
           <div
+            data-testid="page-number-display"
             aria-label={`Current sheet: ${badge}`}
             role="status"
             aria-live="polite"
@@ -550,6 +551,7 @@ export default function TopNavBar({
               </label>
               <button
                 aria-label={aiLoading ? 'AI Takeoff running…' : aiAllPagesMode ? `Run Full Takeoff (all ${totalPages ?? '?'} pages)` : 'Run AI Takeoff on current page'}
+                data-testid="ai-takeoff-btn"
                 aria-busy={aiLoading}
                 onClick={aiAllPagesMode ? onAITakeoffAllPages : onAITakeoff}
                 disabled={aiLoading}
@@ -713,7 +715,7 @@ export default function TopNavBar({
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
               <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
               <NavIconButton ariaLabel="Print Blueprint" srLabel="Print Blueprint" icon={<Printer size={17} aria-hidden="true" />} tooltip="Print Blueprint" onClick={onPrintBlueprint} />
-              <NavIconButton ariaLabel="Export" srLabel="Export" icon={<FileSpreadsheet size={17} aria-hidden="true" />} tooltip="Export" onClick={onExportPanel} />
+              <NavIconButton ariaLabel="Export" srLabel="Export" icon={<FileSpreadsheet size={17} aria-hidden="true" />} tooltip="Export" onClick={onExportPanel} testId="export-btn" />
               <NavIconButton ariaLabel="Quick Export Excel" srLabel="Quick Export Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Quick Export Excel" onClick={onExportExcel} />
             </>
           )}

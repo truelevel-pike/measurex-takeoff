@@ -322,6 +322,7 @@ function CompareOverlaySVG({ data }: { data: { added: Polygon[]; removed: Polygo
 
 function PageInner() {
   const search = useSearchParams();
+  const agentMode = search.get('agent') === '1';
 
   // Store bindings
   const setTool = useStore((s) => s.setTool);
@@ -1450,6 +1451,25 @@ function PageInner() {
       return;
     }
 
+    // GAP-011: If an agent webhook URL is configured, delegate to the agent instead of calling the AI API directly
+    const agentWebhookUrl = typeof window !== 'undefined' ? localStorage.getItem('mx-agent-webhook-url') : null;
+    if (agentWebhookUrl) {
+      try {
+        await fetch(agentWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, action: 'takeoff', totalPages: useStore.getState().totalPages }),
+        });
+        setAiStatus('Agent takeoff triggered via webhook');
+        setTimeout(() => setAiStatus(null), 3000);
+      } catch (err) {
+        console.error('Webhook dispatch failed:', err);
+        setAiStatus('Webhook failed — falling back to AI API');
+        setTimeout(() => setAiStatus(null), 2000);
+      }
+      return;
+    }
+
     const total = useStore.getState().totalPages;
     const originalPage = useStore.getState().currentPage || 1;
     const startTime = Date.now();
@@ -1941,7 +1961,7 @@ function PageInner() {
                     </div>
                     <div className="text-sm text-zinc-500">Re-upload the PDF to view the blueprint</div>
                     <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
-                    <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
+                    <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
                   </label>
                 )}
               </div>
@@ -1966,7 +1986,7 @@ function PageInner() {
                   <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
                   <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
                   <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
-                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" />
+                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
                 </label>
               </div>
             )}
@@ -1994,7 +2014,7 @@ function PageInner() {
       <MobileToolbar />
 
       {/* GAP-006: Single confirmation dialog before applying detected scale */}
-      {showAutoScalePopup && detectedScaleInfo && (
+      {showAutoScalePopup && detectedScaleInfo && !agentMode && (
         <AutoScalePopup
           detectedScale={detectedScaleInfo.scale}
           confidence={detectedScaleInfo.confidence}
@@ -2152,10 +2172,10 @@ function PageInner() {
       )}
 
       {/* What's New modal */}
-      {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+      {!agentMode && whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
 
       {/* First-run tooltips for new editor users */}
-      {projectId && <FirstRunTooltips />}
+      {projectId && !agentMode && <FirstRunTooltips />}
 
       {/* GAP-006: Server-detected scale banner from upload response */}
       {uploadDetectedScale && (

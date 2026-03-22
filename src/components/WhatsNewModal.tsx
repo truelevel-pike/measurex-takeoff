@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, X } from 'lucide-react';
 
-const VERSION_KEY = 'whats-new-seen-v0.1.0';
+// BUG-MX-005 fix: use stable versioned key so seen-state persists correctly
+const VERSION_KEY = 'measurex_whats_new_v2';
 
 const CHANGELOG = [
   { title: 'Project Compare View', desc: 'Compare classification quantities side-by-side across two bids' },
