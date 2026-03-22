@@ -34,6 +34,7 @@ import QuantitiesPanel from '@/components/QuantitiesPanel';
 import TextSearchPanel from '@/components/TextSearchPanel';
 import MeasurementTool from '@/components/MeasurementTool';
 import DrawingTool from '@/components/DrawingTool';
+import CoordInputPanel from '@/components/CoordInputPanel';
 import AnnotationTool from '@/components/AnnotationTool';
 import ScaleCalibrationPanel from '@/components/ScaleCalibrationPanel';
 import MergeSplitTool from '@/components/MergeSplitTool';
@@ -2222,6 +2223,15 @@ function PageInner() {
           </button>
         </div>
       )}
+      <CoordInputPanel />
+      <span
+        id="mx-agent-state"
+        data-current-page={String(currentPage)}
+        data-total-pages={String(totalPages || 1)}
+        data-active-tool={currentTool}
+        data-project-id={projectId || ''}
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }

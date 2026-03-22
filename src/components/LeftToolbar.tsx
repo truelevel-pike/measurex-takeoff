@@ -129,6 +129,8 @@ export default function LeftToolbar() {
               aria-pressed={'tool' in b ? active : undefined}
               title={`${b.label} (${b.shortcut})`}
               onClick={() => onClick(b as (typeof GROUPS)[number][number])}
+              data-testid={'tool' in b ? `tool-${(b as { tool: string }).tool}` : b.label === 'Undo' ? 'tool-undo' : 'tool-redo'}
+              data-active={'tool' in b ? (active ? 'true' : 'false') : undefined}
               style={{
                 minWidth: 62,
                 height: 54,
@@ -192,7 +194,8 @@ export default function LeftToolbar() {
                 aria-pressed={'tool' in b ? active : undefined}
                 title={`${b.label} (${b.shortcut})`}
                 onClick={() => onClick(b as (typeof GROUPS)[number][number])}
-                data-testid={'tool' in b ? `tool-${'tool' in b ? (b as { tool: string }).tool : ''}` : undefined}
+                data-testid={'tool' in b ? `tool-${(b as { tool: string }).tool}` : b.label === 'Undo' ? 'tool-undo' : 'tool-redo'}
+                data-active={'tool' in b ? (active ? 'true' : 'false') : undefined}
                 style={{
                   width: 36,
                   height: 36,
