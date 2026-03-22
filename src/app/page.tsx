@@ -2237,13 +2237,15 @@ function PageInner() {
           </button>
         </div>
       )}
-      <CoordInputPanel />
+      <CoordInputPanel agentMode={agentMode} />
       <span
         id="mx-agent-state"
         data-current-page={String(currentPage)}
         data-total-pages={String(totalPages || 1)}
         data-active-tool={currentTool}
         data-project-id={projectId || ''}
+        data-scale={scale ? String(scale.pixelsPerUnit) : ''}
+        data-scale-unit={scale?.unit || ''}
         style={{ display: 'none' }}
       />
     </div>

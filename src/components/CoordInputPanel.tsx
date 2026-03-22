@@ -1,11 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { calculateLinearFeet, calculatePolygonArea } from '@/lib/polygon-utils';
 import { useStore } from '@/lib/store';
 
-export default function CoordInputPanel() {
+interface CoordInputPanelProps {
+  agentMode?: boolean;
+}
+
+export default function CoordInputPanel({ agentMode }: CoordInputPanelProps) {
   const selectedClassification = useStore((s) => s.selectedClassification);
   const currentTool = useStore((s) => s.currentTool);
   const currentPage = useStore((s) => s.currentPage);
@@ -15,13 +19,7 @@ export default function CoordInputPanel() {
   const setTool = useStore((s) => s.setTool);
 
   const [coords, setCoords] = useState('');
-
-  const agentMode = useMemo(
-    () =>
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('agent') === '1',
-    []
-  );
+  const [result, setResult] = useState<string | null>(null);
 
   if (!agentMode || currentTool !== 'draw' || selectedClassification === null) {
     return null;
@@ -44,7 +42,7 @@ export default function CoordInputPanel() {
     const classification = classifications.find((c) => c.id === selectedClassification);
     const minPoints = classification?.type === 'linear' ? 2 : 3;
     if (points.length < minPoints) {
-      alert(`Please enter at least ${minPoints} valid points.`);
+      setResult(`❌ Error: need at least ${minPoints} points`);
       return;
     }
 
@@ -64,6 +62,9 @@ export default function CoordInputPanel() {
       isComplete: true,
       label: classification?.name,
     });
+
+    const sf = scale ? (area / (scale.pixelsPerUnit * scale.pixelsPerUnit)).toFixed(1) : area.toFixed(1);
+    setResult(`✅ Polygon created — SF: ${sf}`);
     setCoords('');
     setTool('select');
   };
@@ -90,6 +91,11 @@ export default function CoordInputPanel() {
       >
         Create Polygon
       </button>
+      {result && (
+        <p data-testid="coord-input-result" className="mt-2 text-xs text-white/80">
+          {result}
+        </p>
+      )}
     </div>
   );
 }
