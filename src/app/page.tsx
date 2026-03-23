@@ -544,12 +544,16 @@ function PageInner() {
     }
   }, [projectId, buildStatePayload, currentPageNum, persistSaveStatus]);
 
+  // Wave 11B: debounce raised to 2000ms — autosave should only fire after the user
+  // stops making changes, not on every keystroke or rapid polygon placement.
+  // The 2s window batches bursts of polygon creation (agent or manual) into one save.
+  const AUTOSAVE_DEBOUNCE_MS = 2000;
   const requestAutoSave = useCallback(() => {
     if (!projectId) return;
     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
     autoSaveTimeoutRef.current = setTimeout(() => {
       void flushSave(false);
-    }, 1200);
+    }, AUTOSAVE_DEBOUNCE_MS);
   }, [projectId, flushSave]);
 
   const closeContextMenu = useCallback(() => setMenuState(null), []);
@@ -1083,6 +1087,9 @@ function PageInner() {
   }, [pdfFile, currentPageNum]);
 
   // Autosave on state changes (project loaded)
+  // Wave 11B: exclude currentPage and totalPages from the fingerprint — navigating
+  // between pages is not a "data change" and must not trigger an autosave by itself.
+  // Tracks: classifications, polygons, annotations, scale, per-page scales only.
   const autosaveFingerprint = useMemo(() => JSON.stringify({
     projectId,
     classifications,
@@ -1090,9 +1097,7 @@ function PageInner() {
     annotations,
     scale,
     scales,
-    currentPage,
-    totalPages,
-  }), [projectId, classifications, polygons, annotations, scale, scales, currentPage, totalPages]);
+  }), [projectId, classifications, polygons, annotations, scale, scales]);
 
   useEffect(() => {
     if (!projectId || isDemoProject(projectId)) return;
@@ -1985,7 +1990,12 @@ function PageInner() {
               >
                 {pdfFetching ? (
                   /* BUG-R5-002: spinner while auto-fetching saved PDF */
-                  <div className="flex flex-col items-center gap-4 text-[rgba(0,212,255,0.7)]">
+                  <div
+                    className="flex flex-col items-center gap-4 text-[rgba(0,212,255,0.7)]"
+                    data-testid="pdf-loading-indicator"
+                    aria-label="Loading PDF"
+                    role="status"
+                  >
                     <svg className="animate-spin h-10 w-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -2181,7 +2191,13 @@ function PageInner() {
       )}
 
       {!aiLoading && aiStatus && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium">
+        <div
+          className={`fixed bottom-16 left-1/2 -translate-x-1/2 z-50 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium ${aiStatus.startsWith('Error:') || aiStatus.includes('timed out') || aiStatus.includes('failed') ? 'bg-red-600' : 'bg-emerald-600'}`}
+          // Wave 11B: data-testid=api-error-display when the status is an error so
+          // agents and tests can assert on visible API errors without CSS inspection.
+          data-testid={aiStatus.startsWith('Error:') || aiStatus.includes('timed out') || aiStatus.includes('failed') ? 'api-error-display' : undefined}
+          role={aiStatus.startsWith('Error:') || aiStatus.includes('timed out') ? 'alert' : 'status'}
+        >
           {aiStatus}
         </div>
       )}
@@ -2305,6 +2321,15 @@ function PageInner() {
         data-scale-unit={scale?.unit || ''}
         data-canvas-width={String(pageBaseDimensions[currentPage]?.width || '')}
         data-canvas-height={String(pageBaseDimensions[currentPage]?.height || '')}
+        style={{ display: 'none' }}
+      />
+      {/* Wave 11B: SSE status indicator — readable by agent via DOM snapshot or evaluate().
+          data-connected: "true"|"false"
+          data-ready-state: 0=CONNECTING, 1=OPEN, 2=CLOSED
+          The agent can also call window.measurex.sseStatus() for a full object. */}
+      <span
+        id="mx-sse-status"
+        data-testid="sse-status"
         style={{ display: 'none' }}
       />
     </div>

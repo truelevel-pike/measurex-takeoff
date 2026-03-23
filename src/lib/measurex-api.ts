@@ -1,4 +1,5 @@
 import { useStore } from '@/lib/store';
+import { getEventSource, getConnectedProjectId, getLastEventId } from '@/lib/ws-client';
 import type { ScaleCalibration } from '@/lib/types';
 
 function normalizeClassificationType(type: string): 'area' | 'linear' | 'count' {
@@ -111,6 +112,26 @@ export function installMeasurexAPI() {
       };
       s.setScale(cal);
       s.setScaleForPage(s.currentPage, cal);
+    },
+
+    /**
+     * Wave 11B: SSE connection status for agent diagnostics.
+     * Returns a machine-readable object the agent can inspect via evaluate().
+     *
+     * Usage:
+     *   window.measurex.sseStatus()
+     *   // → { connected: true, projectId: "...", lastEventId: 42, readyState: 1 }
+     *
+     * readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
+     */
+    sseStatus() {
+      const es = getEventSource();
+      return {
+        connected: es !== null && es.readyState === EventSource.OPEN,
+        projectId: getConnectedProjectId(),
+        lastEventId: getLastEventId(),
+        readyState: es?.readyState ?? 2,
+      };
     },
   };
 }

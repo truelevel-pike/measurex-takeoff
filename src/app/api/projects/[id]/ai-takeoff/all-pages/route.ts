@@ -214,26 +214,44 @@ export async function POST(
       try {
         const imageDataUrl = await renderPageAsImage(pdfPath, pageNum).catch(() => null);
 
-        if (imageDataUrl) {
-          elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
-        } else {
+        // Wave 11B: per-page 25s timeout — prevents a single slow page from
+        // consuming the entire Vercel 30s budget and causing an opaque 504.
+        const PAGE_TIMEOUT_MS = 25_000;
+        const pageTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('PAGE_TIMEOUT')), PAGE_TIMEOUT_MS)
+        );
+
+        const pageWorkPromise = (async (): Promise<AIDetectedElement[]> => {
+          if (imageDataUrl) {
+            return analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
+          }
           // Gemini native PDF path
           if (!pdfBuffer) {
             pdfBuffer = await getPDFBuffer(id).catch(() => null);
           }
           if (!pdfBuffer) {
             console.error(`[all-pages] page ${pageNum}: no PDF buffer available — skipping`);
-            byPage.push({ page: pageNum, elements: 0, created: 0, skipped: 0 });
-            continue;
+            return [];
           }
           const geminiModel = model?.startsWith('gemini-') ? model : 'gemini-2.5-flash';
-          elements = await analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
+          return analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
+        })();
+
+        const result = await Promise.race([pageWorkPromise, pageTimeoutPromise]);
+        // Handle the "no buffer" skip case — empty array means skip this page
+        if (result.length === 0 && !imageDataUrl && !pdfBuffer) {
+          byPage.push({ page: pageNum, elements: 0, created: 0, skipped: 0 });
+          continue;
         }
+        elements = result;
       } catch (analyzeErr) {
-        const errMsg = analyzeErr instanceof Error ? analyzeErr.message : 'Analysis failed';
+        const isTimeout = analyzeErr instanceof Error && analyzeErr.message === 'PAGE_TIMEOUT';
+        const errMsg = isTimeout
+          ? `Page ${pageNum} timed out after 25s — skipping`
+          : (analyzeErr instanceof Error ? analyzeErr.message : 'Analysis failed');
         console.error(`[all-pages] page ${pageNum} analyze failed:`, analyzeErr);
-        broadcastToProject(id, 'takeoff:error', { message: errMsg, page: pageNum });
-        byPage.push({ page: pageNum, elements: 0, created: 0, skipped: 0 });
+        broadcastToProject(id, isTimeout ? 'takeoff:timeout' : 'takeoff:error', { message: errMsg, page: pageNum });
+        byPage.push({ page: pageNum, elements: 0, created: 0, skipped: 1 });
         continue;
       }
 
