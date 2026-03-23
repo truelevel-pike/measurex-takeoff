@@ -257,19 +257,17 @@ else
   warn_step "Trigger Webhook" "$MS" "non-fatal — response: $(echo "$WH_RESP" | head -c 80)"
 fi
 
-# ── STEP 7: Export JSON (best-effort — may not exist yet) ───
+# ── STEP 7: Export JSON ─────────────────────────────────────
+# Endpoint: GET /api/projects/:id/export/json
 T0=$(_ms)
-EXPORT=$(json_get "$BASE_URL/api/projects/$PROJECT_ID/export")
+EXPORT=$(json_get "$BASE_URL/api/projects/$PROJECT_ID/export/json")
 T1=$(_ms); MS=$(( T1 - T0 ))
-EXPORT_OK=$(echo "$EXPORT" | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); assert isinstance(d,dict) and 'error' not in d; print('ok')" \
+EXPORT_HAS_PROJECT=$(echo "$EXPORT" | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); assert 'project' in d and 'polygons' in d and 'classifications' in d; print('ok')" \
   2>/dev/null)
-if [ "$EXPORT_OK" = "ok" ]; then
-  pass_step "Export JSON" "$MS"
-else
-  EXPORT_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/api/projects/$PROJECT_ID/export" 2>/dev/null)
-  warn_step "Export JSON" "$MS" "HTTP $EXPORT_CODE — endpoint not yet implemented (non-fatal)"
-fi
+[ "$EXPORT_HAS_PROJECT" = "ok" ] \
+  && pass_step "Export JSON" "$MS" "project+polygons+classifications present" \
+  || fail_step "Export JSON" "$MS" "$(echo "$EXPORT" | head -c 120)"
 
 # ── SUMMARY ────────────────────────────────────────────────
 echo ""
