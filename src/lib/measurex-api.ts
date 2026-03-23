@@ -43,5 +43,51 @@ export function installMeasurexAPI() {
     getClassifications() {
       return useStore.getState().classifications;
     },
+
+    getState() {
+      const s = useStore.getState();
+      return {
+        currentPage: s.currentPage,
+        totalPages: s.totalPages,
+        scale: s.scale,
+        selectedClassification: s.selectedClassification,
+        polygonCount: s.polygons.length,
+        classificationCount: s.classifications.length,
+      };
+    },
+
+    getTotals() {
+      const s = useStore.getState();
+      let areaSF = 0, lf = 0, count = 0;
+      const ppu = s.scale?.pixelsPerUnit || 1;
+      s.polygons.forEach((p) => {
+        const c = s.classifications.find((x) => x.id === p.classificationId);
+        if (c?.type === 'area') {
+          areaSF += (p.area || (p.points?.length >= 3
+            ? Math.abs(p.points.reduce((a, b, i) =>
+                a + b.x * (p.points[(i + 1) % p.points.length].y - p.points[(i - 1 + p.points.length) % p.points.length].y),
+              0) / 2)
+            : 0)) / (ppu * ppu);
+        } else if (c?.type === 'linear') {
+          lf += (p.linearFeet || 0) / ppu;
+        } else if (c?.type === 'count') {
+          count++;
+        }
+      });
+      return {
+        totalAreaSF: Math.round(areaSF * 100) / 100,
+        totalLF: Math.round(lf * 100) / 100,
+        totalCount: count,
+      };
+    },
+
+    selectClassification(id: string) {
+      useStore.getState().setSelectedClassification(id);
+    },
+
+    clearPage(pageNumber: number) {
+      const s = useStore.getState();
+      s.polygons.filter((p) => p.pageNumber === pageNumber).forEach((p) => s.deletePolygon(p.id));
+    },
   };
 }

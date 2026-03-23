@@ -1324,6 +1324,13 @@ function PageInner() {
     setDetectedScale(null);
   }, [detectedScale, currentPageNum, setScale, setScaleForPage]);
 
+  // In agentMode, auto-accept detected scale without showing the popup
+  useEffect(() => {
+    if (agentMode && detectedScale) {
+      handleAcceptScale();
+    }
+  }, [agentMode, detectedScale, handleAcceptScale]);
+
   // Install automation API for browser/AI drivers
   // BUG-A8-5-005 fix: return cleanup function to remove window.measurex on unmount
   // (avoids stale closures if the component remounts with a different projectId etc.)
