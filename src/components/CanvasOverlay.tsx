@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import type { Point } from '@/lib/types';
+import { hexToRgba as _hexToRgba, getPolygonColor as _getPolygonColor } from '@/lib/canvas-color-utils';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { snapToNearestVertex, type SnapPoint } from '@/lib/snap-utils';
 import { useUserPrefs } from '@/lib/user-prefs';
@@ -37,30 +38,9 @@ function getModelDisplayName(model: string): string {
 }
 
 /** Convert hex color to rgba string */
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace('#', '');
-  if (!clean || (clean.length !== 3 && clean.length !== 6)) return `rgba(147,197,253,${alpha})`;
-  let r: number, g: number, b: number;
-  if (clean.length === 3) {
-    r = parseInt(clean[0] + clean[0], 16);
-    g = parseInt(clean[1] + clean[1], 16);
-    b = parseInt(clean[2] + clean[2], 16);
-  } else {
-    r = parseInt(clean.slice(0, 2), 16);
-    g = parseInt(clean.slice(2, 4), 16);
-    b = parseInt(clean.slice(4, 6), 16);
-  }
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function getPolygonColor(
-  polygon: { color?: string },
-  classificationColor?: string
-): string {
-  const polygonColor = polygon.color?.trim();
-  if (polygonColor) return polygonColor;
-  return classificationColor?.trim() || '#93c5fd';
-}
+// Use shared lightweight implementations (also exported for testing without ESM deps)
+const hexToRgba = _hexToRgba;
+const getPolygonColor = _getPolygonColor;
 
 function getPolygonFillOpacity(
   polygon: { fillOpacity?: number },

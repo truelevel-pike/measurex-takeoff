@@ -1,3 +1,6 @@
+// Single-page takeoff can take 20-30s on large PDFs; extend beyond 60s default
+export const maxDuration = 120;
+
 import { NextResponse } from 'next/server';
 import { getProject, getPages, setScale } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';

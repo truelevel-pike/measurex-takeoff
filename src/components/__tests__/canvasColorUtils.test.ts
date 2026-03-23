@@ -1,5 +1,6 @@
 // Tests for hexToRgba and getPolygonColor edge cases
-import { hexToRgba, getPolygonColor } from '../CanvasOverlay';
+// Import from lightweight util (no turf/kdbush ESM dependency chain)
+import { hexToRgba, getPolygonColor } from '../../lib/canvas-color-utils';
 
 describe('hexToRgba', () => {
   it('converts valid 6-char hex', () => {

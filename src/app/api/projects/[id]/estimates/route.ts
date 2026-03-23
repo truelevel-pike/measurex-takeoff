@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, getClassifications, getAssemblies, getScale, initDataDir } from '@/server/project-store';
+import { getPolygons, getClassifications, getAssemblies, getScale, getProject, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
@@ -28,6 +28,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const [polygons, classifications, assemblies, scale] = await Promise.all([
       getPolygons(id),
@@ -96,6 +98,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const projectCheck = await getProject(id);
+    if (!projectCheck) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });

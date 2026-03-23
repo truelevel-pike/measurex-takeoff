@@ -266,6 +266,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const currentPage = useStore((s) => s.currentPage);
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [takeoffSearchQuery, setTakeoffSearchQuery] = useState('');
   const [showNewClassification, setShowNewClassification] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
@@ -389,7 +390,13 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     [setShowQuantitiesDrawer]
   );
 
-  const searchLower = search.toLowerCase().trim();
+  // 300ms debounce — prevents re-renders on every keystroke in large classification lists
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const searchLower = debouncedSearch.toLowerCase().trim();
 
   const filtered = useMemo(
     () => {

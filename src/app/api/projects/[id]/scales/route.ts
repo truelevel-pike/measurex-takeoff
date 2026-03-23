@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getScale, setScale, listScales, initDataDir } from '@/server/project-store';
+import { getScale, setScale, listScales, getProject, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -26,6 +26,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const url = new URL(req.url);
     const pagesParam = url.searchParams.get('pages');

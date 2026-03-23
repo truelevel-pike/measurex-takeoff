@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, getClassifications, getScale, getAssemblies } from '@/server/project-store';
+import { getPolygons, getClassifications, getScale, getAssemblies, getProject } from '@/server/project-store';
 import { checkOpenAIKey, getOpenAIKey } from '@/lib/openai-guard';
 import { ProjectIdSchema, ChatBodySchema, validationError } from '@/lib/api-schemas';
 import { validateBody } from '@/lib/api/validate';
@@ -21,6 +21,8 @@ export async function POST(
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     // BUG-A5-6-083: use ChatBodySchema to validate request body
     const raw = await req.json().catch(() => null);

@@ -13,6 +13,10 @@
  *   { pagesProcessed: N, totalElements: M, byPage: [{ page, elements }] }
  */
 
+// Wave 23: extend Vercel serverless timeout — a 10-page PDF takes 20+ seconds.
+// Default is 60s which would cut off mid-takeoff. 300s = 5 minutes.
+export const maxDuration = 300;
+
 import { NextResponse } from 'next/server';
 import {
   getProject,

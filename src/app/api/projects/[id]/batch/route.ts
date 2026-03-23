@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, getClassifications, createClassification, deleteClassification, initDataDir } from '@/server/project-store';
+import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, getClassifications, createClassification, deleteClassification, getProject, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -59,6 +59,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
+
+    const project = await getProject(id);
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });

@@ -145,7 +145,7 @@ describe('API integration: project/classification/polygon CRUD', () => {
       }),
       { params: Promise.resolve({ id: projectId }) },
     );
-    expect(createRes.status).toBe(200);
+    expect(createRes.status).toBe(201);
     const createJson = await createRes.json();
     expect(createJson.classification.id).toBe(classificationId);
     expect(createJson.classification.name).toBe('Flooring');
@@ -233,7 +233,7 @@ describe('API integration: project/classification/polygon CRUD', () => {
       }),
       { params: Promise.resolve({ id: projectId }) },
     );
-    expect(createPolygonRes.status).toBe(200);
+    expect(createPolygonRes.status).toBe(201);
     const createPolygonJson = await createPolygonRes.json();
     expect(createPolygonJson.polygon.id).toBe(polygonId);
     expect(createPolygonJson.polygon.classificationId).toBe(classificationId);
