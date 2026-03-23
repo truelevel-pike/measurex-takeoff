@@ -79,8 +79,11 @@ export function registerWebhook(
   url: string,
   events: string[],
 ): WebhookRegistration {
-  // BUG-A5-6-139: validate URL at registration time to block private/internal targets
-  if (isPrivateUrl(url)) {
+  // BUG-A5-6-139: validate URL at registration time to block private/internal targets.
+  // Wave 19 hotfix: localhost/127.0.0.1/::1 are explicitly allowed for the local agent.
+  const parsedUrl = new URL(url);
+  const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1';
+  if (!isLocalhost && isPrivateUrl(url)) {
     throw new Error('Webhook URL must not target private/internal networks');
   }
 
