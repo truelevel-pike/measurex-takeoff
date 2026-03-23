@@ -102,6 +102,7 @@ export async function analyzePagePDF(
   pageWidth: number,
   pageHeight: number,
   model?: string,
+  detailed = false,
 ): Promise<AIDetectedElement[]> {
   const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Google API key not configured — set GOOGLE_API_KEY in .env.local');
@@ -130,7 +131,10 @@ export async function analyzePagePDF(
     const retryNote = attempt > 1
       ? ' IMPORTANT: You MUST return at least 5 elements. This is a construction blueprint with rooms and walls visible.'
       : '';
-    const promptText = `You are analyzing page ${pageNum} of a multi-page construction blueprint PDF. Focus ONLY on page ${pageNum}.\n\n` + buildSystemPrompt(safeWidth, safeHeight) + (retryNote ? `\n\n${retryNote}` : '');
+    const basePrompt = detailed
+      ? `You are analyzing page ${pageNum} of a construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight)
+      : `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px). Identify ALL construction elements: rooms (areas), walls (linear), doors/windows (count). Return as JSON array: [{"label":"Room Name","type":"area"|"linear"|"count","points":[{"x":0,"y":0},...],"confidence":0.9}]. Areas need 4+ points. Walls need 2 points. Counts need 1 center point. Return 15-30 elements. ONLY return the JSON array.`;
+    const promptText = retryNote ? `${basePrompt}\n\n${retryNote}` : basePrompt;
 
     console.log(`[ai-engine] analyzePagePDF attempt ${attempt}/3 (temperature=${temperature})`);
 
