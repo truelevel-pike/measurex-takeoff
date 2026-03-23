@@ -675,6 +675,23 @@ export default function SettingsPage() {
                     Used for direct GPT-5.4 calls (optional override)
                   </p>
                 </div>
+
+                {/* Agent Webhook URL */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1.5">Agent Webhook URL</label>
+                  <input
+                    type="url"
+                    value={ai.agentWebhookUrl}
+                    onChange={e => updateAi({ agentWebhookUrl: e.target.value })}
+                    placeholder="http://127.0.0.1:9011/hooks/agent"
+                    data-testid="agent-webhook-url-input"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-[#00d4ff] transition-colors"
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    When set, the AI Takeoff button fires this webhook instead of calling the AI API directly.
+                    Use with OpenClaw agent mode (<code className="text-[#00d4ff]">?agent=1</code>).
+                  </p>
+                </div>
               </div>
             </section>
           )}

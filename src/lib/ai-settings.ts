@@ -3,6 +3,7 @@ export interface AiSettings {
   defaultScaleUnit: 'ft' | 'm';
   autoRunScaleDetection: boolean;
   openaiApiKey: string;
+  agentWebhookUrl: string;
 }
 
 // BUG-A8-5-001 fix: split storage keys — non-sensitive settings persist to
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: AiSettings = {
   defaultScaleUnit: 'ft',
   autoRunScaleDetection: true,
   openaiApiKey: '',
+  agentWebhookUrl: '',
 };
 
 export function loadAiSettings(): AiSettings {
@@ -33,12 +35,18 @@ export function loadAiSettings(): AiSettings {
           defaultScaleUnit: parsed.defaultScaleUnit === 'ft' || parsed.defaultScaleUnit === 'm' ? parsed.defaultScaleUnit : DEFAULT_SETTINGS.defaultScaleUnit,
           autoRunScaleDetection: typeof parsed.autoRunScaleDetection === 'boolean' ? parsed.autoRunScaleDetection : DEFAULT_SETTINGS.autoRunScaleDetection,
           openaiApiKey: '',
+          agentWebhookUrl: typeof parsed.agentWebhookUrl === 'string' ? parsed.agentWebhookUrl : DEFAULT_SETTINGS.agentWebhookUrl,
         };
       }
     }
     // Load API key from sessionStorage (cleared on tab close)
     const sessionKey = sessionStorage.getItem(SESSION_KEY);
     base.openaiApiKey = typeof sessionKey === 'string' ? sessionKey : '';
+    // If agentWebhookUrl wasn't in the settings blob, fall back to the legacy localStorage key
+    if (!base.agentWebhookUrl) {
+      const legacyUrl = localStorage.getItem('mx-agent-webhook-url');
+      if (typeof legacyUrl === 'string' && legacyUrl) base.agentWebhookUrl = legacyUrl;
+    }
     return base;
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -48,8 +56,15 @@ export function loadAiSettings(): AiSettings {
 export function saveAiSettings(settings: AiSettings): void {
   if (typeof window === 'undefined') return;
   // Non-sensitive prefs → localStorage (persistent)
+  // agentWebhookUrl is also stored here (it's a local config URL, not a secret)
   const withoutKey = { ...settings, openaiApiKey: '' };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(withoutKey));
+  // Sync agentWebhookUrl to the key used by page.tsx for dispatch
+  if (settings.agentWebhookUrl) {
+    localStorage.setItem('mx-agent-webhook-url', settings.agentWebhookUrl);
+  } else {
+    localStorage.removeItem('mx-agent-webhook-url');
+  }
   // API key → sessionStorage only (clears on tab close, never in localStorage)
   if (settings.openaiApiKey) {
     sessionStorage.setItem(SESSION_KEY, settings.openaiApiKey);
