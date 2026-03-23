@@ -23,16 +23,63 @@ function parseFraction(s: string): number | null {
 }
 
 /**
+ * Normalise agent-friendly shorthand into canonical forms the regexes expect.
+ *
+ * Handles:
+ *   '1/8"=1ft'   → '1/8" = 1\' 0"'
+ *   '1/8in=1ft'  → '1/8" = 1\' 0"'
+ *   '1/8=1ft'    → '1/8" = 1\' 0"'
+ *   '1/4"=1ft'   → '1/4" = 1\' 0"'
+ *   '1"=20ft'    → '1" = 20\' 0"'
+ *   '1:100'      → '1 : 100'  (spaces for ratio regex)
+ *   Already-canonical strings pass through unchanged.
+ */
+function normalisePreset(raw: string): string {
+  let s = raw.trim();
+
+  // Ratio shorthand with no spaces: '1:100' → '1 : 100'
+  s = s.replace(/^(1)\s*:\s*(\d+)$/, '$1 : $2');
+
+  // Replace 'in' (inch abbreviation before '=') with '"'
+  // e.g. '1/8in=1ft'  → '1/8"=1ft'
+  s = s.replace(/in\s*=/i, '"=');
+
+  // If the left-hand side has no inch marker at all before '=', add one
+  // e.g. '1/8=1ft' → '1/8"=1ft'
+  s = s.replace(/^([^"'=]+)=/, (_, lhs) => {
+    const trimmed = lhs.trim();
+    if (!trimmed.endsWith('"') && !trimmed.endsWith("'")) {
+      return `${trimmed}"=`;
+    }
+    return `${trimmed}=`;
+  });
+
+  // Replace 'ft' suffix on the right of '=' with canonical foot notation
+  // e.g. '1/8"=1ft' → '1/8" = 1\' 0"'
+  // e.g. '1"=20ft'  → '1" = 20\' 0"'
+  s = s.replace(/=\s*(\d+(?:\/\d+)?)\s*ft\b/i, (_, feet) => `= ${feet}' 0"`);
+
+  // Normalise spaces around '=' for readability (optional — regexes use \s*)
+  s = s.replace(/"\s*=\s*/, '" = ');
+
+  return s;
+}
+
+/**
  * Convert a preset label string to a pixelsPerUnit value at 72 DPI.
  * Supports:
  *   Architectural: "1/8" = 1' 0""  →  ppu = fraction * DPI
  *   Civil:         "1" = 20' 0""   →  ppu = DPI / feet
  *   Ratio/Metric:  "1 : 500"       →  ppu = DPI / ratio
+ *   Agent shorthand: '1/8"=1ft', '1/8in=1ft', '1:100' etc.
  * Returns null for unrecognised formats.
  */
 function presetToPixelsPerUnit(preset: string): { pixelsPerUnit: number; unit: 'ft' | 'm' } | null {
+  // Normalise before matching so agent shorthand is accepted
+  const s = normalisePreset(preset);
+
   // Ratio / Metric: "1 : 500"
-  const ratioMatch = preset.match(/^1\s*:\s*(\d+)$/);
+  const ratioMatch = s.match(/^1\s*:\s*(\d+)$/);
   if (ratioMatch) {
     const ratio = parseInt(ratioMatch[1], 10);
     if (ratio === 0) return null;
@@ -40,7 +87,7 @@ function presetToPixelsPerUnit(preset: string): { pixelsPerUnit: number; unit: '
   }
 
   // Civil: 1" = X' 0"
-  const civilMatch = preset.match(/^1"\s*=\s*(\d+)'\s*0?"?$/);
+  const civilMatch = s.match(/^1"\s*=\s*(\d+)'\s*0?"?$/);
   if (civilMatch) {
     const feet = parseInt(civilMatch[1], 10);
     if (feet === 0) return null;
@@ -48,7 +95,7 @@ function presetToPixelsPerUnit(preset: string): { pixelsPerUnit: number; unit: '
   }
 
   // Architectural: fraction" = 1' 0"
-  const archMatch = preset.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
+  const archMatch = s.match(/^(.+?)"\s*=\s*1'\s*0?"?$/);
   if (archMatch) {
     const frac = parseFraction(archMatch[1].trim());
     if (frac === null || frac <= 0) return null;
