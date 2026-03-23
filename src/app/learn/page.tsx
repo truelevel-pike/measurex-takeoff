@@ -146,7 +146,7 @@ export default function LearnPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white" data-testid="learn-page">
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
         <Link href="/projects" className="text-gray-400 hover:text-white transition-colors">
@@ -344,12 +344,12 @@ export default function LearnPage() {
 
         {/* Bottom buttons */}
         <section className="flex items-center gap-4 pb-10">
-          <button
-            onClick={() => window.open('https://docs.measurex.io', '_blank', 'noopener,noreferrer')}
+          <Link
+            href="/agent"
             className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
-            <HelpCircle size={16} /> Help Center
-          </button>
+            <HelpCircle size={16} /> Agent Docs
+          </Link>
           <a
             href="mailto:support@measurex.io"
             className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"

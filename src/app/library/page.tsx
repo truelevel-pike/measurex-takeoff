@@ -212,6 +212,7 @@ export default function LibraryPage() {
   return (
     <div
       className="min-h-screen"
+      data-testid="library-page"
       style={{
         background: '#000',
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
@@ -573,6 +574,7 @@ function LibraryCard({
   return (
     <div
       className="rounded-xl bg-[#0a0a0f] border border-[#00d4ff]/20 p-3 flex items-start gap-3 group transition-all hover:border-[#00d4ff]/60 hover:shadow-[0_0_12px_rgba(0,212,255,0.1)]"
+      data-testid="library-classification-item"
     >
       {/* Color dot indicator */}
       <div

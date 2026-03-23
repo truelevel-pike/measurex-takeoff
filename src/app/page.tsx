@@ -2248,7 +2248,7 @@ function PageInner() {
         data-active-tool={currentTool}
         data-project-id={projectId || ''}
         data-selected-classification={selectedClassificationId || ''}
-        data-polygon-count={String(polygons.filter((p) => p.page === currentPage).length)}
+        data-polygon-count={String(polygons.filter((p) => p.pageNumber === currentPage).length)}
         data-scale-px-per-unit={scale ? String(scale.pixelsPerUnit) : ''}
         data-scale={scale ? String(scale.pixelsPerUnit) : ''}
         data-scale-unit={scale?.unit || ''}

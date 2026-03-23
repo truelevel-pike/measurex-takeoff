@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, GitCompare, Layers, Eye, SlidersHorizontal } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, GitCompare, Layers, Eye, SlidersHorizontal, Loader2, AlertCircle } from 'lucide-react';
 
 // --- Types ---
 interface Drawing {
   id: string;
   name: string;
-  url?: string;
 }
 
 interface DiffRegion {
@@ -19,29 +18,88 @@ interface DiffRegion {
   color: string;
 }
 
+interface ClassificationDiffEntry {
+  classificationId: string;
+  name: string;
+  qtyA: number;
+  qtyB: number;
+  delta: number;
+  status: 'added' | 'removed' | 'changed' | 'same';
+}
+
+interface CompareResult {
+  addedCount: number;
+  removedCount: number;
+  unchangedCount: number;
+  classificationDiff: ClassificationDiffEntry[];
+  diffRegions: DiffRegion[];
+}
+
 interface DrawingComparisonProps {
+  /** List of drawings (projects) available to compare. Pass real project data from your store. */
+  drawings?: Drawing[];
   onClose?: () => void;
 }
 
-// Stub diff regions shown as colored border boxes over the canvas panels
-const SAMPLE_DIFF_REGIONS: DiffRegion[] = [
-  { x: 10, y: 12, width: 22, height: 18, label: 'Wall removed', color: '#ef4444' },
-  { x: 45, y: 30, width: 18, height: 24, label: 'New room added', color: '#22c55e' },
-  { x: 68, y: 55, width: 15, height: 12, label: 'Door relocated', color: '#f59e0b' },
-];
+// ---- Helpers ----
 
-// Sample drawing list — in a real integration this would come from your store/project
-const SAMPLE_DRAWINGS: Drawing[] = [
-  { id: 'd1', name: 'A1.1 - Floor Plan (Rev 0)' },
-  { id: 'd2', name: 'A1.1 - Floor Plan (Rev 1)' },
-  { id: 'd3', name: 'A2.0 - Elevations (Rev 0)' },
-  { id: 'd4', name: 'A3.0 - Sections (Rev 0)' },
-  { id: 'd5', name: 'S1.0 - Foundation Plan' },
-];
+/** Convert classification diff entries into canvas-overlay diff regions.
+ *  Since we don't have pixel coordinates from the polygon data, we render
+ *  a tabular legend instead of canvas boxes.  This function is kept for
+ *  future use when polygon bounding-box data is available from the API.
+ */
+function classificationDiffToRegions(diff: ClassificationDiffEntry[]): DiffRegion[] {
+  const statusColors: Record<string, string> = {
+    added: '#22c55e',
+    removed: '#ef4444',
+    changed: '#f59e0b',
+  };
+  return diff
+    .filter((d) => d.status !== 'same')
+    .map((d, i) => ({
+      // Spread vertically across the panel for visibility
+      x: 5,
+      y: 5 + i * 12,
+      width: 90,
+      height: 10,
+      label: `${d.name}: ${d.delta > 0 ? '+' : ''}${d.delta.toFixed(1)}`,
+      color: statusColors[d.status] ?? '#a3a3a3',
+    }));
+}
+
+async function fetchComparisonResult(projectIdA: string, projectIdB: string): Promise<CompareResult> {
+  const res = await fetch('/api/projects/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectIdA, projectIdB }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const classificationDiff: ClassificationDiffEntry[] = data.classificationDiff ?? [];
+  const diffRegions = classificationDiffToRegions(classificationDiff);
+  return {
+    addedCount: data.summary?.addedCount ?? 0,
+    removedCount: data.summary?.removedCount ?? 0,
+    unchangedCount: data.summary?.unchangedCount ?? 0,
+    classificationDiff,
+    diffRegions,
+  };
+}
 
 // ---- Sub-components ----
 
-function PanelPlaceholder({ label, diffRegions, showDiff }: { label: string; diffRegions: DiffRegion[]; showDiff: boolean }) {
+function PanelPlaceholder({
+  label,
+  diffRegions,
+  showDiff,
+}: {
+  label: string;
+  diffRegions: DiffRegion[];
+  showDiff: boolean;
+}) {
   return (
     <div
       className="relative w-full h-full flex items-center justify-center rounded"
@@ -153,6 +211,11 @@ function DrawingSelect({
         }}
         aria-label={`Select ${label}`}
       >
+        {drawings.length === 0 && (
+          <option value="" disabled>
+            No drawings available
+          </option>
+        )}
         {drawings.map((d) => (
           <option key={d.id} value={d.id} style={{ background: '#12121a' }}>
             {d.name}
@@ -165,15 +228,37 @@ function DrawingSelect({
 
 // ---- Main Component ----
 
-export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
-  const [drawingAId, setDrawingAId] = useState<string>(SAMPLE_DRAWINGS[0].id);
-  const [drawingBId, setDrawingBId] = useState<string>(SAMPLE_DRAWINGS[1].id);
+export default function DrawingComparison({ drawings = [], onClose }: DrawingComparisonProps) {
+  const [drawingAId, setDrawingAId] = useState<string>(drawings[0]?.id ?? '');
+  const [drawingBId, setDrawingBId] = useState<string>(drawings[1]?.id ?? drawings[0]?.id ?? '');
   const [viewMode, setViewMode] = useState<'sidebyside' | 'overlay'>('sidebyside');
   const [overlayOpacity, setOverlayOpacity] = useState<number>(50);
   const [showDiff, setShowDiff] = useState<boolean>(true);
 
-  const drawingA = SAMPLE_DRAWINGS.find((d) => d.id === drawingAId) ?? SAMPLE_DRAWINGS[0];
-  const drawingB = SAMPLE_DRAWINGS.find((d) => d.id === drawingBId) ?? SAMPLE_DRAWINGS[1];
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
+  const drawingA = drawings.find((d) => d.id === drawingAId) ?? drawings[0];
+  const drawingB = drawings.find((d) => d.id === drawingBId) ?? drawings[1] ?? drawings[0];
+
+  const diffRegions = compareResult?.diffRegions ?? [];
+  const hasDiff = diffRegions.length > 0;
+
+  const handleCompare = useCallback(async () => {
+    if (!drawingAId || !drawingBId) return;
+    setComparing(true);
+    setCompareError(null);
+    setCompareResult(null);
+    try {
+      const result = await fetchComparisonResult(drawingAId, drawingBId);
+      setCompareResult(result);
+    } catch (err) {
+      setCompareError(err instanceof Error ? err.message : 'Comparison failed');
+    } finally {
+      setComparing(false);
+    }
+  }, [drawingAId, drawingBId]);
 
   const btnBase: React.CSSProperties = {
     background: '#12121a',
@@ -202,6 +287,7 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
     <div
       role="dialog"
       aria-label="Compare Drawings"
+      data-testid="drawing-comparison-container"
       style={{
         position: 'fixed',
         inset: 0,
@@ -300,14 +386,38 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
             label="Drawing A"
             value={drawingAId}
             onChange={setDrawingAId}
-            drawings={SAMPLE_DRAWINGS}
+            drawings={drawings}
           />
           <DrawingSelect
             label="Drawing B"
             value={drawingBId}
             onChange={setDrawingBId}
-            drawings={SAMPLE_DRAWINGS}
+            drawings={drawings}
           />
+
+          {/* Compare button */}
+          <button
+            onClick={handleCompare}
+            disabled={comparing || !drawingAId || !drawingBId || drawings.length < 2}
+            style={{
+              ...btnBase,
+              background: 'rgba(0,212,255,0.15)',
+              border: '1px solid rgba(0,212,255,0.4)',
+              color: '#e0faff',
+              opacity: comparing || drawings.length < 2 ? 0.6 : 1,
+              cursor: comparing || drawings.length < 2 ? 'not-allowed' : 'pointer',
+              alignSelf: 'flex-end',
+              marginBottom: 2,
+            }}
+            aria-label="Run comparison"
+          >
+            {comparing ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <GitCompare size={13} />
+            )}
+            {comparing ? 'Comparing…' : 'Compare'}
+          </button>
 
           {/* Divider */}
           <div style={{ width: 1, height: 36, background: 'rgba(0,212,255,0.15)', flexShrink: 0 }} />
@@ -382,32 +492,53 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
           )}
 
           {/* Diff highlight toggle */}
-          <div className="flex flex-col gap-1">
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 1,
-                color: '#8892a0',
-                fontFamily: 'monospace',
-                textTransform: 'uppercase',
-              }}
-            >
-              Diff Highlight
-            </label>
-            <button
-              onClick={() => setShowDiff(!showDiff)}
-              aria-pressed={showDiff}
-              style={showDiff ? btnActive : btnBase}
-            >
-              {showDiff ? 'On' : 'Off'}
-            </button>
-          </div>
+          {compareResult && (
+            <div className="flex flex-col gap-1">
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  color: '#8892a0',
+                  fontFamily: 'monospace',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Diff Highlight
+              </label>
+              <button
+                onClick={() => setShowDiff(!showDiff)}
+                aria-pressed={showDiff}
+                style={showDiff ? btnActive : btnBase}
+              >
+                {showDiff ? 'On' : 'Off'}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Diff legend */}
-        {showDiff && (
+        {/* Error banner */}
+        {compareError && (
           <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 18px',
+              background: 'rgba(239,68,68,0.1)',
+              borderBottom: '1px solid rgba(239,68,68,0.3)',
+              flexShrink: 0,
+            }}
+          >
+            <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: '#fca5a5' }}>{compareError}</span>
+          </div>
+        )}
+
+        {/* Diff legend — only shown after a successful comparison with results */}
+        {compareResult && hasDiff && showDiff && (
+          <div
+            data-testid="drawing-comparison-result"
             style={{
               display: 'flex',
               gap: 16,
@@ -415,6 +546,8 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
               borderBottom: '1px solid rgba(0,212,255,0.08)',
               background: 'rgba(10,10,15,0.3)',
               flexShrink: 0,
+              flexWrap: 'wrap',
+              alignItems: 'center',
             }}
           >
             {[
@@ -436,8 +569,48 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
                 <span style={{ fontSize: 11, color: '#8892a0', fontFamily: 'monospace' }}>{label}</span>
               </div>
             ))}
-            <span style={{ fontSize: 11, color: 'rgba(0,212,255,0.4)', marginLeft: 'auto', fontStyle: 'italic' }}>
-              {SAMPLE_DIFF_REGIONS.length} diff regions detected (stub)
+            <span style={{ fontSize: 11, color: 'rgba(0,212,255,0.7)', marginLeft: 'auto', fontFamily: 'monospace' }}>
+              +{compareResult.addedCount} added · -{compareResult.removedCount} removed · {compareResult.unchangedCount} unchanged
+            </span>
+          </div>
+        )}
+
+        {/* Empty state — shown after comparison with zero diff */}
+        {compareResult && !hasDiff && (
+          <div
+            data-testid="drawing-comparison-empty"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 18px',
+              borderBottom: '1px solid rgba(0,212,255,0.08)',
+              background: 'rgba(10,10,15,0.3)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 12, color: '#8892a0', fontFamily: 'monospace' }}>
+              No differences detected between the selected drawings.
+            </span>
+          </div>
+        )}
+
+        {/* No drawings state */}
+        {drawings.length < 2 && (
+          <div
+            data-testid="drawing-comparison-empty"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 18px',
+              borderBottom: '1px solid rgba(0,212,255,0.08)',
+              background: 'rgba(10,10,15,0.3)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 12, color: '#8892a0', fontFamily: 'monospace' }}>
+              At least two drawings are required to compare.
             </span>
           </div>
         )}
@@ -458,11 +631,11 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
             <>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 11, color: '#00d4ff', fontFamily: 'monospace', fontWeight: 700 }}>
-                  A — {drawingA.name}
+                  A — {drawingA?.name ?? 'Drawing A'}
                 </div>
                 <PanelPlaceholder
-                  label={drawingA.name}
-                  diffRegions={SAMPLE_DIFF_REGIONS}
+                  label={drawingA?.name ?? 'Drawing A'}
+                  diffRegions={showDiff ? diffRegions : []}
                   showDiff={showDiff}
                 />
               </div>
@@ -471,17 +644,18 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
                 style={{
                   width: 2,
                   alignSelf: 'stretch',
-                  background: 'linear-gradient(to bottom, transparent, rgba(0,212,255,0.3) 30%, rgba(0,212,255,0.3) 70%, transparent)',
+                  background:
+                    'linear-gradient(to bottom, transparent, rgba(0,212,255,0.3) 30%, rgba(0,212,255,0.3) 70%, transparent)',
                   flexShrink: 0,
                 }}
               />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 11, color: '#f59e0b', fontFamily: 'monospace', fontWeight: 700 }}>
-                  B — {drawingB.name}
+                  B — {drawingB?.name ?? 'Drawing B'}
                 </div>
                 <PanelPlaceholder
-                  label={drawingB.name}
-                  diffRegions={SAMPLE_DIFF_REGIONS}
+                  label={drawingB?.name ?? 'Drawing B'}
+                  diffRegions={showDiff ? diffRegions : []}
                   showDiff={showDiff}
                 />
               </div>
@@ -494,7 +668,7 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
                 <span style={{ color: '#f59e0b' }}>B</span> at {overlayOpacity}% opacity
               </div>
               {/* Base drawing B */}
-              <PanelPlaceholder label={drawingB.name} diffRegions={[]} showDiff={false} />
+              <PanelPlaceholder label={drawingB?.name ?? 'Drawing B'} diffRegions={[]} showDiff={false} />
               {/* Drawing A on top with opacity */}
               <div
                 style={{
@@ -520,12 +694,12 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
                 />
               </div>
               {/* Diff regions on overlay */}
-              {showDiff && (
+              {showDiff && hasDiff && (
                 <div
                   style={{ position: 'absolute', inset: '26px 0 0 0', pointerEvents: 'none' }}
                   aria-label="Diff regions"
                 >
-                  {SAMPLE_DIFF_REGIONS.map((region, i) => (
+                  {diffRegions.map((region, i) => (
                     <div
                       key={`diff-${region.label}-${i}`}
                       style={{
@@ -546,6 +720,52 @@ export default function DrawingComparison({ onClose }: DrawingComparisonProps) {
             </div>
           )}
         </div>
+
+        {/* Classification diff table — shown after comparison */}
+        {compareResult && compareResult.classificationDiff.filter((d) => d.status !== 'same').length > 0 && (
+          <div
+            style={{
+              borderTop: '1px solid rgba(0,212,255,0.15)',
+              background: '#07070d',
+              maxHeight: 180,
+              overflowY: 'auto',
+              flexShrink: 0,
+            }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'monospace' }}>
+              <thead>
+                <tr style={{ background: 'rgba(0,212,255,0.05)' }}>
+                  <th style={{ padding: '6px 14px', textAlign: 'left', color: '#8892a0', fontWeight: 700 }}>Classification</th>
+                  <th style={{ padding: '6px 10px', textAlign: 'right', color: '#8892a0', fontWeight: 700 }}>Qty A</th>
+                  <th style={{ padding: '6px 10px', textAlign: 'right', color: '#8892a0', fontWeight: 700 }}>Qty B</th>
+                  <th style={{ padding: '6px 14px', textAlign: 'right', color: '#8892a0', fontWeight: 700 }}>Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compareResult.classificationDiff
+                  .filter((d) => d.status !== 'same')
+                  .map((d) => {
+                    const color =
+                      d.status === 'added' ? '#22c55e' : d.status === 'removed' ? '#ef4444' : '#f59e0b';
+                    return (
+                      <tr key={d.classificationId} style={{ borderTop: '1px solid rgba(0,212,255,0.06)' }}>
+                        <td style={{ padding: '5px 14px', color: '#e0faff' }}>{d.name}</td>
+                        <td style={{ padding: '5px 10px', textAlign: 'right', color: '#8892a0' }}>
+                          {d.qtyA.toFixed(1)}
+                        </td>
+                        <td style={{ padding: '5px 10px', textAlign: 'right', color: '#8892a0' }}>
+                          {d.qtyB.toFixed(1)}
+                        </td>
+                        <td style={{ padding: '5px 14px', textAlign: 'right', color }}>
+                          {d.delta > 0 ? '+' : ''}{d.delta.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
