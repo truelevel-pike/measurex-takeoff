@@ -64,6 +64,40 @@ export function distance(a: Point, b: Point): number {
   return Math.hypot(dx, dy);
 }
 
+/**
+ * Detect whether a polygon self-intersects (any two non-adjacent edges cross).
+ * Uses the 2D line-segment intersection test.
+ * Returns true if any edge pair intersects (invalid polygon).
+ *
+ * BUG-W12-003: self-intersecting polygons produce incorrect shoelace areas.
+ * Callers should treat such polygons as invalid and show a warning.
+ */
+export function detectSelfIntersection(points: Point[]): boolean {
+  if (!points || points.length < 4) return false;
+  const n = points.length;
+
+  function ccw(a: Point, b: Point, c: Point): boolean {
+    return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+  }
+
+  function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
+    return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+  }
+
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      // Skip adjacent edges (share a vertex)
+      if (i === 0 && j === n - 1) continue;
+      const c = points[j];
+      const d = points[(j + 1) % n];
+      if (segmentsIntersect(a, b, c, d)) return true;
+    }
+  }
+  return false;
+}
+
 // Merge polygons using turf v7 union(FeatureCollection)
 export function mergePolygons(poly1: Point[], poly2: Point[]): Point[] {
   // BUG-A5-5-040: validate polygon lengths before calling turf

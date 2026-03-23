@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, createPolygon, deletePolygonsByPage, getProject, initDataDir } from '@/server/project-store';
+import { getPolygons, createPolygon, deletePolygonsByPage, getProject, getClassifications, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
 import { broadcastToProject } from '@/lib/sse-broadcast';
 import { ProjectIdSchema, PolygonSchema, validationError } from '@/lib/api-schemas';
@@ -58,6 +58,15 @@ export const POST = withCache({ noStore: true }, async function POST(req: Reques
     const bodyResult = PolygonSchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
     const data = bodyResult.data;
+    // Validate classificationId exists in this project
+    const classifications = await getClassifications(id);
+    const classificationExists = classifications.some((c) => c.id === data.classificationId);
+    if (!classificationExists) {
+      return NextResponse.json(
+        { error: `Classification '${data.classificationId}' not found in project` },
+        { status: 400 },
+      );
+    }
     // Compute area/perimeter from points if caller didn't supply them
     const computedArea = data.points.length >= 3 ? calculatePolygonArea(data.points) : 0;
     const computedLinear = data.points.length >= 2 ? calculateLinearFeet(data.points, 1, true) : 0;

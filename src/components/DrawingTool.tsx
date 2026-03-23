@@ -37,7 +37,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
-import { calculatePolygonArea, calculateLinearFeet } from '@/lib/polygon-utils';
+import { calculatePolygonArea, calculateLinearFeet, detectSelfIntersection } from '@/lib/polygon-utils';
 import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
 import type { Point } from '@/lib/types';
 
@@ -186,6 +186,10 @@ export default function DrawingTool() {
     const ppu = scale?.pixelsPerUnit || 1;
     // BUG-A5-H02: compute both area and linearFeet for all polygon types.
     // Area polygons get perimeter (closed=true), linear polygons get path length (closed=false).
+    // BUG-W12-003: warn on self-intersecting polygons (area calculation is unreliable)
+    if (!linear && currentPoints.length >= 4 && detectSelfIntersection(currentPoints)) {
+      addToast('Warning: polygon edges cross — area measurement may be inaccurate', 'warning');
+    }
     const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
     const linearFeet = linear
       ? calculateLinearFeet(currentPoints, ppu, false)

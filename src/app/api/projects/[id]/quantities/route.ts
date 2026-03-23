@@ -4,7 +4,9 @@ import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-e
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { withCache } from '@/lib/with-cache';
 
-export const GET = withCache({ maxAge: 30, sMaxAge: 30 }, async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// BUG-12C-5: quantities must always be fresh — polygon changes should be
+// reflected immediately. Use noStore to prevent CDN/browser caching stale data.
+export const GET = withCache({ noStore: true }, async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);

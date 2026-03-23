@@ -450,6 +450,8 @@ function PageInner() {
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
+  // Wave 12B Bug 1: track last-saved fingerprint to compute isDirty
+  const lastSavedFingerprintRef = useRef<string | null>(null);
   const hydrateAbortRef = useRef<AbortController | null>(null);
   const hydrateRequestIdRef = useRef(0);
   const isCreatingProjectRef = useRef(false);
@@ -524,6 +526,15 @@ function PageInner() {
       });
       if (!res.ok) throw new Error(`Update failed (${res.status})`);
 
+      // Wave 12B Bug 1: snapshot the fingerprint at save time so isDirty resets
+      lastSavedFingerprintRef.current = JSON.stringify({
+        projectId,
+        classifications: useStore.getState().classifications,
+        polygons: useStore.getState().polygons,
+        annotations: useStore.getState().annotations,
+        scale: useStore.getState().scale,
+        scales: useStore.getState().scales,
+      });
       if (showToast) persistSaveStatus('Saved!');
       else persistSaveStatus('Auto-saved', 1200);
     } catch (error) {
@@ -2037,6 +2048,7 @@ function PageInner() {
             ) : (
               /* ── No project, no PDF — fresh upload screen ── */
               <div
+                data-testid="empty-state-upload-prompt"
                 className="flex-1 flex items-center justify-center p-4"
                 role="region"
                 aria-describedby="upload-help"

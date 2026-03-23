@@ -6,8 +6,11 @@ export const ClassificationIdSchema = z.object({ id: z.string().uuid(), cid: z.s
 export const PolygonIdSchema = z.object({ id: z.string().uuid(), pid: z.string().uuid() });
 export const AssemblyIdSchema = z.object({ id: z.string().uuid(), aid: z.string().uuid() });
 
-// Point
-export const PointSchema = z.object({ x: z.number(), y: z.number() });
+// Point — x and y must be finite numbers (rejects NaN, Infinity)
+export const PointSchema = z.object({
+  x: z.number().finite('Point x coordinate must be a finite number'),
+  y: z.number().finite('Point y coordinate must be a finite number'),
+});
 
 // Polygon
 export const PolygonSchema = z.object({
