@@ -32,8 +32,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  // BUG-A5-6-101: add rate limiting to POST handler
-  const limited = rateLimitResponse(req);
+  // BUG-A5-6-101 / Wave 18: 100/60s — AI takeoffs create many classifications at once
+  const limited = rateLimitResponse(req, 100, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

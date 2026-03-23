@@ -1308,7 +1308,7 @@ export default function ProjectsPage() {
           {projects.length < projectsTotal && (
             <div className="flex justify-center pt-4 pb-2">
               <button
-                data-testid="load-more-projects"
+                data-testid="load-more-projects-btn"
                 onClick={() => loadProjects(false)}
                 disabled={loadingMore}
                 className="px-6 py-2 text-sm text-[#00d4ff] border border-[#00d4ff]/30 rounded-xl hover:bg-[#00d4ff]/10 transition-colors disabled:opacity-50 font-mono"

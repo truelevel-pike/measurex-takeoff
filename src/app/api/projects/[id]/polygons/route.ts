@@ -24,8 +24,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  // BUG-A5-6-099: add rate limiting to DELETE handler
-  const limited = rateLimitResponse(req);
+  // BUG-A5-6-099 / Wave 18: raised limit — 10/60s was too low for normal takeoff usage
+  const limited = rateLimitResponse(req, 200, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();
@@ -45,8 +45,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 }
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  // BUG-A5-6-100: add rate limiting to POST handler
-  const limited = rateLimitResponse(req);
+  // BUG-A5-6-100 / Wave 18: 200/60s — a full AI takeoff creates 50-200 polygons per run
+  const limited = rateLimitResponse(req, 200, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

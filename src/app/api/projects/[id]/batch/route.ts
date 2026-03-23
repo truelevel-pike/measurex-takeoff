@@ -51,8 +51,8 @@ const BatchBodySchema = z.object({
  * Execute multiple operations in a single request to reduce round-trips.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  // BUG-A5-6-114: add rate limiting to batch handler
-  const limited = rateLimitResponse(req);
+  // BUG-A5-6-114 / Wave 18: 100/60s — batch ops send many polygons in one call
+  const limited = rateLimitResponse(req, 100, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();
