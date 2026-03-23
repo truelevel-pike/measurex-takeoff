@@ -9,8 +9,17 @@ interface CollaborationPanelProps {
   onClose?: () => void;
 }
 
+type SharePermission = 'view' | 'edit' | 'manage';
+
+const PERMISSION_LABELS: Record<SharePermission, string> = {
+  view: 'Can View (read-only)',
+  edit: 'Can Edit (draw polygons)',
+  manage: 'Can Manage (full access)',
+};
+
 export default function CollaborationPanel({ projectId, projectName = 'Untitled Project', onClose }: CollaborationPanelProps) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [permission, setPermission] = useState<SharePermission>('view');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -51,6 +60,7 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
         }
         const { token } = await postRes.json();
         if (!cancelled) {
+          // Base URL without permission — permission is appended when copying
           setShareUrl(`${window.location.origin}/share/${token}`);
         }
       } catch (err) {
@@ -68,8 +78,10 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
 
   const handleCopyLink = useCallback(() => {
     if (!shareUrl) return;
+    // Append permission param so the share page can enforce it
+    const urlWithPerm = permission === 'view' ? shareUrl : `${shareUrl}?perm=${permission}`;
 
-    navigator.clipboard.writeText(shareUrl).then(() => {
+    navigator.clipboard.writeText(urlWithPerm).then(() => {
       setCopied(true);
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = setTimeout(() => setCopied(false), 2500);
@@ -77,7 +89,7 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
       // Fallback: execCommand copy
       try {
         const ta = document.createElement('textarea');
-        ta.value = shareUrl;
+        ta.value = urlWithPerm;
         ta.setAttribute('readonly', '');
         ta.style.cssText = 'position:fixed;opacity:0';
         document.body.appendChild(ta);
@@ -171,6 +183,34 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
               <X size={16} />
             </button>
           )}
+        </div>
+
+        {/* Permission selector */}
+        <div style={{ padding: '12px 18px 0', background: 'rgba(14,16,22,0.4)' }}>
+          <label style={{ fontSize: 11, color: '#8892a0', fontFamily: 'monospace', display: 'block', marginBottom: 4 }}>
+            Permission level
+          </label>
+          <select
+            value={permission}
+            onChange={(e) => setPermission(e.target.value as SharePermission)}
+            data-testid="share-permission-select"
+            style={{
+              width: '100%',
+              background: '#0a0a0f',
+              border: '1px solid rgba(0,212,255,0.25)',
+              color: '#e0faff',
+              borderRadius: 6,
+              padding: '5px 8px',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              outline: 'none',
+              marginBottom: 10,
+            }}
+          >
+            {(Object.entries(PERMISSION_LABELS) as [SharePermission, string][]).map(([val, label]) => (
+              <option key={val} value={val}>{label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Share link */}

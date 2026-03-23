@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Layers, X } from 'lucide-react';
+import { BookOpen, Check, Layers, X } from 'lucide-react';
 
 import { useStore } from '@/lib/store';
 import {
@@ -16,6 +16,27 @@ interface ClassificationLibraryProps {
   onClose: () => void;
 }
 
+interface OrgLibraryItem {
+  id: string;
+  name: string;
+  type: 'area' | 'linear' | 'count';
+  color: string;
+  tileWidth?: number;
+  tileHeight?: number;
+  slopeFactor?: number;
+  formula?: string;
+}
+
+function loadOrgLibrary(): OrgLibraryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('mx-org-library');
+    return raw ? (JSON.parse(raw) as OrgLibraryItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function ClassificationLibrary({ open, onClose }: ClassificationLibraryProps) {
   const { addToast } = useToast();
   const classifications = useStore((s) => s.classifications);
@@ -23,6 +44,7 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
 
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [orgLibrary, setOrgLibrary] = useState<OrgLibraryItem[]>([]);
 
   // BUG-A6-037 fix: capture onClose in a ref so the Escape handler never triggers
   // re-registration when the parent passes a new function identity.
@@ -51,6 +73,11 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  // Wave 10: load org library from localStorage when dialog opens
+  useEffect(() => {
+    if (open) setOrgLibrary(loadOrgLibrary());
   }, [open]);
 
   if (!open) return null;
@@ -211,6 +238,53 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
               })}
             </div>
           </div>
+
+          {/* Wave 10: Org Library section */}
+          {orgLibrary.length > 0 && (
+            <div
+              data-testid="org-library-section"
+              className="border-t border-[#00d4ff]/15 px-4 py-3"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen size={13} className="text-amber-400" />
+                <span className="text-[11px] font-mono text-amber-300 uppercase tracking-wider">Org Library ({orgLibrary.length})</span>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {orgLibrary.map((item) => {
+                  const alreadyExists = classifications.some((c) => c.name.toLowerCase() === item.name.toLowerCase());
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={alreadyExists}
+                      data-testid="import-from-org-btn"
+                      onClick={() => {
+                        if (alreadyExists) return;
+                        addClassification({
+                          name: item.name,
+                          type: item.type as 'area' | 'linear' | 'count',
+                          color: item.color,
+                          visible: true,
+                        });
+                        addToast(`Imported "${item.name}" from org library`, 'success');
+                      }}
+                      title={alreadyExists ? 'Already in project' : `Import "${item.name}"`}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        alreadyExists
+                          ? 'cursor-not-allowed border-[#2f3a4d] bg-[#0f1725] text-[#64748b]'
+                          : 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:border-amber-400/60'
+                      }`}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span>{item.name}</span>
+                      <span className="rounded bg-[#0b1220] px-1.5 py-0.5 text-[10px] uppercase text-[#8aa0b6]">{item.type}</span>
+                      {alreadyExists && <span className="text-[10px] uppercase">Added</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 border-t border-[#00d4ff]/20 px-4 py-3">
             <button

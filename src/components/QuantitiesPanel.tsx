@@ -9,6 +9,7 @@ import { useIsMobile, useIsTablet } from '@/lib/utils';
 import { useMeasurementSettings } from '@/lib/use-measurement-settings';
 import { formatArea, formatLinear, formatCount, AREA_UNIT_LABELS, LINEAR_UNIT_LABELS } from '@/lib/measurement-settings';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
+import { useToast } from './Toast';
 import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
 import EstimatesTab from './EstimatesTab';
@@ -229,6 +230,7 @@ interface QuantitiesPanelProps {
 }
 
 export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading: externalLoading = false, onClassificationZoom }: QuantitiesPanelProps) {
+  const { addToast } = useToast();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [activeTab, setActiveTab] = useState<'quantities' | 'assemblies' | 'estimate'>('quantities');
@@ -2116,6 +2118,41 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     aria-label="Delete classification"
                   >
                     <Trash2 size={13} aria-hidden="true" />
+                  </button>
+
+                  {/* Wave 10: Save to Org Library */}
+                  <button
+                    type="button"
+                    data-testid="save-to-library-btn"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      try {
+                        const raw = localStorage.getItem('mx-org-library');
+                        const lib: Array<{ id: string; name: string; type: string; color: string; tileWidth?: number; tileHeight?: number; slopeFactor?: number; formula?: string }> = raw ? JSON.parse(raw) : [];
+                        const exists = lib.some((item) => item.name.toLowerCase() === classification.name.toLowerCase());
+                        if (!exists) {
+                          lib.push({
+                            id: crypto.randomUUID(),
+                            name: classification.name,
+                            type: classification.type,
+                            color: classification.color,
+                            tileWidth: classification.tileWidth,
+                            tileHeight: classification.tileHeight,
+                            slopeFactor: classification.slopeFactor,
+                            formula: classification.formula,
+                          });
+                          localStorage.setItem('mx-org-library', JSON.stringify(lib));
+                        }
+                        addToast(exists ? `"${classification.name}" already in library` : `"${classification.name}" saved to library`, 'success');
+                      } catch {
+                        addToast('Failed to save to library', 'error');
+                      }
+                    }}
+                    className="hidden group-hover:inline-flex text-amber-400 hover:text-amber-300"
+                    aria-label="Save to org library"
+                    title="Save to Org Library"
+                  >
+                    <BookOpen size={13} aria-hidden="true" />
                   </button>
                 </div>
               )}

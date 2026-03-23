@@ -6,7 +6,7 @@
 // work and contaminate the auto-save loop with a foreign project ID.
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ToastProvider } from '@/components/Toast';
 import { Layers, ChevronLeft, ChevronRight, ExternalLink, Loader2, FileText, Printer, Download } from 'lucide-react';
 
@@ -60,7 +60,13 @@ function inferTrade(name: string): TradeGroup {
 
 export default function SharedViewPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params?.token as string;
+  // Permission level encoded by CollaborationPanel when copying the link.
+  // 'view' (default) = read-only; 'edit' = can draw; 'manage' = full access.
+  const permParam = searchParams?.get('perm');
+  const sharePermission = (permParam === 'edit' || permParam === 'manage') ? permParam : 'view';
+  const isReadOnly = sharePermission === 'view';
 
   const [project, setProject] = useState<SharedProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -638,8 +644,18 @@ export default function SharedViewPage() {
               Takeoff Summary &mdash; {sheetName || `Page ${pageIndex + 1}`}
             </h2>
             <p style={{ fontSize: 13, color: '#7a8a94', lineHeight: 1.5 }}>
-              This is a read-only summary of the takeoff measurements. Open the project in MeasureX to view the full PDF with markup overlays.
+              {isReadOnly
+                ? 'This is a read-only summary of the takeoff measurements. Open the project in MeasureX to view the full PDF with markup overlays.'
+                : `You have ${sharePermission === 'manage' ? 'full management' : 'edit'} access to this project. Open MeasureX to make changes.`}
             </p>
+            {!isReadOnly && (
+              <div
+                data-testid="share-permission-badge"
+                style={{ display: 'inline-block', marginTop: 8, padding: '3px 10px', background: 'rgba(0,212,255,0.12)', border: '1px solid rgba(0,212,255,0.3)', borderRadius: 6, fontSize: 11, color: '#00d4ff', fontFamily: 'monospace' }}
+              >
+                {sharePermission === 'manage' ? '🔑 Can Manage' : '✏️ Can Edit'}
+              </div>
+            )}
           </div>
 
           {/* Inline quantities summary table (grouped by trade) for current page */}

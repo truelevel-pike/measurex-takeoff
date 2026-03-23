@@ -386,11 +386,12 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
           onClick={createSet}
           className="text-neutral-400 hover:text-white p-1 rounded hover:bg-[#1e1e2e] transition-colors"
           title="New Set"
+          data-testid="create-drawing-set-btn"
         >
           <Plus size={14} />
         </button>
       </div>
-      <div className="flex-shrink-0 max-h-[200px] overflow-y-auto px-1">
+      <div className="flex-shrink-0 max-h-[200px] overflow-y-auto px-1" data-testid="drawing-set-list">
         {sets.map((s) => {
           const isActive = s.id === selectedSetId;
           const isEditing = editingSetId === s.id;
@@ -398,6 +399,9 @@ export default function DrawingSetManager({ projectId, onDrawingSelect }: Drawin
           return (
             <div
               key={s.id}
+              data-testid="drawing-set-item"
+              data-set-id={s.id}
+              data-set-name={s.name}
               className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group ${
                 isActive ? 'bg-[#1e1e2e] text-white' : 'hover:bg-[#1a1a28] text-neutral-400'
               }`}
