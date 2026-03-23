@@ -1192,6 +1192,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                       style={{ userSelect: 'none' }}
                       data-testid="polygon-label"
                       data-polygon-id={poly.id}
+                      data-type={clsType}
                       data-value={displayStr}
                     >
                       {displayStr}

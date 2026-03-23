@@ -2413,6 +2413,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             showQuantitiesDrawer ? 'translate-x-0' : 'translate-x-full'
           }`}
           aria-label="Quantities panel"
+          data-classification-count={classifications.length}
           onKeyDown={handleDrawerKeyDown}
           tabIndex={-1}
         >
@@ -2427,6 +2428,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     <aside
       className="hidden lg:flex bg-[rgba(18,18,26,0.8)] w-72 shrink-0 h-full flex-col border-l border-[#00d4ff]/20 text-[13px]"
       aria-label="Quantities panel"
+      data-classification-count={classifications.length}
     >
       {panel}
     </aside>
