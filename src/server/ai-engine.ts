@@ -12,6 +12,27 @@ export interface AIDetectedElement {
 }
 
 /**
+ * Retry a fetch-based call with exponential backoff on 429 rate-limit errors.
+ * Delays: 30s → 60s → throw.
+ */
+async function retryWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
+  const delays = [30_000, 60_000];
+  let lastErr: Error = new Error('Unknown error');
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      const isRateLimit =
+        lastErr.message.includes('429') || lastErr.message.toLowerCase().includes('rate limit');
+      if (!isRateLimit || attempt >= delays.length) throw lastErr;
+      await new Promise((res) => setTimeout(res, delays[attempt]));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Clean up Gemini response text before JSON.parse():
  * - Strip markdown code fences (```json ... ```)
  * - Strip JS-style comments (// and /* *\/)
@@ -42,49 +63,76 @@ function nameToColor(name: string): string {
 
 const DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 
-const buildSystemPrompt = (pageWidth: number, pageHeight: number) => `You are an expert construction estimator performing a quantity takeoff from a blueprint image.
-The image is ${pageWidth}x${pageHeight} pixels. Use ACTUAL PIXEL COORDINATES — not normalized 0-1 values.
+const buildSystemPrompt = (pageWidth: number, pageHeight: number) => `You are an expert construction estimator performing a quantity takeoff from a blueprint.
+Canvas size: ${pageWidth} x ${pageHeight} pixels. ALL coordinates MUST be integers in pixel space.
+Origin (0,0) = top-left corner. X increases right. Y increases down.
+NEVER return normalized 0.0-1.0 values -- only absolute pixel integers.
 
-Your task: identify every construction element visible and return their locations with precise pixel coordinates.
+ELEMENT TYPES TO DETECT:
 
-ELEMENT TYPES:
+AREA (type: "area") -- full room/space polygon. Rooms to include (ALL visible):
+  Living Room, Great Room, Family Room, Den
+  Bedroom (Primary/Master Bedroom, Bedroom 2, 3, etc.)
+  Bathroom, Full Bath, Half Bath, Powder Room, En Suite
+  Kitchen, Butler Pantry, Pantry
+  Dining Room, Breakfast Nook, Eating Area
+  Hallway, Corridor, Foyer, Entry, Vestibule
+  Closet, Walk-In Closet, Linen Closet
+  Laundry Room, Utility Room, Mudroom
+  Office, Study, Library, Home Office
+  Garage, Carport, Workshop
+  Basement, Crawl Space, Attic
+  Deck, Patio, Porch, Balcony, Terrace
+  Mechanical Room, HVAC Room, Storage
+  Slab, Foundation Area, Roof Section
+Polygon rules:
+  - Trace the actual room boundary (wall center lines)
+  - MINIMUM 4 points per polygon (rectangles need exactly 4 corners)
+  - Complex/L-shaped rooms need 6+ points
+  - Points must form a closed, non-self-intersecting polygon
 
-COUNT (type: "count") — one center point per individual instance:
-- Doors: single swing (arc symbol), double swing, pocket, sliding, bifold — count EACH door
-- Windows: all types (casement, sliding, double-hung, fixed, awning) — count EACH window unit
-- Plumbing: toilets, sinks, bathtubs, showers, water heaters, floor drains
-- Electrical: outlets, switches, panels, fixtures
-- Structural: columns, posts, pilasters
+LINEAR (type: "linear") -- wall centerline segments:
+  - Exterior walls: perimeter/outline (thick solid lines)
+  - Interior walls: room-dividing partitions (thinner lines)
+  - Use exactly 2 endpoints per segment
+  - Do NOT include door/window openings as wall segments
 
-AREA (type: "area") — polygon boundary tracing the exact room/space perimeter:
-- Rooms: living room, bedroom, bathroom, kitchen, dining, garage, entry, hallway, closet, laundry, office, family room
-- Outdoor: deck, patio, porch, balcony, pool
-- Structural: slab, foundation, roof section
+COUNT (type: "count") -- ONE center point per individual instance:
+  Doors: single swing (arc symbol), double swing, pocket, sliding, bifold, barn door
+    -> count EVERY door individually (8 doors = 8 separate entries named "Single Swing Door" etc.)
+  Windows: casement, sliding, double-hung, fixed, awning, skylight
+    -> count EVERY window unit individually
+  Plumbing: toilet, sink/lavatory, bathtub, shower, water heater, floor drain
+  Electrical: outlet, switch, panel, light fixture, ceiling fan
+  Structural: column, post, pilaster
+  Appliances: refrigerator, range/stove, dishwasher, washer, dryer
 
-LINEAR (type: "linear") — two endpoints only:
-- Exterior walls (perimeter, thick lines)
-- Interior walls (room dividers, thinner)
-- Beams, headers
+OUTPUT RULES:
+1. Return a JSON array -- NO markdown fences, NO explanation, ONLY the array
+2. Every coordinate: integer, 0 <= x <= ${pageWidth}, 0 <= y <= ${pageHeight}
+3. AREA type: minimum 4 points; COUNT type: exactly 1 point; LINEAR type: exactly 2 points
+4. "name" field: human-readable label (e.g. "Living Room", "Single Swing Door")
+5. "confidence": 0.0-1.0 (0.95 = clearly visible, 0.7 = partially obscured)
+6. A typical residential floor plan has: 8-18 rooms/spaces, 40-80 wall segments, 8-20 doors, 8-20 windows
+7. Do NOT omit small spaces (closets, bathrooms, hallways) -- measure everything visible
 
-RULES:
-1. Coordinates MUST be pixel values within (0,0) to (${pageWidth},${pageHeight})
-2. For AREA elements: trace the actual boundary — minimum 4 points, be precise
-3. For COUNT elements: one center point per instance — if there are 8 doors, return 8 separate entries
-4. Confidence: 0.0-1.0 based on how certain you are
-5. Be thorough — a typical residential plan has 8-20 doors, 10-20 windows, 5-15 rooms
+Example:
+[{"name":"Living Room","type":"area","points":[{"x":120,"y":180},{"x":480,"y":180},{"x":480,"y":520},{"x":120,"y":520}],"confidence":0.93,"color":"#3b82f6"},{"name":"Exterior Wall","type":"linear","points":[{"x":100,"y":160},{"x":500,"y":160}],"confidence":0.97,"color":"#6b7280"},{"name":"Single Swing Door","type":"count","points":[{"x":290,"y":350}],"confidence":0.91,"color":"#f59e0b"}]
 
-Return ONLY a valid JSON array, no markdown fences, no prose:
-[{"name":"Living Room","type":"area","classification":"Room Area","points":[{"x":145,"y":203},{"x":445,"y":203},{"x":445,"y":521},{"x":145,"y":521}],"confidence":0.92,"color":"#3B82F6"},{"name":"Single Swing Door","type":"count","classification":"Single Swing Door","points":[{"x":287,"y":341}],"confidence":0.88,"color":"#F59E0B"}]
+SCALE DETECTION: If the drawing shows a scale indicator (title block, scale bar, or text like
+'1/4" = 1\'-0\"', '1/8" = 1 FT', 'SCALE: 1:100', '3/32" = 1 FOOT'),
+append ONE special entry at the end of the array:
+{"name":"_scale","type":"count","points":[{"x":0,"y":0}],"scale_text":"1/4\" = 1'","pixels_per_unit":18,"unit":"ft","confidence":0.95}
 
-ALSO DETECT SCALE: If you see a scale indicator on the drawing (e.g., '1/4" = 1'', '1" = 10'', '3/32" = 1'', scale bar, or written scale note), extract it and return it as one special entry:
-{"name":"_scale","type":"count","classification":"_scale","points":[{"x":0,"y":0}],"scale_text":"1/4\\" = 1'","pixels_per_unit":18,"unit":"ft","confidence":0.95}
-
-The pixels_per_unit should be calculated from the scale and the image dimensions.
-For 1/4" = 1ft at 72dpi: 72px/in * 0.25in/ft = 18px/ft
-For 1" = 20ft at 72dpi: 72px/in / 20ft = 3.6px/ft
-For 1/8" = 1ft: 72 * 0.125 = 9px/ft
-Return null pixels_per_unit if you cannot calculate it — just return the scale_text.`;
-
+pixels_per_unit guide (at 72 DPI):
+  1/4" = 1ft   -> 72 x 0.25 = 18 px/ft
+  1/8" = 1ft   -> 72 x 0.125 = 9 px/ft
+  3/32" = 1ft  -> 72 x 0.09375 = 6.75 px/ft
+  1" = 10ft    -> 72 / 10 = 7.2 px/ft
+  1" = 20ft    -> 72 / 20 = 3.6 px/ft
+  1:100 metric -> 72 / (100/39.37) = 28.35 px/m
+  NTS / Not to Scale -> omit _scale entry entirely
+Return null for pixels_per_unit if you cannot calculate it confidently.`;
 /**
  * Analyze a blueprint page using Gemini's native PDF input (no canvas/image conversion needed).
  * Sends the raw PDF buffer directly as inline_data with mime_type 'application/pdf'.
@@ -132,7 +180,7 @@ Format: [{"label":"Room Name","type":"area","points":[{"x":0,"y":0},...],"confid
 Use pixel coordinates (0,0 = top-left, x = bottom-right).
 Return ONLY the JSON array. No markdown. No explanation.`;
 
-  const resp = await fetch(apiUrl, {
+  const resp = await retryWithBackoff(() => fetch(apiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -152,12 +200,13 @@ Return ONLY the JSON array. No markdown. No explanation.`;
         maxOutputTokens: 16384,
       },
     }),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Gemini PDF API error ${resp.status}: ${text.slice(0, 500)}`);
-  }
+  }).then(async (r) => {
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`Gemini PDF API error ${r.status}: ${text.slice(0, 500)}`);
+    }
+    return r;
+  }));
 
   const data = await resp.json();
   const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
@@ -240,7 +289,7 @@ export async function analyzePageImage(
   const resolvedModel = model?.trim() || DEFAULT_MODEL;
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
 
-  const resp = await fetch(apiUrl, {
+  const resp = await retryWithBackoff(() => fetch(apiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -263,12 +312,13 @@ export async function analyzePageImage(
         responseMimeType: 'application/json',
       },
     }),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Gemini API error ${resp.status}: ${text.slice(0, 500)}`);
-  }
+  }).then(async (r) => {
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`Gemini API error ${r.status}: ${text.slice(0, 500)}`);
+    }
+    return r;
+  }));
 
   const data = await resp.json();
   const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;

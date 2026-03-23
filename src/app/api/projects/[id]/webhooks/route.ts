@@ -13,9 +13,26 @@ import {
 const MAX_WEBHOOKS_PER_PROJECT = 10;
 
 // BUG-A5-H05: zod schema for webhook creation body
-// BUG-A5-6-109: require https:// protocol for SSRF protection
+// BUG-A5-6-109: require https:// for SSRF protection, except localhost/127.0.0.1/::1
+// which are used by the local OpenClaw agent for webhook callbacks.
+function isAllowedWebhookUrl(u: string): boolean {
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol === 'https:') return true;
+    if (parsed.protocol === 'http:') {
+      const h = parsed.hostname;
+      return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const WebhookCreateSchema = z.object({
-  url: z.string().url().refine((u) => u.startsWith('https://'), { message: 'url must use https:// protocol' }),
+  url: z.string().url().refine(isAllowedWebhookUrl, {
+    message: 'url must use https:// (or http:// for localhost/127.0.0.1 only)',
+  }),
   events: z.array(z.string().min(1)).min(1, 'events must be a non-empty string array'),
 });
 

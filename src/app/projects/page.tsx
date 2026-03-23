@@ -169,6 +169,7 @@ export default function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showCollab, setShowCollab] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showAutoName, setShowAutoName] = useState(false);
   const whatsNew = useWhatsNew();
 
@@ -340,8 +341,15 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this project? This cannot be undone.')) return;
+  const handleDelete = (id: string) => {
+    // BUG-W19-004: replace window.confirm with a proper modal
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
     try {
       const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
@@ -1469,6 +1477,45 @@ export default function ProjectsPage() {
 
       {/* What's New modal */}
       {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+
+      {/* BUG-W19-004: Delete confirmation modal */}
+      {pendingDeleteId && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setPendingDeleteId(null)}
+        >
+          <div
+            className="bg-[#0a0a0f] border border-red-500/30 rounded-xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-white mb-2">Delete project?</h2>
+            <p className="text-xs text-zinc-400 mb-5">
+              <span className="font-medium text-white">
+                {projects.find(p => p.id === pendingDeleteId)?.name ?? 'This project'}
+              </span>{' '}
+              will be permanently deleted. This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                data-testid="delete-project-cancel"
+                onClick={() => setPendingDeleteId(null)}
+                className="px-4 py-2 text-xs text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="delete-project-confirm"
+                onClick={confirmDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Version footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center py-2 pointer-events-none">

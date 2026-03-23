@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, createClassification, deleteClassification, initDataDir } from '@/server/project-store';
+import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, getClassifications, createClassification, deleteClassification, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -65,6 +65,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const bodyResult = BatchBodySchema.safeParse(body);
     if (!bodyResult.success) return validationError(bodyResult.error);
 
+    // BUG-W19-003: pre-load classification IDs to validate createPolygon ops
+    const existingClassifications = await getClassifications(id).catch(() => []);
+    const validClassificationIds = new Set(existingClassifications.map((c) => c.id));
+
     const results: Array<{ type: string; ok: boolean; id?: string; error?: string }> = [];
     // Track created polygons for the enriched response shape agents expect
     const createdPolygons: Polygon[] = [];
@@ -73,6 +77,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       try {
         switch (op.type) {
           case 'createPolygon': {
+            // Validate classificationId exists in this project
+            if (!validClassificationIds.has(op.data.classificationId)) {
+              results.push({ type: op.type, ok: false, error: `Unknown classificationId: ${op.data.classificationId}` });
+              break;
+            }
             const p = await createPolygon(id, {
               id: op.data.id,
               points: op.data.points,
@@ -109,6 +118,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               color: op.data.color || '#3b82f6',
               visible: true,
             });
+            // Make newly created classification available to subsequent createPolygon ops
+            validClassificationIds.add(c.id);
             results.push({ type: op.type, ok: true, id: c.id });
             break;
           }

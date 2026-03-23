@@ -953,6 +953,10 @@ function PageInner() {
           });
           addToast('Polygon duplicated', 'info');
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        // handleSave is declared later — dispatch a custom event to decouple
+        window.dispatchEvent(new CustomEvent('mx-save'));
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
@@ -1510,6 +1514,14 @@ function PageInner() {
       setSaving(false);
     }
   }, [projectId, agentMode, createNamedProject, persistSaveStatus, flushSave, addToast]);
+
+  // BUG-W19-005: Ctrl+S / Cmd+S → save. Uses custom event to avoid hoisting issue
+  // (handleSave is declared after the main keyboard handler useEffect).
+  useEffect(() => {
+    const handler = () => { void handleSave(); };
+    window.addEventListener('mx-save', handler);
+    return () => window.removeEventListener('mx-save', handler);
+  }, [handleSave]);
 
   const handleExportExcel = useCallback(async () => {
     if (!projectId) {
