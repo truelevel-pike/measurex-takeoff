@@ -1169,6 +1169,8 @@ function PageInner() {
   // Auto-create a project when a PDF is loaded and no project exists yet
   // GAP-006: State for server-detected scale banner (from upload response)
   const [uploadDetectedScale, setUploadDetectedScale] = useState<{ pixelsPerUnit: number; unit: string; description: string } | null>(null);
+  // Wave 10B: upload error state — shown inline below the drop zone
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const ensureProject = useCallback(async (fileName: string, file?: File) => {
     if (projectId) return;
@@ -1200,13 +1202,38 @@ function PageInner() {
       // BUG-A8-5-013 fix: clean up the newly-created project if PDF upload fails
       // so we don't leave orphaned projects with no PDF attached.
       if (file) {
+        // Wave 10B: client-side pre-validation before hitting the server
+        const MAX_CLIENT_SIZE = 200 * 1024 * 1024; // 200 MB
+        if (file.size > MAX_CLIENT_SIZE) {
+          const msg = `File too large — maximum size is 200 MB (this file is ${(file.size / 1024 / 1024).toFixed(0)} MB)`;
+          setUploadError(msg);
+          api.deleteProject(project.id).catch(() => {});
+          setProjectId('');
+          setProjectName('');
+          localStorage.removeItem('measurex_project_id');
+          window.history.replaceState(null, '', '/');
+          return;
+        }
         try {
+          setUploadError(null);
           const uploadResult = await api.uploadPDF(project.id, file);
           if (uploadResult.detectedScale) {
             setUploadDetectedScale(uploadResult.detectedScale);
           }
         } catch (uploadErr) {
           console.error('PDF upload failed — cleaning up orphaned project:', uploadErr);
+          // Wave 10B: propagate server error message so user sees the real reason
+          const serverMsg = uploadErr instanceof Error ? uploadErr.message : null;
+          const displayMsg = serverMsg && !serverMsg.startsWith('API error:')
+            ? serverMsg
+            : serverMsg?.includes('413') || serverMsg?.includes('too large')
+              ? 'File too large — maximum size is 50 MB'
+              : serverMsg?.includes('corrupt') || serverMsg?.includes('magic')
+                ? 'Invalid PDF — the file may be corrupted or is not a valid PDF'
+                : serverMsg?.includes('timeout') || serverMsg?.includes('AbortError') || serverMsg?.includes('408')
+                  ? 'Upload timed out — the file may be too large for Vercel. Try a smaller PDF.'
+                  : 'PDF upload failed. Please try again.';
+          setUploadError(displayMsg);
           // Best-effort cleanup: delete the project we just created
           api.deleteProject(project.id).catch((cleanupErr) =>
             console.error('Failed to clean up orphaned project:', cleanupErr)
@@ -1216,7 +1243,7 @@ function PageInner() {
           setProjectName('');
           localStorage.removeItem('measurex_project_id');
           window.history.replaceState(null, '', '/');
-          addToast('PDF upload failed. Please try again.', 'error');
+          addToast(displayMsg, 'error');
           return;
         }
       }
@@ -1230,11 +1257,16 @@ function PageInner() {
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f && f.type === 'application/pdf') {
+      // Wave 10B: clear any prior upload error when user selects a new file
+      setUploadError(null);
       // BUG-R6-002: Reset page count ready flag so TopNavBar shows loading state
       // until PDFViewer fires onPageChange with the real total.
       setPdfPageCountReady(false);
       setPdfFile(f);
       void ensureProject(f.name, f);
+    } else if (f) {
+      // Non-PDF selected — show error immediately without hitting the server
+      setUploadError('Only PDF files are accepted. Please select a .pdf file.');
     }
   };
 
@@ -1992,12 +2024,24 @@ function PageInner() {
                   }
                 }}
               >
-                <label className="cursor-pointer bg-white border-2 border-dashed border-neutral-300 rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full max-w-xl">
-                  <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
-                  <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
-                  <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop</div>
-                  <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
-                </label>
+                <div className="w-full max-w-xl flex flex-col items-center gap-3">
+                  <label className={`cursor-pointer bg-white border-2 border-dashed rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full ${uploadError ? 'border-red-400' : 'border-neutral-300'}`}>
+                    <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
+                    <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
+                    <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop · Max 50 MB</div>
+                    <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
+                  </label>
+                  {uploadError && (
+                    <div
+                      className="w-full rounded-lg px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2"
+                      role="alert"
+                      data-testid="upload-error-message"
+                    >
+                      <span className="mt-0.5 shrink-0">⚠️</span>
+                      <span>{uploadError}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

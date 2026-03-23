@@ -73,6 +73,13 @@ export async function POST(
 
     broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 
+    // Wave 10B: race the AI call against a 25-second deadline so we return a clean
+    // 408 before Vercel's 30-second wall-clock kills the function with an opaque 504.
+    const AI_TIMEOUT_MS = 25_000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('AI_TIMEOUT')), AI_TIMEOUT_MS)
+    );
+
     // Try image-based rendering first (works locally where node-canvas is available).
     // On Vercel, renderPageAsImage returns null because node-canvas is absent —
     // fall back to Gemini native PDF input which needs no canvas at all.
@@ -80,22 +87,38 @@ export async function POST(
 
     let elements: Awaited<ReturnType<typeof analyzePageImage>>;
 
-    if (imageDataUrl) {
-      elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
-    } else {
+    // Build the AI work promise
+    const aiWorkPromise = (async () => {
+      if (imageDataUrl) {
+        return analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
+      }
       // Gemini PDF path: read raw bytes and send directly — no image conversion needed
       const { getPDFBuffer } = await import('@/server/pdf-storage');
       const pdfBuffer = await getPDFBuffer(id).catch(() => null);
       if (!pdfBuffer) {
-        return NextResponse.json(
-          { error: 'PDF rendering not available and PDF buffer could not be loaded' },
-          { status: 500 },
-        );
+        throw new Error('PDF rendering not available and PDF buffer could not be loaded');
       }
       // Use a Gemini model: prefer the request model if it's a Gemini model,
       // otherwise default to gemini-2.5-flash (best for blueprints, no canvas needed)
       const geminiModel = (model && model.startsWith('gemini-')) ? model : 'gemini-2.5-flash';
-      elements = await analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
+      return analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
+    })();
+
+    try {
+      elements = await Promise.race([aiWorkPromise, timeoutPromise]);
+    } catch (aiErr) {
+      if (aiErr instanceof Error && aiErr.message === 'AI_TIMEOUT') {
+        broadcastToProject(id, 'takeoff:timeout', { page: pageNum });
+        return NextResponse.json(
+          { error: 'AI takeoff timed out — try a simpler page or use Manual mode' },
+          { status: 408 },
+        );
+      }
+      // PDF buffer not available — specific 500
+      if (aiErr instanceof Error && aiErr.message.includes('PDF rendering not available')) {
+        return NextResponse.json({ error: aiErr.message }, { status: 500 });
+      }
+      throw aiErr; // re-throw to outer catch
     }
 
     // Auto-apply scale: if Gemini detected a '_scale' element, extract and save it,
