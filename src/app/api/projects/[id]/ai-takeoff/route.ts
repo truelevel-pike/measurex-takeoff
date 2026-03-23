@@ -40,13 +40,23 @@ export async function POST(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const pdfPath = await getPDFPath(id);
+    let pdfPath = await getPDFPath(id);
 
+    // On Vercel, local PDF file doesn't exist — download from Supabase Storage to /tmp
     if (!pdfPath) {
-      return NextResponse.json(
-        { error: `PDF not found for project ${id} — please upload a drawing first` },
-        { status: 404 },
-      );
+      const { getPDFBuffer } = await import('@/server/pdf-storage');
+      const pdfBuffer = await getPDFBuffer(id).catch(() => null);
+      if (!pdfBuffer) {
+        return NextResponse.json(
+          { error: `PDF not found for project ${id} — please upload a drawing first` },
+          { status: 404 },
+        );
+      }
+      // Write to /tmp (writable on Vercel serverless)
+      const { writeFile } = await import('fs/promises');
+      const tmpPath = `/tmp/mx-${id}.pdf`;
+      await writeFile(tmpPath, pdfBuffer);
+      pdfPath = tmpPath;
     }
 
     const imageDataUrl = await renderPageAsImage(pdfPath, pageNum);

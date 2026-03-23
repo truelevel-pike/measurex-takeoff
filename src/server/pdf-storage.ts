@@ -199,3 +199,11 @@ export async function getPDFPath(projectId: string): Promise<string | null> {
 
   return null;
 }
+
+/**
+ * Alias for loadPDF — returns the raw PDF buffer for a project.
+ * Used by the ai-takeoff route to download the PDF on Vercel when the local file is missing.
+ */
+export async function getPDFBuffer(projectId: string): Promise<Buffer | null> {
+  return loadPDF(projectId);
+}
