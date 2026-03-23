@@ -92,9 +92,13 @@ export async function savePDF(projectId: string, buffer: Buffer): Promise<string
  */
 export async function loadPDF(projectId: string): Promise<Buffer | null> {
   assertSafeId(projectId, 'projectId');
-  const localPath = path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
+  // On Vercel cwd() is read-only; cache to /tmp instead so writes succeed.
+  const isVercel = process.env.VERCEL === '1';
+  const localPath = isVercel
+    ? path.join('/tmp', `${projectId}.pdf`)
+    : path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
 
-  // Try local file first (works in dev and as a cache on serverless)
+  // Try local file first (works in dev; also serves cached /tmp copy on warm Vercel instances)
   try {
     return await fs.readFile(localPath);
   } catch {
@@ -115,7 +119,7 @@ export async function loadPDF(projectId: string): Promise<Buffer | null> {
 
     const buffer = Buffer.from(await data.arrayBuffer());
 
-    // Cache locally for subsequent reads in this invocation
+    // Cache to writable path for subsequent reads in this invocation
     try {
       await fs.mkdir(path.dirname(localPath), { recursive: true });
       await fs.writeFile(localPath, buffer);
@@ -143,24 +147,54 @@ export function getPDFPublicUrl(projectId: string): string | null {
 /**
  * Get a local file path for the PDF, downloading from Supabase Storage if needed.
  * This is useful for functions that require a file path (like pdf-processor).
+ *
+ * On Vercel the project root (cwd) is read-only. We use /tmp as the cache
+ * directory instead so the write always succeeds.
+ *
  * Returns null if the PDF cannot be found.
  */
 export async function getPDFPath(projectId: string): Promise<string | null> {
   assertSafeId(projectId, 'projectId');
-  const localPath = path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
 
-  // Check local file first
+  // On Vercel cwd() is read-only; use /tmp so the cached file can actually be written.
+  const isVercel = process.env.VERCEL === '1';
+  const localPath = isVercel
+    ? path.join('/tmp', `${projectId}.pdf`)
+    : path.resolve(process.cwd(), 'data', 'uploads', `${projectId}.pdf`);
+
+  // Check local file first (works in dev; also catches a warm Vercel invocation
+  // where we already cached it to /tmp in a prior request within the same instance)
   try {
     await fs.access(localPath);
     return localPath;
   } catch {
-    // Not on local disk
+    // Not on local disk / not yet cached
   }
 
-  // In Supabase mode, download and cache locally
+  // In Supabase mode, download from storage and cache to the writable path
   if (isSupabaseMode()) {
-    const buffer = await loadPDF(projectId);
-    if (buffer) return localPath; // loadPDF already cached it
+    const client = getClient();
+    const { data, error } = await client.storage
+      .from(BUCKET)
+      .download(storagePath(projectId));
+
+    if (error || !data) {
+      console.error('[pdf-storage] getPDFPath: Supabase download failed:', error?.message);
+      return null;
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+
+    try {
+      await fs.mkdir(path.dirname(localPath), { recursive: true });
+      await fs.writeFile(localPath, buffer);
+    } catch (writeErr) {
+      console.error('[pdf-storage] getPDFPath: failed to cache PDF locally:', writeErr);
+      // Non-fatal on Vercel if /tmp write fails — return null and let caller handle
+      return null;
+    }
+
+    return localPath;
   }
 
   return null;
