@@ -131,7 +131,6 @@ export async function analyzePagePDF(
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
       },
     }),
   });
