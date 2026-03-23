@@ -69,8 +69,20 @@ export function checkRateLimit(
 export function rateLimitResponse(req: Request, max?: number, windowMs?: number): Response | null {
   // Allow bypass in test/dev mode via env var (e.g. for E2E test suites that make many rapid calls).
   // Set DISABLE_RATE_LIMIT=true in your test environment or .env.test to skip rate limiting.
-  if (process.env.DISABLE_RATE_LIMIT === 'true' || process.env.NODE_ENV === 'test') {
+  // Wave 14B: warn loudly if this is set in production — it bypasses ALL rate limits and
+  // exposes every API endpoint to abuse, including AI takeoff (expensive) and file upload.
+  if (process.env.DISABLE_RATE_LIMIT === 'true') {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(
+        '[SECURITY WARNING] DISABLE_RATE_LIMIT=true is set in a production environment. ' +
+        'This bypasses ALL rate limiting on every API endpoint. ' +
+        'Remove this variable from your production environment immediately.'
+      );
+    }
     return null; // no rate limiting
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return null; // silent bypass for automated tests
   }
 
   // BUG-A5-6-188: prefer x-real-ip (typically set by reverse proxy and harder to spoof)

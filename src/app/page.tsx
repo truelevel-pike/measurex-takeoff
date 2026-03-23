@@ -406,6 +406,9 @@ function PageInner() {
   const [patternSearchPageImage, setPatternSearchPageImage] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  // BUG-W14-001: replace window.prompt with proper modal for project naming
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [pendingName, setPendingName] = useState('');
   const [showTakeoffSearch, setShowTakeoffSearch] = useState(false);
   const [showTextSearch, setShowTextSearch] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -1270,8 +1273,8 @@ function PageInner() {
           const serverMsg = uploadErr instanceof Error ? uploadErr.message : null;
           const displayMsg = serverMsg && !serverMsg.startsWith('API error:')
             ? serverMsg
-            : serverMsg?.includes('413') || serverMsg?.includes('too large')
-              ? 'File too large — maximum size is 50 MB'
+            : serverMsg?.includes('413') || serverMsg?.includes('too large') || serverMsg?.includes('FILE_TOO_LARGE')
+              ? 'File too large — maximum size is 100 MB'
               : serverMsg?.includes('corrupt') || serverMsg?.includes('magic')
                 ? 'Invalid PDF — the file may be corrupted or is not a valid PDF'
                 : serverMsg?.includes('timeout') || serverMsg?.includes('AbortError') || serverMsg?.includes('408')
@@ -1431,37 +1434,51 @@ function PageInner() {
   }, []);
 
   // Manual save
+  // createNamedProject: called after user confirms name in modal (or directly in agentMode)
+  const createNamedProject = useCallback(async (name: string) => {
+    setSaving(true);
+    try {
+      const payload = buildStatePayload(currentPageNum);
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, state: payload }),
+      });
+      if (!res.ok) throw new Error(`Create failed (${res.status})`);
+      const data = await res.json();
+      const normalized = normalizeProjectState(data?.project?.state ?? payload);
+      useStore.getState().hydrateState(normalized);
+      setCurrentPageNum(normalized.currentPage || 1);
+      setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
+      setProjectId(data.project.id);
+      setProjectName(data.project.name || name);
+      localStorage.setItem('measurex_project_id', data.project.id);
+      window.history.replaceState(null, '', `/?project=${encodeURIComponent(data.project.id)}`);
+      persistSaveStatus('Saved!');
+      addToast('Project saved', 'success');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      addToast('Failed to save project', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [buildStatePayload, currentPageNum, setCurrentPage, setCurrentPageNum, persistSaveStatus, addToast]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
       if (!projectId) {
-        const name = prompt('Project name:');
-        if (!name) {
+        // BUG-W14-001: use proper modal instead of window.prompt
+        if (agentMode) {
+          // In agent mode skip the modal — use a default name
           setSaving(false);
+          await createNamedProject('Untitled Project');
           return;
         }
-
-        const payload = buildStatePayload(currentPageNum);
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state: payload }),
-        });
-
-        if (!res.ok) throw new Error(`Create failed (${res.status})`);
-
-        const data = await res.json();
-        const normalized = normalizeProjectState(data?.project?.state ?? payload);
-        useStore.getState().hydrateState(normalized);
-        setCurrentPageNum(normalized.currentPage || 1);
-        setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
-
-        setProjectId(data.project.id);
-        setProjectName(data.project.name || name);
-        localStorage.setItem('measurex_project_id', data.project.id);
-        window.history.replaceState(null, '', `/?project=${encodeURIComponent(data.project.id)}`);
-        persistSaveStatus('Saved!');
-        addToast('Project saved', 'success');
+        setSaving(false);
+        setPendingName('');
+        setShowNameModal(true);
+        return;
       } else {
         await flushSave(true);
         addToast('Project saved', 'success');
@@ -1474,7 +1491,7 @@ function PageInner() {
     } finally {
       setSaving(false);
     }
-  }, [projectId, currentPageNum, buildStatePayload, setCurrentPage, persistSaveStatus, flushSave, addToast]);
+  }, [projectId, agentMode, createNamedProject, persistSaveStatus, flushSave, addToast]);
 
   const handleExportExcel = useCallback(async () => {
     if (!projectId) {
@@ -2100,7 +2117,7 @@ function PageInner() {
                     <div
                       className="w-full rounded-lg px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2"
                       role="alert"
-                      data-testid="upload-error-message"
+                      data-testid={uploadError.toLowerCase().includes('too large') || uploadError.toLowerCase().includes('100') ? 'upload-size-error' : 'upload-error-message'}
                     >
                       <span className="mt-0.5 shrink-0">⚠️</span>
                       <span>{uploadError}</span>
@@ -2319,6 +2336,61 @@ function PageInner() {
 
       {/* What's New modal */}
       {!agentMode && whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+
+      {/* BUG-W14-001: Project name modal — replaces window.prompt */}
+      {showNameModal && (
+        <div
+          data-testid="project-name-modal"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowNameModal(false)}
+        >
+          <div
+            className="bg-[#0a0a0f] border border-[#00d4ff]/30 rounded-xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-white mb-4 font-mono tracking-wide">Name your project</h2>
+            <input
+              autoFocus
+              type="text"
+              value={pendingName}
+              onChange={(e) => setPendingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && pendingName.trim()) {
+                  setShowNameModal(false);
+                  void createNamedProject(pendingName.trim());
+                } else if (e.key === 'Escape') {
+                  setShowNameModal(false);
+                }
+              }}
+              placeholder="e.g. 123 Main St — ADU"
+              className="w-full px-3 py-2 mb-4 rounded-lg bg-[#12121a] border border-[#00d4ff]/20 text-white text-sm outline-none focus:border-[#00d4ff]/60 placeholder-gray-600"
+              data-testid="project-name-modal-input"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowNameModal(false)}
+                className="px-4 py-2 text-xs text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="project-name-modal-save"
+                disabled={!pendingName.trim()}
+                onClick={() => {
+                  if (!pendingName.trim()) return;
+                  setShowNameModal(false);
+                  void createNamedProject(pendingName.trim());
+                }}
+                className="px-4 py-2 text-xs font-semibold text-[#00131d] bg-[#00d4ff] rounded-lg hover:bg-[#00bce0] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* First-run tooltips for new editor users */}
       {projectId && !agentMode && <FirstRunTooltips />}

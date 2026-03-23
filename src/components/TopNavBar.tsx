@@ -295,11 +295,12 @@ export default function TopNavBar({
         {/* Left section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <NavIconButton
-            ariaLabel="Open projects"
+            ariaLabel="Back to projects"
             icon={<LayoutGrid size={18} aria-hidden="true" />}
-            srLabel="Open projects"
+            srLabel="Back to projects"
             tooltip="Projects"
             onClick={() => router.push('/projects')}
+            testId="back-to-projects-btn"
           />
           <NavIconButton
             ariaLabel="Classification Library"

@@ -34,10 +34,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 });
     }
 
-    // Validate file size — max 50 MB
-    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    // Validate file size — max 100 MB (Vercel serverless body limit is 4.5MB by default,
+    // but we use Supabase Storage for the binary; the multipart parse itself stays small)
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File too large — maximum size is 50MB' }, { status: 413 });
+      return NextResponse.json(
+        { error: 'PDF too large. Maximum size is 100MB.', code: 'FILE_TOO_LARGE' },
+        { status: 413 },
+      );
     }
 
     // Save file to storage (local + Supabase Storage in prod), then process

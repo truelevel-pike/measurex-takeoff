@@ -1,6 +1,7 @@
 {
   "name": "measurex-takeoff",
   "version": "1.0.0",
+  "description": "AI-powered construction takeoff platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
