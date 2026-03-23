@@ -59,11 +59,17 @@ function storagePath(projectId: string): string {
  * Save a PDF buffer for a project.
  * Returns the local file path (always written locally for server-side processing).
  * In Supabase mode, also uploads to Supabase Storage for persistence.
+ *
+ * On Vercel the project root (cwd) is read-only; we write to /tmp instead so
+ * pdf-processor can read the file during the same request invocation.
  */
 export async function savePDF(projectId: string, buffer: Buffer): Promise<string> {
   assertSafeId(projectId, 'projectId');
-  // Always write locally so pdf-processor can read it during this request
-  const uploadDir = path.resolve(process.cwd(), 'data', 'uploads');
+  // On Vercel cwd() is read-only — use /tmp for the local scratch copy.
+  const isVercel = process.env.VERCEL === '1';
+  const uploadDir = isVercel
+    ? '/tmp'
+    : path.resolve(process.cwd(), 'data', 'uploads');
   await fs.mkdir(uploadDir, { recursive: true });
   const filePath = path.join(uploadDir, `${projectId}.pdf`);
   await fs.writeFile(filePath, buffer);

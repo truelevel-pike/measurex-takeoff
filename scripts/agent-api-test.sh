@@ -93,6 +93,38 @@ else
   echo ""; echo "FATAL: cannot continue without project ID"; exit 1
 fi
 
+# ── STEP 1b: Upload PDF ─────────────────────────────────────
+# Create a minimal valid 1-page PDF in /tmp/test.pdf
+python3 -c "
+import struct
+body  = b'%PDF-1.4\n'
+body += b'1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+body += b'2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+body += b'3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 792 1224]>>endobj\n'
+xref_offset = len(body)
+body += b'xref\n0 4\n'
+body += b'0000000000 65535 f \n'
+body += b'0000000009 00000 n \n'
+body += b'0000000058 00000 n \n'
+body += b'0000000115 00000 n \n'
+body += b'trailer<</Size 4/Root 1 0 R>>\nstartxref\n'
+body += str(xref_offset).encode() + b'\n%%EOF\n'
+open('/tmp/test.pdf','wb').write(body)
+" 2>/dev/null
+T0=$(_ms)
+UPLOAD_RESP=$(curl -s -X POST "$BASE_URL/api/projects/$PROJECT_ID/upload" \
+  -F "file=@/tmp/test.pdf;type=application/pdf" --max-time 30)
+UPLOAD_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/projects/$PROJECT_ID/upload" \
+  -F "file=@/tmp/test.pdf;type=application/pdf" --max-time 30)
+T1=$(_ms); MS=$(( T1 - T0 ))
+if [ "$UPLOAD_HTTP" = "200" ]; then
+  UPLOAD_PAGES=$(echo "$UPLOAD_RESP" | python3 -c \
+    "import json,sys; d=json.load(sys.stdin); print(d.get('pages','?'))" 2>/dev/null)
+  pass_step "Upload PDF" "$MS" "pages=${UPLOAD_PAGES:-?} http=$UPLOAD_HTTP"
+else
+  warn_step "Upload PDF" "$MS" "http=$UPLOAD_HTTP — $(echo "$UPLOAD_RESP" | head -c 120)"
+fi
+
 # ── STEP 2: Create 3 classifications ───────────────────────
 T0=$(_ms)
 CL_AREA=$(json_post "$BASE_URL/api/projects/$PROJECT_ID/classifications" \
