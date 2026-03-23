@@ -230,6 +230,8 @@ function PageThumbnailSidebar({
       >
         <button
           type="button"
+          data-testid="page-thumbnail"
+          data-page={page}
           onClick={() => onPageSelect(page)}
           className={`flex flex-col items-center gap-1 px-1 py-2 transition-colors w-full ${
             isActive
@@ -368,6 +370,7 @@ function PageThumbnailSidebar({
   return (
     <div
       ref={scrollContainerRef}
+      data-testid="page-thumbnail-sidebar"
       className={`hidden md:flex flex-col shrink-0 bg-[rgba(18,18,26,0.8)] border-r border-[#00d4ff]/20 overflow-y-auto ${
         collapsed ? 'w-6' : 'w-20'
       }`}

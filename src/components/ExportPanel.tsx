@@ -648,6 +648,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
   return (
     <div
+      data-testid="export-panel"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
@@ -982,6 +983,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             CSV (coordinates)
           </button>
           <button
+            data-testid="export-markdown-btn"
             onClick={handleMarkdownExport}
             aria-label="Export Markdown report"
             className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500"

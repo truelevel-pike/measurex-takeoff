@@ -159,6 +159,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       ref={menuRef}
       tabIndex={-1}
       role="menu"
+      data-testid="context-menu"
       aria-label="Polygon context menu"
       style={{
         position: 'fixed',
@@ -173,6 +174,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Properties */}
       <button
         role="menuitem"
+        data-testid="context-menu-properties"
         className={itemClass(0)}
         onMouseEnter={() => setFocusIndex(0)}
         onClick={handleOpenProperties}
@@ -183,6 +185,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Duplicate */}
       <button
         role="menuitem"
+        data-testid="context-menu-duplicate"
         className={itemClass(1)}
         onMouseEnter={() => setFocusIndex(1)}
         onClick={handleCopy}
@@ -193,6 +196,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Change Classification */}
       <button
         role="menuitem"
+        data-testid="context-menu-reclassify"
         className={itemClass(2)}
         onMouseEnter={() => setFocusIndex(2)}
         onClick={() => setShowClassifications((v) => !v)}
@@ -222,6 +226,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Go to Classification */}
       <button
         role="menuitem"
+        data-testid="context-menu-gotoclass"
         className={itemClass(3)}
         onMouseEnter={() => setFocusIndex(3)}
         onClick={handleGoToClassification}
@@ -234,6 +239,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Delete */}
       <button
         role="menuitem"
+        data-testid="context-menu-delete"
         className={itemClass(4, confirmDelete ? 'text-red-400 bg-red-500/10' : 'text-red-400')}
         onMouseEnter={() => setFocusIndex(4)}
         onClick={handleDelete}
@@ -244,6 +250,7 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       {/* Add to snapshot */}
       <button
         role="menuitem"
+        data-testid="context-menu-snapshot"
         className={itemClass(5, 'text-slate-400')}
         onMouseEnter={() => setFocusIndex(5)}
         onClick={() => void handleSnapshot()}

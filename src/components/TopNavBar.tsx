@@ -269,6 +269,7 @@ export default function TopNavBar({
   return (
     <div className="w-full relative">
       <header
+        data-testid="top-nav-bar"
         className="w-full backdrop-blur-sm border-b"
         role="banner"
         onKeyDown={handleHeaderKeyDown}
@@ -382,6 +383,7 @@ export default function TopNavBar({
                   setNameInputValue(projectName);
                   setTimeout(() => nameInputRef.current?.select(), 0);
                 }}
+                data-testid="project-name-display"
                 style={{ color: '#8892a0', fontSize: 11, marginLeft: 6, cursor: 'pointer', textDecoration: 'underline dotted rgba(136,146,160,0.4)', textUnderlineOffset: 3 }}
                 aria-label={`Project: ${projectName} (click to edit)`}
                 title="Click to rename project"
@@ -647,6 +649,7 @@ export default function TopNavBar({
                 Image Search
               </button>
               <button
+                data-testid="share-btn"
                 aria-label={shareLoading ? 'Generating share link…' : 'Share project link'}
                 onClick={handleCopyLink}
                 disabled={shareLoading}
@@ -709,6 +712,7 @@ export default function TopNavBar({
                 tooltip={show3D ? '2D View (3)' : '3D View (3)'}
                 onClick={toggleShow3D}
                 ariaPressed={show3D}
+                testId="3d-toggle-btn"
               />
               )}
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" testId="tab-quantities" />
