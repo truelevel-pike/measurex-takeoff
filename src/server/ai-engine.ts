@@ -181,6 +181,11 @@ OUTPUT RULES:
 5. "confidence": 0.0-1.0 (0.95 = clearly visible, 0.7 = partially obscured)
 6. A typical residential floor plan has: 8-18 rooms/spaces, 40-80 wall segments, 8-20 doors, 8-20 windows
 7. Do NOT omit small spaces (closets, bathrooms, hallways) -- measure everything visible
+8. ACCURACY REQUIREMENT: Return EXACTLY the polygon corner coordinates.
+   For rectangular rooms use exactly 4 points (one per corner).
+   For L-shaped rooms use 6-8 points tracing each inside and outside corner.
+   NEVER approximate a polygon with fewer points than the room actually has corners.
+   Trace the actual room boundary precisely -- inaccurate polygons produce wrong square footage.
 
 Example:
 [{"name":"Living Room","type":"area","points":[{"x":120,"y":180},{"x":480,"y":180},{"x":480,"y":520},{"x":120,"y":520}],"confidence":0.93,"color":"#3b82f6"},{"name":"Exterior Wall","type":"linear","points":[{"x":100,"y":160},{"x":500,"y":160}],"confidence":0.97,"color":"#6b7280"},{"name":"Single Swing Door","type":"count","points":[{"x":290,"y":350}],"confidence":0.91,"color":"#f59e0b"}]

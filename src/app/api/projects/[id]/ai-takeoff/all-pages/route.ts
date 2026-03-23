@@ -307,6 +307,8 @@ export async function POST(
     }
 
     fireWebhook(id, 'takeoff.all-pages.completed', { pagesProcessed: totalPages, totalElements });
+    // Wave 28B: also fire canonical snake_case event name agents expect
+    void fireWebhook(id, 'takeoff:all_pages_complete', { totalPages, totalElements });
     broadcastToProject(id, 'takeoff:complete', { totalElements });
     broadcastToProject(id, 'ai-takeoff:all-pages:complete', { pagesProcessed: totalPages, totalElements });
 

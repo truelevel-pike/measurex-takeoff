@@ -8,7 +8,7 @@ import { emitPluginEvent } from '@/lib/plugin-system';
 import { withCache } from '@/lib/with-cache';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -16,8 +16,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { id } = paramsResult.data;
     const project = await getProject(id);
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    const polygons = await getPolygons(id);
-    return NextResponse.json({ polygons });
+    let polygons = await getPolygons(id);
+    // Wave 28B: ?page=N filter — agent queries per-page to verify takeoff results
+    const { searchParams } = new URL(req.url);
+    const pageParam = searchParams.get('page');
+    if (pageParam !== null) {
+      const pageNum = parseInt(pageParam, 10);
+      if (!Number.isFinite(pageNum) || pageNum < 1) {
+        return NextResponse.json({ error: 'Invalid page param — must be a positive integer' }, { status: 400 });
+      }
+      polygons = polygons.filter((p) => p.pageNumber === pageNum);
+    }
+    return NextResponse.json({ polygons, count: polygons.length });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
