@@ -44,7 +44,7 @@ const BottomStatusBar: React.FC<BottomStatusBarProps> = ({ onScaleClick, zoomPer
       <button
         onClick={onScaleClick}
         aria-label={scale ? 'Change scale' : 'Set scale'}
-        data-testid="scale-display"
+        data-testid={scale ? 'scale-display' : 'set-scale-btn'}
         className="inline-flex items-center gap-1 rounded-full px-3 py-0.5 font-mono tracking-wider"
         style={{
           background: scaleText ? 'rgba(0,255,136,0.08)' : 'rgba(255,107,53,0.08)',

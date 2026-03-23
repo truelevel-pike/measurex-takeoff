@@ -1407,6 +1407,17 @@ function PageInner() {
     }
   }, [agentMode, detectedScale, handleAcceptScale]);
 
+  // BUG-W13-004: auto-activate draw tool when user selects a classification
+  // and the current tool is idle (select). Mirrors Togal's UX: clicking a
+  // classification immediately arms the draw tool so the user can start drawing.
+  useEffect(() => {
+    if (!selectedClassificationId) return;
+    const tool = useStore.getState().currentTool;
+    if (tool === 'select') {
+      setTool('draw');
+    }
+  }, [selectedClassificationId, setTool]);
+
   // Install automation API for browser/AI drivers
   // BUG-A8-5-005 fix: return cleanup function to remove window.measurex on unmount
   // (avoids stale closures if the component remounts with a different projectId etc.)
@@ -2076,7 +2087,10 @@ function PageInner() {
                 }}
               >
                 <div className="w-full max-w-xl flex flex-col items-center gap-3">
-                  <label className={`cursor-pointer bg-white border-2 border-dashed rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full ${uploadError ? 'border-red-400' : 'border-neutral-300'}`}>
+                  <label
+                    data-testid="upload-dropzone"
+                    className={`cursor-pointer bg-white border-2 border-dashed rounded-xl p-8 md:p-12 hover:border-blue-400 transition-colors text-center w-full ${uploadError ? 'border-red-400' : 'border-neutral-300'}`}
+                  >
                     <div className="flex items-center justify-center mb-3"><FileIcon className="text-neutral-400" size={40} /></div>
                     <div className="text-lg font-medium text-neutral-700">Upload Blueprint PDF</div>
                     <div id="upload-help" className="text-sm text-neutral-400 mt-1">Click to select or drag & drop · Max 50 MB</div>
@@ -2090,6 +2104,14 @@ function PageInner() {
                     >
                       <span className="mt-0.5 shrink-0">⚠️</span>
                       <span>{uploadError}</span>
+                      <button
+                        type="button"
+                        data-testid="upload-retry-btn"
+                        onClick={() => setUploadError(null)}
+                        className="ml-auto shrink-0 text-red-600 underline hover:text-red-800 text-xs font-medium"
+                      >
+                        Try again
+                      </button>
                     </div>
                   )}
                 </div>
