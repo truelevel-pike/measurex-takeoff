@@ -7,7 +7,6 @@ function normalizeClassificationType(type: string): 'area' | 'linear' | 'count' 
 
 export function installMeasurexAPI() {
   if (typeof window === 'undefined') return;
-  if (process.env.NODE_ENV !== 'development') return;
 
   (window as Window & { measurex?: unknown }).measurex = {
     selectPolygon(id: string) {
