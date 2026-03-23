@@ -667,6 +667,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           <button
             ref={closeButtonRef}
             onClick={onClose}
+            data-testid="export-panel-close"
             aria-label="Close export panel"
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white"
           >
@@ -922,6 +923,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
         <div className="flex items-center justify-end gap-3 border-t border-gray-700 px-6 py-4">
           <button
             onClick={handleScreenViewExport}
+            data-testid="export-excel-btn"
             aria-label="Export screen view to Excel"
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
           >
@@ -938,6 +940,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           </button>
           <button
             onClick={handlePrintExport}
+            data-testid="export-pdf-btn"
             aria-label="Print blueprint with polygon overlays"
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
           >
@@ -954,6 +957,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           </button>
           <button
             onClick={handleJsonExport}
+            data-testid="export-json-btn"
             aria-label="Export to JSON"
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
@@ -970,6 +974,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           </button>
           <button
             onClick={handleCsvCoordinatesExport}
+            data-testid="export-csv-btn"
             aria-label="Export CSV with coordinates"
             className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
           >

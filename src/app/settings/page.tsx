@@ -676,6 +676,19 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
+                {/* Agent docs link */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-sm text-gray-400">Agent integration reference</span>
+                  <a
+                    href="/agent"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[#00d4ff] hover:underline flex items-center gap-1"
+                  >
+                    Agent docs ↗
+                  </a>
+                </div>
+
                 {/* Agent Webhook URL */}
                 <div>
                   <label className="block text-sm text-gray-300 mb-1.5">Agent Webhook URL</label>

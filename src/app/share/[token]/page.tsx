@@ -371,7 +371,7 @@ export default function SharedViewPage() {
         .print-quantities { display: none !important; }
       }
     `}</style>
-    <div className="h-screen w-screen flex flex-col" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
+    <div data-testid="share-page-container" className="h-screen w-screen flex flex-col" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
       {/* Print-only header */}
       <div className="print-only" style={{ padding: '32px 24px 16px', borderBottom: '2px solid #333' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111', margin: 0 }}>{project.name}</h1>
@@ -621,7 +621,7 @@ export default function SharedViewPage() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* PDF preview notice + inline quantities summary */}
-        <div className="no-print flex-1 relative overflow-auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>
+        <div data-testid="share-canvas" className="no-print flex-1 relative overflow-auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>
           {/* PDF notice */}
           <div style={{
             background: 'rgba(0,212,255,0.05)',
@@ -688,6 +688,7 @@ export default function SharedViewPage() {
             we do NOT use the global QuantitiesPanel (BUG-A8-001 fix). */}
         {allPageQuantities.length > 0 && (
           <div
+            data-testid="share-quantities-panel"
             className="no-print hidden md:flex flex-col border-l overflow-y-auto"
             style={{
               width: 360,

@@ -65,7 +65,26 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
   }, [onClose]);
 
   return (
+    <>
+    {/* Hidden machine-readable shortcuts div — agent reads this to know key bindings */}
     <div
+      id="mx-keyboard-shortcuts"
+      hidden
+      data-r="rectangle"
+      data-d="draw"
+      data-v="select"
+      data-h="pan"
+      data-g="merge"
+      data-s="split"
+      data-c="cut"
+      data-m="measure"
+      data-a="ai-takeoff"
+      data-f="fit-page"
+      data-escape="cancel"
+      data-enter="confirm"
+    />
+    <div
+      data-testid="shortcut-escape"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
       role="dialog"
@@ -98,9 +117,21 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
                 {section.title}
               </h3>
               <div className="space-y-2">
-                {section.rows.map((row) => (
+                {section.rows.map((row) => {
+                  // Stable testid for agent-targeted shortcuts
+                  const rowTestId = row.keys.length === 1
+                    ? (() => {
+                        const k = row.keys[0].toUpperCase();
+                        if (k === 'R') return 'shortcut-r';
+                        if (k === 'ESC') return 'shortcut-escape';
+                        if (k === 'ENTER') return 'shortcut-enter';
+                        return undefined;
+                      })()
+                    : undefined;
+                  return (
                   <div
                     key={`${section.title}-${row.description}`}
+                    {...(rowTestId ? { 'data-testid': rowTestId } : {})}
                     className="flex items-center justify-between gap-4 rounded-md bg-gray-800/50 px-3 py-2"
                   >
                     <span className="text-sm text-gray-100">{row.description}</span>
@@ -115,12 +146,14 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}
         </div>
       </div>
     </div>
+    </>
   );
 }
