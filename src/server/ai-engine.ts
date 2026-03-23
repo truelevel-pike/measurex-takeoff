@@ -107,7 +107,7 @@ export async function analyzePagePDF(
   const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Google API key not configured — set GOOGLE_API_KEY in .env.local');
 
-  const resolvedModel = model?.trim() || 'gemini-3.1-pro-preview';
+  const resolvedModel = model?.trim() || 'gemini-2.5-flash';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
 
   // Guard against 0 dimensions (pages not yet registered in DB) — fall back to standard letter/arch-D
