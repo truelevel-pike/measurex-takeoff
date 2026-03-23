@@ -117,6 +117,7 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
     <div
       role="dialog"
       aria-label="Collaboration Panel"
+      data-testid="collab-panel"
       style={{
         position: 'fixed',
         inset: 0,

@@ -331,7 +331,14 @@ function PrintViewInner() {
   }, []);
 
   return (
-    <div className="print-view bg-white text-black min-h-screen">
+    <div
+      className="print-view bg-white text-black min-h-screen"
+      data-testid="print-page"
+      data-pdf-loaded={String(pdfLoaded)}
+      {...(pdfLoaded ? { 'data-testid-print-ready': 'print-ready' } : {})}
+    >
+      {/* Wave 12: print-ready marker — present when PDF + overlays are fully rendered */}
+      {pdfLoaded && <span data-testid="print-ready" style={{ display: 'none' }} aria-hidden="true" />}
       {/* Header */}
       <header className="print-header flex items-center justify-between border-b-2 border-gray-800 px-6 py-4 mb-4">
         <div>

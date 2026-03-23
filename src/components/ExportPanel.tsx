@@ -679,6 +679,20 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
         {/* Scrollable body */}
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-4">
+          {/* Wave 12: empty state — shown when no polygons have been drawn yet */}
+          {polygons.length === 0 && (
+            <div
+              data-testid="export-empty-message"
+              className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-600 bg-gray-800/40 py-12 text-center"
+              role="status"
+            >
+              <svg className="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm font-medium text-gray-300">No measurements to export.</p>
+              <p className="text-xs text-gray-500">Draw some polygons first, then come back to export.</p>
+            </div>
+          )}
           {/* ── Drawings Section ── */}
           <section>
             <h3 className="mb-2 text-sm font-medium text-gray-300 uppercase tracking-wide">
@@ -926,7 +940,8 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             onClick={handleScreenViewExport}
             data-testid="export-excel-btn"
             aria-label="Export screen view to Excel"
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            disabled={polygons.length === 0}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Eye className="h-4 w-4" aria-hidden="true" />
             Screen View
@@ -934,7 +949,8 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           <button
             onClick={handleFullExport}
             aria-label="Full export to Excel"
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+            disabled={polygons.length === 0}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Full Export

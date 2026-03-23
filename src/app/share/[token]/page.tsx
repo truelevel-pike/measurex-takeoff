@@ -163,6 +163,15 @@ export default function SharedViewPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showExportMenu]);
 
+  // Wave 12: helper to get pixelsPerUnit for a given page.
+  // area is stored as pixel² and linearFeet as pixel-length — both need dividing by ppu.
+  const getPPU = useCallback((pageNum: number): number => {
+    if (!project) return 1;
+    const pageScale = project.state.scales?.[pageNum] ?? project.state.scale;
+    const ppu = (pageScale as { pixelsPerUnit?: number } | null)?.pixelsPerUnit;
+    return ppu && ppu > 0 ? ppu : 1;
+  }, [project]);
+
   // Compute per-page quantities summary
   const pageQuantities = useMemo(() => {
     if (!project) return [];
@@ -170,25 +179,28 @@ export default function SharedViewPage() {
     const pagePolygons = project.state.polygons.filter(
       (p) => p.pageNumber === currentPageNum && p.isComplete,
     );
+    const ppu = getPPU(currentPageNum);
     return project.state.classifications.map((cls) => {
       const matching = pagePolygons.filter((p) => p.classificationId === cls.id);
       let value: string;
       let unit: string;
       if (cls.type === 'area') {
-        const total = matching.reduce((sum, p) => sum + (p.area || 0), 0);
+        // p.area is stored in pixel² — convert to SF via ppu²
+        const total = matching.reduce((sum, p) => sum + (p.area || 0), 0) / (ppu * ppu);
         value = total.toFixed(2);
-        unit = 'sqft';
+        unit = 'SF';
       } else if (cls.type === 'linear') {
-        const total = matching.reduce((sum, p) => sum + (p.linearFeet || 0), 0);
+        // p.linearFeet is stored in pixels — convert to LF via ppu
+        const total = matching.reduce((sum, p) => sum + (p.linearFeet || 0), 0) / ppu;
         value = total.toFixed(2);
-        unit = 'ft';
+        unit = 'LF';
       } else {
         value = String(matching.length);
-        unit = 'count';
+        unit = 'EA';
       }
       return { ...cls, value, unit, count: matching.length };
     }).filter((c) => c.count > 0);
-  }, [project, pageIndex]);
+  }, [project, pageIndex, getPPU]);
 
   // Compute all-page quantities for print
   const allPageQuantities = useMemo(() => {
@@ -199,20 +211,26 @@ export default function SharedViewPage() {
       let value: string;
       let unit: string;
       if (cls.type === 'area') {
-        const total = matching.reduce((sum, p) => sum + (p.area || 0), 0);
+        const total = matching.reduce((sum, p) => {
+          const ppu = getPPU(p.pageNumber);
+          return sum + (p.area || 0) / (ppu * ppu);
+        }, 0);
         value = total.toFixed(2);
-        unit = 'sqft';
+        unit = 'SF';
       } else if (cls.type === 'linear') {
-        const total = matching.reduce((sum, p) => sum + (p.linearFeet || 0), 0);
+        const total = matching.reduce((sum, p) => {
+          const ppu = getPPU(p.pageNumber);
+          return sum + (p.linearFeet || 0) / ppu;
+        }, 0);
         value = total.toFixed(2);
-        unit = 'ft';
+        unit = 'LF';
       } else {
         value = String(matching.length);
-        unit = 'count';
+        unit = 'EA';
       }
       return { ...cls, value, unit, count: matching.length };
     }).filter((c) => c.count > 0);
-  }, [project]);
+  }, [project, getPPU]);
 
   // Grand total: count of all complete polygons
   const grandTotal = useMemo(() => {
@@ -256,7 +274,11 @@ export default function SharedViewPage() {
 
   if (error || !project) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center gap-4" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
+      <div
+        className="h-screen w-screen flex flex-col items-center justify-center gap-4"
+        style={{ background: '#0a0a0f', color: '#e0e0e0' }}
+        data-testid="share-invalid-token"
+      >
         <h1 className="text-xl font-semibold text-red-400">{error || 'Project not found'}</h1>
         <p className="text-zinc-500">This share link may have been revoked or is invalid.</p>
         <a

@@ -25,6 +25,7 @@ export default function MobileToolbar() {
   return (
     <nav
       aria-label="Mobile toolbar"
+      data-testid="mobile-toolbar"
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
       style={{
         background: 'rgba(10, 10, 15, 0.92)',
