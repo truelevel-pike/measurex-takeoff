@@ -204,3 +204,9 @@ export function detectScaleFromText(text: string): DetectedScaleResult | null {
     matchIndex: candidates[0].matchIndex,
   };
 }
+
+/** Wave 19B: exported NTS detector so callers can show 'Not to Scale' warning. */
+export function isNotToScale(text: string): boolean {
+  if (!text?.trim()) return false;
+  return hasNts(normalizeScaleText(text));
+}

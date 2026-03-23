@@ -48,6 +48,40 @@ function cleanGeminiJson(raw: string): string {
   s = s.replace(/,\s*([}\]])/g, '$1');
   return s.trim();
 }
+/**
+ * Wave 19B: validate and sanitize AI-detected elements.
+ * - Discard elements with no name or no points
+ * - Clip coordinates to canvas bounds
+ * - Require >= 3 points for 'area' type (min viable polygon)
+ * - Require >= 1 point for 'count' type
+ * - Require >= 2 points for 'linear' type
+ */
+function validateAndSanitizeElements(
+  elements: Array<{ name: string; type: string; points: Array<{ x: number; y: number }>; confidence: number; color: string }>,
+  pageWidth: number,
+  pageHeight: number,
+): AIDetectedElement[] {
+  const MIN_POINTS: Record<string, number> = { area: 3, linear: 2, count: 1 };
+  const VALID_TYPES = new Set<string>(['area', 'linear', 'count']);
+  return elements.filter((el) => {
+    if (!el.name || el.name === 'Unknown' || !Array.isArray(el.points) || el.points.length === 0) return false;
+    if (!VALID_TYPES.has(el.type)) return false;
+    const min = MIN_POINTS[el.type] ?? 1;
+    if (el.points.length < min) return false;
+    // Clip coordinates to canvas bounds
+    el.points = el.points.map((p) => ({
+      x: Math.max(0, Math.min(pageWidth, Math.round(p.x))),
+      y: Math.max(0, Math.min(pageHeight, Math.round(p.y))),
+    }));
+    // Discard if all points collapsed to a single location (degenerate polygon)
+    if (el.type === 'area' || el.type === 'linear') {
+      const unique = new Set(el.points.map((p) => `${p.x},${p.y}`));
+      if (unique.size < min) return false;
+    }
+    return true;
+  }) as AIDetectedElement[];
+}
+
 
 function nameToColor(name: string): string {
   let hash = 0;
@@ -164,21 +198,10 @@ export async function analyzePagePDF(
 
   const pdfBase64 = pdfBuffer.toString('base64');
 
-  const promptText = detailed
-    ? `You are analyzing page ${pageNum} of a construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight)
-    : `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px).
-
-CRITICAL: You MUST return between 15-30 elements. Do NOT return fewer than 15.
-
-Return a JSON array of construction elements. Include ALL of:
-- Every room/space as type 'area' with 4+ corner points
-- Every wall segment as type 'linear' with 2 endpoints
-- Every door and window as type 'count' with 1 center point
-- Property lines, driveways, outdoor spaces as type 'area'
-
-Format: [{"label":"Room Name","type":"area","points":[{"x":0,"y":0},...],"confidence":0.9}]
-Use pixel coordinates (0,0 = top-left, x = bottom-right).
-Return ONLY the JSON array. No markdown. No explanation.`;
+  // Wave 19B: always use the full buildSystemPrompt for PDF path too.
+  // The short "detailed=false" prompt used a different field name ("label" vs "name")
+  // causing all detections to be named "Unknown". Both paths now use the same prompt.
+  const promptText = `Focus on page ${pageNum} of this PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight);
 
   const resp = await retryWithBackoff(() => fetch(apiUrl, {
     method: 'POST',
@@ -250,18 +273,20 @@ Return ONLY the JSON array. No markdown. No explanation.`;
     color?: string;
   };
 
-  return (parsed as ParsedElement[])
+  const mapped = (parsed as ParsedElement[])
     .filter((el) => Array.isArray(el?.points) && el?.type)
     .map((el) => ({
-      name: String(el.name || el.label || el.classification || 'Unknown'),
+      name: String(el.name || el.label || el.classification || '').trim() || 'Unknown',
       type: el.type as AIDetectedElement['type'],
       points: el.points as Array<{ x: number; y: number }>,
       confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
       color:
         typeof el.color === 'string' && el.color.startsWith('#')
           ? el.color
-          : nameToColor(String(el.name || el.label || el.classification || 'Unknown')),
+          : nameToColor(String(el.name || el.label || el.classification || 'element')),
     }));
+  // Wave 19B: clip coordinates + discard degenerate/empty elements
+  return validateAndSanitizeElements(mapped, safeWidth, safeHeight);
 }
 
 /**
@@ -358,16 +383,18 @@ export async function analyzePageImage(
     color?: string;
   };
 
-  return (parsed as ParsedElement[])
+  const mappedImage = (parsed as ParsedElement[])
     .filter((el) => Array.isArray(el?.points) && el?.type)
     .map((el) => ({
-      name: String(el.name || el.classification || 'Unknown'),
+      name: String(el.name || el.classification || '').trim() || 'Unknown',
       type: el.type as AIDetectedElement['type'],
       points: el.points as Array<{ x: number; y: number }>,
       confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
       color:
         typeof el.color === 'string' && el.color.startsWith('#')
           ? el.color
-          : nameToColor(String(el.name || el.classification || 'Unknown')),
+          : nameToColor(String(el.name || el.classification || 'element')),
     }));
+  // Wave 19B: clip coordinates + discard degenerate/empty elements
+  return validateAndSanitizeElements(mappedImage, pageWidth, pageHeight);
 }

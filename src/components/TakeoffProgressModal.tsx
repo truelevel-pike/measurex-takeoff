@@ -15,6 +15,12 @@ export interface TakeoffSummary {
   totalPages: number;
   classifications: string[];
   elapsedMs: number;
+  // Wave 19B: per-type breakdown for the summary display
+  areaCount?: number;
+  areaTotalSF?: number;
+  linearCount?: number;
+  linearTotalLF?: number;
+  countItems?: number;
 }
 
 interface TakeoffProgressModalProps {
@@ -309,12 +315,44 @@ function TakeoffSummaryOverlay({
         <p className="text-sm text-white/40 mb-6">Full AI analysis finished</p>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-3 w-full mb-6">
+        <div className="grid grid-cols-2 gap-3 w-full mb-4">
           <StatCard icon={<Layers size={18} className="text-emerald-400" />} value={summary.totalPolygons} label="Polygons Detected" />
           <StatCard icon={<Eye size={18} className="text-[#00d4ff]" />} value={summary.classifications.length} label="Classifications" />
           <StatCard icon={<Sparkles size={18} className="text-purple-400" />} value={summary.totalPages} label="Pages Analyzed" />
           <StatCard icon={<Clock size={18} className="text-amber-400" />} value={timeStr} label="Time Taken" />
         </div>
+
+        {/* Wave 19B: per-type breakdown */}
+        {(summary.areaCount != null || summary.linearCount != null || summary.countItems != null) && (
+          <div
+            data-testid="takeoff-summary"
+            className="w-full mb-4 rounded-xl p-3 text-xs font-mono"
+            style={{ background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}
+          >
+            <p className="text-white/30 uppercase tracking-wider mb-2 text-[10px]">Breakdown</p>
+            <div className="flex flex-col gap-1 text-white/70">
+              {summary.areaCount != null && (
+                <span>
+                  📐 {summary.areaCount} area{summary.areaCount !== 1 ? 's' : ''}
+                  {summary.areaTotalSF != null && summary.areaTotalSF > 0 && (
+                    <span className="text-emerald-400"> ({summary.areaTotalSF.toFixed(0)} SF total)</span>
+                  )}
+                </span>
+              )}
+              {summary.linearCount != null && (
+                <span>
+                  📏 {summary.linearCount} linear element{summary.linearCount !== 1 ? 's' : ''}
+                  {summary.linearTotalLF != null && summary.linearTotalLF > 0 && (
+                    <span className="text-blue-400"> ({summary.linearTotalLF.toFixed(0)} LF total)</span>
+                  )}
+                </span>
+              )}
+              {summary.countItems != null && (
+                <span>🔢 {summary.countItems} counted item{summary.countItems !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Classifications preview */}
         {summary.classifications.length > 0 && (

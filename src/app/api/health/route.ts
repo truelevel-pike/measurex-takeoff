@@ -5,7 +5,7 @@ import path from 'path';
 
 const startTime = Date.now();
 
-export async function GET() {
+export async function GET(req: Request) {
   let supabaseConnected = false;
 
   if (isConfigured()) {
@@ -44,6 +44,10 @@ export async function GET() {
     // ignore
   }
 
+  // Resolve the app's base URL — same logic as /api/agent/session
+  const rawHost = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_HOST ?? '';
+  const appUrl = rawHost.startsWith('http') ? rawHost : rawHost ? `https://${rawHost}` : '';
+
   return NextResponse.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -52,5 +56,7 @@ export async function GET() {
     geminiConnected,
     storageWritable,
     version,
+    appUrl: appUrl || undefined,
+    agentUrl: appUrl ? `${appUrl}/agent` : undefined,
   });
 }

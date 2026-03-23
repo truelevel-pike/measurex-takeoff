@@ -8,7 +8,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 import { useStore } from '@/lib/store';
 import type { Classification, DetectedElement, PDFViewerHandle, Polygon, ProjectState } from '@/lib/types';
-import { detectScaleFromText, detectedToCalibration, DetectedScale } from '@/lib/auto-scale';
+import { detectScaleFromText, detectedToCalibration, isNotToScale, DetectedScale } from '@/lib/auto-scale';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
 import { useIsMobile } from '@/lib/utils';
@@ -396,6 +396,8 @@ function PageInner() {
 
   // Auto-scale popup state (GAP-006)
   const [showAutoScalePopup, setShowAutoScalePopup] = useState(false);
+  // Wave 19B: NTS (Not to Scale) warning state
+  const [showNtsWarning, setShowNtsWarning] = useState(false);
   const [detectedScaleInfo, setDetectedScaleInfo] = useState<{ scale: string; confidence: number } | null>(null);
 
   // Chat & Image Search panel state
@@ -1399,6 +1401,13 @@ function PageInner() {
     }
 
     // QA-006: Detect scale from text — only reached when text is non-empty
+    // Wave 19B: also detect NTS (Not to Scale) and warn the user
+    if (isNotToScale(text)) {
+      setShowNtsWarning(true);
+    } else {
+      setShowNtsWarning(false);
+    }
+
     const detected = detectScaleFromText(text);
     if (detected) {
       setDetectedScale(detected);
@@ -1697,12 +1706,31 @@ function PageInner() {
     setAiLoading(false);
 
     if (!aiCancelRef.current) {
+      // Wave 19B: compute per-type breakdown from stored polygons
+      const allPolygons = useStore.getState().polygons;
+      const allClassifications = useStore.getState().classifications;
+      const classById = new Map(allClassifications.map((c: Classification) => [c.id, c]));
+      const scaleState = useStore.getState().scale;
+      const ppu = scaleState?.pixelsPerUnit ?? 1;
+      let areaCount = 0, areaTotalSF = 0, linearCount = 0, linearTotalLF = 0, countItems = 0;
+      for (const poly of allPolygons) {
+        const cls = classById.get(poly.classificationId);
+        if (!cls) continue;
+        if (cls.type === 'area') { areaCount++; areaTotalSF += ppu > 0 ? poly.area / (ppu * ppu) : 0; }
+        else if (cls.type === 'linear') { linearCount++; linearTotalLF += ppu > 0 ? poly.linearFeet / ppu : 0; }
+        else if (cls.type === 'count') countItems++;
+      }
       // Show celebratory summary
       setTakeoffSummary({
         totalPolygons,
         totalPages: totalPagesCompleted,
         classifications: classificationNames,
         elapsedMs,
+        areaCount,
+        areaTotalSF: Math.round(areaTotalSF * 100) / 100,
+        linearCount,
+        linearTotalLF: Math.round(linearTotalLF * 100) / 100,
+        countItems,
       });
     } else {
       setAiPageStatuses([]);
@@ -2243,6 +2271,29 @@ function PageInner() {
             setShowAutoScalePopup(false);
           }}
         />
+      )}
+
+      {/* Wave 19B: NTS warning — shown when page text contains "NTS" or "Not to Scale" */}
+      {showNtsWarning && !agentMode && (
+        <div
+          data-testid="nts-warning"
+          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl text-sm font-medium"
+          style={{
+            background: 'rgba(234,179,8,0.15)',
+            border: '1px solid rgba(234,179,8,0.5)',
+            color: '#fef3c7',
+            backdropFilter: 'blur(6px)',
+          }}
+          role="alert"
+        >
+          <span className="text-yellow-400 text-base">⚠️</span>
+          <span>Drawing is <strong>Not to Scale (NTS)</strong> — measurements will be inaccurate without manual scale calibration.</span>
+          <button
+            onClick={() => setShowNtsWarning(false)}
+            className="ml-2 text-yellow-300/60 hover:text-yellow-200 text-base leading-none"
+            aria-label="Dismiss NTS warning"
+          >✕</button>
+        </div>
       )}
 
       {showCalModal && !agentMode && <ScaleCalibration onClose={() => setShowCalModal(false)} />}

@@ -82,8 +82,10 @@ export async function GET(req: Request) {
 
     // Build the canvas URL and agent URL.
     // On Vercel SSR the origin header is often absent — fall back to the
-    // configured app host so the returned URLs are always fully-qualified.
-    const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_HOST ?? '';
+    // configured app host. Ensure the value always has an https:// prefix
+    // (NEXT_PUBLIC_APP_HOST may be set without a protocol in .env.local).
+    const rawHost = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_HOST ?? '';
+    const origin = rawHost.startsWith('http') ? rawHost : rawHost ? `https://${rawHost}` : '';
     const canvasUrl = `${origin}/?project=${projectId}`;
     const agentUrl = `${origin}/?project=${projectId}&agent=1`;
 

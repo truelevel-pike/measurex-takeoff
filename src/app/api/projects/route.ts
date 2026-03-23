@@ -5,8 +5,8 @@ import { withCache } from '@/lib/with-cache';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
 export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req: Request) {
-  // BUG-A5-6-074: add rate limiting to project listing
-  const limited = rateLimitResponse(req);
+  // BUG-A5-6-074 / Wave 20: 30/60s — users refresh the projects list frequently
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
 
   try {
@@ -25,7 +25,8 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request) {
   try {
-    const limited = rateLimitResponse(req);
+    // Wave 20: 20/60s — dev testing hits 10/60s default too easily
+    const limited = rateLimitResponse(req, 20, 60_000);
     if (limited) return limited;
     await initDataDir();
     const body = await req.json().catch(() => null);
