@@ -129,7 +129,7 @@ export async function analyzePagePDF(
   for (let attempt = 1; attempt <= 3; attempt++) {
     const temperature = attempt === 1 ? 0.1 : attempt === 2 ? 0.2 : 0.3;
     const retryNote = attempt > 1
-      ? ' IMPORTANT: You MUST return at least 5 elements. This is a construction blueprint with rooms and walls visible.'
+      ? ' Previous attempt returned too few elements. You MUST identify at least 10 construction elements including rooms, walls, and openings.'
       : '';
     const basePrompt = detailed
       ? `You are analyzing page ${pageNum} of a construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight)
@@ -227,12 +227,18 @@ export async function analyzePagePDF(
             : nameToColor(String(el.name || el.label || el.classification || 'Unknown')),
       }));
 
-    if (elements.length > 0) {
+    if (elements.length >= 10) {
       console.log(`[ai-engine] analyzePagePDF attempt ${attempt}: got ${elements.length} elements`);
       return elements;
     }
 
-    console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: parsed but 0 valid elements`);
+    console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: only ${elements.length} elements (< 10 minimum), retrying`);
+
+    // Track best partial result so we return something useful if all attempts < 10
+    if (elements.length > 0 && attempt === 3) {
+      console.warn(`[ai-engine] analyzePagePDF: all attempts below threshold — returning best result (${elements.length} elements)`);
+      return elements;
+    }
   }
 
   return []; // all 3 attempts returned empty
