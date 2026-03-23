@@ -2488,8 +2488,13 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         )}
 
         {filtered.length === 0 && (
-          <div className="text-center text-xs py-8 text-gray-300">
-            {search ? 'No matches' : 'No classifications yet. Click New Classification to add one.'}
+          <div
+            data-testid={search ? undefined : 'quantities-empty-state'}
+            className="text-center text-xs py-8 text-gray-300"
+          >
+            {search
+              ? 'No matches'
+              : <p data-testid="quantities-empty-state">Add a classification to start measuring</p>}
           </div>
         )}
       </div>

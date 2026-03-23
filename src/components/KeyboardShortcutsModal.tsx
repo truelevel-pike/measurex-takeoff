@@ -27,12 +27,15 @@ const shortcuts: ShortcutEntry[] = [
   { keyCombo: 'Delete / Backspace', action: 'Delete selected polygon' },
   { keyCombo: 'Ctrl+Z', action: 'Undo' },
   { keyCombo: 'Ctrl+Y / Ctrl+Shift+Z', action: 'Redo' },
+  { keyCombo: 'Ctrl+S', action: 'Save project' },
   { keyCombo: 'Ctrl+D', action: 'Duplicate last polygon' },
   { keyCombo: '1–7', action: 'Jump to page 1–7' },
   { keyCombo: 'F', action: 'Fit PDF to page' },
+  { keyCombo: 'Ctrl+0', action: 'Fit PDF to page (fit-to-screen)' },
   { keyCombo: '?', action: 'Show this help' },
   { keyCombo: '+ / -', action: 'Zoom in/out' },
-  { keyCombo: '0', action: 'Reset zoom' },
+  { keyCombo: 'Ctrl+= / Ctrl+-', action: 'Zoom in/out (with modifier)' },
+  { keyCombo: '0', action: 'Reset zoom to 100%' },
   { keyCombo: 'Space (hold)', action: 'Pan mode (hold)' },
 ];
 

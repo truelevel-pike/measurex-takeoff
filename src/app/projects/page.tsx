@@ -377,6 +377,13 @@ export default function ProjectsPage() {
     );
     setProjects((prev) => prev.filter((p) => !ids.includes(p.id)));
     setProjectsTotal((prev) => Math.max(0, prev - ids.length));
+    // BUG-W27-004: clear localStorage if the currently open project was bulk-deleted
+    if (typeof localStorage !== 'undefined') {
+      const current = localStorage.getItem('measurex_project_id');
+      if (current && ids.includes(current)) {
+        localStorage.removeItem('measurex_project_id');
+      }
+    }
   };
 
   const confirmDelete = async () => {
@@ -387,6 +394,11 @@ export default function ProjectsPage() {
       const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
       setProjects(prev => prev.filter(p => p.id !== id));
+      // BUG-W27-004: if this is the currently open project, clear localStorage
+      // so the canvas doesn't reload stale state when the user navigates back.
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('measurex_project_id') === id) {
+        localStorage.removeItem('measurex_project_id');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Delete failed';
       setError(message);
