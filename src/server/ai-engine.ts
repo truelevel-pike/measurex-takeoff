@@ -11,6 +11,23 @@ export interface AIDetectedElement {
   color: string;
 }
 
+/**
+ * Clean up Gemini response text before JSON.parse():
+ * - Strip markdown code fences (```json ... ```)
+ * - Strip JS-style comments (// and /* *\/)
+ * - Remove trailing commas before } or ]
+ */
+function cleanGeminiJson(raw: string): string {
+  let s = raw.trim();
+  // Strip markdown code fences
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  // Strip JS comments
+  s = s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove trailing commas before } or ]
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s.trim();
+}
+
 function nameToColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -131,12 +148,25 @@ export async function analyzePagePDF(
     throw new Error(`No content in Gemini PDF response. Finish reason: ${finishReason ?? 'unknown'}`);
   }
 
-  const jsonStart = raw.indexOf('[');
-  const jsonEnd = raw.lastIndexOf(']');
-  if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON array found in Gemini PDF response');
+  const cleaned = cleanGeminiJson(raw);
+  const jsonStart = cleaned.indexOf('[');
+  const jsonEnd = cleaned.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1) {
+    console.error('[ai-engine] analyzePagePDF: no JSON array in response. Raw:', raw.slice(0, 500));
+    return [];
+  }
 
-  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-  if (!Array.isArray(parsed)) throw new Error('Parsed Gemini PDF response is not an array');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+  } catch (parseErr) {
+    console.error('[ai-engine] analyzePagePDF: JSON.parse failed:', parseErr, '— raw:', raw.slice(0, 500));
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    console.error('[ai-engine] analyzePagePDF: parsed response is not an array');
+    return [];
+  }
 
   type ParsedElement = {
     name?: string;
@@ -225,12 +255,25 @@ export async function analyzePageImage(
   }
 
   // Parse JSON array from response
-  const jsonStart = raw.indexOf('[');
-  const jsonEnd = raw.lastIndexOf(']');
-  if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON array found in Gemini response');
+  const cleaned = cleanGeminiJson(raw);
+  const jsonStart = cleaned.indexOf('[');
+  const jsonEnd = cleaned.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1) {
+    console.error('[ai-engine] analyzePageImage: no JSON array in response. Raw:', raw.slice(0, 500));
+    return [];
+  }
 
-  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-  if (!Array.isArray(parsed)) throw new Error('Parsed Gemini response is not an array');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+  } catch (parseErr) {
+    console.error('[ai-engine] analyzePageImage: JSON.parse failed:', parseErr, '— raw:', raw.slice(0, 500));
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    console.error('[ai-engine] analyzePageImage: parsed response is not an array');
+    return [];
+  }
 
   type ParsedElement = {
     name?: string;
