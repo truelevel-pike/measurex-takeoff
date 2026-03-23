@@ -345,8 +345,36 @@ export const useStore = create<Store>()(
     }
     if (patch.color !== undefined && !isHex(patch.color)) return;
     const before = snapshot(s);
+
+    // BUG-W12-001: when classification type changes, recompute polygon measurements
+    // so quantities panel shows correct SF/LF/count for the new type.
+    let updatedPolygons = s.polygons;
+    const currentCls = s.classifications.find((c) => c.id === id);
+    if (patch.type !== undefined && currentCls && patch.type !== currentCls.type) {
+      const ppu = s.scale?.pixelsPerUnit || 1;
+      updatedPolygons = s.polygons.map((p) => {
+        if (p.classificationId !== id) return p;
+        const area = calculatePolygonArea(p.points);
+        let linearFeet = 0;
+        if (p.points.length >= 2) {
+          let perimeter = 0;
+          for (let i = 0; i < p.points.length - 1; i++) {
+            const a = p.points[i], b = p.points[i + 1];
+            perimeter += Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+          }
+          if (p.points.length > 2) {
+            const first = p.points[0], last = p.points[p.points.length - 1];
+            perimeter += Math.sqrt((last.x - first.x) ** 2 + (last.y - first.y) ** 2);
+          }
+          linearFeet = perimeter / ppu;
+        }
+        return { ...p, area, linearFeet };
+      });
+    }
+
     set({
       classifications: s.classifications.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      polygons: updatedPolygons,
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });

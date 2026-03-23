@@ -52,6 +52,26 @@ export function generateViewport(): Viewport {
   };
 }
 
+// ── Startup env checks (server-side only — runs on every cold start) ─────────
+// Warn loudly about missing required env vars so they surface in Vercel logs
+// immediately rather than as cryptic runtime failures.
+if (typeof window === 'undefined') {
+  if (!process.env.NEXT_PUBLIC_APP_HOST) {
+    console.warn(
+      '[MeasureX] WARNING: NEXT_PUBLIC_APP_HOST is not set. ' +
+      'Share links and agent session URLs will not work correctly in production. ' +
+      'Set it to your deployed URL (e.g. https://app.measurex.io) in Vercel environment variables.',
+    );
+  }
+  if (!process.env.GOOGLE_API_KEY && !process.env.GEMINI_API_KEY) {
+    console.warn(
+      '[MeasureX] WARNING: GOOGLE_API_KEY is not set. ' +
+      'AI Takeoff (Gemini) will be unavailable. ' +
+      'Get a key at https://aistudio.google.com/app/apikey and set GOOGLE_API_KEY.',
+    );
+  }
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
