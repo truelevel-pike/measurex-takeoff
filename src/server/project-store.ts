@@ -371,6 +371,11 @@ export async function deleteProject(projectId: string): Promise<boolean> {
     // All child rows gone — safe to delete the project itself.
     const { error } = await sb.from('mx_projects').delete().eq('id', projectId);
     if (error) throw new Error(`deleteProject: failed to delete mx_projects: ${error.message}`);
+    // BUG-12C-1: delete PDF from Supabase Storage to prevent orphaned files
+    await sb.storage.from('pdfs').remove([`${projectId}.pdf`]).catch((err: unknown) => {
+      // Non-fatal: log but don't fail the delete if storage cleanup errors
+      console.error('[deleteProject] failed to remove PDF from storage:', err);
+    });
     // BUG-A7-5-062 fix: clean up file-based snapshots directory (snapshots are always file-based)
     await fs.rm(snapshotsDir(projectId), { recursive: true, force: true }).catch(() => {});
     return true;

@@ -51,6 +51,7 @@ export default function MobileToolbar() {
               key={b.tool}
               aria-label={b.label}
               aria-pressed={active}
+              data-testid={`mobile-tool-${b.tool}`}
               onClick={() => setTool(b.tool)}
               style={{
                 minWidth: 56,

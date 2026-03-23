@@ -214,6 +214,26 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
           </select>
         </div>
 
+        {/* Expiry display */}
+        {shareUrl && !loading && !error && (
+          <div
+            data-testid="share-expiry-display"
+            style={{
+              padding: '4px 18px 8px',
+              background: 'rgba(14,16,22,0.4)',
+              fontSize: 11,
+              color: '#5a6270',
+              fontFamily: 'monospace',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span style={{ color: '#3a9a6e', fontSize: 12 }}>∞</span>
+            Link never expires · Revoke to disable access
+          </div>
+        )}
+
         {/* Share link */}
         <div
           style={{

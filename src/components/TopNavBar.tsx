@@ -47,6 +47,8 @@ interface TopNavBarProps {
   onExportPanel?: () => void;
   onSave?: () => void;
   saving?: boolean;
+  /** Wave 12B: true when there are unsaved changes; disables save button when false */
+  isDirty?: boolean;
   projectName?: string;
   projectId?: string;
   onProjectNameSaved?: (name: string) => void;
@@ -87,6 +89,7 @@ export default function TopNavBar({
   onExportPanel,
   onSave,
   saving,
+  isDirty,
   projectName,
   aiAllPagesMode,
   onAiAllPagesModeChange,
@@ -317,26 +320,28 @@ export default function TopNavBar({
 
           {!isMobile && onSave && (
             <button
-              aria-label={saving ? 'Saving project, please wait' : 'Save project'}
+              aria-label={saving ? 'Saving project, please wait' : !isDirty ? 'No unsaved changes' : 'Save project'}
               data-testid="save-project-btn"
+              data-dirty={String(!!isDirty)}
               onClick={onSave}
-              disabled={saving}
+              disabled={saving || !isDirty}
               className="ml-2"
               style={{
-                background: saving ? 'rgba(136,146,160,0.3)' : '#12121a',
-                color: saving ? '#8892a0' : '#e0e0e0',
-                border: '1px solid rgba(0,212,255,0.25)',
+                background: saving ? 'rgba(136,146,160,0.3)' : !isDirty ? 'rgba(136,146,160,0.1)' : '#12121a',
+                color: saving || !isDirty ? '#8892a0' : '#e0e0e0',
+                border: `1px solid ${isDirty ? 'rgba(0,212,255,0.25)' : 'rgba(136,146,160,0.2)'}`,
                 borderRadius: 8,
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: saving ? 'default' : 'pointer',
+                cursor: saving || !isDirty ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                opacity: !isDirty && !saving ? 0.55 : 1,
               }}
-              onMouseEnter={(e) => !saving && (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.25)')}
+              onMouseEnter={(e) => isDirty && !saving && (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = isDirty ? 'rgba(0,212,255,0.25)' : 'rgba(136,146,160,0.2)')}
             >
               {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <SaveIcon size={14} aria-hidden="true" />}
               {saving ? 'Saving…' : 'Save'}
@@ -446,8 +451,8 @@ export default function TopNavBar({
             />
           )}
           <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
-          <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} testId="page-prev-btn" />
-          <NavIconButton ariaLabel="Next sheet" srLabel="Next sheet" icon={<ChevronRight size={16} aria-hidden="true" />} tooltip="Next Sheet" onClick={onNext} testId="page-next-btn" />
+          <NavIconButton ariaLabel="Previous sheet" srLabel="Previous sheet" icon={<ChevronLeft size={16} aria-hidden="true" />} tooltip="Previous Sheet" onClick={onPrev} testId="page-prev-btn" disabled={typeof pageIndex === 'number' && pageIndex <= 0} />
+          <NavIconButton ariaLabel="Next sheet" srLabel="Next sheet" icon={<ChevronRight size={16} aria-hidden="true" />} tooltip="Next Sheet" onClick={onNext} testId="page-next-btn" disabled={typeof pageIndex === 'number' && typeof totalPages === 'number' && pageIndex >= totalPages - 1} />
           <div
             data-testid="page-number-display"
             aria-label={`Current sheet: ${badge}`}
@@ -908,23 +913,27 @@ interface NavIconButtonProps {
   ariaExpanded?: boolean;
   ariaPressed?: boolean;
   testId?: string;
+  /** Wave 12B Bug 3: disable button at page navigation boundaries */
+  disabled?: boolean;
 }
 
-function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed, testId }: NavIconButtonProps) {
+function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpanded, ariaPressed, testId, disabled }: NavIconButtonProps) {
   const isActive = ariaPressed === true;
   return (
     <button
       aria-label={ariaLabel}
       title={tooltip}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       aria-expanded={ariaExpanded}
       aria-pressed={ariaPressed}
+      aria-disabled={disabled}
+      disabled={disabled}
       data-testid={testId}
       style={{
         background: isActive ? 'rgba(0,212,255,0.15)' : '#12121a',
         border: isActive ? '1px solid rgba(0,212,255,0.5)' : '1px solid rgba(0,212,255,0.15)',
-        color: isActive ? '#00d4ff' : '#b0dff0',
-        cursor: 'pointer',
+        color: disabled ? '#3a4050' : isActive ? '#00d4ff' : '#b0dff0',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         padding: 6,
         borderRadius: 8,
         display: 'flex',
@@ -934,13 +943,16 @@ function NavIconButton({ icon, tooltip, onClick, ariaLabel, srLabel, ariaExpande
         minWidth: 44,
         minHeight: 44,
         touchAction: 'manipulation',
+        opacity: disabled ? 0.35 : 1,
       }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         e.currentTarget.style.borderColor = 'rgba(0,212,255,0.4)';
         e.currentTarget.style.color = '#e0faff';
         e.currentTarget.style.boxShadow = '0 0 10px rgba(0,212,255,0.2) inset';
       }}
       onMouseLeave={(e) => {
+        if (disabled) return;
         e.currentTarget.style.borderColor = 'rgba(0,212,255,0.15)';
         e.currentTarget.style.color = '#b0dff0';
         e.currentTarget.style.boxShadow = 'none';

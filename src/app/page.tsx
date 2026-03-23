@@ -1127,6 +1127,17 @@ function PageInner() {
     scales,
   }), [projectId, classifications, polygons, annotations, scale, scales]);
 
+  // Wave 12B Bug 1: isDirty = fingerprint has changed since last successful save
+  // Initialise lastSaved on first hydrate so we don't show dirty immediately on load
+  useEffect(() => {
+    if (lastSavedFingerprintRef.current === null && projectId && !isDemoProject(projectId)) {
+      lastSavedFingerprintRef.current = autosaveFingerprint;
+    }
+  }, [projectId, autosaveFingerprint]);
+  const isDirty = projectId && !isDemoProject(projectId)
+    ? lastSavedFingerprintRef.current !== null && lastSavedFingerprintRef.current !== autosaveFingerprint
+    : false;
+
   useEffect(() => {
     if (!projectId || isDemoProject(projectId)) return;
     requestAutoSave();
@@ -1826,6 +1837,7 @@ function PageInner() {
         }}
         onSave={handleSave}
         saving={saving}
+        isDirty={isDirty}
         projectName={projectName || undefined}
         projectId={projectId || undefined}
         onProjectNameSaved={(newName) => {

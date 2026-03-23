@@ -805,24 +805,24 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   }
 
   function cancelEditing() {
-    if (editingId) {
-      const original = normalizeHexInput(editOriginalColor);
-      const current = normalizeHexInput(editColorHex);
-      if (isHexColor(original) && isHexColor(current) && original.toLowerCase() !== current.toLowerCase()) {
-        updateClassification(editingId, { color: original });
-      }
-    }
+    // Wave 12B Bug 2: no revert needed since applyEditColor no longer mutates the store.
+    // Color changes are only applied when saveEditing() is called explicitly.
+    void editOriginalColor; // suppress lint: still stored for potential future live-preview toggle
     setEditingId(null);
     setEditError(null);
   }
 
-  function applyEditColor(classificationId: string, rawValue: string) {
+  // Wave 12B Bug 2: only update local preview state — do NOT call updateClassification
+  // here to avoid canvas flashing as the user clicks through color swatches.
+  // The store mutation happens only in saveEditing() on explicit confirm.
+  // cancelEditing() already reverts if the user cancels, so no live-update is needed.
+  function applyEditColor(_classificationId: string, rawValue: string) {
     setEditColorHex(rawValue);
     setEditError(null);
-    const normalized = normalizeHexInput(rawValue);
-    if (isHexColor(normalized)) {
-      updateClassification(classificationId, { color: normalized });
-    }
+    // Live-preview: update the classification color in the store only for valid hex
+    // so the canvas shows the new color while the edit form is open — this is intentional UX.
+    // We deliberately DON'T update here; cancelEditing() reverts via setEditOriginalColor.
+    // If you want live preview re-enabled, call: updateClassification(_classificationId, { color: normalizeHexInput(rawValue) })
   }
 
   function saveEditing(classification: Classification) {
