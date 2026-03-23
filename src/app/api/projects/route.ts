@@ -11,11 +11,13 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req
 
   try {
     await initDataDir();
-    // listProjects() returns polygon/scale counts inline — no N+1 queries needed.
-    // Thumbnails are intentionally omitted here; they are large and not shown
-    // until hover, so they load lazily via the individual project endpoint.
-    const projects = await listProjects();
-    return NextResponse.json({ projects });
+    // BUG-W16-002: add pagination — default limit 20, sorted by updatedAt DESC.
+    // Thumbnails are intentionally omitted from the list; they load lazily per-project.
+    const url = new URL(req.url);
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') ?? '20', 10) || 20));
+    const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0', 10) || 0);
+    const { projects, total } = await listProjects(limit, offset);
+    return NextResponse.json({ projects, total, limit, offset });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }

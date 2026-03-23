@@ -8,10 +8,9 @@ export async function GET(req: Request) {
 
   try {
     await initDataDir();
-    const projects = await listProjects();
-    const recentProjects = [...projects]
-      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
-      .slice(0, 5);
+    // listProjects now returns { projects, total } — fetch first 20, already sorted by updatedAt DESC
+    const { projects } = await listProjects(20, 0);
+    const recentProjects = projects.slice(0, 5);
 
     return NextResponse.json({ projects: recentProjects });
   } catch (err: unknown) {

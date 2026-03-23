@@ -156,8 +156,14 @@ function saveOnboardingDismissed(v: boolean) {
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [projectsTotal, setProjectsTotal] = useState(0);
+  const [projectsOffset, setProjectsOffset] = useState(0);
+  const PROJECTS_PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // BUG-W16-003: thumbnails are not included in the list endpoint — fetch lazily
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -196,11 +202,17 @@ export default function ProjectsPage() {
     setShowOnboarding(!loadOnboardingDismissed());
   }, []);
 
-  const loadProjects = useCallback(async () => {
-    setLoading(true);
+  const loadProjects = useCallback(async (reset = true) => {
+    if (reset) {
+      setLoading(true);
+      setProjectsOffset(0);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
-      const res = await fetch('/api/projects');
+      const offset = reset ? 0 : projectsOffset;
+      const res = await fetch(`/api/projects?limit=${PROJECTS_PAGE_SIZE}&offset=${offset}`);
       if (res.status === 429) throw new Error('Too many requests. Please wait a moment and try again.');
       if (!res.ok) throw new Error(`Failed to load projects (${res.status})`);
       const data = await res.json();
@@ -209,20 +221,61 @@ export default function ProjectsPage() {
         ...p,
         tags: projectTags[p.id] || [],
       }));
-      setProjects(enriched);
+      setProjectsTotal(data.total ?? enriched.length);
+      if (reset) {
+        setProjects(enriched);
+      } else {
+        setProjects(prev => [...prev, ...enriched]);
+        setProjectsOffset(offset + enriched.length);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load projects';
       setError(message);
-      // Auto-retry after 5 seconds on rate limit
       if (message.includes('Too many requests')) {
-        setTimeout(() => loadProjects(), 5000);
+        setTimeout(() => loadProjects(reset), 5000);
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectsOffset]);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  // BUG-W16-003: lazy-load thumbnails for projects that have data (polygonCount > 0).
+  // Fetch max 10 at a time to avoid hammering the API.
+  useEffect(() => {
+    const needsThumbnail = projects
+      .filter(p => !p.thumbnail && !thumbnails[p.id] && (p.polygonCount ?? 0) > 0)
+      .slice(0, 10);
+    if (needsThumbnail.length === 0) return;
+
+    let cancelled = false;
+    const fetchBatch = async () => {
+      const results = await Promise.allSettled(
+        needsThumbnail.map(async (p) => {
+          const res = await fetch(`/api/projects/${p.id}`, { cache: 'no-store' });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return { id: p.id, thumbnail: data.project?.thumbnail as string | null };
+        })
+      );
+      if (cancelled) return;
+      const updates: Record<string, string> = {};
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value?.thumbnail) {
+          updates[r.value.id] = r.value.thumbnail;
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        setThumbnails(prev => ({ ...prev, ...updates }));
+      }
+    };
+    void fetchBatch();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -1112,11 +1165,12 @@ export default function ProjectsPage() {
                     onClick={() => handleOpen(p.id)}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
                   >
-                    {/* Project thumbnail */}
-                    {p.thumbnail ? (
+                    {/* Project thumbnail — loaded lazily from individual project endpoint */}
+                    {(p.thumbnail || thumbnails[p.id]) ? (
                       <div className="relative w-full h-28" style={{ background: '#0a0a0f' }}>
                         <Image
-                          src={p.thumbnail}
+                          data-testid="project-thumbnail"
+                          src={p.thumbnail || thumbnails[p.id]}
                           alt="Project preview"
                           fill
                           className="object-cover"
@@ -1247,6 +1301,20 @@ export default function ProjectsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* BUG-W16-002: Load more button — shown when there are more projects server-side */}
+          {projects.length < projectsTotal && (
+            <div className="flex justify-center pt-4 pb-2">
+              <button
+                data-testid="load-more-projects"
+                onClick={() => loadProjects(false)}
+                disabled={loadingMore}
+                className="px-6 py-2 text-sm text-[#00d4ff] border border-[#00d4ff]/30 rounded-xl hover:bg-[#00d4ff]/10 transition-colors disabled:opacity-50 font-mono"
+              >
+                {loadingMore ? 'Loading…' : `Load more (${projectsTotal - projects.length} remaining)`}
+              </button>
             </div>
           )}
         </main>

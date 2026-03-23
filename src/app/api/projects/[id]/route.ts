@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, setScale, getPages, getThumbnail } from '@/server/project-store';
+import { getProject, updateProject, deleteProject, initDataDir, getClassifications, getPolygons, getScale, listScales, setScale, getPages, getThumbnail } from '@/server/project-store';
 import type { Classification, Polygon } from '@/lib/types';
 import type { PageInfo, ProjectMeta } from '@/server/project-store';
 import { ProjectIdSchema, ProjectPutSchema, validationError } from '@/lib/api-schemas';
@@ -21,10 +21,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     // Bundle full state so the client can hydrate in a single round-trip
-    const [classifications, polygons, scale, pages, thumbnail] = await Promise.all([
+    const [classifications, polygons, scale, allScales, pages, thumbnail] = await Promise.all([
       getClassifications(id).catch(() => [] as Classification[]),
       getPolygons(id).catch(() => [] as Polygon[]),
       getScale(id).catch(() => null),
+      listScales(id).catch(() => []),
       getPages(id).catch((e) => { console.error('getPages error:', e); return [] as PageInfo[]; }),
       getThumbnail(id).catch(() => null),
     ]);
@@ -50,7 +51,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           classifications,
           polygons,
           scale,
-          scales: {},
+          // BUG-W16-004: include all per-page scales so client can restore them on reload
+          scales: Object.fromEntries(allScales.map((s) => [s.pageNumber ?? 1, s])),
           currentPage: 1,
           totalPages,
           sheetNames,

@@ -39,6 +39,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'projectId query param required' }, { status: 400 });
     }
 
+    // BUG-W16-001: validate UUID format before hitting the DB (prevents 500 on bad input)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+      return NextResponse.json({ error: 'Invalid projectId format — must be a UUID' }, { status: 400 });
+    }
+
     const project = await getProject(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });

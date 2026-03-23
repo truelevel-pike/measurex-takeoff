@@ -194,16 +194,20 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
   return readJson<ProjectMeta | null>(path.join(projectDir(projectId), 'project.json'), null);
 }
 
-export async function listProjects(): Promise<(ProjectMeta & { polygonCount: number; scaleCount: number })[]> {
+export async function listProjects(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<{ projects: (ProjectMeta & { polygonCount: number; scaleCount: number })[]; total: number }> {
   if (isSupabaseMode()) {
     const sb = getClient();
     // Single query with embedded counts — eliminates N+1 pattern
-    const { data, error } = await sb
+    const { data, error, count } = await sb
       .from('mx_projects')
-      .select('*, mx_polygons(count), mx_scales(count)')
-      .order('updated_at', { ascending: false });
+      .select('*, mx_polygons(count), mx_scales(count)', { count: 'exact' })
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) throw new Error(`listProjects: ${error.message}`);
-    return (data || []).map((row: Record<string, unknown>) => ({
+    const rows = (data || []).map((row: Record<string, unknown>) => ({
       id: row.id as string,
       name: row.name as string,
       createdAt: row.created_at as string,
@@ -211,6 +215,7 @@ export async function listProjects(): Promise<(ProjectMeta & { polygonCount: num
       polygonCount: (row.mx_polygons as Array<{ count: number }>)?.[0]?.count ?? 0,
       scaleCount: (row.mx_scales as Array<{ count: number }>)?.[0]?.count ?? 0,
     }));
+    return { projects: rows, total: count ?? rows.length };
   }
 
   // File mode: read each project dir
@@ -218,9 +223,9 @@ export async function listProjects(): Promise<(ProjectMeta & { polygonCount: num
   try {
     entries = await fs.readdir(PROJECTS_DIR);
   } catch {
-    return [];
+    return { projects: [], total: 0 };
   }
-  const projects: (ProjectMeta & { polygonCount: number; scaleCount: number })[] = [];
+  const all: (ProjectMeta & { polygonCount: number; scaleCount: number })[] = [];
   for (const entry of entries) {
     const meta = await readJson<ProjectMeta | null>(
       path.join(PROJECTS_DIR, entry, 'project.json'),
@@ -233,11 +238,11 @@ export async function listProjects(): Promise<(ProjectMeta & { polygonCount: num
         fs.readdir(dir).catch(() => [] as string[]),
       ]);
       const scaleCount = dirEntries.filter((f: string) => /^scale-\d+\.json$/.test(f)).length;
-      projects.push({ ...meta, polygonCount: polygons.length, scaleCount });
+      all.push({ ...meta, polygonCount: polygons.length, scaleCount });
     }
   }
-  projects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-  return projects;
+  all.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return { projects: all.slice(offset, offset + limit), total: all.length };
 }
 
 /** Quick summary flags used by the onboarding checklist. */
