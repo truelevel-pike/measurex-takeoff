@@ -1358,6 +1358,35 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
               <Download size={14} aria-hidden="true" />
             </button>
           )}
+          {/* Wave 21: Copy quantities as tab-separated text for Excel paste */}
+          <button
+            type="button"
+            data-testid="copy-quantities-btn"
+            title="Copy quantities to clipboard (paste into Excel)"
+            aria-label="Copy quantities table"
+            className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
+            onClick={() => {
+              const rows: string[] = ['Name\tType\tQuantity\tUnit'];
+              for (const cls of classifications) {
+                const totals = totalsByClassification.get(cls.id);
+                if (!totals) continue;
+                const qty = cls.type === 'area'
+                  ? formatArea(totals.areaReal, measurementSettings)
+                  : cls.type === 'linear'
+                    ? formatLinear(totals.lengthReal, measurementSettings)
+                    : formatCount(totals.count);
+                const unit = cls.type === 'area' ? 'SF' : cls.type === 'linear' ? 'LF' : 'EA';
+                rows.push(`${cls.name}\t${cls.type}\t${qty}\t${unit}`);
+              }
+              const text = rows.join('\n');
+              navigator.clipboard.writeText(text).then(
+                () => addToast('Copied to clipboard!', 'success'),
+                () => addToast('Copy failed — try manually', 'error'),
+              );
+            }}
+          >
+            <Copy size={14} aria-hidden="true" />
+          </button>
           {projectId && (
             <button
               type="button"

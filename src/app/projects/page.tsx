@@ -170,6 +170,10 @@ export default function ProjectsPage() {
   const [showCompare, setShowCompare] = useState(false);
   const [showCollab, setShowCollab] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // Wave 21: multi-select for bulk delete
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [showAutoName, setShowAutoName] = useState(false);
   const whatsNew = useWhatsNew();
 
@@ -344,6 +348,35 @@ export default function ProjectsPage() {
   const handleDelete = (id: string) => {
     // BUG-W19-004: replace window.confirm with a proper modal
     setPendingDeleteId(id);
+  };
+
+  const toggleSelectProject = (id: string, shiftKey = false) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastSelectedId) {
+        // Range select using current projects order
+        const ids = projects.map((p) => p.id);
+        const a = ids.indexOf(lastSelectedId);
+        const b = ids.indexOf(id);
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        for (let i = lo; i <= hi; i++) next.add(ids[i]);
+      } else {
+        if (next.has(id)) next.delete(id); else next.add(id);
+      }
+      return next;
+    });
+    setLastSelectedId(id);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setConfirmBulkDelete(false);
+    setSelectedIds(new Set());
+    await Promise.allSettled(
+      ids.map((id) => fetch(`/api/projects/${id}`, { method: 'DELETE' }))
+    );
+    setProjects((prev) => prev.filter((p) => !ids.includes(p.id)));
+    setProjectsTotal((prev) => Math.max(0, prev - ids.length));
   };
 
   const confirmDelete = async () => {
@@ -1160,6 +1193,25 @@ export default function ProjectsPage() {
             </div>
           ) : viewMode === 'grid' ? (
             /* Grid view */
+            <>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3 mb-3 px-1">
+                <span className="text-xs text-zinc-400">{selectedIds.size} selected</span>
+                <button
+                  data-testid="delete-selected-btn"
+                  onClick={() => setConfirmBulkDelete(true)}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+                >
+                  Delete selected ({selectedIds.size})
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="px-3 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-lg hover:border-zinc-500 transition-colors"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
             <div data-testid="project-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProjects.map(p => {
                 const polyCount = p.state?.polygons?.length || 0;
@@ -1169,10 +1221,29 @@ export default function ProjectsPage() {
                     key={p.id}
                     data-testid="project-card"
                     data-project-id={p.id}
-                    className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden hover:border-[#00d4ff]/60 transition-all cursor-pointer group hover:shadow-[0_0_12px_rgba(0,212,255,0.12)]"
-                    onClick={() => handleOpen(p.id)}
+                    className={`relative bg-[#0a0a0f] border rounded-xl overflow-hidden transition-all cursor-pointer group hover:shadow-[0_0_12px_rgba(0,212,255,0.12)] ${selectedIds.has(p.id) ? 'border-[#00d4ff]/80 ring-2 ring-[#00d4ff]/40' : 'border-[#00d4ff]/20 hover:border-[#00d4ff]/60'}`}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('[data-select-checkbox]')) return;
+                      handleOpen(p.id);
+                    }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
                   >
+                    {/* Multi-select checkbox */}
+                    <div
+                      data-select-checkbox
+                      className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ opacity: selectedIds.has(p.id) ? 1 : undefined }}
+                      onClick={(e) => { e.stopPropagation(); toggleSelectProject(p.id, e.shiftKey); }}
+                    >
+                      <input
+                        type="checkbox"
+                        data-testid="project-select-checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => {}}
+                        className="w-4 h-4 accent-[#00d4ff] cursor-pointer"
+                        aria-label={`Select ${p.name}`}
+                      />
+                    </div>
                     {/* Project thumbnail — loaded lazily from individual project endpoint */}
                     {(p.thumbnail || thumbnails[p.id]) ? (
                       <div className="relative w-full h-28" style={{ background: '#0a0a0f' }}>
@@ -1239,6 +1310,7 @@ export default function ProjectsPage() {
                 );
               })}
             </div>
+            </>
           ) : (
             /* List view */
             <div data-testid="project-list" className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden">
@@ -1477,6 +1549,40 @@ export default function ProjectsPage() {
 
       {/* What's New modal */}
       {whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+
+      {/* Wave 21: Bulk delete confirmation */}
+      {confirmBulkDelete && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setConfirmBulkDelete(false)}
+        >
+          <div
+            className="bg-[#0a0a0f] border border-red-500/30 rounded-xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-white mb-2">Delete {selectedIds.size} project{selectedIds.size !== 1 ? 's' : ''}?</h2>
+            <p className="text-xs text-zinc-400 mb-5">This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                data-testid="delete-selected-cancel"
+                onClick={() => setConfirmBulkDelete(false)}
+                className="px-4 py-2 text-xs text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="delete-selected-confirm"
+                onClick={handleBulkDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+              >
+                Delete {selectedIds.size}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* BUG-W19-004: Delete confirmation modal */}
       {pendingDeleteId && (

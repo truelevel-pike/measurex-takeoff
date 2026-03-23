@@ -94,6 +94,7 @@ function ToastItem({ toast, index, onRemove }: { toast: Toast; index: number; on
       <Icon size={18} className={`shrink-0 ${iconColorMap[toast.type]}`} />
       <span className="text-sm text-zinc-100 flex-1">{toast.message}</span>
       <button
+        data-testid="toast-close-btn"
         aria-label="Dismiss toast"
         onClick={() => onRemove(toast.id)}
         className="text-zinc-400 hover:text-white shrink-0 transition-colors"

@@ -56,14 +56,46 @@ function cleanGeminiJson(raw: string): string {
  * - Require >= 1 point for 'count' type
  * - Require >= 2 points for 'linear' type
  */
+/**
+ * filterElements — primary validation gate applied before any element is returned.
+ * Filters out garbage polygons that would corrupt a project:
+ *   1. Empty or missing name
+ *   2. Area elements with fewer than 3 points (not enough to form a polygon)
+ *   3. All points coincide at (0,0) — placeholder / hallucinated element
+ *   4. Any point coordinate is negative or exceeds 10× the canvas dimension
+ */
+function filterElements(
+  elements: Array<{ name?: string; type?: string; points?: Array<{ x: number; y: number }> }>,
+  pageWidth: number,
+  pageHeight: number,
+): typeof elements {
+  const maxX = pageWidth * 10;
+  const maxY = pageHeight * 10;
+  return elements.filter((el) => {
+    // 1. Must have a non-empty name
+    if (!el.name || !el.name.trim()) return false;
+    // 2. Must have points array
+    if (!Array.isArray(el.points) || el.points.length === 0) return false;
+    // 3. Area type requires at least 3 points
+    if (el.type === 'area' && el.points.length < 3) return false;
+    // 4. All points at (0,0) — discard
+    if (el.points.every((p) => p.x === 0 && p.y === 0)) return false;
+    // 5. Any point coordinate negative or > 10× canvas dimension
+    if (el.points.some((p) => p.x < 0 || p.y < 0 || p.x > maxX || p.y > maxY)) return false;
+    return true;
+  });
+}
+
 function validateAndSanitizeElements(
   elements: Array<{ name: string; type: string; points: Array<{ x: number; y: number }>; confidence: number; color: string }>,
   pageWidth: number,
   pageHeight: number,
 ): AIDetectedElement[] {
+  // Run the primary filter first
+  const preFiltered = filterElements(elements, pageWidth, pageHeight) as typeof elements;
   const MIN_POINTS: Record<string, number> = { area: 3, linear: 2, count: 1 };
   const VALID_TYPES = new Set<string>(['area', 'linear', 'count']);
-  return elements.filter((el) => {
+  return preFiltered.filter((el) => {
     if (!el.name || el.name === 'Unknown' || !Array.isArray(el.points) || el.points.length === 0) return false;
     if (!VALID_TYPES.has(el.type)) return false;
     const min = MIN_POINTS[el.type] ?? 1;

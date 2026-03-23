@@ -397,7 +397,7 @@ function PageInner() {
   // Auto-scale popup state (GAP-006)
   const [showAutoScalePopup, setShowAutoScalePopup] = useState(false);
   // Wave 19B: NTS (Not to Scale) warning state
-  const [showNtsWarning, setShowNtsWarning] = useState(false);
+  const [ntsWarning, setNtsWarning] = useState(false);
   const [detectedScaleInfo, setDetectedScaleInfo] = useState<{ scale: string; confidence: number } | null>(null);
 
   // Chat & Image Search panel state
@@ -904,7 +904,14 @@ function PageInner() {
         setAiStatus(`Error: ${zeroMsg}`);
         setTimeout(() => setAiStatus(null), 7000);
       } else {
-        const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
+        // Wave 19B: compute per-type breakdown from store after reload
+        const storePolygons = useStore.getState().polygons;
+        const storeClassifications = useStore.getState().classifications;
+        const clsById = new Map(storeClassifications.map((c: Classification) => [c.id, c]));
+        const areas = storePolygons.filter((p: Polygon) => clsById.get(p.classificationId)?.type === 'area');
+        const linears = storePolygons.filter((p: Polygon) => clsById.get(p.classificationId)?.type === 'linear');
+        const counts = storePolygons.filter((p: Polygon) => clsById.get(p.classificationId)?.type === 'count');
+        const doneMsg = `Done: ${areas.length} areas, ${linears.length} walls, ${counts.length} items | Total: ${totalDetected} elements`;
         setAiStatus(doneMsg);
         setTimeout(() => setAiStatus(null), 5000);
 
@@ -981,7 +988,13 @@ function PageInner() {
       } else if (e.key === '=' || e.key === '+') {
         e.preventDefault();
         setZoomLevel(Math.min(MAX_ZOOM, zoomLevel + ZOOM_STEP));
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        setZoomLevel(Math.min(MAX_ZOOM, zoomLevel + ZOOM_STEP));
       } else if (e.key === '-') {
+        e.preventDefault();
+        setZoomLevel(Math.max(MIN_ZOOM, zoomLevel - ZOOM_STEP));
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
         e.preventDefault();
         setZoomLevel(Math.max(MIN_ZOOM, zoomLevel - ZOOM_STEP));
       } else if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
@@ -1403,9 +1416,9 @@ function PageInner() {
     // QA-006: Detect scale from text — only reached when text is non-empty
     // Wave 19B: also detect NTS (Not to Scale) and warn the user
     if (isNotToScale(text)) {
-      setShowNtsWarning(true);
+      setNtsWarning(true);
     } else {
-      setShowNtsWarning(false);
+      setNtsWarning(false);
     }
 
     const detected = detectScaleFromText(text);
@@ -2273,28 +2286,7 @@ function PageInner() {
         />
       )}
 
-      {/* Wave 19B: NTS warning — shown when page text contains "NTS" or "Not to Scale" */}
-      {showNtsWarning && !agentMode && (
-        <div
-          data-testid="nts-warning"
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl text-sm font-medium"
-          style={{
-            background: 'rgba(234,179,8,0.15)',
-            border: '1px solid rgba(234,179,8,0.5)',
-            color: '#fef3c7',
-            backdropFilter: 'blur(6px)',
-          }}
-          role="alert"
-        >
-          <span className="text-yellow-400 text-base">⚠️</span>
-          <span>Drawing is <strong>Not to Scale (NTS)</strong> — measurements will be inaccurate without manual scale calibration.</span>
-          <button
-            onClick={() => setShowNtsWarning(false)}
-            className="ml-2 text-yellow-300/60 hover:text-yellow-200 text-base leading-none"
-            aria-label="Dismiss NTS warning"
-          >✕</button>
-        </div>
-      )}
+      {ntsWarning && !agentMode && <div data-testid='nts-warning' className='fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white px-4 py-2 rounded-lg z-50'>Drawing marked as Not to Scale — measurements may be inaccurate</div>}
 
       {showCalModal && !agentMode && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
       {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}
