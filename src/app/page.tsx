@@ -988,17 +988,22 @@ function PageInner() {
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        const lastPoly = useStore.getState().lastPolygon;
-        if (lastPoly) {
+        const state = useStore.getState();
+        // BUG-W28-003: prefer the currently selected polygon over lastPolygon so
+        // Ctrl+D duplicates what the user has selected, not what was last drawn.
+        const selectedId = state.selectedPolygonId ?? state.selectedPolygon;
+        const polyToDuplicate = (selectedId && state.polygons.find((p) => p.id === selectedId))
+          ?? state.lastPolygon;
+        if (polyToDuplicate) {
           const offset = 20;
-          useStore.getState().addPolygon({
-            points: lastPoly.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
-            classificationId: lastPoly.classificationId,
-            pageNumber: lastPoly.pageNumber,
-            area: lastPoly.area,
-            linearFeet: lastPoly.linearFeet,
+          state.addPolygon({
+            points: polyToDuplicate.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
+            classificationId: polyToDuplicate.classificationId,
+            pageNumber: polyToDuplicate.pageNumber,
+            area: polyToDuplicate.area,
+            linearFeet: polyToDuplicate.linearFeet,
             isComplete: true,
-            label: lastPoly.label,
+            label: polyToDuplicate.label,
           });
           addToast('Polygon duplicated', 'info');
         }

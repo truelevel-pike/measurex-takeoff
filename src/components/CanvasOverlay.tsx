@@ -1059,7 +1059,9 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 // BUG-A7-5-053 fix: use closed=false only for linear (open-path) polygons;
                 // area polygons are closed so their perimeter includes the closing segment.
                 const linearReal = calculateLinearFeet(poly.points, ppu, clsType !== 'linear');
-                const rawLabel = (poly.label ?? cls?.name ?? '').trim();
+                // BUG-W28-004: always use live cls.name so rename propagates immediately to canvas labels.
+                // Fall back to poly.label only when the classification is not found (deleted/unknown).
+                const rawLabel = (cls?.name ?? poly.label ?? '').trim();
 
                 // If this is a COUNT polygon summary (nominated for a dense cluster), use the
                 // pre-computed summary label; otherwise build the label normally.
