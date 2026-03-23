@@ -346,6 +346,7 @@ function PageInner() {
 
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
+  const selectedClassificationId = useStore((s) => s.selectedClassification);
   const annotations = useStore((s) => s.annotations);
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
@@ -2240,10 +2241,15 @@ function PageInner() {
       <CoordInputPanel agentMode={agentMode} />
       <span
         id="mx-agent-state"
+        data-page={String(currentPage)}
         data-current-page={String(currentPage)}
         data-total-pages={String(totalPages || 1)}
+        data-tool={currentTool}
         data-active-tool={currentTool}
         data-project-id={projectId || ''}
+        data-selected-classification={selectedClassificationId || ''}
+        data-polygon-count={String(polygons.filter((p) => p.page === currentPage).length)}
+        data-scale-px-per-unit={scale ? String(scale.pixelsPerUnit) : ''}
         data-scale={scale ? String(scale.pixelsPerUnit) : ''}
         data-scale-unit={scale?.unit || ''}
         data-canvas-width={String(pageBaseDimensions[currentPage]?.width || '')}

@@ -40,6 +40,7 @@ function PillButton({
   onClick,
   active,
   danger,
+  'data-testid': dataTestId,
 }: {
   icon: LucideIcon;
   label: string;
@@ -47,10 +48,12 @@ function PillButton({
   onClick: () => void;
   active?: boolean;
   danger?: boolean;
+  'data-testid'?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      data-testid={dataTestId}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
       style={{
         background: active
@@ -188,6 +191,7 @@ export default function ContextToolbar({
             label="Snap"
             onClick={onToggleSnapping}
             active={snappingEnabled}
+            data-testid="snapping-toggle"
           />
         </>
       )}

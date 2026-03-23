@@ -608,12 +608,12 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
     [onCanvasPointerDown, currentTool, calibrationMode, calibrationPoints, addCalibrationPoint, baseDims]
   );
 
-  // BUG-A7-5-046 fix: use union type for both SVGPolygonElement and SVGPolylineElement
-  // so no unsafe `as unknown as` cast is needed on the polyline onClick handlers.
-  type SvgPolyHandler = React.MouseEventHandler<SVGPolygonElement | SVGPolylineElement>;
+  // BUG-A7-5-046 fix: use union type for SVGPolygonElement, SVGPolylineElement, and SVGCircleElement
+  // so no unsafe `as unknown as` cast is needed on the polyline/circle onClick handlers.
+  type SvgPolyHandler = React.MouseEventHandler<SVGPolygonElement | SVGPolylineElement | SVGCircleElement>;
 
   const handlePolygonClick: SvgPolyHandler = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement>) => {
+    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement | SVGCircleElement>) => {
       e.stopPropagation();
       onCanvasPointerDown?.();
       const polygonId = e.currentTarget.dataset.polygonId;
@@ -630,7 +630,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   );
 
   const handlePolygonContextMenu: SvgPolyHandler = useCallback(
-    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement>) => {
+    (e: React.MouseEvent<SVGPolygonElement | SVGPolylineElement | SVGCircleElement>) => {
       e.preventDefault();
       e.stopPropagation();
       const polygonId = e.currentTarget.dataset.polygonId;
@@ -818,6 +818,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           const color = getPolygonColor(polyWithDisplay, cls?.color);
           const fillOpacity = getPolygonFillOpacity(polyWithDisplay, isSelected, isHighlighted, prefs.polygonFillOpacity);
           const isLinearPoly = cls?.type === 'linear';
+          const isCountPoly = cls?.type === 'count';
+          const countIndex = polygonIndexInClassMap.get(poly.id) ?? 1;
           const isClassHovered = hoveredClassificationId !== null && poly.classificationId === hoveredClassificationId;
           const sharedStyle: React.CSSProperties = {
             cursor: currentTool === 'select' ? 'pointer' : 'default',
@@ -839,7 +841,72 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
               onPointerMove={(currentTool === 'select' || currentTool === 'pan') ? handleGroupPointerMove : undefined}
               onPointerLeave={(currentTool === 'select' || currentTool === 'pan') ? handleGroupPointerLeave : undefined}
             >
-              {isLinearPoly ? (
+              {isCountPoly ? (
+                (() => {
+                  const cx = displayPoints[0]?.x ?? 0;
+                  const cy = displayPoints[0]?.y ?? 0;
+                  return (
+                    <>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={8}
+                        fill={color}
+                        stroke="#fff"
+                        strokeWidth={2}
+                        vectorEffect="non-scaling-stroke"
+                        style={sharedStyle}
+                        data-polygon-id={poly.id}
+                        onClick={handlePolygonClick}
+                        onContextMenu={handlePolygonContextMenu}
+                        aria-label={cls?.name ?? 'Count marker'}
+                      >
+                        <title>{`${cls?.name ?? 'Count marker'} #${countIndex}`}</title>
+                      </circle>
+                      <text
+                        x={cx}
+                        y={cy + 4}
+                        textAnchor="middle"
+                        fontSize="10"
+                        fontWeight="700"
+                        fontFamily="sans-serif"
+                        fill="#ffffff"
+                        pointerEvents="none"
+                        style={{ userSelect: 'none' }}
+                      >
+                        {countIndex}
+                      </text>
+                      {isSelected && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={12}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeDasharray="4 3"
+                          opacity={0.75}
+                          vectorEffect="non-scaling-stroke"
+                          pointerEvents="none"
+                        />
+                      )}
+                      {isClassHovered && !isSelected && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={12}
+                          fill="rgba(255,255,255,0.15)"
+                          stroke="#00d4ff"
+                          strokeWidth={2}
+                          opacity={0.8}
+                          vectorEffect="non-scaling-stroke"
+                          pointerEvents="none"
+                        />
+                      )}
+                    </>
+                  );
+                })()
+              ) : isLinearPoly ? (
                 <>
                   <polyline
                     points={pointsStr}
@@ -888,7 +955,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                   <title>{`${cls?.name ?? 'Polygon'}${poly.confidence !== undefined ? ` | ${Math.round(poly.confidence * 100)}% confidence` : ''}${poly.detectedByModel ? ` | Model: ${poly.detectedByModel}` : ''}`}</title>
                 </polygon>
               )}
-              {isSelected && (
+              {isSelected && !isCountPoly && (
                 isLinearPoly ? (
                   <polyline
                     points={pointsStr}
@@ -916,7 +983,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 )
               )}
               {/* Classification hover highlight overlay */}
-              {isClassHovered && !isSelected && (
+              {isClassHovered && !isSelected && !isCountPoly && (
                 isLinearPoly ? (
                   <polyline
                     points={pointsStr}
@@ -1007,6 +1074,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 const countForClass = clsType === 'count'
                   ? (polygonCountByClassification.get(poly.classificationId) ?? 0)
                   : 0;
+                const countIndex = polygonIndexInClassMap.get(poly.id) ?? 1;
                 const areaReal = poly.area / (ppu * ppu);
                 // BUG-A7-5-053 fix: use closed=false only for linear (open-path) polygons;
                 // area polygons are closed so their perimeter includes the closing segment.
@@ -1036,7 +1104,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
                 // for dense summaries render a slightly larger pill badge.
                 if (clsType === 'count') {
                   // Badge dimensions — tighter than full text labels
-                  const badgeText = isCountSummary ? displayStr : `${countForClass}`;
+                  const badgeText = isCountSummary ? displayStr : `${countIndex}`;
                   const badgeW = Math.max(isCountSummary ? 80 : 26, badgeText.length * 7 + 10);
                   const badgeH = isCountSummary ? 20 : 18;
                   const badgeX = centX - badgeW / 2;

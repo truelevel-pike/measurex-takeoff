@@ -68,6 +68,24 @@ type ClassTotals = {
 };
 type ClassificationDeduction = { label: string; quantity: number };
 
+function linearToFeet(value: number, unit: 'ft' | 'in' | 'm' | 'mm' | 'cm'): number {
+  if (unit === 'ft') return value;
+  if (unit === 'in') return value / 12;
+  if (unit === 'm') return value * 3.280839895;
+  if (unit === 'cm') return value * 0.03280839895;
+  if (unit === 'mm') return value * 0.003280839895;
+  return value;
+}
+
+function areaToSquareFeet(value: number, unit: 'ft' | 'in' | 'm' | 'mm' | 'cm'): number {
+  if (unit === 'ft') return value;
+  if (unit === 'in') return value / 144;
+  if (unit === 'm') return value * 10.763910417;
+  if (unit === 'cm') return value * 0.0010763910417;
+  if (unit === 'mm') return value * 0.000010763910417;
+  return value;
+}
+
 function isHexColor(value: string): boolean {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
 }
@@ -430,6 +448,31 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     }
     return byId;
   }, [classifications]);
+
+  const totalsSummary = useMemo(() => {
+    let totalAreaSF = 0;
+    let totalLinearLF = 0;
+    let totalCountEA = 0;
+    for (const polygon of polygons) {
+      const classification = classificationById.get(polygon.classificationId);
+      if (!classification) continue;
+      if (classification.type === 'count') {
+        totalCountEA += 1;
+        continue;
+      }
+      const pageScale = scales[polygon.pageNumber] ?? scale;
+      const ppu = pageScale?.pixelsPerUnit || 1;
+      const unit = pageScale?.unit ?? 'ft';
+      if (classification.type === 'area') {
+        const areaReal = polygon.area / (ppu * ppu);
+        totalAreaSF += areaToSquareFeet(areaReal, unit);
+      } else if (classification.type === 'linear') {
+        const lengthReal = calculateLinearFeet(polygon.points, ppu, false);
+        totalLinearLF += linearToFeet(lengthReal, unit);
+      }
+    }
+    return { totalAreaSF, totalLinearLF, totalCountEA };
+  }, [polygons, classificationById, scales, scale]);
 
   // Polygons matching search by label (shown as extra search results)
   const matchingPolygons = useMemo(() => {
@@ -2186,6 +2229,14 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
             })}
           </div>
         )}
+      </div>
+      <div
+        className="px-3 py-2 text-[12px] text-[#e5e7eb] flex flex-col gap-1"
+        style={{ borderTop: '2px solid rgba(0,212,255,0.35)', marginTop: 8, paddingTop: 8 }}
+      >
+        <span data-testid="quantities-total-area">Total Area: {totalsSummary.totalAreaSF.toFixed(1)} SF</span>
+        <span data-testid="quantities-total-linear">Total Linear: {totalsSummary.totalLinearLF.toFixed(1)} LF</span>
+        <span data-testid="quantities-total-count">Total Count: {totalsSummary.totalCountEA}</span>
       </div>
 
       <ClassificationLibrary open={showTemplateLibrary} onClose={handleCloseTemplateLibrary} />

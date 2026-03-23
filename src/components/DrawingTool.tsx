@@ -55,6 +55,8 @@ export default function DrawingTool() {
   const [points, setPoints] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
+  const [rectangleMode, setRectangleMode] = useState(false);
+  const [rectCorner1, setRectCorner1] = useState<Point | null>(null);
   const addPolygon = useStore((s) => s.addPolygon);
   const polygons = useStore((s) => s.polygons);
   const classifications = useStore((s) => s.classifications);
@@ -66,6 +68,7 @@ export default function DrawingTool() {
   const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
   // BUG-A5-H01: read snap/grid settings from store instead of hardcoded constants
   const snappingEnabled = useStore((s) => s.snappingEnabled);
+  const setSnapping = useStore((s) => s.setSnapping);
   const gridEnabled = useStore((s) => s.gridEnabled);
   const gridSize = useStore((s) => s.gridSize);
   const snapOptions = { vertices: snappingEnabled, midpoints: snappingEnabled, edges: false, grid: gridEnabled, gridSize };
@@ -208,6 +211,7 @@ export default function DrawingTool() {
       window.__perfMarks.polygonDraw = null;
     }
     setPointsAndRef([]);
+    setRectCorner1(null);
     setTool('select');
   }, [getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale, setPointsAndRef]);
 
@@ -227,6 +231,29 @@ export default function DrawingTool() {
       if (cls.type === 'count') {
         placeCountItem(pt);
         return;
+      }
+
+      // Rectangle mode: 2-click rectangle shortcut (R key)
+      if (rectangleMode) {
+        if (!rectCorner1) {
+          setRectCorner1(pt);
+          setPointsAndRef([pt]);
+          return;
+        } else {
+          const c1 = rectCorner1;
+          const c2 = pt;
+          const rectPoints: Point[] = [
+            { x: c1.x, y: c1.y },
+            { x: c2.x, y: c1.y },
+            { x: c2.x, y: c2.y },
+            { x: c1.x, y: c2.y },
+          ];
+          pointsRef.current = rectPoints;
+          commitPolygon();
+          setRectangleMode(false);
+          setRectCorner1(null);
+          return;
+        }
       }
 
       // Close polygon if clicking near the first point (area mode only)
@@ -250,7 +277,7 @@ export default function DrawingTool() {
       const nextPoints = [...currentPoints, pt];
       setPointsAndRef(nextPoints);
     },
-    [getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims, setPointsAndRef]
+    [getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims, setPointsAndRef, rectangleMode, rectCorner1, setRectangleMode, setRectCorner1]
   );
 
   const handleDoubleClick = useCallback(
@@ -297,7 +324,13 @@ export default function DrawingTool() {
       e.preventDefault();
       setPointsAndRef(pointsRef.current.slice(0, -1));
     }
-  }, [setTool, commitPolygon, setPointsAndRef]);
+    if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      setRectangleMode((v) => !v);
+      setRectCorner1(null);
+      setPointsAndRef([]);
+    }
+  }, [setTool, commitPolygon, setPointsAndRef, setRectangleMode, setRectCorner1]);
 
   const hasScale = scale !== null && scale.pixelsPerUnit > 0;
   const ppu = scale?.pixelsPerUnit || 1;
@@ -397,17 +430,55 @@ export default function DrawingTool() {
             : '(Scale not set)'}
         </div>
       )}
+      {/* Rectangle mode toggle button */}
+      {cls?.type !== 'count' && !isLinear && (
+        <div className="absolute top-3 right-3 inline-flex items-center gap-2 pointer-events-auto">
+          <button
+            data-testid="snapping-toggle"
+            onClick={(e) => { e.stopPropagation(); setSnapping(!snappingEnabled); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: snappingEnabled ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
+              color: snappingEnabled ? '#00d4ff' : '#d1d5db',
+              border: `1px solid ${snappingEnabled ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Snapping"
+          >
+            Snap
+          </button>
+          <button
+            data-testid="tool-rectangle"
+            onClick={(e) => { e.stopPropagation(); setRectangleMode((v) => !v); setRectCorner1(null); setPointsAndRef([]); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: rectangleMode ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
+              color: rectangleMode ? '#00d4ff' : '#d1d5db',
+              border: `1px solid ${rectangleMode ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Rectangle tool (R)"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <rect x="1" y="2" width="10" height="8" rx="1" />
+            </svg>
+            Rect
+          </button>
+        </div>
+      )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
         {cls?.type === 'count'
           ? 'Click to place count marker · Esc to finish'
-          : isLinear
-            ? points.length === 0
-              ? 'Click to draw line — double-click or Enter to finish'
-              : points.length < 2
-                ? `${points.length} point — need 1 more`
-                : 'Click to add points · double-click or Enter to finish · Esc to cancel'
-            : points.length === 0
-              ? 'Click to start drawing polygon'
+          : rectangleMode
+            ? rectCorner1
+              ? 'Click second corner to complete rectangle'
+              : 'Click first corner · R=Rectangle mode (toggle)'
+            : isLinear
+              ? points.length === 0
+                ? 'Click to draw line — double-click or Enter to finish'
+                : points.length < 2
+                  ? `${points.length} point — need 1 more`
+                  : 'Click to add points · double-click or Enter to finish · Esc to cancel'
+              : points.length === 0
+                ? 'Click to start drawing polygon · R=Rectangle mode'
               : points.length < 3
                 ? `${points.length} points — need ${3 - points.length} more to close`
                 : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
