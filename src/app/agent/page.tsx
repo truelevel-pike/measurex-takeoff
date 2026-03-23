@@ -5,7 +5,7 @@
 // agent can bootstrap itself by reading /agent before starting a takeoff.
 
 import Link from 'next/link';
-import { ArrowLeft, Bot, Eye, Keyboard, Database, LayoutGrid, Zap } from 'lucide-react';
+import { ArrowLeft, Bot, Eye, Keyboard, Database, LayoutGrid, Radio, Zap } from 'lucide-react';
 
 export default function AgentDocsPage() {
   return (
@@ -368,6 +368,135 @@ const t = window.measurex.getTotals();
 window.measurex.setPage(s.currentPage + 1);`}</pre>
             </div>
 
+          </div>
+        </section>
+
+        {/* SSE Real-time Stream */}
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <Radio size={16} className="text-[#00d4ff]" />
+            SSE Real-time Stream
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Subscribe to live project updates via Server-Sent Events. The agent can use this to
+            react instantly to polygon creation, scale changes, and page navigation without polling.
+          </p>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-4 text-xs">
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Endpoint</p>
+              <pre className="text-[#00d4ff] overflow-x-auto">{`GET /api/ws?projectId=<id>
+# Optional: &lastEventId=<seq>  (for reconnect/replay)`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Event types</p>
+              <pre className="text-[#00d4ff] overflow-x-auto leading-relaxed">{`polygon:created    { polygon }
+polygon:updated    { polygon }
+polygon:deleted    { polygonId }
+classification:created  { classification }
+classification:updated  { classification }
+classification:deleted  { classificationId }
+scale:updated      { scale, pageNumber }
+page:changed       { page, totalPages }
+takeoff:started    { projectId }
+takeoff:complete   { projectId, count }
+keepalive          { t }  (every 20s)`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Usage (curl)</p>
+              <pre className="text-gray-300 overflow-x-auto">{`curl -N "https://measurex-takeoff.vercel.app/api/ws?projectId=<id>"`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Note</p>
+              <p className="text-gray-400">
+                Vercel serverless functions have a 30s response limit — the SSE stream works best
+                in development or a persistent server environment. For production polling, use
+                the webhook event log instead (see API Reference below).
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Webhook event log */}
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <Database size={16} className="text-[#00d4ff]" />
+            Webhook Event Log
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Every agent event POSTed to <code className="text-[#00d4ff] bg-gray-800 px-1 rounded">/api/projects/:id/webhooks</code> is
+            appended to an in-memory event log. Poll this to confirm events have fired.
+          </p>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-4 text-xs">
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Read event log</p>
+              <pre className="text-[#00d4ff] overflow-x-auto leading-relaxed">{`GET /api/projects/:id/webhooks/events
+# → { events: [ { event, page, source, timestamp, projectId, meta? } ], count }
+
+# Optional: ?limit=N  (default 20, max 100)`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Fire an agent event</p>
+              <pre className="text-gray-300 overflow-x-auto leading-relaxed">{`POST /api/projects/:id/webhooks
+Content-Type: application/json
+
+{ "event": "takeoff_started", "page": 1, "source": "agent" }
+→ { "ok": true, "event": "takeoff_started", "timestamp": "2026-..." }`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Batch polygon creation</p>
+              <pre className="text-gray-300 overflow-x-auto leading-relaxed">{`POST /api/projects/:id/batch
+Content-Type: application/json
+
+{
+  "operations": [
+    {
+      "type": "createPolygon",
+      "data": {
+        "classificationId": "<uuid>",
+        "points": [{"x":100,"y":100},{"x":300,"y":100},{"x":300,"y":300},{"x":100,"y":300}],
+        "pageNumber": 1,
+        "area": 277.78,
+        "label": "Living Room"
+      }
+    }
+  ]
+}
+→ { "created": 1, "polygons": [...], "results": [{ "type": "createPolygon", "ok": true, "id": "<uuid>" }] }`}</pre>
+            </div>
+          </div>
+        </section>
+
+        {/* Export API */}
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <Zap size={16} className="text-[#00d4ff]" />
+            Export API (no auth required)
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            All export endpoints are publicly accessible with just a <code className="text-[#00d4ff] bg-gray-800 px-1 rounded">projectId</code> — no
+            browser session, cookies, or auth tokens required. The agent can call these directly.
+          </p>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-4 text-xs">
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">JSON export</p>
+              <pre className="text-gray-300 overflow-x-auto">{`curl -s "https://measurex-takeoff.vercel.app/api/projects/<id>/export/json"
+# → { project, pages, classifications, polygons, scale }`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Excel export (.xlsx)</p>
+              <pre className="text-gray-300 overflow-x-auto">{`curl -o takeoff.xlsx "https://measurex-takeoff.vercel.app/api/projects/<id>/export/excel"
+# Downloads measurex-<name>.xlsx with quantities sheet`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Contractor PDF report</p>
+              <pre className="text-gray-300 overflow-x-auto">{`# Open in browser or download:
+https://measurex-takeoff.vercel.app/api/projects/<id>/export/contractor`}</pre>
+            </div>
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Quantities (JSON)</p>
+              <pre className="text-gray-300 overflow-x-auto">{`curl -s "https://measurex-takeoff.vercel.app/api/projects/<id>/quantities"
+# → { quantities: [...], scale }`}</pre>
+            </div>
           </div>
         </section>
 

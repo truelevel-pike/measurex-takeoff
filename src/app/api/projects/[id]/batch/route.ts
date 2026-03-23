@@ -66,6 +66,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!bodyResult.success) return validationError(bodyResult.error);
 
     const results: Array<{ type: string; ok: boolean; id?: string; error?: string }> = [];
+    // Track created polygons for the enriched response shape agents expect
+    const createdPolygons: Polygon[] = [];
 
     for (const op of bodyResult.data.operations) {
       try {
@@ -84,6 +86,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               detectedByModel: op.data.detectedByModel,
             });
             results.push({ type: op.type, ok: true, id: p.id });
+            createdPolygons.push(p);
             break;
           }
           case 'deletePolygon': {
@@ -125,7 +128,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const allFailed = results.every((r) => !r.ok);
     const status = allFailed ? 500 : hasFailures ? 207 : 200;
 
-    return NextResponse.json({ results }, { status });
+    // Return enriched shape: { created, polygons, results }
+    // so agents can get polygon data directly without a follow-up GET.
+    return NextResponse.json(
+      {
+        results,
+        created: createdPolygons.length,
+        polygons: createdPolygons,
+      },
+      { status },
+    );
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
