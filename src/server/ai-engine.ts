@@ -116,6 +116,81 @@ export async function analyzePagePDF(
 
   const pdfBase64 = pdfBuffer.toString('base64');
 
+  const promptText = detailed
+    ? `You are analyzing page ${pageNum} of a construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight)
+    : `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px).
+
+CRITICAL: You MUST return between 15-30 elements. Do NOT return fewer than 15.
+
+Return a JSON array of construction elements. Include ALL of:
+- Every room/space as type 'area' with 4+ corner points
+- Every wall segment as type 'linear' with 2 endpoints
+- Every door and window as type 'count' with 1 center point
+- Property lines, driveways, outdoor spaces as type 'area'
+
+Format: [{"label":"Room Name","type":"area","points":[{"x":0,"y":0},...],"confidence":0.9}]
+Use pixel coordinates (0,0 = top-left, x = bottom-right).
+Return ONLY the JSON array. No markdown. No explanation.`;
+
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: promptText },
+          {
+            inline_data: {
+              mime_type: 'application/pdf',
+              data: pdfBase64,
+            },
+          },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 16384,
+      },
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Gemini PDF API error ${resp.status}: ${text.slice(0, 500)}`);
+  }
+
+  const data = await resp.json();
+  const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!raw) return [];
+
+  // Find JSON array — handle markdown fences and any wrapping text
+  let jsonStr = raw.trim();
+  jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  const start = jsonStr.indexOf('[');
+  if (start === -1) return [];
+  // Depth-counting bracket walk to find matching close
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < jsonStr.length; i++) {
+    if (jsonStr[i] === '[') depth++;
+    else if (jsonStr[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  // Repair truncated response — find last complete object
+  if (end === -1) {
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (lastBrace === -1) return [];
+    jsonStr = jsonStr.slice(start, lastBrace + 1) + ']';
+  } else {
+    jsonStr = jsonStr.slice(start, end + 1);
+  }
+  // Remove trailing commas before } or ]
+  jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(jsonStr); }
+  catch { return []; }
+  if (!Array.isArray(parsed)) return [];
+
   type ParsedElement = {
     name?: string;
     classification?: string;
@@ -126,122 +201,18 @@ export async function analyzePagePDF(
     color?: string;
   };
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const temperature = attempt === 1 ? 0.1 : attempt === 2 ? 0.2 : 0.3;
-    const retryNote = attempt > 1
-      ? ' Previous attempt returned too few elements. You MUST identify at least 10 construction elements including rooms, walls, and openings.'
-      : '';
-    const basePrompt = detailed
-      ? `You are analyzing page ${pageNum} of a construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight)
-      : `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px). Identify ALL construction elements: rooms (areas), walls (linear), doors/windows (count). Return as JSON array: [{"label":"Room Name","type":"area"|"linear"|"count","points":[{"x":0,"y":0},...],"confidence":0.9}]. Areas need 4+ points. Walls need 2 points. Counts need 1 center point. Return 15-30 elements. ONLY return the JSON array.`;
-    const promptText = retryNote ? `${basePrompt}\n\n${retryNote}` : basePrompt;
-
-    console.log(`[ai-engine] analyzePagePDF attempt ${attempt}/3 (temperature=${temperature})`);
-
-    const resp = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: promptText },
-            {
-              inline_data: {
-                mime_type: 'application/pdf',
-                data: pdfBase64,
-              },
-            },
-          ],
-        }],
-        generationConfig: {
-          temperature,
-          maxOutputTokens: 16384,
-        },
-      }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`Gemini PDF API error ${resp.status}: ${text.slice(0, 500)}`);
-    }
-
-    const data = await resp.json();
-    const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    if (!raw) {
-      console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: empty response`);
-      continue;
-    }
-
-    // Find JSON array — handle markdown fences and any wrapping text
-    let jsonStr = raw.trim();
-    // Strip markdown fences
-    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
-    // Find the outermost [ ... ]
-    const start = jsonStr.indexOf('[');
-    if (start === -1) {
-      console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: no '[' found`);
-      continue;
-    }
-    // Walk forward to find matching closing bracket
-    let depth = 0;
-    let end = -1;
-    for (let i = start; i < jsonStr.length; i++) {
-      if (jsonStr[i] === '[') depth++;
-      else if (jsonStr[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
-    }
-    // If truncated (no closing bracket found), repair by finding last complete object
-    if (end === -1) {
-      const lastBrace = jsonStr.lastIndexOf('}');
-      if (lastBrace === -1) {
-        console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: truncated + no '}' found`);
-        continue;
-      }
-      jsonStr = jsonStr.slice(start, lastBrace + 1) + ']';
-    } else {
-      jsonStr = jsonStr.slice(start, end + 1);
-    }
-    // Remove trailing commas before } or ]
-    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
-
-    let parsed: unknown;
-    try { parsed = JSON.parse(jsonStr); }
-    catch {
-      console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: JSON.parse failed`);
-      continue;
-    }
-    if (!Array.isArray(parsed)) {
-      console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: parsed is not an array`);
-      continue;
-    }
-
-    const elements = (parsed as ParsedElement[])
-      .filter((el) => Array.isArray(el?.points) && el?.type)
-      .map((el) => ({
-        name: String(el.name || el.label || el.classification || 'Unknown'),
-        type: el.type as AIDetectedElement['type'],
-        points: el.points as Array<{ x: number; y: number }>,
-        confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
-        color:
-          typeof el.color === 'string' && el.color.startsWith('#')
-            ? el.color
-            : nameToColor(String(el.name || el.label || el.classification || 'Unknown')),
-      }));
-
-    if (elements.length >= 10) {
-      console.log(`[ai-engine] analyzePagePDF attempt ${attempt}: got ${elements.length} elements`);
-      return elements;
-    }
-
-    console.warn(`[ai-engine] analyzePagePDF attempt ${attempt}: only ${elements.length} elements (< 10 minimum), retrying`);
-
-    // Track best partial result so we return something useful if all attempts < 10
-    if (elements.length > 0 && attempt === 3) {
-      console.warn(`[ai-engine] analyzePagePDF: all attempts below threshold — returning best result (${elements.length} elements)`);
-      return elements;
-    }
-  }
-
-  return []; // all 3 attempts returned empty
+  return (parsed as ParsedElement[])
+    .filter((el) => Array.isArray(el?.points) && el?.type)
+    .map((el) => ({
+      name: String(el.name || el.label || el.classification || 'Unknown'),
+      type: el.type as AIDetectedElement['type'],
+      points: el.points as Array<{ x: number; y: number }>,
+      confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
+      color:
+        typeof el.color === 'string' && el.color.startsWith('#')
+          ? el.color
+          : nameToColor(String(el.name || el.label || el.classification || 'Unknown')),
+    }));
 }
 
 /**
