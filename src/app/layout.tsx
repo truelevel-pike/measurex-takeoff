@@ -24,13 +24,25 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "MeasureX",
-  description: "AI-powered construction takeoff - measure, count, and estimate from blueprints",
-  keywords: ["construction takeoff", "AI", "blueprints", "estimating"],
+  // Wave 13B: proper title template so per-route layouts get " — MeasureX" suffix
+  title: {
+    default: "MeasureX — AI Construction Takeoff",
+    template: "%s — MeasureX",
+  },
+  description: "MeasureX — AI-powered construction takeoff. Upload blueprints, measure areas, export to Excel.",
+  keywords: ["construction takeoff", "AI", "blueprints", "estimating", "quantity takeoff"],
   manifest: "/manifest.json",
+  // Wave 13B: explicit favicon referencing our branded SVG + existing ICO fallback
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "16x16" },
+    ],
+    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+  },
   openGraph: {
-    title: "MeasureX",
-    description: "AI-powered construction takeoff - measure, count, and estimate from blueprints",
+    title: "MeasureX — AI Construction Takeoff",
+    description: "MeasureX — AI-powered construction takeoff. Upload blueprints, measure areas, export to Excel.",
     type: "website",
     url: "https://app.measurex.io",
     siteName: "MeasureX",
@@ -38,14 +50,15 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MeasureX",
-    description: "AI-powered construction takeoff - measure, count, and estimate from blueprints",
+    title: "MeasureX — AI Construction Takeoff",
+    description: "MeasureX — AI-powered construction takeoff. Upload blueprints, measure areas, export to Excel.",
   },
 };
 
 export function generateViewport(): Viewport {
   return {
-    themeColor: "#1a1a2e",
+    // Wave 13B: align with manifest.json theme_color (#00d4ff = MeasureX cyan)
+    themeColor: "#00d4ff",
     width: "device-width",
     initialScale: 1,
     maximumScale: 5,
