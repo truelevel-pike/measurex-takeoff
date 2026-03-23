@@ -1,4 +1,5 @@
 import { useStore } from '@/lib/store';
+import type { ScaleCalibration } from '@/lib/types';
 
 function normalizeClassificationType(type: string): 'area' | 'linear' | 'count' {
   if (type === 'area' || type === 'linear' || type === 'count') return type;
@@ -88,6 +89,28 @@ export function installMeasurexAPI() {
     clearPage(pageNumber: number) {
       const s = useStore.getState();
       s.polygons.filter((p) => p.pageNumber === pageNumber).forEach((p) => s.deletePolygon(p.id));
+    },
+
+    /** Navigate to a page (1-based). Updates store; caller must also trigger PDF viewer navigation. */
+    setPage(pageNumber: number) {
+      const s = useStore.getState();
+      s.setCurrentPage(pageNumber);
+    },
+
+    /** Apply a scale calibration to the current page and store.
+     *  Accepts a full or partial ScaleCalibration; unit defaults to 'ft'.
+     */
+    setScale(scale: Partial<ScaleCalibration> & { pixelsPerUnit: number }) {
+      const s = useStore.getState();
+      const unit = scale.unit ?? 'ft';
+      const cal: ScaleCalibration = {
+        pixelsPerUnit: scale.pixelsPerUnit,
+        unit,
+        label: scale.label ?? `${scale.pixelsPerUnit} px/${unit}`,
+        source: scale.source ?? 'manual',
+      };
+      s.setScale(cal);
+      s.setScaleForPage(s.currentPage, cal);
     },
   };
 }

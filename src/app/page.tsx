@@ -1918,7 +1918,7 @@ function PageInner() {
                 </ErrorBoundary>
                 <ZoomControls onFitToPage={() => pdfViewerRef.current?.fitToPage()} />
 
-                {menuState && (
+                {menuState && !agentMode && (
                   <ContextMenu
                     polygonId={menuState.polygonId}
                     x={menuState.x}

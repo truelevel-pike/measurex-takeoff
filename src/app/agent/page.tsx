@@ -301,6 +301,76 @@ export default function AgentDocsPage() {
           </div>
         </section>
 
+        {/* JavaScript Automation API */}
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <Zap size={16} className="text-[#00d4ff]" />
+            JavaScript Automation API — <code className="text-[#00d4ff] text-base">window.measurex</code>
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            When <code className="text-[#00d4ff] bg-gray-800 px-1 rounded">?agent=1</code> is active,{' '}
+            <code className="text-[#00d4ff] bg-gray-800 px-1 rounded">window.measurex</code> is injected and provides
+            direct store access. Use via{' '}
+            <code className="text-[#00d4ff] bg-gray-800 px-1 rounded">browser act(kind=&quot;evaluate&quot;, fn=&quot;...&quot;)</code>.
+          </p>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-5 text-xs">
+
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Read state</p>
+              <pre className="text-[#00d4ff] overflow-x-auto leading-relaxed">{`window.measurex.getState()
+// → { currentPage, totalPages, scale, selectedClassification, polygonCount, classificationCount }
+
+window.measurex.getTotals()
+// → { totalAreaSF, totalLF, totalCount }
+
+window.measurex.getPolygons()       // → Polygon[]
+window.measurex.getClassifications() // → Classification[]`}</pre>
+            </div>
+
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Navigation &amp; scale</p>
+              <pre className="text-[#00d4ff] overflow-x-auto leading-relaxed">{`window.measurex.setPage(3)
+// Navigate to page 3 (1-based). Also update PDF viewer via keyboard or URL.
+
+window.measurex.setScale({ pixelsPerUnit: 47.2, unit: 'ft' })
+// Apply scale to current page. unit: 'ft' | 'in' | 'm' | 'mm' | 'cm'`}</pre>
+            </div>
+
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Classifications &amp; polygons</p>
+              <pre className="text-[#00d4ff] overflow-x-auto leading-relaxed">{`window.measurex.selectClassification('abc-uuid')
+// Set active classification for the next drawn polygon.
+
+window.measurex.selectPolygon('polygon-uuid')
+// Highlight / select a polygon in the canvas.
+
+window.measurex.reclassify('polygon-uuid', 'New Room Name')
+// Move polygon to a classification by name (creates it if missing).
+
+window.measurex.clearPage(2)
+// Delete all polygons on page 2.`}</pre>
+            </div>
+
+            <div>
+              <p className="text-gray-500 mb-1 font-semibold uppercase tracking-wide text-[10px]">Typical agent flow (evaluate calls)</p>
+              <pre className="text-gray-300 overflow-x-auto leading-relaxed">{`// 1. Get current state
+const s = window.measurex.getState();
+// s.currentPage, s.totalPages, s.scale.pixelsPerUnit ...
+
+// 2. Select classification before drawing
+window.measurex.selectClassification(s.selectedClassification);
+
+// 3. After drawing, verify
+const t = window.measurex.getTotals();
+// t.totalAreaSF, t.totalLF, t.totalCount
+
+// 4. Navigate to next page
+window.measurex.setPage(s.currentPage + 1);`}</pre>
+            </div>
+
+          </div>
+        </section>
+
         {/* Footer nav */}
         <div className="border-t border-gray-800 pt-8 flex gap-6 text-sm">
           <Link href="/settings" className="text-[#00d4ff] hover:underline">← Settings</Link>

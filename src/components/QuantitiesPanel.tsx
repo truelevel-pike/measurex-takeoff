@@ -295,6 +295,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [editColorHex, setEditColorHex] = useState('#3b82f6');
   const [editOriginalColor, setEditOriginalColor] = useState('#3b82f6');
   const [editError, setEditError] = useState<string | null>(null);
+  // Wave 9B: tile + slope edit state
+  const [editTileWidth, setEditTileWidth] = useState<string>('');
+  const [editTileHeight, setEditTileHeight] = useState<string>('');
+  const [editTileUnit, setEditTileUnit] = useState<'in' | 'ft'>('in');
+  const [editSlopeFactor, setEditSlopeFactor] = useState<string>('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [showMeasurementSettings, setShowMeasurementSettings] = useState(false);
@@ -786,6 +791,11 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setEditColorHex(classification.color);
     setEditOriginalColor(classification.color);
     setEditError(null);
+    // Wave 9B: populate tile + slope fields
+    setEditTileWidth(classification.tileWidth != null ? String(classification.tileWidth) : '');
+    setEditTileHeight(classification.tileHeight != null ? String(classification.tileHeight) : '');
+    setEditTileUnit(classification.tileUnit ?? 'in');
+    setEditSlopeFactor(classification.slopeFactor != null && classification.slopeFactor !== 1 ? String(classification.slopeFactor) : '');
   }
 
   function cancelEditing() {
@@ -831,10 +841,32 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       return;
     }
 
+    // Wave 9B: parse tile + slope values
+    const tileW = editTileWidth.trim() ? parseFloat(editTileWidth) : undefined;
+    const tileH = editTileHeight.trim() ? parseFloat(editTileHeight) : undefined;
+    const slope = editSlopeFactor.trim() ? parseFloat(editSlopeFactor) : undefined;
+
+    if (tileW !== undefined && (isNaN(tileW) || tileW <= 0)) {
+      setEditError('Tile width must be a positive number.');
+      return;
+    }
+    if (tileH !== undefined && (isNaN(tileH) || tileH <= 0)) {
+      setEditError('Tile height must be a positive number.');
+      return;
+    }
+    if (slope !== undefined && (isNaN(slope) || slope < 1 || slope > 3)) {
+      setEditError('Slope factor must be between 1.0 and 3.0.');
+      return;
+    }
+
     updateClassification(classification.id, {
       name,
       color,
       type: editType,
+      tileWidth: tileW,
+      tileHeight: tileH,
+      tileUnit: (tileW !== undefined || tileH !== undefined) ? editTileUnit : undefined,
+      slopeFactor: slope,
     });
 
     setEditingId(null);
@@ -1804,6 +1836,70 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     ))}
                   </select>
 
+                  {/* Wave 9B: Tile Count inputs (area only) */}
+                  {editType === 'area' && (
+                    <div className="mb-2 p-2 rounded border border-[#00d4ff]/15 bg-[#0a0a0f]">
+                      <div className="text-[10px] font-mono text-[#8892a0] uppercase tracking-wider mb-1.5">Tile Count (optional)</div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.25"
+                          value={editTileWidth}
+                          onChange={(e) => setEditTileWidth(e.target.value)}
+                          placeholder="W"
+                          className="w-16 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                          aria-label="Tile width"
+                          data-testid="tile-width-input"
+                        />
+                        <span className="text-[10px] text-gray-500">×</span>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.25"
+                          value={editTileHeight}
+                          onChange={(e) => setEditTileHeight(e.target.value)}
+                          placeholder="H"
+                          className="w-16 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                          aria-label="Tile height"
+                          data-testid="tile-height-input"
+                        />
+                        <select
+                          value={editTileUnit}
+                          onChange={(e) => setEditTileUnit(e.target.value as 'in' | 'ft')}
+                          className="flex-1 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                          aria-label="Tile unit"
+                        >
+                          <option value="in">in</option>
+                          <option value="ft">ft</option>
+                        </select>
+                      </div>
+                      <div className="text-[10px] text-gray-500">e.g. 12 × 12 in → tiles per SF</div>
+                    </div>
+                  )}
+
+                  {/* Wave 9B: Slope Factor input (area only) */}
+                  {editType === 'area' && (
+                    <div className="mb-2 p-2 rounded border border-[#00d4ff]/15 bg-[#0a0a0f]">
+                      <div className="text-[10px] font-mono text-[#8892a0] uppercase tracking-wider mb-1.5">Slope Factor (optional)</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1.0"
+                          max="3.0"
+                          step="0.05"
+                          value={editSlopeFactor}
+                          onChange={(e) => setEditSlopeFactor(e.target.value)}
+                          placeholder="1.0"
+                          className="w-20 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                          aria-label="Slope factor"
+                          data-testid="slope-factor-input"
+                        />
+                        <span className="text-[10px] text-gray-500">× measured area (range 1.0–3.0)</span>
+                      </div>
+                    </div>
+                  )}
+
                   {editError && <p className="text-[11px] text-red-400 mb-2">{editError}</p>}
 
                   <div className="flex gap-2 justify-end">
@@ -1905,6 +2001,36 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                       <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
                         {formatClassificationTotal(classification, totals)}
                       </span>
+                      {/* Wave 9B: inline slope badge */}
+                      {classification.type === 'area' && classification.slopeFactor != null && classification.slopeFactor > 1 && (
+                        <span
+                          className="text-[9px] px-1 py-0.5 rounded font-mono bg-orange-900/30 text-orange-300 border border-orange-700/30 flex-shrink-0"
+                          title={`Slope ×${classification.slopeFactor} → ${formatArea(totals.areaReal * classification.slopeFactor, measurementSettings)}`}
+                          data-testid="adjusted-area-display"
+                        >
+                          ×{classification.slopeFactor}
+                        </span>
+                      )}
+                      {/* Wave 9B: inline tile count badge */}
+                      {classification.type === 'area' && classification.tileWidth && classification.tileHeight && (() => {
+                        const tw = classification.tileUnit === 'ft' ? classification.tileWidth : classification.tileWidth / 12;
+                        const th = classification.tileUnit === 'ft' ? classification.tileHeight : classification.tileHeight / 12;
+                        const tileSF = tw * th;
+                        const baseArea = classification.slopeFactor != null && classification.slopeFactor > 1
+                          ? totals.areaReal * classification.slopeFactor
+                          : totals.areaReal;
+                        const tileCount = tileSF > 0 ? Math.ceil(baseArea / tileSF) : 0;
+                        const tileLabel = `${classification.tileWidth}×${classification.tileHeight}${classification.tileUnit ?? 'in'}`;
+                        return (
+                          <span
+                            className="text-[9px] px-1 py-0.5 rounded font-mono bg-amber-900/30 text-amber-300 border border-amber-700/30 flex-shrink-0"
+                            title={`${tileCount} tiles (${tileLabel})`}
+                            data-testid="tile-count-display"
+                          >
+                            {tileCount.toLocaleString('en-US')} tiles
+                          </span>
+                        );
+                      })()}
                     </>
                   )}
 
@@ -2012,6 +2138,37 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                           ? `Total: ${totals.count} items - Raw ${formatLinear(totals.lengthReal, measurementSettings)} - Net ${formatLinear(netLinear, measurementSettings)}`
                           : `Total: ${totals.count} items - ${formatArea(totals.areaReal, measurementSettings)} - ${formatLinear(totals.lengthReal, measurementSettings)}`}
                       </div>
+                      {/* Wave 9B: slope-adjusted area display */}
+                      {classification.type === 'area' && classification.slopeFactor != null && classification.slopeFactor > 1 && (() => {
+                        const adjusted = totals.areaReal * classification.slopeFactor;
+                        return (
+                          <div
+                            className="text-[10px] py-0.5 text-[#00d4ff] font-mono"
+                            data-testid="adjusted-area-display"
+                          >
+                            {formatArea(totals.areaReal, measurementSettings)} × {classification.slopeFactor} slope = {formatArea(adjusted, measurementSettings)}
+                          </div>
+                        );
+                      })()}
+                      {/* Wave 9B: tile count display */}
+                      {classification.type === 'area' && classification.tileWidth && classification.tileHeight && (() => {
+                        const tw = classification.tileUnit === 'ft' ? classification.tileWidth : classification.tileWidth / 12;
+                        const th = classification.tileUnit === 'ft' ? classification.tileHeight : classification.tileHeight / 12;
+                        const tileSF = tw * th;
+                        const baseArea = classification.slopeFactor != null && classification.slopeFactor > 1
+                          ? totals.areaReal * classification.slopeFactor
+                          : totals.areaReal;
+                        const tileCount = tileSF > 0 ? Math.ceil(baseArea / tileSF) : 0;
+                        const tileLabel = `${classification.tileWidth}×${classification.tileHeight}${classification.tileUnit ?? 'in'}`;
+                        return (
+                          <div
+                            className="text-[10px] py-0.5 text-amber-300 font-mono"
+                            data-testid="tile-count-display"
+                          >
+                            {formatArea(baseArea, measurementSettings)} | {tileCount.toLocaleString('en-US')} tiles ({tileLabel})
+                          </div>
+                        );
+                      })()}
                       {polygonsForClassification.map((polygon, index) => {
                         const polygonPpu = getPixelsPerUnitForPage(polygon.pageNumber);
                         const areaReal = polygon.area / (polygonPpu * polygonPpu);
@@ -2041,7 +2198,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                         );
                       })}
                       {classification.type === 'linear' && (
-                        <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
+                        <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5" data-testid="classification-deductions">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-[10px] text-gray-300 font-mono uppercase">Deductions</span>
                             <button
