@@ -134,7 +134,7 @@ export async function analyzePagePDF(
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 65536,
       },
     }),
   });
@@ -154,14 +154,29 @@ export async function analyzePagePDF(
   const cleaned = cleanGeminiJson(raw);
   const jsonStart = cleaned.indexOf('[');
   const jsonEnd = cleaned.lastIndexOf(']');
-  if (jsonStart === -1 || jsonEnd === -1) {
-    console.error('[ai-engine] analyzePagePDF: no JSON array in response. Raw:', raw.slice(0, 500));
+
+  if (jsonStart === -1) {
+    console.error('[ai-engine] analyzePagePDF: no JSON array start in response');
     return [];
+  }
+
+  // If no closing bracket, response was truncated — attempt repair
+  let jsonSlice = jsonEnd === -1 ? cleaned.slice(jsonStart) : cleaned.slice(jsonStart, jsonEnd + 1);
+
+  // Repair truncated JSON: remove last incomplete object and close the array
+  if (jsonEnd === -1) {
+    // Find last complete object (ends with })
+    const lastComplete = jsonSlice.lastIndexOf('}');
+    if (lastComplete > 0) {
+      jsonSlice = jsonSlice.slice(0, lastComplete + 1) + ']';
+    } else {
+      return [];
+    }
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+    parsed = JSON.parse(jsonSlice);
   } catch (parseErr) {
     console.error('[ai-engine] analyzePagePDF: JSON.parse failed:', parseErr, '— raw:', raw.slice(0, 500));
     return [];
