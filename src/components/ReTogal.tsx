@@ -88,15 +88,21 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
       }
     }
 
-    // In agent mode, POST a webhook event instead of calling the AI takeoff API.
+    // In agent mode, POST a webhook event to the external agent webhook URL (if configured)
+    // and also notify the internal webhook endpoint.
     if (agentMode) {
+      const pid = useStore.getState().projectId;
+      const externalUrl = typeof window !== 'undefined' ? localStorage.getItem('mx-agent-webhook-url') : null;
+      const payload = JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button', projectId: pid });
       try {
-        const pid = useStore.getState().projectId;
-        await fetch(`/api/projects/${pid}/webhooks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button' }),
-        });
+        const requests: Promise<unknown>[] = [];
+        if (externalUrl) {
+          requests.push(fetch(externalUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }));
+        }
+        if (pid) {
+          requests.push(fetch(`/api/projects/${pid}/webhooks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }));
+        }
+        await Promise.allSettled(requests);
       } catch (err) {
         console.error('Re-Togal: agent webhook failed:', err);
       }
@@ -120,13 +126,18 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
 
   // Agent-mode handler for the initial (pre-takeoff) button paths.
   const handleAgentWebhook = useCallback(async () => {
+    const pid = useStore.getState().projectId;
+    const externalUrl = typeof window !== 'undefined' ? localStorage.getItem('mx-agent-webhook-url') : null;
+    const payload = JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button', projectId: pid });
     try {
-      const pid = useStore.getState().projectId;
-      await fetch(`/api/projects/${pid}/webhooks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'agent_takeoff_requested', page: currentPage, source: 'togal_button' }),
-      });
+      const requests: Promise<unknown>[] = [];
+      if (externalUrl) {
+        requests.push(fetch(externalUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }));
+      }
+      if (pid) {
+        requests.push(fetch(`/api/projects/${pid}/webhooks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }));
+      }
+      await Promise.allSettled(requests);
     } catch (err) {
       console.error('ReTogal: agent webhook failed:', err);
     }
