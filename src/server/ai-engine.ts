@@ -122,7 +122,7 @@ export async function analyzePagePDF(
       contents: [{
         parts: [
           {
-            text: `Focus on page ${pageNum} of this construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight),
+            text: `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px). Return the top 15 most important elements as a JSON array. Each element: {"label":"Room Name","type":"area"|"linear"|"count","points":[{"x":0,"y":0},...],"confidence":0.9}. For areas: 4-6 corner points. For walls: 2 endpoints. For counts (doors/windows): 1 center point each. Use actual pixel coordinates. Return ONLY the JSON array, no other text.`,
           },
           {
             inline_data: {
@@ -134,7 +134,7 @@ export async function analyzePagePDF(
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 65536,
+        maxOutputTokens: 4096,
       },
     }),
   });
