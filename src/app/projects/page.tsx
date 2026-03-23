@@ -904,7 +904,9 @@ export default function ProjectsPage() {
                     <input
                       type="file"
                       accept=".pdf"
+                      multiple
                       className="hidden"
+                      data-testid="upload-multi-btn"
                       onChange={e => handleFileSelect(e.target.files?.[0] || null)}
                     />
                     {pdfFile && (

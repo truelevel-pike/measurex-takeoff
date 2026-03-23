@@ -1,6 +1,9 @@
 /**
  * Outbound webhook registry — stores registered webhooks in memory (globalThis)
  * and fires HTTP POSTs when matching events occur.
+ *
+ * Also maintains an in-memory agent event log per project so agents can poll
+ * GET /api/projects/:id/webhooks/events to see what events have fired.
  */
 
 import { randomUUID } from 'crypto';
@@ -13,15 +16,63 @@ export interface WebhookRegistration {
   createdAt: string;
 }
 
+// ── Agent event log ────────────────────────────────────────────────────────
+export interface AgentEvent {
+  event: string;
+  page?: number;
+  source?: string;
+  timestamp: string;
+  projectId: string;
+  /** Any extra fields POSTed by the client (e.g. quantities). */
+  meta?: Record<string, unknown>;
+}
+
+const MAX_EVENTS_PER_PROJECT = 100;
+
 declare const globalThis: typeof global & {
   __webhookRegistry?: Map<string, WebhookRegistration>;
+  __agentEventLog?: Map<string, AgentEvent[]>;
 };
 
 if (!globalThis.__webhookRegistry) {
   globalThis.__webhookRegistry = new Map();
 }
+if (!globalThis.__agentEventLog) {
+  globalThis.__agentEventLog = new Map();
+}
 
 const registry = globalThis.__webhookRegistry;
+const agentEventLog = globalThis.__agentEventLog;
+
+/** Append an event to the in-memory log for a project (capped at MAX_EVENTS_PER_PROJECT). */
+export function logAgentEvent(
+  projectId: string,
+  event: string,
+  extras: { page?: number; source?: string; meta?: Record<string, unknown> } = {},
+): AgentEvent {
+  const entry: AgentEvent = {
+    event,
+    page: extras.page,
+    source: extras.source,
+    timestamp: new Date().toISOString(),
+    projectId,
+    meta: extras.meta,
+  };
+  const log = agentEventLog.get(projectId) ?? [];
+  log.push(entry);
+  // Keep only the most recent N events per project
+  if (log.length > MAX_EVENTS_PER_PROJECT) {
+    log.splice(0, log.length - MAX_EVENTS_PER_PROJECT);
+  }
+  agentEventLog.set(projectId, log);
+  return entry;
+}
+
+/** Return the last N events for a project (most recent last). */
+export function getAgentEvents(projectId: string, limit = 20): AgentEvent[] {
+  const log = agentEventLog.get(projectId) ?? [];
+  return log.slice(-limit);
+}
 
 export function registerWebhook(
   projectId: string,

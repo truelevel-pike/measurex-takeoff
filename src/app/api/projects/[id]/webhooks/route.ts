@@ -6,6 +6,7 @@ import {
   unregisterWebhook,
   getWebhooksForProject,
   isPrivateUrl,
+  logAgentEvent,
 } from '@/lib/webhooks';
 
 // BUG-A5-6-112: max webhooks per project
@@ -53,9 +54,13 @@ export async function POST(
     const eventResult = AgentEventSchema.safeParse(body);
     if (!eventResult.success) return validationError(eventResult.error);
     const { event, page, source } = eventResult.data;
-    // Log for server-side observability; downstream agents can poll or subscribe.
+    // Extract any extra non-schema fields as meta (e.g. quantities, custom data)
+    const { event: _e, page: _p, source: _s, ...rest } = body as Record<string, unknown>;
+    void _e; void _p; void _s;
+    const meta = Object.keys(rest).length > 0 ? rest : undefined;
+    const logged = logAgentEvent(id, event, { page, source, meta });
     console.log(`[webhooks] agent event: project=${id} event=${event} page=${page ?? 'n/a'} source=${source ?? 'n/a'}`);
-    return NextResponse.json({ ok: true, event, page, source });
+    return NextResponse.json({ ok: true, event, page, source, timestamp: logged.timestamp });
   }
 
   // Webhook registration path: requires admin secret (SSRF protection).

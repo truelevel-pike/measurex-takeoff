@@ -3,6 +3,7 @@ import { createPolygon, deletePolygon as deletePolygonStore, getPolygons, create
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
+import type { Polygon } from '@/lib/types';
 
 // BUG-A5-6-116: add .finite() to x and y to reject NaN/Infinity
 const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });

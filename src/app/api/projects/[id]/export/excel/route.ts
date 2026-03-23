@@ -86,14 +86,38 @@ function buildSummarySheet(projectName: string, totalCostEstimate: number): XLSX
   return ws;
 }
 
-function buildQuantitiesSheet(rows: QuantityRow[]): XLSX.WorkSheet {
-  const aoa: Array<Array<string | number>> = [
-    ['Classification Name', 'Type', 'Quantity', 'Unit'],
-    ...rows.map((row) => [row.name, row.type, row.quantity, row.unit]),
-  ];
+function buildQuantitiesSheet(rows: QuantityRow[], classifications: Classification[]): XLSX.WorkSheet {
+  // Collect all unique custom property keys across all classifications
+  const allKeys = Array.from(
+    new Set(
+      classifications.flatMap((c) => (c.customProperties ?? []).map((p) => p.key).filter(Boolean))
+    )
+  );
 
+  const header: string[] = ['Classification Name', 'Type', 'Quantity', 'Unit', ...allKeys];
+  const dataRows = rows.map((row) => {
+    const cls = classifications.find((c) => c.id === row.classificationId);
+    const propMap = Object.fromEntries((cls?.customProperties ?? []).map((p) => [p.key, p.value]));
+    return [row.name, row.type, row.quantity, row.unit, ...allKeys.map((k) => propMap[k] ?? '')] as Array<string | number>;
+  });
+
+  const aoa: Array<Array<string | number>> = [header, ...dataRows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 10 }];
+  ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, ...allKeys.map(() => ({ wch: 18 }))];
+  return ws;
+}
+
+function buildCustomPropertiesSheet(classifications: Classification[]): XLSX.WorkSheet | null {
+  const rows = classifications.flatMap((c) =>
+    (c.customProperties ?? []).map((p) => [c.name, p.key, p.value])
+  );
+  if (rows.length === 0) return null;
+  const aoa: Array<Array<string | number>> = [
+    ['Classification', 'Property', 'Value'],
+    ...rows,
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 28 }];
   return ws;
 }
 
@@ -235,8 +259,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const summarySheet = buildSummarySheet(projectName, totalCostEstimate);
     XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
 
-    // Sheet 2: Quantities
-    const quantitiesSheet = buildQuantitiesSheet(rows);
+    // Sheet 2: Quantities (with custom property columns inline)
+    const quantitiesSheet = buildQuantitiesSheet(rows, classifications);
     XLSX.utils.book_append_sheet(wb, quantitiesSheet, 'Quantities');
 
     // Sheet 3: Assemblies
@@ -246,6 +270,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Sheet 4: Estimates
     const estimatesSheet = buildEstimatesSheet(rows, unitCosts);
     XLSX.utils.book_append_sheet(wb, estimatesSheet, 'Estimates');
+
+    // Sheet 5: Custom Properties (only if any exist)
+    const customPropsSheet = buildCustomPropertiesSheet(classifications);
+    if (customPropsSheet) {
+      XLSX.utils.book_append_sheet(wb, customPropsSheet, 'Custom Properties');
+    }
 
     // Write to binary array — Uint8Array is a valid BodyInit in every Next.js runtime.
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;

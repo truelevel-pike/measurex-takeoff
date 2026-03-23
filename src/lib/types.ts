@@ -37,6 +37,11 @@ export interface Classification {
   // ── Wave 9B: Slope Factor ────────────────────────────────────────────────
   /** Multiplier for sloped surfaces (e.g. roofs, ramps). Range 1.0–3.0. Default 1.0. */
   slopeFactor?: number;
+  // ── Wave 10: Breakdowns + Custom Properties ──────────────────────────────
+  /** Sub-categories that group polygons within this classification (e.g. "Living Room", "Kitchen"). */
+  breakdowns?: { id: string; name: string; polygonIds: string[] }[];
+  /** Arbitrary key-value metadata (e.g. height: "10ft", material: "hardwood"). */
+  customProperties?: { key: string; value: string }[];
 }
 
 export interface Annotation {

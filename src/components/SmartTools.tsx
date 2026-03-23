@@ -49,9 +49,10 @@ interface SmartToolBtnProps {
   disabled: boolean;
   onClick: () => void;
   shortcut?: string;
+  testId?: string;
 }
 
-function SmartToolBtn({ icon: Icon, label, tooltip, disabled, onClick, shortcut }: SmartToolBtnProps) {
+function SmartToolBtn({ icon: Icon, label, tooltip, disabled, onClick, shortcut, testId }: SmartToolBtnProps) {
   return (
     <button
       title={tooltip}
@@ -59,6 +60,7 @@ function SmartToolBtn({ icon: Icon, label, tooltip, disabled, onClick, shortcut 
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
       style={{ ...toolBtnBase, ...(disabled ? disabledStyle : {}) }}
+      data-testid={testId}
     >
       <Icon size={16} />
       <span style={{ flex: 1 }}>{label}</span>
@@ -296,6 +298,7 @@ export default function SmartTools() {
         tooltip="Paste classifications from clipboard, auto-adjusting to current page"
         disabled={false}
         onClick={handleSmartPaste}
+        testId="smart-paste-btn"
       />
 
       <SmartToolBtn

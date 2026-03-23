@@ -300,6 +300,8 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
   const [editTileHeight, setEditTileHeight] = useState<string>('');
   const [editTileUnit, setEditTileUnit] = useState<'in' | 'ft'>('in');
   const [editSlopeFactor, setEditSlopeFactor] = useState<string>('');
+  // Wave 10: custom properties edit state
+  const [editCustomProperties, setEditCustomProperties] = useState<{ key: string; value: string }[]>([]);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [showMeasurementSettings, setShowMeasurementSettings] = useState(false);
@@ -796,6 +798,8 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     setEditTileHeight(classification.tileHeight != null ? String(classification.tileHeight) : '');
     setEditTileUnit(classification.tileUnit ?? 'in');
     setEditSlopeFactor(classification.slopeFactor != null && classification.slopeFactor !== 1 ? String(classification.slopeFactor) : '');
+    // Wave 10: populate custom properties
+    setEditCustomProperties(classification.customProperties ? [...classification.customProperties.map(p => ({ ...p }))] : []);
   }
 
   function cancelEditing() {
@@ -859,6 +863,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       return;
     }
 
+    // Wave 10: persist non-empty custom properties
+    const customProperties = editCustomProperties.filter(p => p.key.trim());
+
     updateClassification(classification.id, {
       name,
       color,
@@ -867,6 +874,7 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       tileHeight: tileH,
       tileUnit: (tileW !== undefined || tileH !== undefined) ? editTileUnit : undefined,
       slopeFactor: slope,
+      customProperties: customProperties.length > 0 ? customProperties : undefined,
     });
 
     setEditingId(null);
@@ -1900,6 +1908,46 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                     </div>
                   )}
 
+                  {/* Wave 10: Custom Properties */}
+                  <div className="mb-2 p-2 rounded border border-[#00d4ff]/15 bg-[#0a0a0f]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-mono text-[#8892a0] uppercase tracking-wider">Custom Properties</span>
+                      <button
+                        type="button"
+                        data-testid="add-custom-property-btn"
+                        onClick={() => setEditCustomProperties(prev => [...prev, { key: '', value: '' }])}
+                        className="text-[10px] text-[#00d4ff] hover:underline"
+                      >+ Add</button>
+                    </div>
+                    {editCustomProperties.map((prop, idx) => (
+                      <div key={idx} className="flex items-center gap-1 mb-1">
+                        <input
+                          type="text"
+                          placeholder="key"
+                          value={prop.key}
+                          data-testid="custom-property-key"
+                          onChange={e => setEditCustomProperties(prev => prev.map((p, i) => i === idx ? { ...p, key: e.target.value } : p))}
+                          className="w-20 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                        />
+                        <span className="text-[10px] text-gray-500">:</span>
+                        <input
+                          type="text"
+                          placeholder="value"
+                          value={prop.value}
+                          data-testid="custom-property-value"
+                          onChange={e => setEditCustomProperties(prev => prev.map((p, i) => i === idx ? { ...p, value: e.target.value } : p))}
+                          className="flex-1 border border-[#00d4ff]/20 rounded px-1.5 py-0.5 text-[11px] bg-[#0e1016] text-[#e5e7eb] outline-none focus:border-[#00d4ff]/40"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditCustomProperties(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-gray-500 hover:text-red-400 text-[10px]"
+                          aria-label="Remove property"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+
                   {editError && <p className="text-[11px] text-red-400 mb-2">{editError}</p>}
 
                   <div className="flex gap-2 justify-end">
@@ -2271,6 +2319,49 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* Wave 10: Breakdowns sub-category display */}
+                  {(classification.breakdowns ?? []).length > 0 && (
+                    <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
+                      <div className="text-[10px] font-mono text-[#8892a0] uppercase tracking-wider mb-1">Breakdowns</div>
+                      {(classification.breakdowns ?? []).map((bd) => (
+                        <div key={bd.id} data-testid="breakdown-item" className="text-[11px] py-0.5 flex items-center justify-between text-gray-300 gap-1">
+                          <span data-testid="breakdown-name" className="truncate flex-1">{bd.name}</span>
+                          <span className="text-[10px] text-gray-500">{bd.polygonIds.length} polygon{bd.polygonIds.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Wave 10: Add breakdown button */}
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      data-testid="add-breakdown-btn"
+                      onClick={() => {
+                        const bdName = prompt('Breakdown name (e.g. Living Room):');
+                        if (!bdName?.trim()) return;
+                        const newBd = { id: crypto.randomUUID(), name: bdName.trim(), polygonIds: [] };
+                        updateClassification(classification.id, {
+                          breakdowns: [...(classification.breakdowns ?? []), newBd],
+                        });
+                      }}
+                      className="text-[10px] text-[#00d4ff] hover:underline"
+                    >+ Add Breakdown</button>
+                  </div>
+
+                  {/* Wave 10: Custom Properties display */}
+                  {(classification.customProperties ?? []).length > 0 && (
+                    <div className="mt-1.5 border-t border-[#00d4ff]/10 pt-1.5">
+                      <div className="text-[10px] font-mono text-[#8892a0] uppercase tracking-wider mb-1">Properties</div>
+                      {(classification.customProperties ?? []).map((prop, idx) => (
+                        <div key={idx} className="text-[10px] py-0.5 flex items-center gap-2 text-gray-300">
+                          <span className="text-gray-500 w-20 truncate shrink-0">{prop.key}</span>
+                          <span className="truncate">{prop.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
