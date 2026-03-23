@@ -2087,6 +2087,16 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
                       <span className="text-[10px] px-1 py-0.5 rounded font-mono bg-[#0e1016] text-[#00d4ff]">
                         {formatClassificationTotal(classification, totals)}
                       </span>
+                      {/* Wave 26: polygon count badge */}
+                      {totals.count > 0 && (
+                        <span
+                          data-testid="classification-polygon-count"
+                          className="text-[9px] px-1 py-0.5 rounded font-mono bg-[#0e1016]/80 text-gray-500 flex-shrink-0"
+                          title={`${totals.count} polygon${totals.count !== 1 ? 's' : ''}`}
+                        >
+                          ×{totals.count}
+                        </span>
+                      )}
                       {/* Wave 9B: inline slope badge */}
                       {classification.type === 'area' && classification.slopeFactor != null && classification.slopeFactor > 1 && (
                         <span

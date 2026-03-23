@@ -763,6 +763,36 @@ function PageInner() {
     hydrateProject(pid);
   }, [search, hydrateProject]);
 
+  // BUG-W26-002: after hydration, check sessionStorage for a newer backup and offer restore
+  useEffect(() => {
+    if (!projectId || isDemoProject(projectId)) return;
+    // Only run once per project load
+    let isCancelled = false;
+    const timer = setTimeout(() => {
+      if (isCancelled) return;
+      try {
+        const raw = sessionStorage.getItem('mx-session-backup');
+        if (!raw) return;
+        const backup = JSON.parse(raw) as { projectId: string; polygons: unknown[]; classifications: unknown[]; savedAt: number };
+        if (backup.projectId !== projectId) return;
+        const storePolygonCount = useStore.getState().polygons.length;
+        const backupPolygonCount = backup.polygons.length;
+        // Offer restore only if backup has more polygons than what's in the store
+        if (backupPolygonCount > storePolygonCount) {
+          addToast(
+            `Restore ${backupPolygonCount - storePolygonCount} unsaved polygon${backupPolygonCount - storePolygonCount !== 1 ? 's' : ''} from last session?`,
+            'info',
+            10000,
+          );
+        }
+      } catch {
+        // non-fatal — bad backup JSON
+      }
+    }, 2000); // wait 2s for hydration to settle
+    return () => { isCancelled = true; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   // Flush any pending page text that was extracted before projectId was set
   useEffect(() => {
     if (!projectId) return;
@@ -1204,6 +1234,22 @@ function PageInner() {
       if (!currentIds.has(id)) knownPolygonIds.current.delete(id);
     }
   }, [projectId, polygons]);
+
+  // BUG-W26-002: sessionStorage backup — save polygon+classification snapshot on every change
+  // so that a browser refresh during mid-drawing doesn't lose unsaved work.
+  useEffect(() => {
+    if (!projectId || isDemoProject(projectId)) return;
+    if (polygons.length === 0 && classifications.length === 0) return;
+    try {
+      const backup = JSON.stringify({ projectId, polygons, classifications, savedAt: Date.now() });
+      // Only write if it fits (sessionStorage is ~5MB; skip if backup is huge)
+      if (backup.length < 4 * 1024 * 1024) {
+        sessionStorage.setItem('mx-session-backup', backup);
+      }
+    } catch {
+      // sessionStorage can be unavailable in private browsing — non-fatal
+    }
+  }, [projectId, polygons, classifications]);
 
   // Sync new classifications to API individually
   useEffect(() => {
