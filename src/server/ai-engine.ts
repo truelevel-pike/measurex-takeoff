@@ -134,7 +134,7 @@ export async function analyzePagePDF(
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 16384,
       },
     }),
   });
@@ -145,50 +145,43 @@ export async function analyzePagePDF(
   }
 
   const data = await resp.json();
-  const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) {
-    const finishReason = data?.candidates?.[0]?.finishReason;
-    throw new Error(`No content in Gemini PDF response. Finish reason: ${finishReason ?? 'unknown'}`);
+  const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!raw) return [];
+
+  // Find JSON array — handle markdown fences and any wrapping text
+  let jsonStr = raw.trim();
+  // Strip markdown fences
+  jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  // Find the outermost [ ... ]
+  const start = jsonStr.indexOf('[');
+  if (start === -1) return [];
+  // Walk forward to find matching closing bracket
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < jsonStr.length; i++) {
+    if (jsonStr[i] === '[') depth++;
+    else if (jsonStr[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
   }
-
-  const cleaned = cleanGeminiJson(raw);
-  const jsonStart = cleaned.indexOf('[');
-  const jsonEnd = cleaned.lastIndexOf(']');
-
-  if (jsonStart === -1) {
-    console.error('[ai-engine] analyzePagePDF: no JSON array start in response');
-    return [];
+  // If truncated (no closing bracket found), repair by finding last complete object
+  if (end === -1) {
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (lastBrace === -1) return [];
+    jsonStr = jsonStr.slice(start, lastBrace + 1) + ']';
+  } else {
+    jsonStr = jsonStr.slice(start, end + 1);
   }
-
-  // If no closing bracket, response was truncated — attempt repair
-  let jsonSlice = jsonEnd === -1 ? cleaned.slice(jsonStart) : cleaned.slice(jsonStart, jsonEnd + 1);
-
-  // Repair truncated JSON: remove last incomplete object and close the array
-  if (jsonEnd === -1) {
-    // Find last complete object (ends with })
-    const lastComplete = jsonSlice.lastIndexOf('}');
-    if (lastComplete > 0) {
-      jsonSlice = jsonSlice.slice(0, lastComplete + 1) + ']';
-    } else {
-      return [];
-    }
-  }
+  // Remove trailing commas before } or ]
+  jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
 
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonSlice);
-  } catch (parseErr) {
-    console.error('[ai-engine] analyzePagePDF: JSON.parse failed:', parseErr, '— raw:', raw.slice(0, 500));
-    return [];
-  }
-  if (!Array.isArray(parsed)) {
-    console.error('[ai-engine] analyzePagePDF: parsed response is not an array');
-    return [];
-  }
+  try { parsed = JSON.parse(jsonStr); }
+  catch { return []; }
+  if (!Array.isArray(parsed)) return [];
 
   type ParsedElement = {
     name?: string;
     classification?: string;
+    label?: string;
     type?: string;
     points?: unknown;
     confidence?: unknown;
@@ -198,14 +191,14 @@ export async function analyzePagePDF(
   return (parsed as ParsedElement[])
     .filter((el) => Array.isArray(el?.points) && el?.type)
     .map((el) => ({
-      name: String(el.name || el.classification || 'Unknown'),
+      name: String(el.name || el.label || el.classification || 'Unknown'),
       type: el.type as AIDetectedElement['type'],
       points: el.points as Array<{ x: number; y: number }>,
       confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
       color:
         typeof el.color === 'string' && el.color.startsWith('#')
           ? el.color
-          : nameToColor(String(el.name || el.classification || 'Unknown')),
+          : nameToColor(String(el.name || el.label || el.classification || 'Unknown')),
     }));
 }
 
