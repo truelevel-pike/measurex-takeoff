@@ -619,7 +619,7 @@ export default function TopNavBar({
               </button>
               </div>
               <select
-                value={aiModel ?? "gpt-5.4"}
+                value={aiModel || "gemini-2.5-flash"}
                 onChange={(e) => onAiModelChange?.(e.target.value)}
                 aria-label="AI Model"
                 style={{
@@ -634,10 +634,12 @@ export default function TopNavBar({
                   fontFamily: 'inherit',
                 }}
               >
-                <option value="gpt-5.4">GPT-5.4</option>
-                <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
-                <option value="anthropic/claude-opus-4.6">Claude Opus 4.6</option>
-                <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4.1">GPT-4.1</option>
+                <option value="o4-mini">o4-mini</option>
+                <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
               </select>
               <button
                 aria-label="Open MX Chat"

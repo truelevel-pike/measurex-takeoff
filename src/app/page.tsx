@@ -15,6 +15,7 @@ import { useIsMobile } from '@/lib/utils';
 // downloadExcel dynamically imported to avoid bundling XLSX (~300KB) at load time
 import { convertTakeoffTo3D } from '@/lib/takeoff-to-3d';
 import { installMeasurexAPI } from '@/lib/measurex-api';
+import { loadAiSettings } from '@/lib/ai-settings';
 
 import { connectToProject, disconnectFromProject, subscribeToActivity } from '@/lib/ws-client';
 import * as api from '@/lib/api-client';
@@ -739,9 +740,8 @@ function PageInner() {
     if (saved) {
       setAiModel(saved);
     } else {
-      // No canvas override — read from ai-settings.defaultModel
+      // No canvas override — read from ai-settings.defaultModel (set in Settings page)
       try {
-        const { loadAiSettings } = require('@/lib/ai-settings') as typeof import('@/lib/ai-settings');
         const settings = loadAiSettings();
         setAiModel(settings.defaultModel || "gemini-2.5-flash");
       } catch {
