@@ -158,6 +158,12 @@ export async function POST(
       page: pageNum,
       detections: elements.length,
     });
+    // Wave 27B: also broadcast the canonical 'takeoff:complete' event so agents
+    // polling SSE for 'takeoff:complete' (without the 'ai-' prefix) are notified.
+    broadcastToProject(id, 'takeoff:complete', {
+      page: pageNum,
+      detections: elements.length,
+    });
 
     return NextResponse.json({ elements, ...(detectedScale ? { detectedScale } : {}) });
   } catch (err: unknown) {

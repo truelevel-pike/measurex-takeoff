@@ -941,6 +941,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             data-testid="export-excel-btn"
             aria-label="Export screen view to Excel"
             disabled={polygons.length === 0}
+            title={polygons.length === 0 ? 'Draw some polygons first' : 'Export screen view to Excel'}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Eye className="h-4 w-4" aria-hidden="true" />
@@ -950,6 +951,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
             onClick={handleFullExport}
             aria-label="Full export to Excel"
             disabled={polygons.length === 0}
+            title={polygons.length === 0 ? 'Draw some polygons first' : 'Full export to Excel'}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" aria-hidden="true" />

@@ -465,6 +465,9 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
     return byId;
   }, [classifications]);
 
+  // Wave 27B verification: totals intentionally span ALL pages (Togal parity).
+  // Do NOT filter by currentPage here — the panel shows project-wide totals, not per-page.
+  // Per-page breakdowns appear inside each expanded classification row.
   const totalsSummary = useMemo(() => {
     let totalAreaSF = 0;
     let totalLinearLF = 0;

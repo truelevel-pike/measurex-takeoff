@@ -608,6 +608,9 @@ function PageInner() {
   const hydrateProject = useCallback(async (pid: string) => {
     const requestId = ++hydrateRequestIdRef.current;
     setQuantitiesLoading(true);
+    // Wave 27B: reset dirty-state tracking so the save button shows clean
+    // immediately after loading a project (not dirty until user makes a change).
+    lastSavedFingerprintRef.current = null;
 
     // Demo project: load from localStorage, skip all API calls
     try {
