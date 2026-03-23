@@ -692,17 +692,46 @@ export default function SettingsPage() {
                 {/* Agent Webhook URL */}
                 <div>
                   <label className="block text-sm text-gray-300 mb-1.5">Agent Webhook URL</label>
-                  <input
-                    type="url"
-                    value={ai.agentWebhookUrl}
-                    onChange={e => updateAi({ agentWebhookUrl: e.target.value })}
-                    placeholder="http://127.0.0.1:9011/hooks/agent"
-                    data-testid="agent-webhook-url-input"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-[#00d4ff] transition-colors"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={ai.agentWebhookUrl}
+                      onChange={e => updateAi({ agentWebhookUrl: e.target.value })}
+                      placeholder="https://your-agent-host/hooks/agent"
+                      data-testid="agent-webhook-url-input"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-[#00d4ff] transition-colors"
+                    />
+                    {ai.agentWebhookUrl && (
+                      <button
+                        type="button"
+                        onClick={() => updateAi({ agentWebhookUrl: '' })}
+                        data-testid="agent-webhook-clear-btn"
+                        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-400 hover:text-white hover:border-red-500/50 transition-colors whitespace-nowrap"
+                        title="Clear webhook URL"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {/* Wave 15B Bug 1: warn when URL is localhost — won't work in production */}
+                  {ai.agentWebhookUrl && /^https?:\/\/(localhost|127\.|0\.0\.0\.0|::1)/i.test(ai.agentWebhookUrl) && (
+                    <div
+                      data-testid="agent-webhook-warning"
+                      className="mt-2 flex items-start gap-2 rounded-lg bg-amber-900/20 border border-amber-500/30 px-3 py-2 text-xs text-amber-300"
+                      role="alert"
+                    >
+                      <span className="mt-0.5 shrink-0">⚠️</span>
+                      <span>
+                        This URL points to <strong>localhost</strong> and will only work on your local machine.
+                        In production (Vercel), this webhook will fail silently.
+                        Set a publicly reachable URL for production agent use.
+                      </span>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500 mt-1.5">
                     When set, the AI Takeoff button fires this webhook instead of calling the AI API directly.
                     Use with OpenClaw agent mode (<code className="text-[#00d4ff]">?agent=1</code>).
+                    Leave blank to use direct AI Takeoff.
                   </p>
                 </div>
               </div>

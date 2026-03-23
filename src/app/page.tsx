@@ -424,7 +424,9 @@ function PageInner() {
   const [aiAllPagesMode, setAiAllPagesMode] = useState(false);
   const [aiAllPagesProgress, setAiAllPagesProgress] = useState<{current: number, total: number} | null>(null);
   const [aiPageStatuses, setAiPageStatuses] = useState<PageStatus[]>([]);
-  const [aiModel, setAiModel] = useState<string>("gpt-5.4"); // persisted via localStorage: "measurex_ai_model"
+  // Wave 15B Bug 4: default to empty string — actual default resolved in useEffect below
+  // to avoid SSR/client mismatch and to sync with ai-settings.defaultModel.
+  const [aiModel, setAiModel] = useState<string>("");
   const [takeoffSummary, setTakeoffSummary] = useState<TakeoffSummary | null>(null);
   const aiCancelRef = useRef(false);
 
@@ -728,9 +730,24 @@ function PageInner() {
   }, [setCurrentPage, setSheetName]);
 
   // Hydrate aiModel from localStorage on mount (useEffect avoids Next.js SSR hydration mismatch)
+  // Wave 15B Bug 4: prefer the canvas-specific "measurex_ai_model" key (set when user
+  // changes model via the canvas selector), then fall back to ai-settings.defaultModel
+  // (set in Settings page), then fall back to "gemini-2.5-flash" as the product default.
+  // This ensures the canvas model selector and Settings page are always in sync.
   useEffect(() => {
     const saved = localStorage.getItem("measurex_ai_model");
-    if (saved) setAiModel(saved);
+    if (saved) {
+      setAiModel(saved);
+    } else {
+      // No canvas override — read from ai-settings.defaultModel
+      try {
+        const { loadAiSettings } = require('@/lib/ai-settings') as typeof import('@/lib/ai-settings');
+        const settings = loadAiSettings();
+        setAiModel(settings.defaultModel || "gemini-2.5-flash");
+      } catch {
+        setAiModel("gemini-2.5-flash");
+      }
+    }
   }, []);
 
   // Load project by URL param or localStorage on mount
@@ -2070,20 +2087,48 @@ function PageInner() {
                     </svg>
                     <span className="text-sm font-medium">Loading PDF…</span>
                   </div>
-                ) : (
-                  <label className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]">
-                    <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
-                    <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
-                      {projectName || 'Project loaded'}
-                    </div>
-                    <div className="text-sm text-zinc-400 mb-3">
-                      {classifications.length} classification{classifications.length !== 1 ? 's' : ''} · {polygons.length} polygon{polygons.length !== 1 ? 's' : ''} · {totalPages} page{totalPages !== 1 ? 's' : ''}
-                    </div>
-                    <div className="text-sm text-zinc-500">Re-upload the PDF to view the blueprint</div>
-                    <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
-                    <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
-                  </label>
-                )}
+                ) : (() => {
+                  // BUG-W15-001: distinguish "new project (never had PDF)" from
+                  // "project had a PDF but it's not in memory".
+                  // A project has had a PDF if it has polygons, totalPages > 1, or
+                  // if the pdfUrl is stored on the project (Supabase mode).
+                  const hadPdf = polygons.length > 0 || totalPages > 1;
+                  return hadPdf ? (
+                    <label
+                      data-testid="empty-state-re-upload"
+                      className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]"
+                    >
+                      <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
+                      <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
+                        {projectName || 'Project loaded'}
+                      </div>
+                      <div className="text-sm text-zinc-400 mb-3">
+                        {classifications.length} classification{classifications.length !== 1 ? 's' : ''} · {polygons.length} polygon{polygons.length !== 1 ? 's' : ''} · {totalPages} page{totalPages !== 1 ? 's' : ''}
+                      </div>
+                      <div
+                        data-testid="pdf-missing-banner"
+                        className="text-sm text-amber-400 mb-2 font-medium"
+                      >
+                        This PDF was uploaded locally. Please re-upload to continue.
+                      </div>
+                      <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop</div>
+                      <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
+                    </label>
+                  ) : (
+                    <label
+                      data-testid="empty-state-new-project"
+                      className="cursor-pointer border-2 border-dashed border-[rgba(0,212,255,0.4)] rounded-xl p-8 md:p-12 hover:border-[rgba(0,212,255,0.8)] transition-colors text-center w-full max-w-xl bg-[rgba(0,212,255,0.03)]"
+                    >
+                      <div className="flex items-center justify-center mb-3"><FileIcon className="text-[rgba(0,212,255,0.5)]" size={40} /></div>
+                      <div className="text-base font-semibold text-[rgba(0,212,255,0.9)] mb-1">
+                        {projectName || 'New project'}
+                      </div>
+                      <div className="text-sm text-zinc-400 mb-3">Upload a PDF to get started with your takeoff.</div>
+                      <div className="text-xs text-zinc-600 mt-1">Click to select or drag & drop · Max 100 MB</div>
+                      <input type="file" accept=".pdf" onChange={onFileChange} className="sr-only" data-testid="upload-pdf-input" />
+                    </label>
+                  );
+                })()}
               </div>
             ) : (
               /* ── No project, no PDF — fresh upload screen ── */

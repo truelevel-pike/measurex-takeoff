@@ -71,8 +71,11 @@ export async function GET(request: NextRequest) {
         encoder.encode(`data: ${JSON.stringify({ event: 'viewer:count', data: { viewerId, viewerCount } })}\n\n`)
       );
 
-      // Broadcast viewer joined to all clients
-      broadcastToProject(projectId, 'viewer:joined', { viewerId, viewerCount });
+      // BUG-W15-003: only broadcast viewer:joined when there are already other viewers.
+      // When count goes 0→1 (solo user opening their own project) this is noise.
+      if (viewerCount > 1) {
+        broadcastToProject(projectId, 'viewer:joined', { viewerId, viewerCount });
+      }
 
       // 15-second keepalive to prevent proxy/load-balancer timeouts
       // BUG-A5-5-044: reuse existing encoder instead of new TextEncoder() per tick

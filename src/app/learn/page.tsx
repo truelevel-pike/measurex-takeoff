@@ -60,16 +60,21 @@ const GETTING_STARTED = [
   },
 ];
 
+// Wave 15B Bug 3: corrected shortcuts — matches toolKeys in page.tsx.
+// Area/linear/count are classification TYPES, not tool shortcuts.
+// The tool key activates the drawing mode; the classification type determines what is measured.
 const KEYBOARD_SHORTCUTS = [
-  ['S', 'Set Scale'],
-  ['A', 'Area measurement'],
-  ['L', 'Linear measurement'],
-  ['C', 'Count measurement'],
+  ['V', 'Select tool'],
+  ['D', 'Draw tool (polygon / area)'],
+  ['M', 'Measure tool (linear)'],
+  ['H', 'Pan mode'],
+  ['C', 'Cut tool'],
+  ['G', 'Merge tool'],
+  ['S', 'Split tool'],
   ['Esc', 'Cancel / deselect'],
-  ['Del / Backspace', 'Delete selected measurement'],
+  ['Del / Backspace', 'Delete selected polygon'],
   ['Ctrl+Z / Cmd+Z', 'Undo'],
   ['Ctrl+Shift+Z / Cmd+Shift+Z', 'Redo'],
-  ['Space', 'Pan mode'],
   ['+ / -', 'Zoom in / out'],
   ['Ctrl+A / Cmd+A', 'Select all'],
   ['Ctrl+E / Cmd+E', 'Export to Excel'],
@@ -91,24 +96,6 @@ const TUTORIALS = [
   { icon: <Layers size={20} />, title: 'Using Assemblies', time: '6 min read' },
   { icon: <Download size={20} />, title: 'Exporting to Excel', time: '2 min read' },
   { icon: <Ruler size={20} />, title: 'Calibrating Scale', time: '3 min read' },
-];
-
-const VIDEOS = [
-  {
-    title: 'Full Walkthrough',
-    duration: '12:34',
-    description: 'Upload drawings, run AI takeoff, and export your first estimate end to end.',
-  },
-  {
-    title: 'Advanced Calibration',
-    duration: '8:15',
-    description: 'Set precise scale on any drawing using known dimensions for accurate measurements.',
-  },
-  {
-    title: 'Team Collaboration',
-    duration: '6:42',
-    description: 'Invite teammates, assign edit or view permissions, and review takeoffs together.',
-  },
 ];
 
 const FAQ_ITEMS = [
@@ -288,29 +275,6 @@ export default function LearnPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-white">{tut.title}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{tut.time}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Video Guides */}
-        <section>
-          <h2 className="text-lg font-semibold mb-6">Video Guides</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {VIDEOS.map((vid, i) => (
-              <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
-                  <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                    <Play size={24} className="text-white/40 ml-1" />
-                  </div>
-                  <span className="absolute bottom-2 right-2 bg-black/70 text-xs text-gray-300 px-2 py-0.5 rounded">
-                    Coming soon
-                  </span>
-                </div>
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-white">{vid.title}</h3>
-                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{vid.description}</p>
                 </div>
               </div>
             ))}
