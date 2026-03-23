@@ -130,7 +130,7 @@ export async function analyzePagePDF(
     const retryNote = attempt > 1
       ? ' IMPORTANT: You MUST return at least 5 elements. This is a construction blueprint with rooms and walls visible.'
       : '';
-    const promptText = `Analyze page ${pageNum} of this construction blueprint PDF (${safeWidth}x${safeHeight}px). Return the top 15 most important elements as a JSON array. Each element: {"label":"Room Name","type":"area"|"linear"|"count","points":[{"x":0,"y":0},...],"confidence":0.9}. For areas: 4-6 corner points. For walls: 2 endpoints. For counts (doors/windows): 1 center point each. Use actual pixel coordinates. Return ONLY the JSON array, no other text.${retryNote}`;
+    const promptText = `You are analyzing page ${pageNum} of a multi-page construction blueprint PDF. Focus ONLY on page ${pageNum}.\n\n` + buildSystemPrompt(safeWidth, safeHeight) + (retryNote ? `\n\n${retryNote}` : '');
 
     console.log(`[ai-engine] analyzePagePDF attempt ${attempt}/3 (temperature=${temperature})`);
 
