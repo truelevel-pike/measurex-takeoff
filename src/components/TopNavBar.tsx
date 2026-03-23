@@ -551,10 +551,38 @@ export default function TopNavBar({
                 />
                 Run Full Takeoff
               </label>
+              <div style={{ position: 'relative', display: 'inline-flex' }}>
+              {!hasScale && !aiLoading && (
+                <span
+                  data-testid="scale-required-warning"
+                  title="Set scale first"
+                  aria-label="Scale required"
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    background: '#f59e0b',
+                    border: '2px solid #1a1a2e',
+                    zIndex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: '#000',
+                    lineHeight: 1,
+                    pointerEvents: 'none',
+                  }}
+                >!</span>
+              )}
               <button
-                aria-label={aiLoading ? 'AI Takeoff running…' : aiAllPagesMode ? `Run Full Takeoff (all ${totalPages ?? '?'} pages)` : 'Run AI Takeoff on current page'}
+                aria-label={aiLoading ? 'AI Takeoff running…' : !hasScale ? 'Set scale first before running AI Takeoff' : aiAllPagesMode ? `Run Full Takeoff (all ${totalPages ?? '?'} pages)` : 'Run AI Takeoff on current page'}
                 data-testid="ai-takeoff-btn"
                 aria-busy={aiLoading}
+                title={!hasScale && !aiLoading ? 'Set scale first' : undefined}
                 onClick={aiAllPagesMode ? onAITakeoffAllPages : onAITakeoff}
                 disabled={aiLoading}
                 style={{
@@ -583,6 +611,7 @@ export default function TopNavBar({
                     : <><Sparkles size={14} aria-hidden="true" /> {(currentPagePolygonCount ?? 0) > 0 ? 'Re-Takeoff' : 'Run AI Takeoff'}</>
                 }
               </button>
+              </div>
               <select
                 value={aiModel ?? "gpt-5.4"}
                 onChange={(e) => onAiModelChange?.(e.target.value)}

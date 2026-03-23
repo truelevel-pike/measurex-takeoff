@@ -865,17 +865,32 @@ function PageInner() {
       }
 
       localStorage.setItem('mx-onboarding-takeoff-run', 'true');
-      const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
-      setAiStatus(doneMsg);
-      setTimeout(() => setAiStatus(null), 5000);
+      if (totalDetected === 0) {
+        const zeroMsg = 'AI found no elements. Try a different page or check scale.';
+        setAiStatus(`Error: ${zeroMsg}`);
+        setTimeout(() => setAiStatus(null), 7000);
+      } else {
+        const doneMsg = `Done! ${pages} page${pages !== 1 ? 's' : ''} processed — ${totalDetected} elements detected`;
+        setAiStatus(doneMsg);
+        setTimeout(() => setAiStatus(null), 5000);
 
-      const { getNotificationPrefs } = await import('@/components/NotificationSettings');
-      if (getNotificationPrefs().aiTakeoffComplete) {
-        addToast(doneMsg, 'success');
+        const { getNotificationPrefs } = await import('@/components/NotificationSettings');
+        if (getNotificationPrefs().aiTakeoffComplete) {
+          addToast(doneMsg, 'success');
+        }
       }
     } catch (error) {
       console.error(error);
-      setAiStatus(`Error: ${error instanceof Error ? error.message : 'AI failed'}`);
+      const errMsg = error instanceof Error ? error.message : 'AI failed';
+      let friendlyMsg: string;
+      if (errMsg.includes('429') || errMsg.toLowerCase().includes('rate limit') || errMsg.toLowerCase().includes('too many')) {
+        friendlyMsg = 'Too many requests. Wait 60s and try again.';
+      } else if (errMsg.toLowerCase().includes('timeout') || errMsg.toLowerCase().includes('timed out') || errMsg.toLowerCase().includes('aborted')) {
+        friendlyMsg = 'Takeoff timed out. Try again.';
+      } else {
+        friendlyMsg = errMsg;
+      }
+      setAiStatus(`Error: ${friendlyMsg}`);
       setTimeout(() => setAiStatus(null), 7000);
     } finally {
       setAiLoading(false);
@@ -972,7 +987,9 @@ function PageInner() {
       } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         pdfViewerRef.current?.fitToPage();
-      } else if (toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
+        // Only activate tool shortcuts when no modifier key is held — prevents
+        // conflicts with browser shortcuts (Ctrl+C, Ctrl+S, etc.)
         setTool(toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]);
       }
     };
@@ -2195,7 +2212,7 @@ function PageInner() {
           className={`fixed bottom-16 left-1/2 -translate-x-1/2 z-50 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium ${aiStatus.startsWith('Error:') || aiStatus.includes('timed out') || aiStatus.includes('failed') ? 'bg-red-600' : 'bg-emerald-600'}`}
           // Wave 11B: data-testid=api-error-display when the status is an error so
           // agents and tests can assert on visible API errors without CSS inspection.
-          data-testid={aiStatus.startsWith('Error:') || aiStatus.includes('timed out') || aiStatus.includes('failed') ? 'api-error-display' : undefined}
+          data-testid={aiStatus.startsWith('Error:') || aiStatus.includes('timed out') || aiStatus.includes('failed') ? 'takeoff-error-message' : undefined}
           role={aiStatus.startsWith('Error:') || aiStatus.includes('timed out') ? 'alert' : 'status'}
         >
           {aiStatus}
