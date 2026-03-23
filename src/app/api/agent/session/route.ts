@@ -75,8 +75,10 @@ export async function GET(req: Request) {
     // Pages that have scale info — use pages array if available, else just check page 1
     const totalPages = pages.length > 0 ? pages.length : ((project as unknown as Record<string, unknown>).totalPages as number | undefined) ?? 1;
 
-    // Build the canvas URL and agent URL
-    const origin = req.headers.get('origin') ?? '';
+    // Build the canvas URL and agent URL.
+    // On Vercel SSR the origin header is often absent — fall back to the
+    // configured app host so the returned URLs are always fully-qualified.
+    const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_HOST ?? '';
     const canvasUrl = `${origin}/?project=${projectId}`;
     const agentUrl = `${origin}/?project=${projectId}&agent=1`;
 

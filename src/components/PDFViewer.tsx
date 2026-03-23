@@ -270,6 +270,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           canvas.height = viewport.height * effectiveDpr;
           canvas.style.width = `${viewport.width}px`;
           canvas.style.height = `${viewport.height}px`;
+          // Fill white before render to prevent transparent/blank flash during page navigation
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
 
           const dims = { width: viewport.width, height: viewport.height };

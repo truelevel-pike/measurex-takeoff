@@ -2407,13 +2407,24 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
         })}
 
         {visibleCount < summaryFilteredItems.length && (
-          <button
-            type="button"
-            onClick={() => setVisibleCount((c) => c + LOAD_STEP)}
-            className="w-full py-2 text-center text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
-          >
-            Load more ({summaryFilteredItems.length - visibleCount} remaining)
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              data-testid="show-all-classifications-btn"
+              onClick={() => setVisibleCount(summaryFilteredItems.length)}
+              className="py-2 text-center text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
+            >
+              Show all {summaryFilteredItems.length}
+            </button>
+            <span className="text-[#00d4ff]/30 text-[11px]">·</span>
+            <button
+              type="button"
+              onClick={() => setVisibleCount((c) => c + LOAD_STEP)}
+              className="py-2 text-center text-[11px] text-[#00d4ff] hover:text-[#9eeeff] transition-colors"
+            >
+              Load more ({summaryFilteredItems.length - visibleCount} remaining)
+            </button>
+          </div>
         )}
 
         {summaryExcludedCount > 0 && (

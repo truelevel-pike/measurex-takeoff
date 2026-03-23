@@ -1038,12 +1038,12 @@ export default function ProjectsPage() {
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-6 max-w-lg text-center">
+                <div data-testid="projects-empty-state" className="flex flex-col items-center gap-6 max-w-lg text-center">
                   <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/20 p-5 rounded-2xl">
                     <FileSpreadsheet size={56} className="text-blue-400" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-bold tracking-tight mb-2">Welcome to MeasureX</h2>
+                    <h2 className="text-3xl font-bold tracking-tight mb-2">Create your first project</h2>
                     <p className="text-zinc-400 text-base">Upload a PDF blueprint to get started with AI-powered construction takeoff.</p>
                   </div>
                   <button
