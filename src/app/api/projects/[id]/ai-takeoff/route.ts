@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getProject, getPages } from '@/server/project-store';
+import { getProject, getPages, setScale } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { getPDFPath } from '@/server/pdf-storage';
 import { analyzePageImage, analyzePagePDF } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
 import { broadcastToProject } from '@/lib/sse-broadcast';
+import type { ScaleCalibration } from '@/lib/types';
 
 export async function POST(
   req: Request,
@@ -97,12 +98,42 @@ export async function POST(
       elements = await analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
     }
 
+    // Auto-apply scale: if Gemini detected a '_scale' element, extract and save it,
+    // then remove it from the elements array so it doesn't get treated as a polygon.
+    let detectedScale: ScaleCalibration | null = null;
+    const scaleElement = elements.find((el) => el.name === '_scale');
+    if (scaleElement) {
+      const raw = scaleElement as unknown as Record<string, unknown>;
+      const pixelsPerUnit = typeof raw.pixelsPerUnit === 'number' ? raw.pixelsPerUnit : null;
+      const unit = typeof raw.unit === 'string' ? raw.unit as ScaleCalibration['unit'] : null;
+      if (pixelsPerUnit && pixelsPerUnit > 0 && unit) {
+        detectedScale = {
+          pixelsPerUnit,
+          unit,
+          label: typeof raw.label === 'string' ? raw.label : 'Auto-detected',
+          source: 'ai',
+          confidence: typeof raw.confidence === 'number' ? raw.confidence : 0.9,
+          pageNumber: pageNum,
+        };
+        try {
+          await setScale(id, detectedScale);
+          broadcastToProject(id, 'scale:updated', detectedScale);
+          console.log(`[ai-takeoff] auto-applied scale for project ${id} page ${pageNum}:`, detectedScale);
+        } catch (scaleErr) {
+          console.error('[ai-takeoff] failed to auto-apply detected scale:', scaleErr);
+          detectedScale = null;
+        }
+      }
+      // Remove _scale from elements regardless — it's not a polygon
+      elements = elements.filter((el) => el.name !== '_scale');
+    }
+
     broadcastToProject(id, 'ai-takeoff:complete', {
       page: pageNum,
       detections: elements.length,
     });
 
-    return NextResponse.json({ elements });
+    return NextResponse.json({ elements, ...(detectedScale ? { detectedScale } : {}) });
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : 'AI takeoff failed';
     const message = `Takeoff failed — try a different model or check your internet connection (${raw})`;
