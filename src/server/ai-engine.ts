@@ -109,6 +109,10 @@ export async function analyzePagePDF(
   const resolvedModel = model?.trim() || 'gemini-2.5-flash';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
 
+  // Guard against 0 dimensions (pages not yet registered in DB) — fall back to standard letter/arch-D
+  const safeWidth = pageWidth > 0 ? pageWidth : 792;
+  const safeHeight = pageHeight > 0 ? pageHeight : 1224;
+
   const pdfBase64 = pdfBuffer.toString('base64');
 
   const resp = await fetch(apiUrl, {
@@ -118,7 +122,7 @@ export async function analyzePagePDF(
       contents: [{
         parts: [
           {
-            text: `Focus on page ${pageNum} of this construction blueprint PDF.\n\n` + buildSystemPrompt(pageWidth, pageHeight),
+            text: `Focus on page ${pageNum} of this construction blueprint PDF.\n\n` + buildSystemPrompt(safeWidth, safeHeight),
           },
           {
             inline_data: {

@@ -67,8 +67,8 @@ export async function POST(
     // Get page dimensions up-front (needed by both paths)
     const pages = await getPages(id);
     const pageInfo = pages.find((p) => p.pageNum === pageNum);
-    const pageWidth = pageInfo?.width ?? 1000;
-    const pageHeight = pageInfo?.height ?? 800;
+    const pageWidth = pageInfo?.width ?? 792;
+    const pageHeight = pageInfo?.height ?? 1224;
 
     broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 
