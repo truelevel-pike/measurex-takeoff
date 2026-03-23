@@ -67,7 +67,7 @@ export default function TakeoffProgressModal({
     : '';
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Takeoff Progress" className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+    <div role="dialog" aria-modal="true" aria-label="Takeoff Progress" data-testid="takeoff-progress-modal" className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
 
       {/* Central content */}
@@ -99,7 +99,7 @@ export default function TakeoffProgressModal({
 
         {/* Large progress text */}
         <h1 className="text-3xl font-bold text-white mb-2 text-center">
-          Page {currentPage} of {total}
+          Page <span data-testid="takeoff-current-page">{currentPage}</span> of <span data-testid="takeoff-total-pages">{total}</span>
         </h1>
         {model && (
           <p className="text-xs text-white/40 mb-2 text-center">Using: <span className="text-white/60">{model}</span></p>

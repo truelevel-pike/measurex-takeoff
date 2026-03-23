@@ -196,7 +196,10 @@ export async function POST(
     const byPage: Array<{ page: number; elements: number; created: number; skipped: number; scale?: ScaleCalibration }> = [];
     let totalElements = 0;
 
+    broadcastToProject(id, 'takeoff:started', { totalPages });
     broadcastToProject(id, 'ai-takeoff:all-pages:started', { totalPages });
+
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
     // Sequential loop — avoids Gemini rate limits
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
@@ -204,6 +207,7 @@ export async function POST(
       const pageWidth = pageInfo?.width ?? 792;
       const pageHeight = pageInfo?.height ?? 1224;
 
+      broadcastToProject(id, 'takeoff:progress', { page: pageNum, total: totalPages });
       broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 
       let elements: AIDetectedElement[];
@@ -226,7 +230,9 @@ export async function POST(
           elements = await analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
         }
       } catch (analyzeErr) {
+        const errMsg = analyzeErr instanceof Error ? analyzeErr.message : 'Analysis failed';
         console.error(`[all-pages] page ${pageNum} analyze failed:`, analyzeErr);
+        broadcastToProject(id, 'takeoff:error', { message: errMsg, page: pageNum });
         byPage.push({ page: pageNum, elements: 0, created: 0, skipped: 0 });
         continue;
       }
@@ -271,9 +277,15 @@ export async function POST(
         skipped,
         ...(appliedScale ? { scale: appliedScale } : {}),
       });
+
+      // Rate-limit guard: 2-second delay between pages to avoid Gemini 429s
+      if (pageNum < totalPages) {
+        await sleep(2000);
+      }
     }
 
     fireWebhook(id, 'takeoff.all-pages.completed', { pagesProcessed: totalPages, totalElements });
+    broadcastToProject(id, 'takeoff:complete', { totalElements });
     broadcastToProject(id, 'ai-takeoff:all-pages:complete', { pagesProcessed: totalPages, totalElements });
 
     return NextResponse.json({
