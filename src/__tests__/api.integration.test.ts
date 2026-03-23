@@ -211,7 +211,7 @@ describe('API integration: project/classification/polygon CRUD', () => {
       }),
       { params: Promise.resolve({ id: projectId }) },
     );
-    expect(classificationRes.status).toBe(200);
+    expect(classificationRes.status).toBe(201);
     const classificationJson = await classificationRes.json();
     expect(classificationJson.classification.id).toBe(classificationId);
 

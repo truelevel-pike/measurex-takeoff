@@ -128,6 +128,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json(response);
   } catch (err: unknown) {
     console.error("[upload route]", err);
-    return NextResponse.json({ error: `Unable to load PDF — the file may be corrupted or too large (max 50MB)` }, { status: 500 });
+    return NextResponse.json({
+      error: `Unable to process PDF — the file may be corrupted, too large (max 100MB), or the upload exceeded Vercel's request size limit. For very large PDFs, please reduce the file size or contact support.`,
+      code: 'UPLOAD_FAILED',
+    }, { status: 500 });
   }
 }

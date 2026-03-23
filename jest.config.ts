@@ -13,6 +13,11 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
+  // Exclude tests that require a live server or external services
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/tests/api.integration.test.ts',  // requires running dev server
+  ],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',

@@ -840,6 +840,13 @@ function PageInner() {
     if (aiTakeoffInFlightRef.current) return;
     aiTakeoffInFlightRef.current = true;
 
+    // BUG-W24-003: guard against no-PDF state
+    if (!pdfFile) {
+      addToast('Please upload a PDF first before running AI takeoff', 'warning');
+      aiTakeoffInFlightRef.current = false;
+      return;
+    }
+
     const viewer = pdfViewerRef.current;
     if (!viewer || !projectId) {
       setAiStatus('AI takeoff requires a saved project');
@@ -1610,6 +1617,11 @@ function PageInner() {
   }, [projectId, classifications, polygons, scale, scales, addToast]);
 
   const handleAITakeoffAllPages = useCallback(async () => {
+    if (!pdfFile) {
+      addToast('Please upload a PDF first before running AI takeoff', 'warning');
+      return;
+    }
+
     const viewer = pdfViewerRef.current;
     if (!viewer || !projectId) {
       setAiStatus('AI takeoff requires a saved project');

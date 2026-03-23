@@ -15,7 +15,7 @@
       "maxDuration": 120
     },
     "src/app/api/projects/[id]/upload/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "src/app/api/projects/[id]/ai-takeoff/all-pages/route.ts": {
       "maxDuration": 300
