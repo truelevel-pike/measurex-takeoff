@@ -1097,13 +1097,15 @@ export default function ProjectsPage() {
             </div>
           ) : viewMode === 'grid' ? (
             /* Grid view */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div data-testid="project-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProjects.map(p => {
                 const polyCount = p.state?.polygons?.length || 0;
                 const clsCount = p.state?.classifications?.length || 0;
                 return (
                   <div
                     key={p.id}
+                    data-testid="project-card"
+                    data-project-id={p.id}
                     className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden hover:border-[#00d4ff]/60 transition-all cursor-pointer group hover:shadow-[0_0_12px_rgba(0,212,255,0.12)]"
                     onClick={() => handleOpen(p.id)}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}
@@ -1175,7 +1177,7 @@ export default function ProjectsPage() {
             </div>
           ) : (
             /* List view */
-            <div className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden">
+            <div data-testid="project-list" className="bg-[#0a0a0f] border border-[#00d4ff]/20 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-700 text-zinc-400 text-left">
@@ -1192,6 +1194,8 @@ export default function ProjectsPage() {
                     return (
                       <tr
                         key={p.id}
+                        data-testid="project-card"
+                        data-project-id={p.id}
                         className="border-b border-zinc-700/50 hover:bg-zinc-700/40 cursor-pointer transition-colors group"
                         onClick={() => handleOpen(p.id)}
                         onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, projectId: p.id }); }}

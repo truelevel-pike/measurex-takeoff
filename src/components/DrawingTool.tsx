@@ -1,5 +1,39 @@
 'use client';
 
+/**
+ * CANVAS COORDINATE SYSTEM
+ * ─────────────────────────────────────────────────────────────────────────────
+ * - Origin: top-left corner of the rendered PDF page (0, 0).
+ * - Units: BASE DIMENSIONS space (baseDims.width × baseDims.height pixels),
+ *   independent of the current zoom level or viewport size.
+ *   baseDims reflects the intrinsic resolution at which the PDF page was
+ *   rasterised; polygons are stored in this space so coordinates remain
+ *   stable across zoom changes.
+ *
+ * Converting from viewport (screen) coordinates to base-space:
+ *   canvas_x = (viewport_x / rect.width)  * baseDims.width
+ *   canvas_y = (viewport_y / rect.height) * baseDims.height
+ *   where rect = containerElement.getBoundingClientRect()
+ *
+ * Agent state is exposed in the #mx-agent-state <span> element:
+ *   data-canvas-width  → baseDims.width  (base-space width of current page)
+ *   data-canvas-height → baseDims.height (base-space height of current page)
+ *
+ * Example (agent usage):
+ *   const state = document.getElementById('mx-agent-state');
+ *   const bw = Number(state.dataset.canvasWidth);
+ *   const bh = Number(state.dataset.canvasHeight);
+ *   const canvas = document.querySelector('[data-testid="canvas-area"]');
+ *   const rect = canvas.getBoundingClientRect();
+ *   // Click at 30 % from left, 50 % from top of the page:
+ *   const baseX = 0.30 * bw;
+ *   const baseY = 0.50 * bh;
+ *   // Corresponding viewport click:
+ *   const vx = rect.left + (baseX / bw) * rect.width;
+ *   const vy = rect.top  + (baseY / bh) * rect.height;
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
@@ -282,6 +316,7 @@ export default function DrawingTool() {
   return (
     <div
       ref={containerRef}
+      data-testid="drawing-tool-container"
       className="absolute inset-0 z-20 cursor-crosshair outline-none"
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}

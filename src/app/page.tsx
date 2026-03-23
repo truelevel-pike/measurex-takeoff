@@ -2045,7 +2045,7 @@ function PageInner() {
         />
       )}
 
-      {showCalModal && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
+      {showCalModal && !agentMode && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
       {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}
       {showProjectSettings && (
         <ProjectSettingsPanel
@@ -2085,9 +2085,9 @@ function PageInner() {
           }}
         />
       )}
-      <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
+      {!agentMode && <KeyboardShortcutsModal open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />}
 
-      {takeoffSummary ? (
+      {!agentMode && takeoffSummary ? (
         <TakeoffProgressModal
           open={false}
           pageStatuses={[]}
@@ -2102,7 +2102,7 @@ function PageInner() {
             safeGoToPage(1, 'takeoff-summary:view-results');
           }}
         />
-      ) : aiLoading && aiAllPagesProgress ? (
+      ) : !agentMode && aiLoading && aiAllPagesProgress ? (
         <TakeoffProgressModal
           open={true}
           pageStatuses={aiPageStatuses}
@@ -2112,7 +2112,7 @@ function PageInner() {
           sheetNames={sheetNames}
           onCancel={handleCancelTakeoff}
         />
-      ) : aiLoading ? (
+      ) : !agentMode && aiLoading ? (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl p-8 shadow-2xl text-center max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
