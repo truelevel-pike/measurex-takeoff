@@ -150,12 +150,20 @@ function buildSummarySheet(
       }
     }
 
-    // BUG-A5-6-177: Unit is derived from the first polygon's page scale only.
-    // If polygons span multiple pages with different scale units, this may be inaccurate.
-    // TODO: verify unit consistency across pages or report per-page breakdowns.
-    const pageScale = pickScaleForPage(clsPolygons[0].pageNumber ?? 1, scales, scale);
-    const baseUnit = pageScale?.unit ?? 'px';
-    const unit = cls.type === 'area' ? `sq ${baseUnit}` : cls.type === 'linear' ? baseUnit : 'ea';
+    // BUG-A5-6-177 fix: detect mixed scale units across pages.
+    // If all polygons share the same scale unit, use it directly.
+    // If units are mixed, label as 'mixed-units' to flag the inconsistency
+    // instead of silently showing incorrect units from the first polygon only.
+    const pageUnits = new Set(
+      clsPolygons.map((poly) => {
+        const ps = pickScaleForPage(poly.pageNumber ?? 1, scales, scale);
+        return ps?.unit ?? 'px';
+      })
+    );
+    const baseUnit = pageUnits.size === 1 ? (pageUnits.values().next().value as string) : 'mixed-units';
+    const unit = cls.type === 'area'
+      ? (baseUnit === 'mixed-units' ? 'mixed-units' : `sq ${baseUnit}`)
+      : cls.type === 'linear' ? baseUnit : 'ea';
 
     aoa.push([
       cls.name,

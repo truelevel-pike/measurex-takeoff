@@ -1030,16 +1030,10 @@ export const useStore = create<Store>()(
   setDrawingSet: (page, setName) => set((s) => ({ drawingSets: { ...s.drawingSets, [page]: setName } })),
 
   // ─── Classification Groups ───
-  groups: [
-    { id: 'grp-drywall', name: 'Drywall', color: '#f59e0b', classificationIds: [], breakdowns: [] },
-    { id: 'grp-painting', name: 'Painting', color: '#3b82f6', classificationIds: [], breakdowns: [] },
-    { id: 'grp-flooring', name: 'Flooring', color: '#10b981', classificationIds: [], breakdowns: [] },
-    { id: 'grp-plumbing', name: 'Plumbing', color: '#6366f1', classificationIds: [], breakdowns: [] },
-    { id: 'grp-electrical', name: 'Electrical', color: '#ef4444', classificationIds: [], breakdowns: [] },
-    { id: 'grp-concrete', name: 'Concrete', color: '#8b5cf6', classificationIds: [], breakdowns: [] },
-    { id: 'grp-masonry', name: 'Masonry', color: '#d97706', classificationIds: [], breakdowns: [] },
-    { id: 'grp-framing', name: 'Framing', color: '#14b8a6', classificationIds: [], breakdowns: [] },
-  ],
+  // BUG-W17-002: start with empty groups — the 8 hardcoded defaults were phantom
+  // groups that appeared on every fresh load regardless of project state.
+  // Groups are now API-only, loaded via hydrateState on project open.
+  groups: [],
 
   // BUG-A6-010 fix: return the new group's ID so callers can avoid the fragile
   // setTimeout(0) pattern to find the newly created group.

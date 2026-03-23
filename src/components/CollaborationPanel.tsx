@@ -247,6 +247,7 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
         >
           <Link2 size={14} style={{ color: '#8892a0', flexShrink: 0 }} />
           <span
+            data-testid="share-url-display"
             style={{
               flex: 1,
               fontSize: 11,
@@ -260,6 +261,7 @@ export default function CollaborationPanel({ projectId, projectName = 'Untitled 
             {loading ? 'Generating share link…' : error ? error : shareUrl}
           </span>
           <button
+            data-testid="share-copy-btn"
             onClick={handleCopyLink}
             disabled={loading || !!error}
             aria-label="Copy share link"

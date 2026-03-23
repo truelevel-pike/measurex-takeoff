@@ -2305,6 +2305,14 @@ function PageInner() {
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
             <div className="text-lg font-semibold text-neutral-800">AI Takeoff in Progress</div>
             <div className="text-sm text-neutral-500 mt-2">{aiStatus}</div>
+            {aiAllPagesProgress && (
+              <div
+                data-testid="takeoff-progress-pct"
+                className="text-xs font-mono text-blue-500 mt-1"
+              >
+                {Math.round((aiAllPagesProgress.current / Math.max(aiAllPagesProgress.total, 1)) * 100)}%
+              </div>
+            )}
           </div>
         </div>
       ) : null}
