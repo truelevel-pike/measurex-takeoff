@@ -229,6 +229,17 @@ function PrintViewInner() {
   useEffect(() => {
     if (pdfLoaded && !hasPrinted.current) {
       hasPrinted.current = true;
+      // Wave 17B Bug 1: set document.title to project name before triggering print
+      // so the browser print dialog shows "ProjectName — MeasureX Takeoff" not the
+      // generic tab title. Restore original title after print dialog closes.
+      const originalTitle = document.title;
+      const printTitle = state?.projectName
+        ? `${state.projectName} — MeasureX Takeoff`
+        : 'MeasureX Takeoff';
+      document.title = printTitle;
+      const restoreTitle = () => { document.title = originalTitle; };
+      window.addEventListener('afterprint', restoreTitle, { once: true });
+
       setTimeout(() => {
         if (document.visibilityState === 'visible') {
           window.print();
@@ -452,7 +463,13 @@ function PrintViewInner() {
       {/* Print-only button (hidden during print) */}
       <div className="mt-8 px-6 pb-8 no-print flex gap-3">
         <button
-          onClick={() => window.print()}
+          onClick={() => {
+            // Wave 17B Bug 1: set title before manual print trigger too
+            const orig = document.title;
+            document.title = state?.projectName ? `${state.projectName} — MeasureX Takeoff` : 'MeasureX Takeoff';
+            window.addEventListener('afterprint', () => { document.title = orig; }, { once: true });
+            window.print();
+          }}
           className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-500"
         >
           Print

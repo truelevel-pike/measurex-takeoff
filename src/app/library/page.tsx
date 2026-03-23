@@ -280,6 +280,32 @@ export default function LibraryPage() {
 
         {!loading && (
           <>
+            {/* Wave 17B Bug 3: combined empty state when library has no items at all */}
+            {orgItems.length === 0 && myItems.length === 0 && (
+              <div
+                data-testid="library-empty-state"
+                className="flex flex-col items-center justify-center py-24 gap-4 text-center"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)] flex items-center justify-center mb-2">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#00d4ff]/40" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#e0faff]">No saved classifications yet</h3>
+                <p className="text-sm text-[#8892a0] max-w-sm leading-relaxed">
+                  Create a classification in any project and save it to the library to reuse it across projects.
+                </p>
+                <a
+                  href="/projects"
+                  className="mt-2 px-4 py-2 text-sm font-medium rounded-lg bg-[rgba(0,212,255,0.1)] border border-[rgba(0,212,255,0.3)] text-[#00d4ff] hover:bg-[rgba(0,212,255,0.18)] transition-colors"
+                >
+                  Go to Projects →
+                </a>
+              </div>
+            )}
+
             {/* Organization Library */}
             <section className="mb-10">
               <div className="flex items-center gap-2 mb-4">

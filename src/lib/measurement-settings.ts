@@ -78,6 +78,10 @@ export function loadMeasurementSettings(): MeasurementSettings {
 export function saveMeasurementSettings(settings: MeasurementSettings): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  // Wave 17B Bug 2: dispatch a custom event so same-tab consumers (QuantitiesPanel,
+  // canvas label renderers) re-read settings immediately without waiting for a cross-tab
+  // StorageEvent (which browsers only fire for other tabs, not the originating tab).
+  window.dispatchEvent(new CustomEvent('mx-measurement-settings-changed', { detail: settings }));
 }
 
 /** Convert a value in sq ft to the target area unit */

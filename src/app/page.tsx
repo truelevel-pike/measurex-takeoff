@@ -541,8 +541,9 @@ function PageInner() {
         scale: useStore.getState().scale,
         scales: useStore.getState().scales,
       });
+      // Wave 17B Bug 5: auto-saved shows for 2s (was 1.2s — too fast to read)
       if (showToast) persistSaveStatus('Saved!');
-      else persistSaveStatus('Auto-saved', 1200);
+      else persistSaveStatus('Auto-saved', 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Save failed';
       // Don't show error toast for rate limit — silently retry later
@@ -2318,7 +2319,23 @@ function PageInner() {
       ) : null}
 
       {saveStatus && (
-        <div className="fixed top-14 right-4 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium">
+        <div
+          className="fixed top-14 right-4 z-50 text-white px-3 py-1.5 rounded-lg shadow-lg text-xs font-medium flex items-center gap-1.5 transition-opacity"
+          style={{
+            background: saveStatus.startsWith('Error') ? 'rgba(239,68,68,0.9)' : 'rgba(34,197,94,0.85)',
+            backdropFilter: 'blur(4px)',
+            border: saveStatus.startsWith('Error') ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(34,197,94,0.3)',
+          }}
+          data-testid="save-status-indicator"
+          role="status"
+          aria-live="polite"
+          aria-label={saveStatus}
+        >
+          {!saveStatus.startsWith('Error') && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
           {saveStatus}
         </div>
       )}

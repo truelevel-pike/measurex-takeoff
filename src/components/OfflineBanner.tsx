@@ -28,6 +28,8 @@ export default function OfflineBanner() {
     <div
       className="fixed top-0 left-0 right-0 z-[99998] bg-amber-400 text-[#1a1a2e] text-center font-semibold text-sm px-4 py-2"
       role="alert"
+      aria-live="assertive"
+      data-testid="offline-banner"
       suppressHydrationWarning
     >
       ⚠️ You are offline. Changes may not be saved.
