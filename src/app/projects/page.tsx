@@ -1392,7 +1392,7 @@ export default function ProjectsPage() {
             >
               <X size={14} />
             </button>
-            <AutoNameTool />
+            <AutoNameTool projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
           </div>
         </div>
       )}

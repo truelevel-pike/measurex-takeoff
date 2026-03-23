@@ -3,28 +3,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Check, X, ChevronRight, Loader2, CheckSquare, Square, RefreshCw } from 'lucide-react';
 import { useFeatureFlag } from '@/hooks/use-feature-flag';
+import { extractSheetName } from '@/lib/sheet-namer';
 
 // --- Types ---
 interface RenameItem {
   id: string;
+  projectId: string;
   originalName: string;
   aiName: string;
   accepted: boolean | null; // null = pending user choice
 }
 
-// --- Sample stub data ---
-const STUB_RENAMES: RenameItem[] = [
-  { id: 'r1', originalName: 'scan001.pdf',         aiName: 'A1.1 - Floor Plan (Level 1)',       accepted: null },
-  { id: 'r2', originalName: 'scan002.pdf',         aiName: 'A1.2 - Floor Plan (Level 2)',       accepted: null },
-  { id: 'r3', originalName: 'drawing_final2.pdf',  aiName: 'A2.0 - Exterior Elevations',        accepted: null },
-  { id: 'r4', originalName: 'photo0037.pdf',       aiName: 'A3.0 - Building Sections',          accepted: null },
-  { id: 'r5', originalName: 'S-001.pdf',           aiName: 'S1.0 - Foundation Plan',            accepted: null },
-  { id: 'r6', originalName: 'mech_new_v3.pdf',     aiName: 'M1.0 - HVAC Floor Plan',            accepted: null },
-  { id: 'r7', originalName: 'electrical_rev2.pdf', aiName: 'E1.0 - Electrical Layout (L1)',     accepted: null },
-  { id: 'r8', originalName: 'plumbing_draft.pdf',  aiName: 'P1.0 - Plumbing Floor Plan',        accepted: null },
-];
+interface ProjectEntry {
+  id: string;
+  name: string;
+}
 
-const PROCESSING_DELAY_MS = 2800; // simulated AI processing time
+interface AutoNameToolProps {
+  /** Pre-loaded projects list. When omitted, component fetches from /api/projects. */
+  projects?: ProjectEntry[];
+}
 
 // --- Sub-components ---
 
@@ -192,14 +190,16 @@ function ProgressBar({ progress }: { progress: number }) {
 
 // ---- Main Component ----
 
-export default function AutoNameTool() {
+export default function AutoNameTool({ projects: projectsProp }: AutoNameToolProps = {}) {
   const aiSheetNaming = useFeatureFlag('ai-sheet-naming');
-  const [state, setState] = useState<'idle' | 'processing' | 'done'>('idle');
+  const [state, setState] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [items, setItems] = useState<RenameItem[]>([]);
   const [appliedCount, setAppliedCount] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // BUG-A6-001 fix: cleanup effect must be placed before any early return so it is
   // always registered regardless of the aiSheetNaming flag value.
@@ -207,6 +207,7 @@ export default function AutoNameTool() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -255,29 +256,117 @@ export default function AutoNameTool() {
     );
   }
 
-  function startProcessing() {
+  async function startProcessing() {
     setState('processing');
     setProgress(0);
     setItems([]);
     setAppliedCount(null);
+    setErrorMsg(null);
 
-    const startTime = Date.now();
-    intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min((elapsed / PROCESSING_DELAY_MS) * 100, 99);
-      setProgress(pct);
-      if (pct >= 99) {
-        if (intervalRef.current) clearInterval(intervalRef.current);
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    try {
+      // 1. Resolve projects list (use prop or fetch)
+      let projectList: ProjectEntry[] = projectsProp ?? [];
+      if (projectList.length === 0) {
+        setProgress(10);
+        const res = await fetch('/api/projects', { signal: abort.signal });
+        if (!res.ok) throw new Error(`Failed to load projects (${res.status})`);
+        const data = await res.json();
+        projectList = (data.projects ?? []).map((p: { id: string; name: string }) => ({
+          id: p.id,
+          name: p.name,
+        }));
       }
-    }, 50);
 
-    timeoutRef.current = setTimeout(() => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setProgress(100);
-      // All items default to accepted = true after AI processing
-      setItems(STUB_RENAMES.map((r) => ({ ...r, accepted: true })));
-      setState('done');
-    }, PROCESSING_DELAY_MS);
+      if (projectList.length === 0) {
+        setProgress(100);
+        setItems([]);
+        setState('done');
+        return;
+      }
+
+      // 2. For each project, fetch page text and run sheet-name extraction
+      const suggestions: RenameItem[] = [];
+      const step = 80 / projectList.length;
+
+      for (let i = 0; i < projectList.length; i++) {
+        if (abort.signal.aborted) return;
+        const proj = projectList[i];
+        setProgress(10 + Math.round(step * i));
+
+        try {
+          const pagesRes = await fetch(`/api/projects/${proj.id}/pages`, { signal: abort.signal });
+          let aiName: string | null = null;
+
+          if (pagesRes.ok) {
+            const pagesData = await pagesRes.json();
+            const pages: Array<{ pageNumber: number; text?: string; name?: string }> =
+              pagesData.pages ?? [];
+            // Check if page already has a saved name
+            const firstPage = pages[0];
+            if (firstPage?.name) {
+              // Already named — skip
+              continue;
+            }
+            // Try to extract from page text (first page is usually the title sheet)
+            for (const page of pages.slice(0, 3)) {
+              if (page.text) {
+                aiName = extractSheetName(page.text);
+                if (aiName) break;
+              }
+            }
+          }
+
+          // Fall back to heuristic rename of the project name itself
+          if (!aiName) {
+            aiName = inferNameFromFilename(proj.name);
+          }
+
+          if (aiName && aiName !== proj.name) {
+            suggestions.push({
+              id: `rename-${proj.id}`,
+              projectId: proj.id,
+              originalName: proj.name,
+              aiName,
+              accepted: true,
+            });
+          }
+        } catch {
+          // Skip projects that fail — don't abort the whole batch
+        }
+      }
+
+      if (!abort.signal.aborted) {
+        setProgress(100);
+        setItems(suggestions);
+        setState('done');
+      }
+    } catch (err: unknown) {
+      if (abort.signal.aborted) return;
+      setErrorMsg(err instanceof Error ? err.message : 'Analysis failed');
+      setState('error');
+    }
+  }
+
+  /**
+   * Infer a cleaner sheet name from a project/filename string.
+   * Strips common noise patterns and applies title-casing.
+   */
+  function inferNameFromFilename(name: string): string | null {
+    // Strip file extension
+    let cleaned = name.replace(/\.pdf$/i, '').trim();
+    // Replace underscores/hyphens/dots with spaces
+    cleaned = cleaned.replace(/[_\-.]+/g, ' ').trim();
+    // Remove trailing version noise like v2, rev3, final, _2
+    cleaned = cleaned.replace(/\b(v\d+|rev\d*|final|draft|copy|new|old|\d{8})\b/gi, '').trim();
+    // Collapse whitespace
+    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+    if (!cleaned || cleaned === name.replace(/\.pdf$/i, '').trim()) return null;
+    // Title-case
+    return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   function reset() {
@@ -305,19 +394,29 @@ export default function AutoNameTool() {
     );
   }
 
-  function handleApplySelected() {
-    const selected = items.filter((item) => item.accepted === true);
+  async function applyRenames(selected: RenameItem[]) {
+    // PATCH each project name via the API
+    await Promise.allSettled(
+      selected.map((item) =>
+        fetch(`/api/projects/${item.projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: item.aiName }),
+        })
+      )
+    );
     setAppliedCount(selected.length);
-    // Stub: in a real app, rename files here
     setState('idle');
     setItems([]);
   }
 
+  function handleApplySelected() {
+    const selected = items.filter((item) => item.accepted === true);
+    applyRenames(selected);
+  }
+
   function handleApplyAll() {
-    setAppliedCount(items.length);
-    // Stub: in a real app, rename all files here
-    setState('idle');
-    setItems([]);
+    applyRenames(items);
   }
 
   const acceptedCount = items.filter((i) => i.accepted === true).length;
@@ -438,6 +537,17 @@ export default function AutoNameTool() {
           </div>
         )}
 
+        {state === 'error' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#f87171' }}>
+              <X size={14} /> {errorMsg ?? 'Analysis failed. Please try again.'}
+            </div>
+            <button onClick={() => { setState('idle'); setErrorMsg(null); }} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#8892a0', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
+              Try again
+            </button>
+          </div>
+        )}
+
         {state === 'processing' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -446,7 +556,7 @@ export default function AutoNameTool() {
                 Processing... {Math.round(progress)}%
               </span>
               <span style={{ fontSize: 11, color: '#8892a0', marginLeft: 'auto' }}>
-                Analyzing {STUB_RENAMES.length} drawings
+                Analyzing drawings…
               </span>
             </div>
             <ProgressBar progress={progress} />
@@ -480,6 +590,17 @@ export default function AutoNameTool() {
               @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
               @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
             `}</style>
+          </div>
+        )}
+
+        {state === 'done' && items.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', fontSize: 12, color: '#4ade80' }}>
+              <Check size={14} /> All drawings are already well-named — no suggestions.
+            </div>
+            <button onClick={reset} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#8892a0', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
+              Re-analyze
+            </button>
           </div>
         )}
 

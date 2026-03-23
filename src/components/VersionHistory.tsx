@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Camera, Clock, CheckCircle, ChevronDown, ChevronRight, RotateCcw, X, Loader2, Plus, Pencil, Trash2, User, Zap } from 'lucide-react';
+import { History, Camera, ChevronDown, ChevronRight, RotateCcw, X, Loader2, Plus, Pencil, Trash2, User, Zap } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import SnapshotPanel from '@/components/SnapshotPanel';
@@ -31,42 +31,6 @@ interface ApiHistoryEntry {
   beforeData: Record<string, unknown> | null;
   afterData: Record<string, unknown> | null;
   createdAt: string;
-}
-
-interface MockEntry {
-  id: string;
-  timestamp: string;
-  description: string;
-  isCurrent: boolean;
-}
-
-function generateMockEntries(undoStackLength: number): MockEntry[] {
-  if (undoStackLength <= 0) return [];
-  const now = new Date();
-  const descriptions = [
-    'Current state',
-    'Added classification Flooring',
-    'Changed scale to 1/8" = 1\'0"',
-    'Merged 2 polygons',
-    'Drew new area polygon',
-    'Deleted classification Electrical',
-    'Split polygon into 2 sections',
-    'Added classification Drywall',
-    'Updated polygon area',
-    'Set scale manually',
-  ];
-  const count = Math.min(undoStackLength + 1, descriptions.length);
-  const entries: MockEntry[] = [];
-  for (let i = 0; i < count && i < descriptions.length; i++) {
-    const time = new Date(now.getTime() - i * 7 * 60 * 1000);
-    entries.push({
-      id: `entry-${i}`,
-      timestamp: time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      description: descriptions[i],
-      isCurrent: i === 0,
-    });
-  }
-  return entries;
 }
 
 function timeAgo(dateStr: string): string {
@@ -269,43 +233,10 @@ function loadTakeoffRuns(): TakeoffRun[] {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch { /* ignore */ }
-
-  // Pre-populate mock entries for demo
-  const now = Date.now();
-  const mocks: TakeoffRun[] = [
-    {
-      id: 'run-001',
-      timestamp: new Date(now - 15 * 60 * 1000).toISOString(),
-      model: 'claude-sonnet-4-6',
-      pageRange: '1-3',
-      polygonCount: 24,
-      projectId: 'demo',
-      isCurrent: true,
-    },
-    {
-      id: 'run-002',
-      timestamp: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-      model: 'gpt-5.4',
-      pageRange: 'all',
-      polygonCount: 18,
-      projectId: 'demo',
-    },
-    {
-      id: 'run-003',
-      timestamp: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
-      model: 'gemini-3.1',
-      pageRange: '1-2',
-      polygonCount: 12,
-      projectId: 'demo',
-    },
-  ];
-  localStorage.setItem(RUNS_STORAGE_KEY, JSON.stringify(mocks));
-  return mocks;
+  return [];
 }
 
 export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel }: VersionHistoryProps) {
-  const undoStack = useStore((s) => s.undoStack);
-  const undo = useStore((s) => s.undo);
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'history' | 'snapshots' | 'runs'>('history');
@@ -342,24 +273,6 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [projectId]);
-
-  // Mock fallback entries
-  const mockEntries = generateMockEntries(undoStack.length);
-
-  function handleRestore(entry: MockEntry) {
-    if (entry.isCurrent) return;
-    const idx = mockEntries.indexOf(entry);
-    if (idx > 0 && idx <= undoStack.length) {
-      // BUG-A6-5-037 fix: batch N undo() calls so they produce a single re-render
-      // instead of N re-renders that cause visible UI thrashing on large undo stacks.
-      React.startTransition(() => {
-        for (let i = 0; i < idx; i++) undo();
-      });
-      addToast(`Restored to "${entry.description}"`, 'success');
-    } else {
-      addToast(`Restore to "${entry.description}" is not available.`, 'info');
-    }
-  }
 
   async function handleApiRestore(entry: ApiHistoryEntry) {
     if (!projectId) {
@@ -639,48 +552,11 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
             );
           })
         ) : (
-          mockEntries.length > 0 ? (
-            mockEntries.map((entry) => (
-              <div
-                key={entry.id}
-                className="group flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/60 transition-colors"
-              >
-                <div className="mt-0.5">
-                  {entry.isCurrent ? (
-                    <CheckCircle size={14} className="text-emerald-400" />
-                  ) : (
-                    <Clock size={14} className="text-gray-500" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-200 truncate">{entry.description}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">{entry.timestamp}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {entry.isCurrent ? (
-                    <span className="text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 rounded px-1.5 py-0.5">
-                      Current
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleRestore(entry)}
-                      className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
-                    >
-                      <RotateCcw size={10} />
-                      Restore
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-              <History size={18} className="text-gray-600 mb-2" />
-              <p className="text-sm font-medium text-gray-300">No history yet</p>
-              <p className="text-xs text-gray-500 mt-1">Changes will appear here after your first edit.</p>
-            </div>
-          )
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <History size={18} className="text-gray-600 mb-2" />
+            <p className="text-sm font-medium text-gray-300">No history yet</p>
+            <p className="text-xs text-gray-500 mt-1">Changes will appear here after your first edit.</p>
+          </div>
         )}
       </div>
 
