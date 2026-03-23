@@ -69,6 +69,99 @@ For 1/8" = 1ft: 72 * 0.125 = 9px/ft
 Return null pixels_per_unit if you cannot calculate it — just return the scale_text.`;
 
 /**
+ * Analyze a blueprint page using Gemini's native PDF input (no canvas/image conversion needed).
+ * Sends the raw PDF buffer directly as inline_data with mime_type 'application/pdf'.
+ * Gemini Flash and Pro support multi-page PDFs; pageNum tells the model which page to focus on.
+ *
+ * @param pdfBuffer - Raw PDF file bytes.
+ * @param pageNum - 1-based page number to analyze.
+ * @param pageWidth - Width of the page in pixels (from stored page metadata).
+ * @param pageHeight - Height of the page in pixels (from stored page metadata).
+ * @param model - Optional model override (defaults to gemini-2.5-flash).
+ */
+export async function analyzePagePDF(
+  pdfBuffer: Buffer,
+  pageNum: number,
+  pageWidth: number,
+  pageHeight: number,
+  model?: string,
+): Promise<AIDetectedElement[]> {
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Google API key not configured — set GOOGLE_API_KEY in .env.local');
+
+  const resolvedModel = model?.trim() || 'gemini-2.5-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
+
+  const pdfBase64 = pdfBuffer.toString('base64');
+
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          {
+            text: `Focus on page ${pageNum} of this construction blueprint PDF.\n\n` + buildSystemPrompt(pageWidth, pageHeight),
+          },
+          {
+            inline_data: {
+              mime_type: 'application/pdf',
+              data: pdfBase64,
+            },
+          },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Gemini PDF API error ${resp.status}: ${text.slice(0, 500)}`);
+  }
+
+  const data = await resp.json();
+  const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) {
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    throw new Error(`No content in Gemini PDF response. Finish reason: ${finishReason ?? 'unknown'}`);
+  }
+
+  const jsonStart = raw.indexOf('[');
+  const jsonEnd = raw.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON array found in Gemini PDF response');
+
+  const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+  if (!Array.isArray(parsed)) throw new Error('Parsed Gemini PDF response is not an array');
+
+  type ParsedElement = {
+    name?: string;
+    classification?: string;
+    type?: string;
+    points?: unknown;
+    confidence?: unknown;
+    color?: string;
+  };
+
+  return (parsed as ParsedElement[])
+    .filter((el) => Array.isArray(el?.points) && el?.type)
+    .map((el) => ({
+      name: String(el.name || el.classification || 'Unknown'),
+      type: el.type as AIDetectedElement['type'],
+      points: el.points as Array<{ x: number; y: number }>,
+      confidence: typeof el.confidence === 'number' ? el.confidence : 0.85,
+      color:
+        typeof el.color === 'string' && el.color.startsWith('#')
+          ? el.color
+          : nameToColor(String(el.name || el.classification || 'Unknown')),
+    }));
+}
+
+/**
  * Analyze a blueprint page image using Gemini 3.1 Pro Preview vision.
  * @param imageBase64DataUrl - Base64-encoded PNG/JPEG data URL of the page image.
  * @param pageWidth - Width of the page in pixels.

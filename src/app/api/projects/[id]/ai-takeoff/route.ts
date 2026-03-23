@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProject, getPages } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { getPDFPath } from '@/server/pdf-storage';
-import { analyzePageImage } from '@/server/ai-engine';
+import { analyzePageImage, analyzePagePDF } from '@/server/ai-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
 import { broadcastToProject } from '@/lib/sse-broadcast';
@@ -24,7 +24,12 @@ export async function POST(
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     const pageNum: number = body?.page;
     // BUG-A5-5-037: validate model against whitelist
-    const ALLOWED_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
+    const ALLOWED_MODELS = [
+      // OpenAI vision models
+      'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
+      // Gemini models (support native PDF input — no canvas required)
+      'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview',
+    ];
     const rawModel = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
     if (rawModel && !ALLOWED_MODELS.includes(rawModel)) {
       return NextResponse.json({ error: `Invalid model. Allowed: ${ALLOWED_MODELS.join(', ')}` }, { status: 400 });
@@ -59,15 +64,7 @@ export async function POST(
       pdfPath = tmpPath;
     }
 
-    const imageDataUrl = await renderPageAsImage(pdfPath, pageNum);
-    if (!imageDataUrl) {
-      return NextResponse.json(
-        { error: 'PDF rendering not available — canvas package required' },
-        { status: 400 },
-      );
-    }
-
-    // Get page dimensions
+    // Get page dimensions up-front (needed by both paths)
     const pages = await getPages(id);
     const pageInfo = pages.find((p) => p.pageNum === pageNum);
     const pageWidth = pageInfo?.width ?? 1000;
@@ -75,7 +72,30 @@ export async function POST(
 
     broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 
-    const elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
+    // Try image-based rendering first (works locally where node-canvas is available).
+    // On Vercel, renderPageAsImage returns null because node-canvas is absent —
+    // fall back to Gemini native PDF input which needs no canvas at all.
+    const imageDataUrl = await renderPageAsImage(pdfPath, pageNum).catch(() => null);
+
+    let elements: Awaited<ReturnType<typeof analyzePageImage>>;
+
+    if (imageDataUrl) {
+      elements = await analyzePageImage(imageDataUrl, pageWidth, pageHeight, model);
+    } else {
+      // Gemini PDF path: read raw bytes and send directly — no image conversion needed
+      const { getPDFBuffer } = await import('@/server/pdf-storage');
+      const pdfBuffer = await getPDFBuffer(id).catch(() => null);
+      if (!pdfBuffer) {
+        return NextResponse.json(
+          { error: 'PDF rendering not available and PDF buffer could not be loaded' },
+          { status: 500 },
+        );
+      }
+      // Use a Gemini model: prefer the request model if it's a Gemini model,
+      // otherwise default to gemini-2.5-flash (best for blueprints, no canvas needed)
+      const geminiModel = (model && model.startsWith('gemini-')) ? model : 'gemini-2.5-flash';
+      elements = await analyzePagePDF(pdfBuffer, pageNum, pageWidth, pageHeight, geminiModel);
+    }
 
     broadcastToProject(id, 'ai-takeoff:complete', {
       page: pageNum,
