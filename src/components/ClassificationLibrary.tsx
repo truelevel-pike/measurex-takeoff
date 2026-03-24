@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Check, Layers, X } from 'lucide-react';
+import { BookOpen, Check, Download, Layers, X } from 'lucide-react';
 
 import { useStore } from '@/lib/store';
 import {
@@ -165,6 +165,24 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
     }
   }
 
+  function handleExportLibrary() {
+    const exportData = classifications.map((c) => ({
+      name: c.name,
+      type: c.type,
+      color: c.color,
+      visible: c.visible,
+    }));
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `classification-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast(`Exported ${exportData.length} classifications`, 'success');
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/40" onClick={onClose} />
@@ -286,21 +304,34 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 border-t border-[#00d4ff]/20 px-4 py-3">
+          <div className="flex items-center justify-between border-t border-[#00d4ff]/20 px-4 py-3">
             <button
               type="button"
-              onClick={handleLoadTemplate}
-              className="rounded border border-[#00d4ff]/30 px-3 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10"
+              data-testid="export-library-btn"
+              onClick={handleExportLibrary}
+              disabled={classifications.length === 0}
+              title={classifications.length === 0 ? 'No classifications to export' : `Export ${classifications.length} classifications as JSON`}
+              className="flex items-center gap-1.5 rounded border border-[#00d4ff]/30 px-3 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Load Template
+              <Download size={12} aria-hidden="true" />
+              Export JSON
             </button>
-            <button
-              type="button"
-              onClick={handleAddSelected}
-              className="rounded bg-[#00d4ff] px-3 py-1.5 text-xs font-medium text-[#00131d] hover:bg-[#00bce0]"
-            >
-              Add Selected
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLoadTemplate}
+                className="rounded border border-[#00d4ff]/30 px-3 py-1.5 text-xs text-[#b8e6f7] hover:bg-[#00d4ff]/10"
+              >
+                Load Template
+              </button>
+              <button
+                type="button"
+                onClick={handleAddSelected}
+                className="rounded bg-[#00d4ff] px-3 py-1.5 text-xs font-medium text-[#00131d] hover:bg-[#00bce0]"
+              >
+                Add Selected
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -19,7 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     let polygons = await getPolygons(id);
     // Wave 28B: ?page=N filter — agent queries per-page to verify takeoff results
     const { searchParams } = new URL(req.url);
-    const pageParam = searchParams.get('page');
+    // Accept both ?page=N (Wave 28B) and ?pageNumber=N (Wave 29 alias for agent per-page verification)
+    const pageParam = searchParams.get('pageNumber') ?? searchParams.get('page');
     if (pageParam !== null) {
       const pageNum = parseInt(pageParam, 10);
       if (!Number.isFinite(pageNum) || pageNum < 1) {

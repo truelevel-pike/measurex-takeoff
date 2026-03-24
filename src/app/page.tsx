@@ -888,6 +888,15 @@ function PageInner() {
       return;
     }
 
+    // Warn if no scale is set — AI detection still works but measurements will be inaccurate.
+    // Do NOT block: scale is needed for display/export accuracy, not for AI element detection.
+    const currentScale = useStore.getState().scale;
+    const currentScales = useStore.getState().scales;
+    const hasAnyScale = currentScale || (currentScales && Object.keys(currentScales).length > 0);
+    if (!hasAnyScale) {
+      addToast('No scale set — AI takeoff may be inaccurate. Set scale first for best results.', 'warning');
+    }
+
     const pages = useStore.getState().totalPages || 1;
     const originalPage = useStore.getState().currentPage || 1;
 
@@ -1681,6 +1690,14 @@ function PageInner() {
       setAiStatus('AI takeoff requires a saved project');
       setTimeout(() => setAiStatus(null), 4000);
       return;
+    }
+
+    // Warn if no scale set — allow takeoff to proceed, measurements will be approximate.
+    const allPagesScale = useStore.getState().scale;
+    const allPagesScales = useStore.getState().scales;
+    const allPagesHasScale = allPagesScale || (allPagesScales && Object.keys(allPagesScales).length > 0);
+    if (!allPagesHasScale) {
+      addToast('No scale set — AI takeoff may be inaccurate. Set scale first for best results.', 'warning');
     }
 
     // GAP-011: If an agent webhook URL is configured, delegate to the agent instead of calling the AI API directly

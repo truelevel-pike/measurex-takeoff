@@ -387,34 +387,47 @@ export default function DrawingTool() {
       tabIndex={0}
     >
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={vb} preserveAspectRatio="none">
-        {/* Drawn edges */}
-        {points.map((pt, i) => i > 0 ? (
-          <line key={`e-${i}`} x1={points[i-1].x} y1={points[i-1].y} x2={pt.x} y2={pt.y} stroke="#3b82f6" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-        ) : null)}
-        {/* Rubber-band line to cursor */}
-        {points.length > 0 && cursor && (
-          <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
-        )}
-        {/* In-progress fill preview (area only) */}
-        {!isLinear && points.length >= 3 && (
-          <polygon points={points.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="none" />
-        )}
-        {/* Vertex dots — no green close-indicator for linear */}
-        {points.map((pt, i) => (
-          <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={!isLinear && i === 0 && points.length >= 3 ? 8 : 5} fill={!isLinear && i === 0 ? '#10b981' : '#3b82f6'} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-        ))}
-        {/* Snap indicator — yellow ring when cursor is snapped */}
-        {snapIndicator && cursor && (
-          <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#06b6d4" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-        )}
-        {/* Crosshair cursor indicator */}
-        {cursor && (
-          <g>
-            <line x1={cursor.x - 10} y1={cursor.y} x2={cursor.x + 10} y2={cursor.y} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
-            <line x1={cursor.x} y1={cursor.y - 10} x2={cursor.x} y2={cursor.y + 10} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
-            <circle cx={cursor.x} cy={cursor.y} r={3} fill="none" stroke="#3b82f6" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-          </g>
-        )}
+        {/* Use active classification color for all in-progress drawing chrome */}
+        {(() => {
+          const drawColor = cls?.color ?? '#3b82f6';
+          // Parse hex to rgba for fill preview
+          const hexToRgbaPreview = (hex: string, a: number) => {
+            const c = hex.replace('#', '');
+            if (c.length !== 6) return `rgba(59,130,246,${a})`;
+            const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16);
+            return `rgba(${r},${g},${b},${a})`;
+          };
+          return (<>
+            {/* Drawn edges */}
+            {points.map((pt, i) => i > 0 ? (
+              <line key={`e-${i}`} x1={points[i-1].x} y1={points[i-1].y} x2={pt.x} y2={pt.y} stroke={drawColor} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            ) : null)}
+            {/* Rubber-band line to cursor */}
+            {points.length > 0 && cursor && (
+              <line x1={points[points.length-1].x} y1={points[points.length-1].y} x2={cursor.x} y2={cursor.y} stroke={drawColor} strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
+            )}
+            {/* In-progress fill preview (area only) */}
+            {!isLinear && points.length >= 3 && (
+              <polygon points={points.map((p) => `${p.x},${p.y}`).join(' ')} fill={hexToRgbaPreview(drawColor, 0.1)} stroke="none" />
+            )}
+            {/* Vertex dots — green close-indicator for first point when closeable */}
+            {points.map((pt, i) => (
+              <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={!isLinear && i === 0 && points.length >= 3 ? 8 : 5} fill={!isLinear && i === 0 ? '#10b981' : drawColor} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            ))}
+            {/* Snap indicator — cyan ring when cursor is snapped */}
+            {snapIndicator && cursor && (
+              <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#06b6d4" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            )}
+            {/* Crosshair cursor indicator */}
+            {cursor && (
+              <g>
+                <line x1={cursor.x - 10} y1={cursor.y} x2={cursor.x + 10} y2={cursor.y} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
+                <line x1={cursor.x} y1={cursor.y - 10} x2={cursor.x} y2={cursor.y + 10} stroke="#fff" strokeWidth={1.5} opacity={0.8} vectorEffect="non-scaling-stroke" />
+                <circle cx={cursor.x} cy={cursor.y} r={3} fill="none" stroke={drawColor} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+              </g>
+            )}
+          </>);
+        })()}
       </svg>
       {(isLinear ? (points.length >= 1 && cursor) : points.length >= 3) && (
         <div className="absolute bg-white/90 border border-blue-200 rounded px-2 py-1 text-xs font-mono text-blue-700 pointer-events-none"

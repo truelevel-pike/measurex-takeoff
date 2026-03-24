@@ -154,6 +154,7 @@ export default function MeasurementTool() {
           stays correct at any zoom level */}
       {start && lineEnd && midpoint && (
         <div
+          data-testid="measurement-result"
           className="absolute bg-white/95 border border-sky-200 rounded px-2 py-1 text-xs font-mono text-sky-700 pointer-events-none"
           style={{
             left: `${(midpoint.x / baseDims.width) * 100}%`,
