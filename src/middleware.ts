@@ -8,7 +8,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+};
+
 export function middleware(request: NextRequest): NextResponse {
+  // Handle CORS preflight for all API routes
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   const apiKey = process.env.API_KEY;
 
   // If API_KEY is configured, enforce it on /api/projects/* requests
@@ -16,16 +27,21 @@ export function middleware(request: NextRequest): NextResponse {
     const headerKey = request.headers.get('x-api-key');
     const queryKey = request.nextUrl.searchParams.get('apiKey');
     if (headerKey !== apiKey && queryKey !== apiKey) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  // Inject CORS headers on all API responses in dev (vercel.json handles prod)
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
 }
 
 export const config = {
   matcher: [
-    // Enforce API key auth on all project endpoints
-    '/api/projects/:path*',
+    // API key auth + CORS on all API routes
+    '/api/:path*',
   ],
 };

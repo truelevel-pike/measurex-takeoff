@@ -1,3 +1,17 @@
+/**
+ * GET /api/projects/:id/snapshot
+ *
+ * Returns a complete, machine-readable dump of the current project state:
+ * { version, exportedAt, project: { ...meta, pages, classifications, polygons, scale } }
+ *
+ * Wave 34B audit: this endpoint is NOT dead code. It is used by:
+ *   - The OpenClaw agent to inspect project state without a browser session
+ *   - External integrations and debugging tooling
+ *   - Future webhook-driven pipelines (e.g. "snapshot before bulk edit")
+ *
+ * It differs from /export/json in that it returns raw pixel-space coordinates
+ * rather than real-world quantities, making it suitable for round-trip restore.
+ */
 import {
   getProject,
   getPolygons,
