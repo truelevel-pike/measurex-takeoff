@@ -100,6 +100,12 @@ function validateAndSanitizeElements(
     if (!VALID_TYPES.has(el.type)) return false;
     const min = MIN_POINTS[el.type] ?? 1;
     if (el.points.length < min) return false;
+    // Coerce string coordinates to numbers (Gemini sometimes returns '"450"' instead of 450)
+    // and filter out any points that become NaN after coercion.
+    el.points = (el.points as Array<{ x: unknown; y: unknown }>)
+      .map((p) => ({ x: Number(p.x), y: Number(p.y) }))
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    if (el.points.length === 0) return false;
     // Clip coordinates to canvas bounds
     el.points = el.points.map((p) => ({
       x: Math.max(0, Math.min(pageWidth, Math.round(p.x))),

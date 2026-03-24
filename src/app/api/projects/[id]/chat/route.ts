@@ -120,11 +120,21 @@ export async function POST(
     let currentPageContext = '';
     if (currentPage !== undefined) {
       const currentPageEntries = pageClassBreakdown[currentPage];
+      const currentPagePolygons = polygons.filter((p) => {
+        const rawPg = (p as unknown as Record<string, unknown>).pageNumber;
+        return (typeof rawPg === 'number' ? rawPg : 1) === currentPage;
+      });
       if (currentPageEntries && currentPageEntries.length > 0) {
         const lines = currentPageEntries.map((e) => `  - ${e.name}: ${e.count}`);
-        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) elements:\n${lines.join('\n')}`;
+        // Include a summary of polygon types on the current page so AI can answer
+        // questions like "what is drawn on this page?" with real data
+        const polygonSummary = currentPagePolygons.slice(0, 30).map((p) => {
+          const cls = classifications.find((c) => c.id === p.classificationId);
+          return `    • ${cls?.name ?? 'Unknown'} (${cls?.type ?? '?'}, ${p.points?.length ?? 0} points)`;
+        });
+        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) elements:\n${lines.join('\n')}\nPolygon detail (up to 30):\n${polygonSummary.join('\n')}`;
       } else {
-        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) has no elements.`;
+        currentPageContext = `\nThe user is currently viewing page ${currentPage}.\nCurrent page (${currentPage}) has no elements drawn yet.`;
       }
     }
 

@@ -495,6 +495,7 @@ function PageInner() {
   // BUG-R5-002: Track whether the auto-fetched PDF is loading during hydration.
   const [pdfFetching, setPdfFetching] = useState(false);
   const [quantitiesLoading, setQuantitiesLoading] = useState(true);
+  const [projectNotFound, setProjectNotFound] = useState(false);
 
   // Project state
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -690,6 +691,12 @@ function PageInner() {
       // Try full project endpoint first (returns all state in one call)
       const res = await fetch(`/api/projects/${pid}`, { signal: controller.signal });
       if (controller.signal.aborted) return;
+      if (res.status === 404) {
+        // Project does not exist — show a clear error instead of blank canvas
+        setProjectNotFound(true);
+        localStorage.removeItem('measurex_project_id');
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         if (controller.signal.aborted) return;
@@ -2240,7 +2247,7 @@ function PageInner() {
         <div id="main-content" className="flex flex-col flex-1 min-h-0 order-1">
           {/* Wave 34B: project-loading-spinner — shown while hydrateProject is in flight
               with a projectId in the URL so the user sees a spinner instead of blank content */}
-          {quantitiesLoading && !pdfFile && !hasProjectData && projectId && (
+          {quantitiesLoading && !pdfFile && !hasProjectData && projectId && !projectNotFound && (
             <div
               data-testid="project-loading-skeleton"
               className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#0a0a0f]"
@@ -2252,6 +2259,27 @@ function PageInner() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               <span className="text-sm text-[#8892a0] font-mono">Loading project…</span>
+            </div>
+          )}
+
+          {/* BUG-W39-001: project not found — show clear error with link back to /projects */}
+          {projectNotFound && (
+            <div
+              data-testid="project-not-found"
+              className="flex-1 flex flex-col items-center justify-center gap-5 bg-[#0a0a0f] p-8"
+              role="alert"
+            >
+              <div className="text-5xl">🔍</div>
+              <h2 className="text-xl font-semibold text-white">Project not found</h2>
+              <p className="text-sm text-zinc-400 text-center max-w-sm">
+                This project doesn&apos;t exist or may have been deleted.
+              </p>
+              <a
+                href="/projects"
+                className="px-5 py-2.5 rounded-xl bg-[#00d4ff] text-[#00131d] text-sm font-semibold hover:bg-[#00bce0] transition-colors"
+              >
+                ← Back to Projects
+              </a>
             </div>
           )}
           <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' || currentTool === 'annotate' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
