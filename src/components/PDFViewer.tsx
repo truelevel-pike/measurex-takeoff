@@ -259,20 +259,20 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           const viewport = page.getViewport({ scale: zoomRef.current * 1.5 });
           const canvas = canvasRef.current;
           if (!canvas) return;
-          const ctx = canvas.getContext('2d')!;
           const dpr = window.devicePixelRatio || 1;
           // Large PDF support: DPR clamped to prevent canvas overflow on high-DPI displays
           const MAX_CANVAS_DIM = 4096;
           const clampedDpr = Math.min(dpr, MAX_CANVAS_DIM / Math.max(viewport.width, viewport.height, 1));
           const effectiveDpr = Math.max(1, clampedDpr);
 
-          canvas.width = viewport.width * effectiveDpr;
-          canvas.height = viewport.height * effectiveDpr;
-          canvas.style.width = `${viewport.width}px`;
-          canvas.style.height = `${viewport.height}px`;
-          // Fill white before render to prevent transparent/blank flash during page navigation
+          // Wave 34B: render into an offscreen canvas first, then swap — prevents
+          // the white flash caused by clearing the visible canvas before rendering.
+          const offscreen = document.createElement('canvas');
+          offscreen.width = viewport.width * effectiveDpr;
+          offscreen.height = viewport.height * effectiveDpr;
+          const ctx = offscreen.getContext('2d')!;
           ctx.fillStyle = '#fff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillRect(0, 0, offscreen.width, offscreen.height);
           ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
 
           const dims = { width: viewport.width, height: viewport.height };
@@ -285,8 +285,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           useStore.getState().setPageBaseDimensions(pageNum, { width: baseViewport.width, height: baseViewport.height });
 
           // ISSUE #5: Store the render task so it can be cancelled if superseded
+          // Wave 34B: render to offscreen canvas — swap to main canvas after completion
           performance.mark('pdf-render-start');
-          const renderTask = page.render({ canvas, canvasContext: ctx, viewport });
+          const renderTask = page.render({ canvasContext: ctx, viewport } as Parameters<typeof page.render>[0]);
           renderTaskRef.current = renderTask;
           try {
             await renderTask.promise;
@@ -306,6 +307,17 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 
           // Stale check #2: abort if superseded during render
           if (renderVersionRef.current !== myVersion) return;
+
+          // Wave 34B: now swap offscreen → visible canvas atomically (no white flash)
+          if (canvasRef.current) {
+            const mainCanvas = canvasRef.current;
+            mainCanvas.width = offscreen.width;
+            mainCanvas.height = offscreen.height;
+            mainCanvas.style.width = `${viewport.width}px`;
+            mainCanvas.style.height = `${viewport.height}px`;
+            const mainCtx = mainCanvas.getContext('2d')!;
+            mainCtx.drawImage(offscreen, 0, 0);
+          }
 
           try {
             const textContent = await page.getTextContent();

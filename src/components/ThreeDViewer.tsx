@@ -257,12 +257,20 @@ export default function ThreeDViewer({
         <button onClick={() => setShowGrid(!showGrid)} className={`h-9 px-3 rounded-md text-xs font-mono uppercase tracking-wider border transition ${showGrid ? "bg-[#00d4ff]/20 border-[#00d4ff]/50 text-[#00d4ff]" : "bg-[#12121a] border-[#00d4ff]/15 text-[#8892a0] hover:text-white"}`}>Grid</button>
       </div>
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas — Wave 34B: added onError + frameloop='demand' to prevent
+          unnecessary redraws and surface WebGL errors in the console cleanly */}
       <Canvas
         shadows
         dpr={[1, 2]}
+        frameloop="demand"
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         style={{ width: '100%', height: '100%', background: '#0a0a0f' }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            console.warn('[3D] WebGL context lost — will attempt recovery');
+          });
+        }}
       >
         {cameraMode === 'perspective' ? (
           <PerspectiveCamera

@@ -31,6 +31,7 @@ import ZoomControls from '@/components/ZoomControls';
 import ContextMenu from '@/components/ContextMenu';
 import PolygonProperties from '@/components/PolygonProperties';
 import BottomStatusBar from '@/components/BottomStatusBar';
+import ContextToolbar from '@/components/ContextToolbar';
 import QuantitiesPanel from '@/components/QuantitiesPanel';
 import TextSearchPanel from '@/components/TextSearchPanel';
 import MeasurementTool from '@/components/MeasurementTool';
@@ -320,6 +321,56 @@ function CompareOverlaySVG({ data }: { data: { added: Polygon[]; removed: Polygo
         {renderPolygons(data.removed, 'rgba(239,68,68,0.3)', '#ef4444')}
       </svg>
     </div>
+  );
+}
+
+/** Thin connector component that supplies reactive store state to ContextToolbar. */
+function ContextToolbarConnected({
+  currentTool,
+  polygonsExist,
+  onMerge,
+  addToast: toast,
+}: {
+  currentTool: import('@/lib/store').Tool;
+  polygonsExist: boolean;
+  onMerge: () => void;
+  addToast: (msg: string, type: import('@/components/Toast').ToastType) => void;
+}) {
+  const selectedPolygons = useStore((s) => s.selectedPolygons);
+  const snappingEnabled = useStore((s) => s.snappingEnabled);
+  const gridEnabled = useStore((s) => s.gridEnabled);
+  const setSnapping = useStore((s) => s.setSnapping);
+  const setGrid = useStore((s) => s.setGrid);
+  const deleteSelectedPolygons = useStore((s) => s.deleteSelectedPolygons);
+  const deletePolygon = useStore((s) => s.deletePolygon);
+  const addPolygon = useStore((s) => s.addPolygon);
+
+  return (
+    <ContextToolbar
+      selectedPolygonIds={selectedPolygons}
+      currentTool={currentTool}
+      snappingEnabled={snappingEnabled}
+      gridEnabled={gridEnabled}
+      hasPolygons={polygonsExist}
+      onCombine={onMerge}
+      onMergeLines={onMerge}
+      onDeleteSelected={() => {
+        const s = useStore.getState();
+        if (s.selectedPolygons.length > 0) deleteSelectedPolygons();
+        else if (s.selectedPolygon) deletePolygon(s.selectedPolygon);
+      }}
+      onToggleSnapping={() => setSnapping(!snappingEnabled)}
+      onToggleGrid={() => setGrid(!gridEnabled)}
+      onDuplicate={() => {
+        const s = useStore.getState();
+        const id = s.selectedPolygonId ?? s.selectedPolygon;
+        const poly = (id && s.polygons.find((p) => p.id === id)) ?? s.lastPolygon;
+        if (poly) {
+          addPolygon({ points: poly.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })), classificationId: poly.classificationId, pageNumber: poly.pageNumber, area: poly.area, linearFeet: poly.linearFeet, isComplete: true, label: poly.label });
+          toast('Polygon duplicated', 'info');
+        }
+      }}
+    />
   );
 }
 
@@ -1023,6 +1074,14 @@ function PageInner() {
         e.preventDefault();
         // handleSave is declared later — dispatch a custom event to decouple
         window.dispatchEvent(new CustomEvent('mx-save'));
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        // BUG-W34-002: Ctrl+A — select all polygons on the current page
+        e.preventDefault();
+        const page = useStore.getState().currentPage;
+        const allIds = useStore.getState().polygons
+          .filter((p) => p.pageNumber === page)
+          .map((p) => p.id);
+        useStore.getState().setSelectedPolygons(allIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
@@ -2131,6 +2190,22 @@ function PageInner() {
         )}
 
         <div id="main-content" className="flex flex-col flex-1 min-h-0 order-1">
+          {/* Wave 34B: project-loading-spinner — shown while hydrateProject is in flight
+              with a projectId in the URL so the user sees a spinner instead of blank content */}
+          {quantitiesLoading && !pdfFile && !hasProjectData && projectId && (
+            <div
+              data-testid="project-loading-spinner"
+              className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#0a0a0f]"
+              role="status"
+              aria-label="Loading project"
+            >
+              <svg className="animate-spin h-10 w-10 text-[#00d4ff]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              <span className="text-sm text-[#8892a0] font-mono">Loading project…</span>
+            </div>
+          )}
           <div className="flex flex-1 min-h-0 relative" style={{ cursor: currentTool === 'draw' || currentTool === 'measure' || currentTool === 'annotate' ? 'crosshair' : currentTool === 'pan' ? 'grab' : undefined }}>
             {pdfFile ? (
               /* ── PDF loaded — full viewer ── */
@@ -2321,6 +2396,15 @@ function PageInner() {
             )}
           </div>
 
+          {/* Context toolbar — shown when polygons are selected or draw/measure tool is active */}
+          {!agentMode && (
+            <ContextToolbarConnected
+              currentTool={currentTool}
+              polygonsExist={polygons.length > 0}
+              onMerge={() => setTool('merge')}
+              addToast={addToast}
+            />
+          )}
           <BottomStatusBar onScaleClick={() => setShowScaleCalibPanel(true)} />
         </div>
 

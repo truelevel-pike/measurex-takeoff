@@ -28,6 +28,7 @@ const shortcuts: ShortcutEntry[] = [
   { keyCombo: 'Ctrl+Z', action: 'Undo' },
   { keyCombo: 'Ctrl+Y / Ctrl+Shift+Z', action: 'Redo' },
   { keyCombo: 'Ctrl+S', action: 'Save project' },
+  { keyCombo: 'Ctrl+A', action: 'Select all polygons on page' },
   { keyCombo: 'Ctrl+D', action: 'Duplicate last polygon' },
   { keyCombo: '1–7', action: 'Jump to page 1–7' },
   { keyCombo: 'F', action: 'Fit PDF to page' },
