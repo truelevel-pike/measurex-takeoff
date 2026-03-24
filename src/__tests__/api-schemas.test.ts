@@ -129,9 +129,11 @@ describe('ProjectCreateSchema', () => {
     const result = ProjectCreateSchema.safeParse({ name: 'My Project', description: 'A test' });
     expect(result.success).toBe(true);
   });
-  it('rejects empty name', () => {
+  it('transforms empty name to Untitled Project', () => {
+    // Schema intentionally transforms empty/missing name to 'Untitled Project' for better UX
     const result = ProjectCreateSchema.safeParse({ name: '' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe('Untitled Project');
   });
   it('rejects name over 200 chars', () => {
     const result = ProjectCreateSchema.safeParse({ name: 'a'.repeat(201) });

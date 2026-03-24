@@ -2242,7 +2242,7 @@ function PageInner() {
               with a projectId in the URL so the user sees a spinner instead of blank content */}
           {quantitiesLoading && !pdfFile && !hasProjectData && projectId && (
             <div
-              data-testid="project-loading-spinner"
+              data-testid="project-loading-skeleton"
               className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#0a0a0f]"
               role="status"
               aria-label="Loading project"
