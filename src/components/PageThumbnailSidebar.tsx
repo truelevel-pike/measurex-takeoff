@@ -23,6 +23,9 @@ interface PageThumbnailSidebarProps {
   onPageSelect: (page: number) => void;
   pdfDoc?: PDFDocumentProxy | null;
   onAITakeoffPage?: (page: number) => void;
+  /** Wave 39B: project's stored page-1 thumbnail (base64 JPEG) — shown as a fallback
+   *  for page 1 when the PDF hasn't been loaded into memory yet. */
+  page1Thumbnail?: string | null;
 }
 
 function PageThumbnailSidebar({
@@ -31,6 +34,7 @@ function PageThumbnailSidebar({
   onPageSelect,
   pdfDoc,
   onAITakeoffPage,
+  page1Thumbnail,
 }: PageThumbnailSidebarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnails, setThumbnails] = useState<(string | null)[]>([]);
@@ -210,7 +214,8 @@ function PageThumbnailSidebar({
 
   function renderPageButton(page: number) {
     const isActive = page === currentPage;
-    const thumb = thumbnails[page - 1];
+    // Wave 39B: use stored page-1 thumbnail as fallback when PDF hasn't loaded yet
+    const thumb = thumbnails[page - 1] ?? (page === 1 && !pdfDoc ? page1Thumbnail ?? null : null);
     const setLabel = drawingSets[page] || '';
     const pagePolygons = polygonsByPage.get(page);
     const polyCount = pagePolygons?.length ?? 0;

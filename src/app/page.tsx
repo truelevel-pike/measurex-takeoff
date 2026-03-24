@@ -503,6 +503,8 @@ function PageInner() {
   // Flushed to server once projectId becomes available.
   const pendingPageTextRef = useRef<Map<number, { text: string; sheetName: string | null }>>(new Map());
   const [projectName, setProjectName] = useState<string | null>(null);
+  // Wave 39B: page-1 thumbnail loaded from the project record for PageThumbnailSidebar fallback
+  const [projectPage1Thumbnail, setProjectPage1Thumbnail] = useState<string | null>(null);
   // Show the full viewer layout (sidebars, panels, overlays) when a project has data,
   // even if pdfFile is null (PDF isn't stored server-side, user needs to re-upload).
   const hasProjectData = Boolean(projectId || classifications.length > 0 || polygons.length > 0);
@@ -713,6 +715,8 @@ function PageInner() {
         setCurrentPage(normalized.currentPage || 1, normalized.totalPages || 1);
         setProjectId(data.project.id);
         setProjectName(data.project.name || 'Untitled');
+        // Wave 39B: cache the stored thumbnail for PageThumbnailSidebar page-1 fallback
+        if (data.project.thumbnail) setProjectPage1Thumbnail(data.project.thumbnail);
         localStorage.setItem('measurex_project_id', data.project.id);
 
         // Hydrate server-side sheet names and drawing sets (extracted during upload)
@@ -2232,6 +2236,7 @@ function PageInner() {
             totalPages={totalPages}
             currentPage={currentPageNum}
             pdfDoc={pdfDocState}
+            page1Thumbnail={projectPage1Thumbnail}
             onPageSelect={(page) => {
               setCurrentPageNum(page);
               setCurrentPage(page, totalPages);
