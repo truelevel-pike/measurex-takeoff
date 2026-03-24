@@ -1090,6 +1090,8 @@ export async function recordHistory(
   entry: Omit<HistoryEntry, "id" | "createdAt">,
 ): Promise<void> {
   try {
+    const HISTORY_CAP = 100;
+
     if (isSupabaseMode()) {
       const sb = getClient();
       // mx_history_action_type_check requires UPPERCASE (CREATE/UPDATE/DELETE)
@@ -1103,6 +1105,22 @@ export async function recordHistory(
       });
       if (error) {
         console.error('[recordHistory] insert failed:', error.message, '|', error.details, '|', error.hint);
+        return;
+      }
+      // BUG-W30-001: cap stored history to HISTORY_CAP most recent entries per project.
+      // Fetch IDs of all entries beyond the cap and delete them.
+      const { data: allIds } = await sb
+        .from('mx_history')
+        .select('id, created_at')
+        .eq('project_id', entry.projectId)
+        .order('created_at', { ascending: false });
+      if (allIds && allIds.length > HISTORY_CAP) {
+        const idsToDelete = (allIds as Array<{ id: string }>)
+          .slice(HISTORY_CAP)
+          .map((r) => r.id);
+        if (idsToDelete.length > 0) {
+          await sb.from('mx_history').delete().in('id', idsToDelete);
+        }
       }
     } else {
       const filePath = path.join(projectDir(entry.projectId), 'history.json');
@@ -1112,7 +1130,8 @@ export async function recordHistory(
         ...entry,
         createdAt: new Date().toISOString(),
       });
-      if (list.length > 200) list.length = 200;
+      // BUG-W30-001: cap at HISTORY_CAP most recent entries
+      if (list.length > HISTORY_CAP) list.length = HISTORY_CAP;
       await writeJson(filePath, list);
     }
   } catch (err) {
