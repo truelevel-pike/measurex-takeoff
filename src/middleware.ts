@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-vapi-secret',
 };
 
 export function middleware(request: NextRequest): NextResponse {
