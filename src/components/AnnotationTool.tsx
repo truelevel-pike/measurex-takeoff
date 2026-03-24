@@ -135,6 +135,7 @@ export default function AnnotationTool() {
               }}
               placeholder="Add annotation"
               aria-label="Annotation text"
+              data-testid="annotation-input"
               className="w-44 rounded border border-white/20 bg-black/40 px-2 py-1 text-xs text-white outline-none focus:border-cyan-300/60"
             />
             <button

@@ -36,10 +36,18 @@ function makeRequest(body: unknown): Request {
   });
 }
 
+// Helper: build a Gemini-format response wrapping a JSON array string
+function geminiResponse(elements: unknown[]) {
+  return jsonResponse({
+    candidates: [{ content: { parts: [{ text: JSON.stringify(elements) }] } }],
+  });
+}
+
 describe('AI Takeoff route tests', () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.OPENAI_API_KEY;
   const originalPublicApiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const originalGoogleKey = process.env.GOOGLE_API_KEY;
 
   afterEach(() => {
     global.fetch = originalFetch;
@@ -52,6 +60,11 @@ describe('AI Takeoff route tests', () => {
       delete process.env.NEXT_PUBLIC_OPENAI_API_KEY;
     } else {
       process.env.NEXT_PUBLIC_OPENAI_API_KEY = originalPublicApiKey;
+    }
+    if (originalGoogleKey === undefined) {
+      delete process.env.GOOGLE_API_KEY;
+    } else {
+      process.env.GOOGLE_API_KEY = originalGoogleKey;
     }
     jest.clearAllMocks();
   });
@@ -98,7 +111,7 @@ describe('AI Takeoff route tests', () => {
   });
 
   it('creates classifications and polygons from AI-detected elements', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.GOOGLE_API_KEY = 'test-google-key';
     const projectId = '22222222-2222-4222-8222-222222222222';
     let batchOperations: Array<Record<string, unknown>> = [];
     const classificationPosts: Array<Record<string, unknown>> = [];
@@ -107,35 +120,30 @@ describe('AI Takeoff route tests', () => {
       const url = String(input);
       const method = init?.method ?? 'GET';
 
-      if (url === 'https://api.openai.com/v1/chat/completions') {
-        return jsonResponse({
-          choices: [{
-            message: {
-              content: JSON.stringify([
-                {
-                  name: 'Living Room',
-                  type: 'area',
-                  classification: 'Rooms',
-                  points: [
-                    { x: 0.1, y: 0.1 },
-                    { x: 0.5, y: 0.1 },
-                    { x: 0.5, y: 0.5 },
-                    { x: 0.1, y: 0.5 },
-                  ],
-                  color: '#ff0000',
-                },
-                {
-                  name: 'Door',
-                  type: 'count',
-                  classification: 'Doors',
-                  quantity: 1,
-                  points: [{ x: 0.3, y: 0.3 }],
-                  color: '#00ff00',
-                },
-              ]),
-            },
-          }],
-        });
+      if (url.includes('generativelanguage.googleapis.com')) {
+        return geminiResponse([
+          {
+            name: 'Living Room',
+            type: 'area',
+            classification: 'Rooms',
+            points: [
+              { x: 100, y: 100 },
+              { x: 500, y: 100 },
+              { x: 500, y: 500 },
+              { x: 100, y: 500 },
+            ],
+            color: '#ff0000',
+            confidence: 0.9,
+          },
+          {
+            name: 'Door',
+            type: 'count',
+            classification: 'Doors',
+            points: [{ x: 300, y: 300 }],
+            color: '#00ff00',
+            confidence: 0.85,
+          },
+        ]);
       }
 
       if (url.endsWith(`/api/projects/${projectId}/classifications`) && method === 'GET') {
@@ -189,7 +197,7 @@ describe('AI Takeoff route tests', () => {
   });
 
   it('denormalizes points from 0-1 range to pixel coordinates', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.GOOGLE_API_KEY = 'test-google-key';
     const projectId = '33333333-3333-4333-8333-333333333333';
     let batchOperations: Array<Record<string, unknown>> = [];
 
@@ -197,26 +205,22 @@ describe('AI Takeoff route tests', () => {
       const url = String(input);
       const method = init?.method ?? 'GET';
 
-      if (url === 'https://api.openai.com/v1/chat/completions') {
-        return jsonResponse({
-          choices: [{
-            message: {
-              content: JSON.stringify([
-                {
-                  name: 'Slab',
-                  type: 'area',
-                  classification: 'Foundation',
-                  points: [
-                    { x: 0.0, y: 0.0 },
-                    { x: 1.0, y: 0.0 },
-                    { x: 1.0, y: 1.0 },
-                  ],
-                  color: '#aabbcc',
-                },
-              ]),
-            },
-          }],
-        });
+      if (url.includes('generativelanguage.googleapis.com')) {
+        // Return 0-1 normalized coords — route's normalizePoint() will scale to pixel space
+        return geminiResponse([
+          {
+            name: 'Slab',
+            type: 'area',
+            classification: 'Foundation',
+            points: [
+              { x: 0.0, y: 0.0 },
+              { x: 1.0, y: 0.0 },
+              { x: 1.0, y: 1.0 },
+            ],
+            color: '#aabbcc',
+            confidence: 0.9,
+          },
+        ]);
       }
 
       if (url.endsWith('/classifications') && method === 'GET') {

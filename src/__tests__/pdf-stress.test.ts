@@ -85,6 +85,8 @@ describe('PDF stress', () => {
       value: jest.fn(() => ({
         setTransform: jest.fn(),
         clearRect: jest.fn(),
+        fillRect: jest.fn(),
+        fillStyle: '',
       })),
     });
 
