@@ -1682,6 +1682,36 @@ function PageInner() {
     return () => window.removeEventListener('mx-save', handler);
   }, [handleSave]);
 
+  // Wave 37B: sendBeacon fallback for mid-tab-close autosave.
+  // fetch() is cancelled by the browser on tab close; navigator.sendBeacon is not.
+  // On beforeunload we fire a beacon with the current state so in-flight data
+  // is not lost even if the regular autosave fetch was in-flight or not yet triggered.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!projectId) return;
+      try {
+        const payload = buildStatePayload(currentPageNum);
+        const body = JSON.stringify({ state: payload });
+        const blob = new Blob([body], { type: 'application/json' });
+        // sendBeacon is best-effort — returns false if queuing failed (browser may block).
+        const sent = navigator.sendBeacon?.(`/api/projects/${projectId}`, blob);
+        if (!sent) {
+          // Fallback: keepalive fetch — still completes after tab close on most browsers.
+          fetch(`/api/projects/${projectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            keepalive: true,
+          }).catch(() => { /* best-effort */ });
+        }
+      } catch {
+        // Never throw in beforeunload — could suppress the tab close dialog.
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [projectId, buildStatePayload, currentPageNum]);
+
   // Wave 36: window.measurex.setPage() dispatches 'mx-goto-page' so both the store
   // AND the PDF viewer are updated (store-only navigation doesn't move the rendered PDF).
   useEffect(() => {

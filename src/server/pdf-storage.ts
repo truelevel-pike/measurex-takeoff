@@ -76,6 +76,25 @@ export async function savePDF(projectId: string, buffer: Buffer): Promise<string
 
   if (isSupabaseMode()) {
     const client = getClient();
+
+    // Verify the bucket exists before uploading — a missing bucket produces a
+    // cryptic "The resource was not found" 404 from Supabase that is hard to diagnose.
+    const { data: buckets, error: listErr } = await client.storage.listBuckets();
+    if (listErr) {
+      console.error('[pdf-storage] failed to list storage buckets:', listErr.message);
+      // Non-fatal bucket check failure — attempt upload anyway; the upload error
+      // will surface if the bucket truly doesn't exist.
+    } else {
+      const bucketExists = (buckets ?? []).some((b) => b.name === BUCKET);
+      if (!bucketExists) {
+        console.error(`[pdf-storage] storage bucket '${BUCKET}' not found. Available:`, (buckets ?? []).map((b) => b.name));
+        throw new Error(
+          `Storage bucket not configured. Contact admin. ` +
+          `(Expected bucket '${BUCKET}' in Supabase Storage — create it at https://supabase.com/dashboard)`,
+        );
+      }
+    }
+
     const { error } = await client.storage
       .from(BUCKET)
       .upload(storagePath(projectId), buffer, {
