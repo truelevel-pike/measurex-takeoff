@@ -1487,7 +1487,10 @@ export default function ProjectsPage() {
 
       {/* Modals — preserved exactly */}
       {showCompare && (
-        <DrawingComparison onClose={() => setShowCompare(false)} />
+        <DrawingComparison
+          drawings={projects.map(p => ({ id: p.id, name: p.name }))}
+          onClose={() => setShowCompare(false)}
+        />
       )}
 
       {showCollab && (

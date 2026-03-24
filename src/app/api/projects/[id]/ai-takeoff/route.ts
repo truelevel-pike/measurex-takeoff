@@ -2,7 +2,7 @@
 export const maxDuration = 120;
 
 import { NextResponse } from 'next/server';
-import { getProject, getPages, setScale } from '@/server/project-store';
+import { getProject, getPages, setScale, updateProject } from '@/server/project-store';
 import { renderPageAsImage } from '@/server/pdf-processor';
 import { getPDFPath } from '@/server/pdf-storage';
 import { analyzePageImage, analyzePagePDF } from '@/server/ai-engine';
@@ -73,6 +73,16 @@ export async function POST(
     const pageInfo = pages.find((p) => p.pageNum === pageNum);
     const pageWidth = pageInfo?.width ?? 792;
     const pageHeight = pageInfo?.height ?? 1224;
+
+    // If this page number exceeds the recorded totalPages, update the project.
+    // This can happen when a PDF is re-uploaded with more pages, or when the
+    // upload route didn't persist totalPages correctly.
+    const recordedTotal = project.totalPages ?? pages.length;
+    if (pageNum > recordedTotal) {
+      await updateProject(id, { totalPages: pageNum }).catch((err) =>
+        console.warn(`[ai-takeoff] failed to update totalPages to ${pageNum}:`, err),
+      );
+    }
 
     broadcastToProject(id, 'ai-takeoff:started', { page: pageNum });
 

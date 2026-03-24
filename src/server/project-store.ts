@@ -963,6 +963,36 @@ export async function createPolygon(
   return poly;
 }
 
+/**
+ * Validate that a polygon's points array is well-formed: must be an array of
+ * objects with finite numeric x and y. Returns true if the polygon is safe to use.
+ * Logs a warning for any skipped polygon so issues surface in server logs.
+ */
+function isValidPolygonPoints(points: unknown, polygonId: string): boolean {
+  if (!Array.isArray(points)) {
+    console.warn(`[getPolygons] skipping polygon ${polygonId}: points is not an array (got ${typeof points})`);
+    return false;
+  }
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
+    if (
+      pt === null ||
+      typeof pt !== 'object' ||
+      typeof (pt as Record<string, unknown>).x !== 'number' ||
+      typeof (pt as Record<string, unknown>).y !== 'number' ||
+      !Number.isFinite((pt as { x: number }).x) ||
+      !Number.isFinite((pt as { y: number }).y)
+    ) {
+      console.warn(
+        `[getPolygons] skipping polygon ${polygonId}: point[${i}] is malformed:`,
+        JSON.stringify(pt),
+      );
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function getPolygons(projectId: string): Promise<Polygon[]> {
   if (isSupabaseMode()) {
     const sb = getClient();
@@ -971,23 +1001,26 @@ export async function getPolygons(projectId: string): Promise<Polygon[]> {
       .select('*')
       .eq('project_id', projectId);
     if (error) throw new Error(`getPolygons: ${error.message}`);
-    return (data || []).map((row: Record<string, unknown>): Polygon => ({
-      id: row.id as string,
-      points: row.points as Polygon['points'],
-      classificationId: row.classification_id as string,
-      pageNumber: row.page_number as number,
-      area: row.area_pixels as number,
-      linearFeet: row.linear_pixels as number,
-      isComplete: row.is_complete as boolean,
-      label: (row.label as string | null) ?? undefined,
-      confidence: (row.confidence as number | null) ?? undefined,
-      detectedByModel: (row.detected_by_model as string | null) ?? undefined,
-      createdAt: (row.created_at as string | null) ?? undefined,
-      updatedAt: (row.updated_at as string | null) ?? undefined,
-    }));
+    return (data || [])
+      .filter((row: Record<string, unknown>) => isValidPolygonPoints(row.points, row.id as string))
+      .map((row: Record<string, unknown>): Polygon => ({
+        id: row.id as string,
+        points: row.points as Polygon['points'],
+        classificationId: row.classification_id as string,
+        pageNumber: row.page_number as number,
+        area: row.area_pixels as number,
+        linearFeet: row.linear_pixels as number,
+        isComplete: row.is_complete as boolean,
+        label: (row.label as string | null) ?? undefined,
+        confidence: (row.confidence as number | null) ?? undefined,
+        detectedByModel: (row.detected_by_model as string | null) ?? undefined,
+        createdAt: (row.created_at as string | null) ?? undefined,
+        updatedAt: (row.updated_at as string | null) ?? undefined,
+      }));
   }
 
-  return readJson<Polygon[]>(path.join(projectDir(projectId), 'polygons.json'), []);
+  const raw = await readJson<Polygon[]>(path.join(projectDir(projectId), 'polygons.json'), []);
+  return raw.filter((p) => isValidPolygonPoints(p.points, p.id ?? '(no id)'));
 }
 
 export async function updatePolygon(
