@@ -1317,7 +1317,19 @@ export default function ProjectsPage() {
                         {(p.pageCount || p.state?.totalPages || 0) > 0 && (
                           <span className="flex items-center gap-1"><FileText size={11} aria-hidden />{p.pageCount || p.state?.totalPages} pages</span>
                         )}
-                        {polyCount > 0 && <span>{polyCount} drawings</span>}
+                        <span
+                          data-testid="project-polygon-count"
+                          data-count={polyCount}
+                          className="flex items-center gap-1"
+                          title={polyCount > 0 ? `${polyCount} polygon${polyCount !== 1 ? 's' : ''} drawn` : 'No polygons yet'}
+                        >
+                          <span
+                            className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: polyCount > 0 ? '#22c55e' : '#52525b' }}
+                            aria-hidden="true"
+                          />
+                          {polyCount > 0 ? `${polyCount} drawings` : 'No drawings'}
+                        </span>
                         {clsCount > 0 && <span>{clsCount} cls</span>}
                       </div>
                       {p.tags && p.tags.length > 0 && (
@@ -1381,7 +1393,21 @@ export default function ProjectsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-zinc-400">{fmtDate(p)}</td>
-                        <td className="px-4 py-3 text-zinc-400">{polyCount}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            data-testid="project-polygon-count"
+                            data-count={polyCount}
+                            className="flex items-center gap-1.5 text-zinc-400"
+                            title={polyCount > 0 ? `${polyCount} polygon${polyCount !== 1 ? 's' : ''} drawn` : 'No polygons yet'}
+                          >
+                            <span
+                              className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: polyCount > 0 ? '#22c55e' : '#52525b' }}
+                              aria-hidden="true"
+                            />
+                            {polyCount > 0 ? polyCount : '—'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
