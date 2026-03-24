@@ -5,7 +5,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-055 / BUG-A5-6-056: add rate limiting to export endpoint
-  const limited = rateLimitResponse(_req);
+  const limited = rateLimitResponse(_req, 20, 60_000);
   if (limited) return limited;
 
   try {

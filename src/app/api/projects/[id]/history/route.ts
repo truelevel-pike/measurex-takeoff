@@ -4,7 +4,7 @@ import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

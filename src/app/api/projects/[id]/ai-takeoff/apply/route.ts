@@ -123,7 +123,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   // BUG-A5-6-096: add rate limiting
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
 
   try {

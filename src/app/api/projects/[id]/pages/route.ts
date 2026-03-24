@@ -12,7 +12,7 @@ const PagePatchSchema = z.object({
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-089: add rate limiting
-  const limited = rateLimitResponse(_req);
+  const limited = rateLimitResponse(_req, 60, 60_000);
   if (limited) return limited;
 
   try {
@@ -40,7 +40,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-089: add rate limiting
-  const limitedPatch = rateLimitResponse(req);
+  const limitedPatch = rateLimitResponse(req, 60, 60_000);
   if (limitedPatch) return limitedPatch;
 
   try {

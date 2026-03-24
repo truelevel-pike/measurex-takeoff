@@ -64,7 +64,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-113: add rate limiting to PUT handler
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 60, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

@@ -9,7 +9,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-085: add rate limiting to project CRUD
-  const limited = rateLimitResponse(_req);
+  const limited = rateLimitResponse(_req, 60, 60_000);
   if (limited) return limited;
 
   try {
@@ -116,7 +116,7 @@ export const PUT = withCache({ noStore: true }, async function PUT(req: Request,
 
 export const PATCH = withCache({ noStore: true }, async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-085: add rate limiting to project CRUD
-  const limitedPatch = rateLimitResponse(req);
+  const limitedPatch = rateLimitResponse(req, 30, 60_000);
   if (limitedPatch) return limitedPatch;
 
   try {
@@ -150,7 +150,7 @@ export const PATCH = withCache({ noStore: true }, async function PATCH(req: Requ
 
 export const DELETE = withCache({ noStore: true }, async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-085: add rate limiting to project CRUD
-  const limitedDelete = rateLimitResponse(_req);
+  const limitedDelete = rateLimitResponse(_req, 30, 60_000);
   if (limitedDelete) return limitedDelete;
 
   try {

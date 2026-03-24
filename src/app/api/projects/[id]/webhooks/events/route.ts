@@ -20,7 +20,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
 
   const paramsResult = ProjectIdSchema.safeParse(await params);

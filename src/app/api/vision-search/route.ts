@@ -28,7 +28,7 @@ const SYSTEM_PROMPT = `You are analyzing a construction blueprint/plan. The user
 
 export async function POST(req: Request) {
   // BUG-A5-5-034: apply rate limiting to vision search
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 20, 60_000);
   if (limited) return limited;
 
   try {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
-import { getPolygons, getClassifications, getScale, getProject, getAssemblies, initDataDir } from '@/server/project-store';
+import { getPolygons, getClassifications, getScale, listScales, getProject, getAssemblies, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -43,16 +43,21 @@ function buildQuantityRows(
   classifications: Classification[],
   polygons: Polygon[],
   scaleConfig: ScaleConfig,
+  // Wave 30B: per-page scales map so multi-page projects compute correctly.
+  // Key = pageNumber (1-based), value = ScaleConfig for that page.
+  pageScales?: Map<number, ScaleConfig>,
 ): QuantityRow[] {
   return classifications.map((c) => {
     const classPolygons = polygons.filter((p) => p.classificationId === c.id);
     let quantity = 0;
 
     for (const p of classPolygons) {
+      // Use page-specific scale when available; fall back to project-level scale.
+      const sc = (pageScales?.get(p.pageNumber)) ?? scaleConfig;
       if (c.type === 'area') {
-        quantity += calculatePolygonArea(p.points, scaleConfig) ?? 0;
+        quantity += calculatePolygonArea(p.points, sc) ?? 0;
       } else if (c.type === 'linear') {
-        quantity += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+        quantity += calculateLinearLength(p.points, sc, true) ?? 0;
       } else {
         quantity += 1;
       }
@@ -196,19 +201,21 @@ function buildEstimatesSheet(
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const limited = rateLimitResponse(_req);
+    const limited = rateLimitResponse(_req, 10, 60_000);
     if (limited) return limited;
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
-    const [project, polygons, classifications, assemblies, scale] = await Promise.all([
+    const [project, polygons, classifications, assemblies, scale, allPageScales] = await Promise.all([
       getProject(id),
       getPolygons(id),
       getClassifications(id),
       getAssemblies(id),
       getScale(id),
+      // Wave 30B: load per-page scales so multi-page exports are accurate
+      listScales(id).catch(() => [] as Awaited<ReturnType<typeof listScales>>),
     ]);
 
     if (!project) {
@@ -218,6 +225,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const ppu = scale?.pixelsPerUnit ?? 0;
     const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
     const scaleConfig: ScaleConfig = { pixelsPerFoot: ppu, unit };
+    // Wave 30B: build per-page scale map for accurate multi-page calculations
+    const pageScales = new Map<number, ScaleConfig>();
+    for (const ps of allPageScales) {
+      if (ps.pageNumber != null && ps.pixelsPerUnit > 0) {
+        const psUnit = (ps.unit === 'm' || ps.unit === 'mm') ? 'metric' as const : 'imperial' as const;
+        pageScales.set(ps.pageNumber, { pixelsPerFoot: ps.pixelsPerUnit, unit: psUnit });
+      }
+    }
     const projectName = project.name || id;
     const url = new URL(_req.url);
     const unitCostsParam = url.searchParams.get('unitCosts');
@@ -234,7 +249,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         // Invalid base64/JSON — use empty costs
       }
     }
-    const rows = buildQuantityRows(classifications, polygons, scaleConfig);
+    const rows = buildQuantityRows(classifications, polygons, scaleConfig, pageScales.size > 0 ? pageScales : undefined);
     const quantityByClassificationId = new Map(rows.map((row) => [row.classificationId, row]));
 
     const assemblyRows = assemblies.map((assembly) => {

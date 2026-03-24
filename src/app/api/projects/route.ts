@@ -26,7 +26,7 @@ export const GET = withCache({ maxAge: 10, sMaxAge: 10 }, async function GET(req
 export const POST = withCache({ noStore: true }, async function POST(req: Request) {
   try {
     // Wave 20: 20/60s — dev testing hits 10/60s default too easily
-    const limited = rateLimitResponse(req, 20, 60_000);
+    const limited = rateLimitResponse(req, 30, 60_000);
     if (limited) return limited;
     await initDataDir();
     const body = await req.json().catch(() => null);

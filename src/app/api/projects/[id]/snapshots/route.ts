@@ -5,7 +5,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const rlResp = rateLimitResponse(_req);
+    const rlResp = rateLimitResponse(_req, 30, 60_000);
     if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);
@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const rlResp = rateLimitResponse(req);
+    const rlResp = rateLimitResponse(req, 30, 60_000);
     if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = ProjectIdSchema.safeParse(await params);

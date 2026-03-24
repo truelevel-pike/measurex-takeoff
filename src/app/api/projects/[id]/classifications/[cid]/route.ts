@@ -5,7 +5,7 @@ import { ClassificationIdSchema, ClassificationUpdateSchema, validationError } f
 import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string; cid: string }> }) {
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 60, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

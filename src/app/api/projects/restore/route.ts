@@ -22,7 +22,7 @@ const SnapshotRestoreSchema = z.object({
 
 // Restore a project from either a full export object or a snapshot ID.
 export async function POST(req: Request) {
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 5, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

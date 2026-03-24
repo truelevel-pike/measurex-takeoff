@@ -12,7 +12,7 @@ interface ChatApiMessage {
 
 export async function POST(req: Request) {
   // BUG-A5-5-036: apply rate limiting
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
 
   try {

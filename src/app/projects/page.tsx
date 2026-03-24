@@ -483,10 +483,13 @@ export default function ProjectsPage() {
     if (ws && ws.projectIds.length > 0) {
       list = list.filter(p => ws.projectIds.includes(p.id));
     }
-    // Search filter
+    // Search filter — matches project name OR any tag (Wave 30B)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q));
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.tags?.some(t => t.toLowerCase().includes(q))
+      );
     }
     // Tag filter (OR logic)
     if (selectedTags.length > 0) {
@@ -709,9 +712,18 @@ export default function ProjectsPage() {
               aria-label="Search projects"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search name or tag…"
               className="bg-[#0a0a0f] border border-zinc-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-zinc-500 outline-none focus:border-[#00d4ff]/60 w-32 sm:w-56 font-mono"
             />
+            {searchQuery.trim() && (
+              <span
+                data-testid="search-result-count"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#00d4ff]/60 font-mono pointer-events-none"
+                aria-live="polite"
+              >
+                {filteredProjects.length}
+              </span>
+            )}
           </div>
           <select
             aria-label="Sort projects"

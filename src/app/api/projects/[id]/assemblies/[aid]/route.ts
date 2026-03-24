@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
-    const limited = rateLimitResponse(req);
+    const limited = rateLimitResponse(req, 60, 60_000);
     if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);
@@ -44,7 +44,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
-    const limited = rateLimitResponse(req);
+    const limited = rateLimitResponse(req, 60, 60_000);
     if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);
@@ -66,7 +66,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; aid: string }> }) {
   try {
-    const limited = rateLimitResponse(req);
+    const limited = rateLimitResponse(req, 60, 60_000);
     if (limited) return limited;
     await initDataDir();
     const paramsResult = AssemblyIdSchema.safeParse(await params);

@@ -147,7 +147,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   // Rate limit: same ceiling as single-page route
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 5, 60_000);
   if (limited) return limited;
 
   try {

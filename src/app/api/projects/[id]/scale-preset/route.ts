@@ -111,7 +111,7 @@ function presetToPixelsPerUnit(preset: string): { pixelsPerUnit: number; unit: '
  * Returns: { preset, pixelsPerUnit, unit }
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 30, 60_000);
   if (limited) return limited;
 
   try {

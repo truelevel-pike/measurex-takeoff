@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export const POST = withCache({ noStore: true }, async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-106: add rate limiting to POST handler
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 60, 60_000);
   if (limited) return limited;
   try {
     await initDataDir();

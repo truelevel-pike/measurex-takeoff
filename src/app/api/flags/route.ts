@@ -10,7 +10,7 @@ const SetFlagSchema = z.object({
 });
 
 export async function GET(req: Request) {
-  const rlResponse = rateLimitResponse(req);
+  const rlResponse = rateLimitResponse(req, 60, 60_000);
   if (rlResponse) return rlResponse;
 
   return NextResponse.json(getAllFlags());

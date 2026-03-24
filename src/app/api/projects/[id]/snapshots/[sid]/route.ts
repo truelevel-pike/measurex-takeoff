@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: Params) {
 
 export async function POST(req: Request, { params }: Params) {
   try {
-    const rlResp = rateLimitResponse(req);
+    const rlResp = rateLimitResponse(req, 30, 60_000);
     if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = SnapshotIdSchema.safeParse(await params);
@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
-    const rlResp = rateLimitResponse(_req);
+    const rlResp = rateLimitResponse(_req, 30, 60_000);
     if (rlResp) return rlResp;
     await initDataDir();
     const paramsResult = SnapshotIdSchema.safeParse(await params);

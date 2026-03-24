@@ -196,7 +196,7 @@ async function searchProjectSheets(query: string, projectId: string): Promise<Im
 
 export async function POST(req: Request) {
   // Rate limit: 10 req/min per IP
-  const limited = rateLimitResponse(req);
+  const limited = rateLimitResponse(req, 20, 60_000);
   if (limited) return limited;
 
   try {

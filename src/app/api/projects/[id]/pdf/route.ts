@@ -10,7 +10,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-063: add rate limiting to PDF endpoint
-  const limited = rateLimitResponse(_req);
+  const limited = rateLimitResponse(_req, 30, 60_000);
   if (limited) return limited;
 
   try {

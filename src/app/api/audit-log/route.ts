@@ -15,7 +15,7 @@ const MAX_ENTRIES = 500;
 const entries: AuditEntry[] = [];
 
 export async function GET(request: Request) {
-  const rlResp = rateLimitResponse(request);
+  const rlResp = rateLimitResponse(request, 20, 60_000);
   if (rlResp) return rlResp;
   // BUG-A5-5-018: require auth before exposing audit log data
   const adminSecret = process.env.ADMIN_SECRET;
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const rlResp = rateLimitResponse(request);
+    const rlResp = rateLimitResponse(request, 20, 60_000);
     if (rlResp) return rlResp;
     const body = await request.json();
     const { action, resource, resourceId, metadata } = body;

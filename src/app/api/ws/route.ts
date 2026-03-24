@@ -4,7 +4,7 @@ import { rateLimitResponse } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   // BUG-A5-6-065: add rate limiting to SSE endpoint
-  const limited = rateLimitResponse(request);
+  const limited = rateLimitResponse(request, 60, 60_000);
   if (limited) return limited;
 
   const projectId = request.nextUrl.searchParams.get('projectId');
