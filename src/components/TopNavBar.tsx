@@ -71,7 +71,7 @@ interface TopNavBarProps {
   currentPagePolygonCount?: number;
 }
 
-export default function TopNavBar({
+const TopNavBar = React.memo(function TopNavBar({
   sheetName = 'Sheet 1',
   pageIndex,
   totalPages,
@@ -905,7 +905,9 @@ export default function TopNavBar({
       )}
     </div>
   );
-}
+});
+
+export default TopNavBar;
 
 interface NavIconButtonProps {
   icon: React.ReactNode;

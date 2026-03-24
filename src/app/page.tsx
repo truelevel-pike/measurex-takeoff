@@ -327,24 +327,11 @@ function PageInner() {
   const search = useSearchParams();
   const agentMode = search.get('agent') === '1';
 
-  // Store bindings
-  const setTool = useStore((s) => s.setTool);
+  // ── Reactive state subscriptions (fine-grained selectors — each only re-renders on its own change) ──
   const currentTool = useStore((s) => s.currentTool);
   const isDefiningGroup = useStore((s) => s.isDefiningGroup);
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
-  const setSelectedClassification = useStore((s) => s.setSelectedClassification);
-  const deletePolygon = useStore((s) => s.deletePolygon);
   const selectedPolygon = useStore((s) => s.selectedPolygon);
-  const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
-  const setScale = useStore((s) => s.setScale);
-  const setScaleForPage = useStore((s) => s.setScaleForPage);
   const zoomLevel = useStore((s) => s.zoomLevel);
-  const setZoomLevel = useStore((s) => s.setZoomLevel);
-  // showScalePopup removed — GAP-006: AutoScalePopup is the sole confirmation
-  const setCurrentPage = useStore((s) => s.setCurrentPage);
-  const setSheetName = useStore((s) => s.setSheetName);
-
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const selectedClassificationId = useStore((s) => s.selectedClassification);
@@ -355,15 +342,31 @@ function PageInner() {
   const currentPage = useStore((s) => s.currentPage);
   const pageBaseDimensions = useStore((s) => s.pageBaseDimensions);
   const sheetNames = useStore((s) => s.sheetNames);
+  const show3D = useStore((s) => s.show3D);
+
+  // ── Stable action refs (Zustand actions never change identity — read once, skip subscriptions) ──
+  // This reduces the subscription count by ~12 and avoids registering listeners that
+  // can never trigger a re-render anyway (stable references always pass selector equality).
+  const {
+    setTool,
+    undo,
+    redo,
+    setSelectedClassification,
+    deletePolygon,
+    setSelectedPolygon,
+    setScale,
+    setScaleForPage,
+    setZoomLevel,
+    setCurrentPage,
+    setSheetName,
+    setShow3D,
+    toggleShow3D,
+  } = React.useMemo(() => useStore.getState(), []);
 
   const { addToast } = useToast();
 
   const quickTakeoff = useQuickTakeoff();
   const whatsNew = useWhatsNew();
-
-  const show3D = useStore((s) => s.show3D);
-  const setShow3D = useStore((s) => s.setShow3D);
-  const toggleShow3D = useStore((s) => s.toggleShow3D);
   const threeData = React.useMemo(() => convertTakeoffTo3D(polygons, classifications), [polygons, classifications]);
 
   const pdfViewerRef = useRef<PDFViewerHandle>(null);

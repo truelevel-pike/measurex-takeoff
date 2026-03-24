@@ -791,4 +791,9 @@ const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
 );
 
 PDFViewer.displayName = 'PDFViewer';
-export default PDFViewer;
+
+// Wrap with React.memo so PDFViewer doesn't re-render when unrelated store state
+// changes (e.g. classification color edits, polygon selections). The component manages
+// its own PDF rendering state internally and only needs to re-render when its own
+// props change (pdfUrl, projectId, onPageChange, etc.).
+export default React.memo(PDFViewer);

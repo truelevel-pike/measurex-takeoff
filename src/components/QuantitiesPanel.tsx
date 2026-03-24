@@ -229,7 +229,10 @@ interface QuantitiesPanelProps {
   onClassificationZoom?: (classificationId: string) => void;
 }
 
-export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading: externalLoading = false, onClassificationZoom }: QuantitiesPanelProps) {
+// Export as memo-wrapped component to prevent re-renders when unrelated store
+// state changes (e.g. zoom level, tool selection, PDF load events).
+// eslint-disable-next-line react/display-name
+const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSearchSelect, isLoading: externalLoading = false, onClassificationZoom }: QuantitiesPanelProps) {
   const { addToast } = useToast();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -2783,4 +2786,6 @@ export default function QuantitiesPanel({ showTakeoffSearch = false, onTakeoffSe
       {panel}
     </aside>
   );
-}
+});
+
+export default QuantitiesPanel;
