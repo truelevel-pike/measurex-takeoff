@@ -175,7 +175,9 @@ function collectRatios(text: string, candidates: Candidate[]): void {
   }
 }
 
-export function detectedToCalibration(detected: DetectedScaleResult): ScaleCalibration {
+export function detectedToCalibration(detected: DetectedScaleResult | null | undefined): ScaleCalibration | null {
+  if (!detected) return null;
+  if (!detected.scale || detected.scale.pixelsPerUnit <= 0) return null;
   return detected.scale;
 }
 

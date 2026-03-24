@@ -1572,6 +1572,11 @@ function PageInner() {
   const handleAcceptScale = useCallback(() => {
     if (detectedScale) {
       const cal = detectedToCalibration(detectedScale);
+      if (!cal) {
+        // detectedToCalibration returned null — invalid/zero pixelsPerUnit, skip silently
+        setDetectedScale(null);
+        return;
+      }
       setScale(cal);
       setScaleForPage(currentPageNum, cal);
       localStorage.setItem('mx-onboarding-scale-set', 'true');
