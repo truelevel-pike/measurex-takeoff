@@ -2303,7 +2303,13 @@ function PageInner() {
                   e.preventDefault();
                   e.stopPropagation();
                   const f = e.dataTransfer.files?.[0];
-                  if (f && f.type === 'application/pdf') setPdfFile(f);
+                  if (f && f.type === 'application/pdf') {
+                    setUploadError(null);
+                    setPdfFile(f);
+                    // Wave 36B: also call ensureProject when there is no project yet
+                    // so dropping a PDF on the canvas always auto-creates a project
+                    if (!projectId) void ensureProject(f.name, f);
+                  }
                 }}
               >
                 {pdfFetching ? (
@@ -2475,6 +2481,28 @@ function PageInner() {
       )}
 
       {ntsWarning && !agentMode && <div data-testid='nts-warning' className='fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white px-4 py-2 rounded-lg z-50'>Drawing marked as Not to Scale — measurements may be inaccurate</div>}
+
+      {/* Wave 36B: large PDF warning — shown when PDF has > 20 pages.
+          AI all-pages takeoff at ~3s/page means 50 pages ≈ 150s. Warn the user. */}
+      {pdfPageCountReady && totalPages > 20 && pdfFile && !agentMode && (
+        <div
+          data-testid="large-pdf-warning"
+          className="fixed top-14 right-4 z-50 max-w-xs rounded-xl px-4 py-3 text-sm shadow-xl"
+          style={{
+            background: 'rgba(161,98,7,0.15)',
+            border: '1px solid rgba(251,191,36,0.45)',
+            color: '#fef3c7',
+            backdropFilter: 'blur(6px)',
+          }}
+          role="status"
+        >
+          <div className="font-semibold mb-1">⚠️ Large PDF detected ({totalPages} pages)</div>
+          <div className="text-xs text-amber-200/80">
+            AI takeoff will take ~{Math.round(totalPages * 3)}s total.
+            Consider running page-by-page for faster results.
+          </div>
+        </div>
+      )}
 
       {showCalModal && !agentMode && <ScaleCalibration onClose={() => setShowCalModal(false)} />}
       {showScaleCalibPanel && <ScaleCalibrationPanel onClose={() => setShowScaleCalibPanel(false)} />}

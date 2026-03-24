@@ -40,7 +40,8 @@ export const ClassificationUpdateSchema = ClassificationCreateSchema.partial();
 
 // Project
 export const ProjectCreateSchema = z.object({
-  name: z.string().min(1).max(200),
+  // Wave 36B: name is optional — defaults to 'Untitled Project' when omitted or empty
+  name: z.string().max(200).optional().transform((v) => (v && v.trim().length > 0 ? v.trim() : 'Untitled Project')),
   description: z.string().max(2000).optional(),
 });
 
