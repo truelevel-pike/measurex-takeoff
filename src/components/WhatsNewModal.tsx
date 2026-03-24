@@ -4,14 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, X } from 'lucide-react';
 
 // BUG-MX-005 fix: use stable versioned key so seen-state persists correctly
-const VERSION_KEY = 'measurex_whats_new_v2';
+// Wave 38B: bumped to v3 so users see the updated Wave changelog
+const VERSION_KEY = 'measurex_whats_new_v3';
 
 const CHANGELOG = [
-  { title: 'Project Compare View', desc: 'Compare classification quantities side-by-side across two bids' },
-  { title: 'Duplicate Project', desc: 'Right-click any project card to create an exact copy' },
-  { title: "What's New Modal", desc: 'First-run changelog popup so you never miss updates' },
-  { title: 'AI Takeoff All Pages', desc: 'Run AI takeoff across all PDF pages in one click' },
-  { title: 'Contractor Report Export', desc: 'Export full estimates as Excel/PDF' },
+  { title: 'AI Element Validation', desc: 'Takeoff results are now filtered — garbage polygons, out-of-bounds points, and degenerate shapes are automatically discarded before they reach your project' },
+  { title: 'NTS Warning', desc: 'Drawings marked "Not to Scale" are detected automatically and a warning banner appears before you run takeoff' },
+  { title: 'Scale Preset API', desc: 'Set scale via API using shorthand formats like 1/8"=1ft, 1/4"=1ft, or 1:100 — perfect for agent automation' },
+  { title: 'Multi-Select Delete', desc: 'Hold Shift and click to select multiple polygons, then delete them all at once' },
+  { title: 'Copy Quantities', desc: 'Copy the full quantities table to clipboard as formatted text for pasting into estimates' },
+  { title: 'Agent API (window.measurex)', desc: 'Full JavaScript automation API exposed in agent mode — getState(), setPage(), setScale(), getTotals(), and more' },
+  { title: 'Gemini Retry on 429', desc: 'AI takeoff now retries automatically with exponential backoff when Gemini rate limits hit, instead of failing immediately' },
+  { title: 'Ctrl+S to Save', desc: 'Save your project instantly with Ctrl+S (Cmd+S on Mac) without clicking the Save button' },
+  { title: 'Delete Confirmation', desc: 'Deleting a project now shows a confirmation dialog so accidental deletions don\'t happen' },
+  { title: 'Per-Page Polygons API', desc: 'GET /api/projects/{id}/pages/{page}/polygons — returns enriched polygon data for a single page, perfect for agent verification' },
 ];
 
 export function useWhatsNew() {
