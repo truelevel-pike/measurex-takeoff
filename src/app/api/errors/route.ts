@@ -26,7 +26,7 @@ const MAX_URL_LENGTH = 2_000;
 const loggedErrors: LoggedErrorReport[] = [];
 
 export async function POST(request: Request) {
-  const rlResponse = rateLimitResponse(request);
+  const rlResponse = rateLimitResponse(request, 20, 60_000);
   if (rlResponse) return rlResponse;
 
   let payload: IncomingErrorReport;
