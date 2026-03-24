@@ -138,6 +138,41 @@ export function installMeasurexAPI() {
     },
 
     /**
+     * Wave 37: Get polygons for a specific page (1-based).
+     * Used by the agent to verify what was drawn on a particular page after takeoff.
+     * Usage: window.measurex.getPolygonsForPage(1)
+     */
+    getPolygonsForPage(pageNumber: number) {
+      return useStore.getState().polygons.filter((p) => p.pageNumber === pageNumber);
+    },
+
+    /**
+     * Wave 37: Delete a polygon by ID.
+     * Used by the agent to remove incorrect polygons after AI takeoff.
+     * Usage: window.measurex.deletePolygon('polygon-uuid')
+     */
+    deletePolygon(id: string) {
+      useStore.getState().deletePolygon(id);
+    },
+
+    /**
+     * Wave 37: Verify takeoff state — returns a summary object the agent can
+     * inspect to confirm the project is ready and results are valid.
+     * Usage: window.measurex.verify()
+     * → { hasPDF, hasScale, classificationCount, polygonCount, totalPages }
+     */
+    verify() {
+      const s = useStore.getState();
+      return {
+        hasPDF: s.totalPages > 0,
+        hasScale: !!s.scale,
+        classificationCount: s.classifications.length,
+        polygonCount: s.polygons.length,
+        totalPages: s.totalPages,
+      };
+    },
+
+    /**
      * Wave 11B: SSE connection status for agent diagnostics.
      * Returns a machine-readable object the agent can inspect via evaluate().
      *
