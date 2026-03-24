@@ -1682,6 +1682,19 @@ function PageInner() {
     return () => window.removeEventListener('mx-save', handler);
   }, [handleSave]);
 
+  // Wave 36: window.measurex.setPage() dispatches 'mx-goto-page' so both the store
+  // AND the PDF viewer are updated (store-only navigation doesn't move the rendered PDF).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const page = (e as CustomEvent<{ page: number }>).detail?.page;
+      if (typeof page === 'number' && page >= 1) {
+        safeGoToPage(page, 'measurex-api:setPage');
+      }
+    };
+    window.addEventListener('mx-goto-page', handler);
+    return () => window.removeEventListener('mx-goto-page', handler);
+  }, [safeGoToPage]);
+
   const handleExportExcel = useCallback(async () => {
     if (!projectId) {
       const { downloadExcel } = await import('@/lib/export');
