@@ -7,6 +7,7 @@ import { useFocusTrap } from '@/lib/use-focus-trap';
 const AUTO_DISMISS_MS = 10_000;
 
 interface AutoScalePopupProps {
+  projectId?: string | null;
   detectedScale: string;
   confidence: number;
   onDismiss: () => void;

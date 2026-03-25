@@ -1572,7 +1572,11 @@ function PageInner() {
 
       // GAP-006: Show AutoScalePopup as the sole confirmation dialog.
       // Scale is NOT applied until user explicitly accepts.
-      const hidden = typeof window !== 'undefined' && localStorage.getItem('measurex_hide_scale_popup') === 'true';
+      const autoScaleSkipKey = projectId ? `mx-autoscale-skip-${projectId}` : null;
+      const hidden =
+        typeof window !== 'undefined' &&
+        !!autoScaleSkipKey &&
+        localStorage.getItem(autoScaleSkipKey) === 'true';
       if (!hidden) {
         setDetectedScaleInfo({ scale: detected.scale.label, confidence: detected.confidence });
         setShowAutoScalePopup(true);
@@ -2529,11 +2533,14 @@ function PageInner() {
       {/* GAP-006: Single confirmation dialog before applying detected scale */}
       {showAutoScalePopup && detectedScaleInfo && !agentMode && (
         <AutoScalePopup
+          projectId={projectId}
           detectedScale={detectedScaleInfo.scale}
           confidence={detectedScaleInfo.confidence}
           onDismiss={() => setShowAutoScalePopup(false)}
           onDontShowAgain={() => {
-            localStorage.setItem('measurex_hide_scale_popup', 'true');
+            if (projectId) {
+              localStorage.setItem(`mx-autoscale-skip-${projectId}`, 'true');
+            }
             setShowAutoScalePopup(false);
           }}
           onAccept={() => {
