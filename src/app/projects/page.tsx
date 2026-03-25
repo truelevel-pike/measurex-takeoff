@@ -524,8 +524,8 @@ export default function ProjectsPage() {
       { label: 'Create a project', done: projects.length > 0, hint: '' },
       { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0), hint: '' },
       { label: 'Set the scale', done: hasScale, hint: 'Click the "No scale" indicator in the toolbar to calibrate your drawing scale.' },
-      { label: 'Run AI takeoff', done: localStorage.getItem('mx-onboarding-takeoff-run') === 'true', hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
-      { label: 'Export quantities', done: localStorage.getItem('mx-onboarding-exported') === 'true', hint: '' },
+      { label: 'Run AI takeoff', done: typeof window !== 'undefined' && localStorage.getItem('mx-onboarding-takeoff-run') === 'true', hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
+      { label: 'Export quantities', done: typeof window !== 'undefined' && localStorage.getItem('mx-onboarding-exported') === 'true', hint: '' },
     ];
   }, [projects]);
   const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
