@@ -239,6 +239,7 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
 
           <div className="flex items-center justify-end gap-2">
             <button
+              data-testid="retogal-cancel-btn"
               onClick={() => setOpen(false)}
               className="rounded-lg px-4 py-1.5 text-xs font-medium transition-colors"
               style={{
@@ -251,6 +252,7 @@ export default function ReTogal({ currentPage, hasScale, hasRunTakeoff, onRunTak
               Cancel
             </button>
             <button
+              data-testid="retogal-confirm-btn"
               onClick={handleConfirm}
               className="rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors"
               style={{

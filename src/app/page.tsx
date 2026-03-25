@@ -988,7 +988,10 @@ function PageInner() {
         // Navigate to the page and wait for the canvas to render
         const canvas = await viewer.renderPageForCapture(pageNum);
         if (!canvas) {
-          console.error(`AI Takeoff: could not capture canvas for page ${pageNum}, skipping`);
+          const renderWarnMsg = `AI Takeoff: could not render page ${pageNum} for capture — PDF may still be loading. Try again in a moment.`;
+          console.error(renderWarnMsg);
+          addToast(renderWarnMsg, 'warning');
+          setAiStatus(renderWarnMsg);
           continue;
         }
 
@@ -1886,8 +1889,10 @@ function PageInner() {
 
       const canvas = await viewer.renderPageForCapture(page);
       if (!canvas) {
-        setAiStatus(`Page ${page}/${total}: Could not capture, skipping`);
-        setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'failed' as const, errorMsg: 'Could not capture page' } : ps));
+        const renderWarnMsg = `AI Takeoff: could not render page ${page} for capture — PDF may still be loading. Try again in a moment.`;
+        addToast(renderWarnMsg, 'warning');
+        setAiStatus(renderWarnMsg);
+        setAiPageStatuses(prev => prev.map(ps => ps.page === page ? { ...ps, status: 'failed' as const, errorMsg: renderWarnMsg } : ps));
         continue;
       }
 
