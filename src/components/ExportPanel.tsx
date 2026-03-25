@@ -3,19 +3,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { X, Download, FileSpreadsheet, FileText, Eye, Printer } from 'lucide-react';
 import { useFocusTrap } from '@/lib/use-focus-trap';
-// BUG-A6-5-020 / BUG-A8-011: xlsx@0.18.x has known prototype pollution / ReDoS CVEs
-// (CVE-2023-30533 — SEVERITY: HIGH — prototype pollution + ReDoS).
-// TODO(security): Migrate to `exceljs` or `xlsx@0.20.x+` before production release.
-// Migration is deferred to a dedicated cycle due to API surface differences.
-// For now, lazy-load via dynamic import to restrict client bundle exposure.
-// The server-side API routes (api/projects/[id]/export/excel) are the
-// preferred export path; this component is a fallback for offline/quick use.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _xlsxModule: any = null;
-async function getXLSX() {
-  if (!_xlsxModule) _xlsxModule = await import('xlsx');
-  return _xlsxModule as typeof import('xlsx');
-}
 import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
@@ -334,10 +321,9 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   }, [filteredClassifications, filteredPolygons, scale, scales, groupBy1, groupBy2, groupBy3, classifications, groups]);
 
   // ── Export: Screen View (grouped/filtered, visible columns) ──
-  // BUG-A8-011: xlsx loaded via dynamic import (lazy) to reduce client bundle exposure
   const handleScreenViewExport = useCallback(async () => {
-    const XLSX = await getXLSX();
-    const wb = XLSX.utils.book_new();
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
     const headers: string[] = [];
     if (columns.name) headers.push('Name');
     if (columns.type) headers.push('Type');
@@ -367,33 +353,29 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       aoa.push(r);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = headers.map(() => ({ wch: 18 }));
-    XLSX.utils.book_append_sheet(wb, ws, 'Export');
-
-    try {
-      XLSX.writeFile(wb, 'measurex-screen-export.xlsx');
-    } catch {
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'measurex-screen-export.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    const ws = wb.addWorksheet('Export');
+    ws.columns = headers.map((h: string) => ({ header: h, width: 18 }));
+    for (const row of aoa.slice(1)) {
+      ws.addRow(row);
     }
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'measurex-screen-export.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     if (getNotificationPrefs().exportReady) showToast('Screen view exported!');
   }, [previewRows, columns, showToast]);
 
   // ── Export: Full Export (flat dump, all columns, no grouping) ──
-  // BUG-A8-011: xlsx loaded via dynamic import
   const handleFullExport = useCallback(async () => {
-    const XLSX = await getXLSX();
+    const ExcelJS = (await import('exceljs')).default;
     const allRows = computeClassificationTotals(
       filteredClassifications,
       filteredPolygons,
@@ -401,7 +383,7 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       scales
     );
 
-    const wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
     const headers = ['Name', 'Type', 'Area', 'Linear', 'Count', 'Per Page', 'Total', 'Unit'];
     const aoa: (string | number)[][] = [headers];
 
@@ -418,26 +400,23 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       ]);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = headers.map(() => ({ wch: 18 }));
-    XLSX.utils.book_append_sheet(wb, ws, 'Full Export');
-
-    try {
-      XLSX.writeFile(wb, 'measurex-full-export.xlsx');
-    } catch {
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'measurex-full-export.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    const ws = wb.addWorksheet('Full Export');
+    ws.columns = headers.map((h: string) => ({ header: h, width: 18 }));
+    for (const row of aoa.slice(1)) {
+      ws.addRow(row);
     }
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'measurex-full-export.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     if (getNotificationPrefs().exportReady) showToast('Full export completed!');
   }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
 
