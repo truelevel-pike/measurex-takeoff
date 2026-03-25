@@ -198,7 +198,10 @@ export default function ProjectsPage() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [pageDragOver, setPageDragOver] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pageDragCounter = React.useRef(0);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Load persisted local state
   useEffect(() => {
@@ -524,10 +527,10 @@ export default function ProjectsPage() {
       { label: 'Create a project', done: projects.length > 0, hint: '' },
       { label: 'Upload drawings', done: projects.some(p => p.pdfPath || p.pdf_path || (p.pageCount ?? 0) > 0), hint: '' },
       { label: 'Set the scale', done: hasScale, hint: 'Click the "No scale" indicator in the toolbar to calibrate your drawing scale.' },
-      { label: 'Run AI takeoff', done: typeof window !== 'undefined' && localStorage.getItem('mx-onboarding-takeoff-run') === 'true', hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
-      { label: 'Export quantities', done: typeof window !== 'undefined' && localStorage.getItem('mx-onboarding-exported') === 'true', hint: '' },
+      { label: 'Run AI takeoff', done: mounted ? localStorage.getItem('mx-onboarding-takeoff-run') === 'true' : false, hint: 'Click the Sparkles (\u2728) button in the toolbar to auto-detect quantities.' },
+      { label: 'Export quantities', done: mounted ? localStorage.getItem('mx-onboarding-exported') === 'true' : false, hint: '' },
     ];
-  }, [projects]);
+  }, [projects, mounted]);
   const completedOnboardingSteps = onboardingSteps.filter(step => step.done).length;
 
   // Collect all unique tags from all projects
