@@ -169,7 +169,7 @@ export default function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showCollab, setShowCollab] = useState<string | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Wave 21: multi-select for bulk delete
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
@@ -347,7 +347,7 @@ export default function ProjectsPage() {
 
   const handleDelete = (id: string) => {
     // BUG-W19-004: replace window.confirm with a proper modal
-    setPendingDeleteId(id);
+    setDeleteConfirmId(id);
   };
 
   const toggleSelectProject = (id: string, shiftKey = false) => {
@@ -387,9 +387,9 @@ export default function ProjectsPage() {
   };
 
   const confirmDelete = async () => {
-    if (!pendingDeleteId) return;
-    const id = pendingDeleteId;
-    setPendingDeleteId(null);
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteConfirmId(null);
     try {
       const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
@@ -1638,10 +1638,10 @@ export default function ProjectsPage() {
       )}
 
       {/* BUG-W19-004: Delete confirmation modal */}
-      {pendingDeleteId && (
+      {deleteConfirmId && (
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setPendingDeleteId(null)}
+          onClick={() => setDeleteConfirmId(null)}
         >
           <div
             className="bg-[#0a0a0f] border border-red-500/30 rounded-xl p-6 w-full max-w-sm shadow-2xl"
@@ -1649,8 +1649,8 @@ export default function ProjectsPage() {
           >
             <h2 className="text-sm font-semibold text-white mb-2">Delete project?</h2>
             <p className="text-xs text-zinc-400 mb-5">
-              <span className="font-medium text-white">
-                {projects.find(p => p.id === pendingDeleteId)?.name ?? 'This project'}
+                <span className="font-medium text-white">
+                {projects.find(p => p.id === deleteConfirmId)?.name ?? 'This project'}
               </span>{' '}
               will be permanently deleted. This cannot be undone.
             </p>
@@ -1658,7 +1658,7 @@ export default function ProjectsPage() {
               <button
                 type="button"
                 data-testid="delete-project-cancel"
-                onClick={() => setPendingDeleteId(null)}
+                onClick={() => setDeleteConfirmId(null)}
                 className="px-4 py-2 text-xs text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
               >
                 Cancel
