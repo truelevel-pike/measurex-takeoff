@@ -521,6 +521,7 @@ function PageInner() {
   const hydrateRequestIdRef = useRef(0);
   const isCreatingProjectRef = useRef(false);
   const thumbnailCapturedRef = useRef(false);
+  const hasAppliedPageParam = useRef(false);
   // BUG-A8-5-006 fix: re-entry guard for AI takeoff — prevents concurrent
   // requests from rapid keypresses during the brief window before aiLoading state updates.
   const aiTakeoffInFlightRef = useRef(false);
@@ -830,6 +831,18 @@ function PageInner() {
     }
     hydrateProject(pid);
   }, [search, hydrateProject]);
+
+  // BUG-W41-002: apply ?page=N once after project/PDF load when real page count is known.
+  useEffect(() => {
+    if (hasAppliedPageParam.current) return;
+    if (!pdfPageCountReady) return;
+
+    const pageParam = parseInt(search.get('page') || '1', 10);
+    if (pageParam > 1 && pageParam <= totalPages) {
+      safeGoToPage(pageParam, 'url-param:page-on-load');
+    }
+    hasAppliedPageParam.current = true;
+  }, [pdfPageCountReady, search, totalPages, safeGoToPage]);
 
   // BUG-W26-002: after hydration, check sessionStorage for a newer backup and offer restore
   useEffect(() => {
