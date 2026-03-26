@@ -494,6 +494,7 @@ function PageInner() {
 
   // BUG-R5-002: Track whether the auto-fetched PDF is loading during hydration.
   const [pdfFetching, setPdfFetching] = useState(false);
+  const [pdfFetchAttemptCompleted, setPdfFetchAttemptCompleted] = useState(false);
   const [quantitiesLoading, setQuantitiesLoading] = useState(true);
   const [projectNotFound, setProjectNotFound] = useState(false);
 
@@ -522,6 +523,8 @@ function PageInner() {
   const isCreatingProjectRef = useRef(false);
   const thumbnailCapturedRef = useRef(false);
   const hasAppliedPageParam = useRef(false);
+  const isMountedRef = useRef(true);
+  const pdfAutoRetryAttemptedProjectRef = useRef<string | null>(null);
   // BUG-A8-5-006 fix: re-entry guard for AI takeoff — prevents concurrent
   // requests from rapid keypresses during the brief window before aiLoading state updates.
   const aiTakeoffInFlightRef = useRef(false);
@@ -662,10 +665,44 @@ function PageInner() {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchStoredPdf = useCallback(async (pid: string, fileNameHint?: string) => {
+    if (!pid || isDemoProject(pid)) return false;
+    if (isMountedRef.current) setPdfFetching(true);
+
+    try {
+      const pdfRes = await fetch(`/api/projects/${pid}/pdf`);
+      if (!pdfRes.ok) return false;
+
+      const blob = await pdfRes.blob();
+      if (!isMountedRef.current) return false;
+
+      const file = new File([blob], `${fileNameHint || pid}.pdf`, { type: 'application/pdf' });
+      // BUG-R6-002: Reset page count ready flag before setting new PDF file
+      setPdfPageCountReady(false);
+      setPdfFile(file);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (isMountedRef.current) {
+        setPdfFetching(false);
+        setPdfFetchAttemptCompleted(true);
+      }
+    }
+  }, []);
+
   // Hydrate project from API — tries full project endpoint, falls back to granular endpoints
   const hydrateProject = useCallback(async (pid: string) => {
     const requestId = ++hydrateRequestIdRef.current;
     setQuantitiesLoading(true);
+    setPdfFetchAttemptCompleted(false);
+    pdfAutoRetryAttemptedProjectRef.current = null;
     // Wave 27B: reset dirty-state tracking so the save button shows clean
     // immediately after loading a project (not dirty until user makes a change).
     lastSavedFingerprintRef.current = null;
@@ -735,23 +772,10 @@ function PageInner() {
           }
         }
 
-        // Auto-fetch stored PDF so the viewer loads without re-upload (BUG-R5-002)
-        setPdfFetching(true);
-        fetch(`/api/projects/${pid}/pdf`, { signal: controller.signal })
-          .then(async (pdfRes) => {
-            if (controller.signal.aborted) return;
-            if (!pdfRes.ok) return;
-            const blob = await pdfRes.blob();
-            if (controller.signal.aborted) return;
-            const file = new File([blob], `${data.project.name || pid}.pdf`, { type: 'application/pdf' });
-            // BUG-R6-002: Reset page count ready flag before setting new PDF file
-            setPdfPageCountReady(false);
-            setPdfFile(file);
-          })
-          .catch(() => null) // non-fatal — user can still upload manually
-          .finally(() => {
-            if (!controller.signal.aborted) setPdfFetching(false);
-          });
+        // Auto-fetch stored PDF so the viewer loads without re-upload (BUG-R5-002).
+        // Use a dedicated fetch path (not hydration abort signal) so early hydration
+        // aborts do not silently leave pdfFile null.
+        void fetchStoredPdf(pid, data.project.name || pid);
 
         return;
       }
@@ -800,7 +824,7 @@ function PageInner() {
         setQuantitiesLoading(false);
       }
     }
-  }, [setCurrentPage, setSheetName]);
+  }, [setCurrentPage, setSheetName, fetchStoredPdf]);
 
   // Hydrate aiModel from localStorage on mount (useEffect avoids Next.js SSR hydration mismatch)
   // Wave 15B Bug 4: prefer the canvas-specific "measurex_ai_model" key (set when user
@@ -831,6 +855,20 @@ function PageInner() {
     }
     hydrateProject(pid);
   }, [search, hydrateProject]);
+
+  // BUG-W43-001: if initial PDF auto-fetch settles with no file, retry once after 3s.
+  useEffect(() => {
+    if (!projectId || !!pdfFile || pdfFetching || !pdfFetchAttemptCompleted) return;
+    if (pdfAutoRetryAttemptedProjectRef.current === projectId) return;
+
+    const retryTimer = setTimeout(() => {
+      if (!isMountedRef.current || !!pdfFile || pdfFetching) return;
+      pdfAutoRetryAttemptedProjectRef.current = projectId;
+      void fetchStoredPdf(projectId, projectName || projectId);
+    }, 3000);
+
+    return () => clearTimeout(retryTimer);
+  }, [projectId, projectName, pdfFile, pdfFetching, pdfFetchAttemptCompleted, fetchStoredPdf]);
 
   // BUG-W41-002: apply ?page=N once after project/PDF load when real page count is known.
   useEffect(() => {
@@ -2205,6 +2243,26 @@ function PageInner() {
           safeGoToPage(next, 'top-nav:next');
         }}
       />
+      {pdfFetching && (
+        <div
+          data-testid="pdf-loading-indicator"
+          role="status"
+          aria-live="polite"
+          className="absolute right-4 top-2 z-[70] rounded-md border border-[rgba(0,212,255,0.4)] bg-[rgba(0,212,255,0.12)] px-3 py-1 text-xs font-semibold text-[#7be9ff] shadow-[0_0_12px_rgba(0,212,255,0.25)]"
+        >
+          Loading PDF...
+        </div>
+      )}
+      {!pdfFile && !pdfFetching && pdfFetchAttemptCompleted && projectId && (
+        <button
+          data-testid="reload-pdf-btn"
+          onClick={() => void fetchStoredPdf(projectId, projectName || projectId)}
+          className="absolute right-4 top-2 z-[70] rounded-md border border-amber-400/50 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300 hover:border-amber-300 hover:bg-amber-400/20"
+          aria-label="Reload PDF"
+        >
+          Reload PDF
+        </button>
+      )}
       {showTextSearch && (
         <TextSearchPanel
           projectId={projectId}
@@ -2401,7 +2459,7 @@ function PageInner() {
                   /* BUG-R5-002: spinner while auto-fetching saved PDF */
                   <div
                     className="flex flex-col items-center gap-4 text-[rgba(0,212,255,0.7)]"
-                    data-testid="pdf-loading-indicator"
+                    data-testid="pdf-loading-indicator-canvas"
                     aria-label="Loading PDF"
                     role="status"
                   >
