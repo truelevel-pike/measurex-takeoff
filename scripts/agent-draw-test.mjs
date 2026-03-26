@@ -63,6 +63,18 @@ async function run() {
   const ws = new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise(resolve => ws.on('open', resolve));
 
+  // Step 0: Wait for PDF to load (pdfFile must be non-null before AI takeoff works)
+  console.log('\n[0] Waiting for PDF to load...');
+  let pdfReady = false;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const pdfSize = await evaluate(ws, `
+      fetch('/api/projects/${PROJECT_ID}/pdf').then(r => r.ok ? r.blob().then(b => b.size) : 0).catch(() => 0)
+    `);
+    if (pdfSize > 0) { pdfReady = true; console.log(`  PDF ready (${pdfSize} bytes)`); break; }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (!pdfReady) throw new Error('PDF not available after 10s');
+
   // Step 1: Get canvas position
   console.log('\n[1] Getting canvas position...');
   const canvasInfo = JSON.parse(await evaluate(ws, `
