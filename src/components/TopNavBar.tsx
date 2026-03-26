@@ -873,6 +873,7 @@ const TopNavBar = React.memo(function TopNavBar({
           </button>
           <button
             onClick={() => { onExportPanel?.(); setShowMobileMenu(false); }}
+            data-testid="export-btn"
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-[#e0e0e0] bg-[#12121a] border border-[rgba(0,212,255,0.2)] min-h-[44px]"
             style={{ touchAction: 'manipulation' }}
           >
