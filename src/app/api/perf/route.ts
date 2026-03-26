@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabase();
     const { error } = await supabase.from('mx_perf_events').insert(parsed.data);
     if (error) {
-      console.warn('[Perf API] Insert failed:', error.message);
+      // Table may not exist in all environments — suppress to avoid log spam
       return NextResponse.json({ ok: true, persisted: false });
     }
   } catch (err) {
