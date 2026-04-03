@@ -10,6 +10,7 @@ import {
   Combine,
   Scissors,
   Minus,
+  Hash,
   Ruler,
   Sparkles,
   Undo2,
@@ -27,6 +28,8 @@ const GROUPS = [
   ],
   [
     { icon: PenTool, label: 'Draw Area', shortcut: 'D', tool: 'draw' },
+    { icon: Minus, label: 'Linear', shortcut: 'L', tool: 'draw' },
+    { icon: Hash, label: 'Count', shortcut: 'N', tool: 'draw' },
     { icon: Combine, label: 'Merge', shortcut: 'G', tool: 'merge' },
     { icon: Scissors, label: 'Split', shortcut: 'S', tool: 'split' },
     { icon: Minus, label: 'Cut', shortcut: 'C', tool: 'cut' },
@@ -129,7 +132,7 @@ export default function LeftToolbar() {
               aria-pressed={'tool' in b ? active : undefined}
               title={`${b.label} (${b.shortcut})`}
               onClick={() => onClick(b as (typeof GROUPS)[number][number])}
-              data-testid={'tool' in b ? `tool-${(b as { tool: string }).tool}` : b.label === 'Undo' ? 'undo-btn' : 'redo-btn'}
+              data-testid={'tool' in b ? (b.label === 'Draw Area' ? 'tool-area' : b.label === 'Linear' ? 'tool-linear' : b.label === 'Count' ? 'tool-count' : `tool-${(b as { tool: string }).tool}`) : b.label === 'Undo' ? 'tool-undo' : 'tool-redo'}
               data-active={'tool' in b ? (active ? 'true' : 'false') : undefined}
               style={{
                 minWidth: 62,
@@ -194,7 +197,7 @@ export default function LeftToolbar() {
                 aria-pressed={'tool' in b ? active : undefined}
                 title={`${b.label} (${b.shortcut})`}
                 onClick={() => onClick(b as (typeof GROUPS)[number][number])}
-                data-testid={'tool' in b ? `tool-${(b as { tool: string }).tool}` : b.label === 'Undo' ? 'undo-btn' : 'redo-btn'}
+                data-testid={'tool' in b ? (b.label === 'Draw Area' ? 'tool-area' : b.label === 'Linear' ? 'tool-linear' : b.label === 'Count' ? 'tool-count' : `tool-${(b as { tool: string }).tool}`) : b.label === 'Undo' ? 'tool-undo' : 'tool-redo'}
                 data-active={'tool' in b ? (active ? 'true' : 'false') : undefined}
                 style={{
                   width: 36,
