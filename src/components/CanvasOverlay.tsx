@@ -60,6 +60,9 @@ function getPolygonFillOpacity(
 // `(() => { if (!poly) return null; ... })()`) are plain functions, not hooks, so
 // they do not violate React's Rules of Hooks. No hook reordering is required.
 function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedPolygonId }: CanvasOverlayProps = {}) {
+  // AG-005: in agent mode always show polygon labels regardless of size thresholds
+  const agentMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('agent') === '1';
+
   const wrapperRef = useRef<HTMLDivElement>(null);
   // BUG-A7-5-043 fix: use ref instead of querySelector for SVG element
   const svgRef = useRef<SVGSVGElement>(null);
@@ -421,7 +424,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
       // Approximate rendered pixel area of the polygon
       const pts = p.points;
       if (pts.length < 3) {
-        decisions.set(p.id, { show: false });
+        // AG-005: in agent mode always show labels so agent can read measurements
+        decisions.set(p.id, { show: agentMode });
         continue;
       }
       // Shoelace in baseDim units → convert to px²
@@ -431,7 +435,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         shoelace += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
       }
       const areaPx2 = Math.abs(shoelace / 2) * pxPerUnitX * pxPerUnitY;
-      decisions.set(p.id, { show: areaPx2 >= minArea3000px2 });
+      // AG-005: bypass minimum-area threshold in agent mode
+      decisions.set(p.id, { show: agentMode || areaPx2 >= minArea3000px2 });
     }
 
     // Default all remaining (linear) polygons to show

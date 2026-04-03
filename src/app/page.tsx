@@ -2930,6 +2930,7 @@ function PageInner() {
       <CoordInputPanel agentMode={agentMode} />
       <span
         id="mx-agent-state"
+        data-testid="mx-agent-state"
         data-page={String(currentPage)}
         data-current-page={String(currentPage)}
         data-total-pages={String(totalPages || 1)}
@@ -2943,6 +2944,10 @@ function PageInner() {
         data-scale-unit={scale?.unit || ''}
         data-canvas-width={String(pageBaseDimensions[currentPage]?.width || '')}
         data-canvas-height={String(pageBaseDimensions[currentPage]?.height || '')}
+        data-is-dirty={String(!!isDirty)}
+        data-sheet-name={sheetNames[currentPage] || ''}
+        data-ai-loading={String(!!aiLoading)}
+        data-classification-count={String(classifications.length)}
         style={{ display: 'none' }}
       />
       {/* Wave 11B: SSE status indicator — readable by agent via DOM snapshot or evaluate().

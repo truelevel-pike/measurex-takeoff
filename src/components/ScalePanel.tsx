@@ -141,6 +141,7 @@ export default function ScalePanel(props: ScalePanelProps) {
           ref={closeButtonRef}
           onClick={onClose}
           aria-label="Close scale panel"
+          data-testid="scale-cancel-btn"
           className="p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition"
         >
           <X size={18} aria-hidden="true" />
@@ -168,6 +169,7 @@ export default function ScalePanel(props: ScalePanelProps) {
       <div className="px-5 py-3 border-b border-zinc-200">
         <button
           onClick={onStartCalibrate}
+          data-testid="set-scale-btn"
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm"
         >
           <Crosshair size={16} aria-hidden="true" />
@@ -188,6 +190,8 @@ export default function ScalePanel(props: ScalePanelProps) {
               <button
                 key={scale}
                 onClick={() => onSelectScale(scale)}
+                data-testid="scale-preset-btn"
+                data-scale-value={scale}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
                   isSelected
                     ? 'bg-green-100 border-green-300 text-green-800'
@@ -240,6 +244,7 @@ export default function ScalePanel(props: ScalePanelProps) {
         <button
           onClick={onOpenManual}
           aria-label="Set scale manually"
+          data-testid="scale-manual-btn"
           className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 transition"
         >
           Set Scale Manually

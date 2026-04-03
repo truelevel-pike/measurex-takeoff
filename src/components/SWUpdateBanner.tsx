@@ -66,12 +66,15 @@ export default function SWUpdateBanner() {
     };
   }, []);
 
-  if (!waitingWorker || !visible) return null;
+  // Suppress in agent mode — SW updates must not force page reload during automated sessions
+  const agentMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('agent') === '1';
+  if (!waitingWorker || !visible || agentMode) return null;
 
   const handleUpdate = () => {
     waitingWorker.postMessage('SKIP_WAITING');
-    // Reload once the new SW takes control
+    // Reload once the new SW takes control — guarded: never fires in agent mode (see above)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('agent') === '1') return;
       window.location.reload();
     }, { once: true });
   };

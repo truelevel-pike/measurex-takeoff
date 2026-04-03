@@ -214,6 +214,8 @@ export default function ClassificationGroups() {
     return (
       <div
         key={classificationId}
+        data-testid="classification-item"
+        data-classification-id={classificationId}
         className="flex items-center gap-1.5 px-2 py-0.5 text-[12px] text-[#e5e7eb] hover:bg-[#0e1016] rounded cursor-default"
         draggable={draggable}
         onDragStart={(e) => handleClassificationDragStart(e, classificationId)}
@@ -274,6 +276,7 @@ export default function ClassificationGroups() {
 
                 {renamingGroupId === group.id ? (
                   <input
+                    data-testid="group-name-input"
                     className="flex-1 bg-[#0a0a0f] text-[#e5e7eb] text-[12px] px-1 py-0.5 rounded border border-[#00d4ff]/40 outline-none"
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
@@ -446,6 +449,7 @@ export default function ClassificationGroups() {
               placeholder="Group name"
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
+              data-testid="group-name-input"
               className="w-full px-2 py-1 border rounded text-[12px] mb-2 outline-none bg-[#0a0a0f] text-[#e5e7eb] focus:border-[#00d4ff]/40"
               autoFocus
             />
@@ -473,7 +477,7 @@ export default function ClassificationGroups() {
               >
                 Cancel
               </button>
-              <button type="submit" className="text-[#00d4ff] font-medium text-xs">
+              <button type="submit" data-testid="create-group-btn" className="text-[#00d4ff] font-medium text-xs">
                 Create
               </button>
             </div>
@@ -481,6 +485,7 @@ export default function ClassificationGroups() {
         ) : (
           <button
             type="button"
+            data-testid="create-group-btn"
             onClick={() => setShowAddGroup(true)}
             className="w-full border border-[#00d4ff]/30 rounded px-2 py-1.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 flex items-center justify-center gap-1"
           >
@@ -499,6 +504,7 @@ export default function ClassificationGroups() {
         >
           <button
             type="button"
+            data-testid="rename-group-btn"
             className="w-full text-left px-3 py-1.5 text-[12px] text-[#e5e7eb] hover:bg-[#00d4ff]/10"
             onClick={() => handleRenameStart(contextMenu.groupId)}
           >
@@ -506,6 +512,7 @@ export default function ClassificationGroups() {
           </button>
           <button
             type="button"
+            data-testid="delete-group-btn"
             className="w-full text-left px-3 py-1.5 text-[12px] text-red-400 hover:bg-red-500/10"
             onClick={() => handleDeleteGroup(contextMenu.groupId)}
           >

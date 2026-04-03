@@ -151,6 +151,7 @@ export default function ProjectSettingsPanel({
 
       {/* Panel */}
       <aside
+        data-testid="project-settings-panel"
         className="fixed top-0 right-0 bottom-0 z-[70] w-[340px] max-w-[90vw] bg-[rgba(15,18,32,0.98)] backdrop-blur-md border-l border-[#00d4ff]/20 flex flex-col"
         aria-label="Project settings"
       >

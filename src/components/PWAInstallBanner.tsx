@@ -44,7 +44,9 @@ export default function PWAInstallBanner() {
     setDismissed(true);
   };
 
-  if (dismissed || !deferredPrompt) return null;
+  // Suppress in agent mode to prevent UI interruptions during automated sessions
+  const agentMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('agent') === '1';
+  if (agentMode || dismissed || !deferredPrompt) return null;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#10131d] border border-[rgba(0,212,255,0.3)] rounded-lg px-4 py-3 shadow-2xl max-w-md">

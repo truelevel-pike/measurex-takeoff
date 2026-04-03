@@ -1,0 +1,60 @@
+{
+  "mission": "MeasureX Togal Feature Parity",
+  "status": "active",
+  "currentPhase": 1,
+  "phaseName": "Agent-Readiness",
+  "startedAt": "2026-04-03T22:42:00Z",
+  "lastUpdated": "2026-04-03T23:34:00Z",
+  "nextAdmiral": "admiral7",
+  "tasks": {
+    "phase1": [
+      {"id": "P1-01", "title": "Audit all interactive elements for data-testid coverage", "status": "done", "assignedTo": "admiral5", "admiral": "admiral5", "commit": "fb38545", "notes": "AG-001 fixed: tool-area/linear/count added to LeftToolbar. Undo/Redo renamed to tool-undo/tool-redo. But ONLY LeftToolbar was done — TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups still need testid coverage. Splitting remaining into P1-01b."},
+      {"id": "P1-01b", "title": "Add data-testid to TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups (AG-002/AG-009)", "status": "in-progress", "assignedTo": "admiral6", "admiral": "admiral6"},
+      {"id": "P1-02", "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding (AG-004)", "status": "in-progress", "assignedTo": "admiral6", "admiral": "admiral6"},
+      {"id": "P1-03", "title": "Verify SF labels always visible on every polygon type (AG-005)", "status": "in-progress", "assignedTo": "admiral6", "admiral": "admiral6"},
+      {"id": "P1-04", "title": "Canvas must accept standard PointerEvents for drawing (no isTrusted block)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P1-05", "title": "Document canvas coordinate contract for agent programming", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P1-06", "title": "CDP interaction test suite — verify all draw tools", "status": "pending", "assignedTo": null, "admiral": null}
+    ],
+    "phase2": [
+      {"id": "P2-01", "title": "Auto-naming sheets from title blocks on upload", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-02", "title": "Pattern Search — find repeated symbols across pages", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-03", "title": "AI Image Search improvements", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-04", "title": "Drawing Comparison — compare revisions, quantify changes", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-07", "title": "Cut/subtract tool — remove area from polygon", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-08", "title": "Smart paste", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-09", "title": "Flip, rotate, combine polygons", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-10", "title": "Arc line tool", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-11", "title": "Circle shortcut (C key)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-12", "title": "Edge snapping (auto + toggle)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-13", "title": "Wall centerline auto-detection", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-14", "title": "Door/window backout from wall linear measurements", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-15", "title": "Multi-select classifications", "status": "pending", "assignedTo": null, "admiral": null}
+    ],
+    "phase3": [
+      {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P3-02", "title": "Material library (reusable)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P3-03", "title": "Custom formulas (Excel-like syntax)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P3-04", "title": "Assembly export", "status": "pending", "assignedTo": null, "admiral": null}
+    ],
+    "phase4": [
+      {"id": "P4-01", "title": "Multi-user real-time editing", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P4-02", "title": "External collaboration (no license, permission levels)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P4-03", "title": "Organization-level classification library", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P4-04", "title": "Version history", "status": "pending", "assignedTo": null, "admiral": null}
+    ]
+  },
+  "completedTasks": ["P1-01"],
+  "blockers": [],
+  "decisions": [],
+  "corrections": [],
+  "buildStatus": "green",
+  "lastBuildCheck": "2026-04-03T23:34:00Z",
+  "admiralDispatches": [
+    {"admiral": "admiral5", "task": "P1-01", "dispatchedAt": "2026-04-03T22:46:00Z", "completedAt": "2026-04-03T23:00:00Z", "commit": "fb38545", "result": "partial — AG-001 fixed, remaining tasks not attempted"},
+    {"admiral": "admiral6", "task": "P1-01b+P1-02+P1-03", "dispatchedAt": "2026-04-03T23:34:00Z", "completedAt": null, "commit": null, "result": "in-progress"}
+  ],
+  "dailySummaries": []
+}

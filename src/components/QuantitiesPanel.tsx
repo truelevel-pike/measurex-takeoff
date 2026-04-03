@@ -1255,9 +1255,9 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
       ) : activeTab === 'estimate' ? (
         <aside className="bg-[rgba(18,18,26,0.8)] flex flex-col h-full text-[13px]" aria-label="Estimate panel" data-testid="quantities-panel">
           <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
-            <button type="button" onClick={handleSwitchToQuantities} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Quantities</button>
-            <button type="button" onClick={handleSwitchToAssemblies} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Assemblies</button>
-            <button type="button" className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]">Estimate</button>
+            <button type="button" data-testid="quantities-tab-btn" onClick={handleSwitchToQuantities} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Quantities</button>
+            <button type="button" data-testid="assemblies-tab-btn" onClick={handleSwitchToAssemblies} className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]">Assemblies</button>
+            <button type="button" data-testid="estimate-tab-btn" className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]">Estimate</button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             {projectId ? (
@@ -1273,12 +1273,14 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
       <div className="flex border-b border-[#00d4ff]/20 bg-[rgba(10,10,15,0.6)]">
         <button
           type="button"
+          data-testid="quantities-tab-btn"
           className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#00d4ff] border-b-2 border-[#00d4ff]"
         >
           Quantities
         </button>
         <button
           type="button"
+          data-testid="assemblies-tab-btn"
           onClick={handleSwitchToAssemblies}
           className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >
@@ -1286,6 +1288,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
         </button>
         <button
           type="button"
+          data-testid="estimate-tab-btn"
           onClick={handleSwitchToEstimate}
           className="flex-1 px-2 py-2 text-xs font-mono tracking-wider text-[#8892a0] hover:text-[#e5e7eb]"
         >

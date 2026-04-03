@@ -491,6 +491,7 @@ const TopNavBar = React.memo(function TopNavBar({
                 min={1}
                 max={totalPages}
                 value={pageInputValue}
+                data-testid="page-select"
                 onChange={(e) => setPageInputValue(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -643,6 +644,7 @@ const TopNavBar = React.memo(function TopNavBar({
               </select>
               <button
                 aria-label="Open MX Chat"
+                data-testid="mx-chat-btn"
                 onClick={onChat}
                 style={{
                   background: '#12121a',
@@ -739,6 +741,7 @@ const TopNavBar = React.memo(function TopNavBar({
                 icon={<Settings size={17} aria-hidden="true" />}
                 tooltip="Settings"
                 onClick={onSettings}
+                testId="settings-btn"
               />
               <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)', margin: '0 6px' }} role="separator" aria-hidden="true" />
               {is3DEnabled && (
