@@ -1553,5 +1553,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   );
 }
 
+// P1-04 audit: CanvasOverlay has no isTrusted, synthetic, or simulated event guards.
+// onCanvasPointerDown and all pointer/mouse handlers accept both trusted (human)
+// and synthetic (CDP agent, browser-use) events without filtering.
 export default React.memo(CanvasOverlay);
 export { hexToRgba, getPolygonColor };
