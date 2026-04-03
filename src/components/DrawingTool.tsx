@@ -51,12 +51,42 @@ function openPathDistance(pts: Point[], ppu: number): number {
   return total / ppu;
 }
 
+/** P2-11: Generate a regular N-gon approximating a circle. */
+function makeCirclePoints(cx: number, cy: number, radius: number, n = 32): Point[] {
+  const pts: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (2 * Math.PI * i) / n;
+    pts.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+  }
+  return pts;
+}
+
+/** P2-10: Flatten a quadratic bezier (start, control, end) into N line segments. */
+function flattenQuadBezier(p0: Point, p1: Point, p2: Point, n = 24): Point[] {
+  const pts: Point[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    pts.push({
+      x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
+      y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
+    });
+  }
+  return pts;
+}
+
 export default function DrawingTool() {
   const [points, setPoints] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [snapIndicator, setSnapIndicator] = useState<SnapPoint | null>(null);
   const [rectangleMode, setRectangleMode] = useState(false);
   const [rectCorner1, setRectCorner1] = useState<Point | null>(null);
+  // P2-11: circle draw mode — 2 clicks: center then edge point
+  const [circleMode, setCircleMode] = useState(false);
+  const [circleCenter, setCircleCenter] = useState<Point | null>(null);
+  // P2-10: arc draw mode — 3 clicks: start, control, end (quadratic bezier flattened)
+  const [arcMode, setArcMode] = useState(false);
+  const [arcPoints, setArcPoints] = useState<Point[]>([]); // [start] then [start,end] waiting for control
   const addPolygon = useStore((s) => s.addPolygon);
   const polygons = useStore((s) => s.polygons);
   const classifications = useStore((s) => s.classifications);
@@ -216,6 +246,10 @@ export default function DrawingTool() {
     }
     setPointsAndRef([]);
     setRectCorner1(null);
+    setCircleMode(false);
+    setCircleCenter(null);
+    setArcMode(false);
+    setArcPoints([]);
     setTool('select');
   }, [getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale, setPointsAndRef]);
 
@@ -260,6 +294,51 @@ export default function DrawingTool() {
         }
       }
 
+      // P2-11: Circle mode — click 1: center, click 2: edge point → 32-point polygon
+      if (circleMode) {
+        if (!circleCenter) {
+          setCircleCenter(pt);
+          setPointsAndRef([pt]);
+          return;
+        } else {
+          const cx = circleCenter.x;
+          const cy = circleCenter.y;
+          const radius = Math.sqrt((pt.x - cx) ** 2 + (pt.y - cy) ** 2);
+          if (radius < 1) {
+            addToast('Circle radius too small — click further from the center', 'warning');
+            return;
+          }
+          const circlePoints = makeCirclePoints(cx, cy, radius, 32);
+          pointsRef.current = circlePoints;
+          commitPolygon(); // resets circleMode/circleCenter internally
+          return;
+        }
+      }
+
+      // P2-10: Arc mode — only for linear classifications
+      // Click 1: start, Click 2: end, Click 3: control point → bezier flattened to segments
+      if (arcMode && isLinear) {
+        const next = [...arcPoints, pt];
+        if (next.length === 1) {
+          setArcPoints(next);
+          setPointsAndRef(next);
+          return;
+        }
+        if (next.length === 2) {
+          // After start+end, wait for control point (shown via mouse move preview)
+          setArcPoints(next);
+          setPointsAndRef(next);
+          return;
+        }
+        if (next.length === 3) {
+          // control point arrived — flatten bezier: start=next[0], end=next[1], control=next[2]
+          const flattened = flattenQuadBezier(next[0], next[2], next[1], 24);
+          pointsRef.current = flattened;
+          commitPolygon(); // resets arcMode/arcPoints internally
+          return;
+        }
+      }
+
       // Close polygon if clicking near the first point (area mode only)
       const clickCls = cls;
       const currentPoints = pointsRef.current;
@@ -281,7 +360,8 @@ export default function DrawingTool() {
       const nextPoints = [...currentPoints, pt];
       setPointsAndRef(nextPoints);
     },
-    [getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims, setPointsAndRef, rectangleMode, rectCorner1, setRectangleMode, setRectCorner1]
+    // isLinear removed from deps — it's a render-time derived value; getSelectedClassification covers it
+    [getCoords, getSelectedClassification, commitPolygon, placeCountItem, addToast, baseDims, setPointsAndRef, rectangleMode, rectCorner1, setRectangleMode, setRectCorner1, circleMode, circleCenter, setCircleMode, setCircleCenter, arcMode, arcPoints, setArcMode, setArcPoints]
   );
 
   const handleDoubleClick = useCallback(
@@ -332,9 +412,37 @@ export default function DrawingTool() {
       e.preventDefault();
       setRectangleMode((v) => !v);
       setRectCorner1(null);
+      setCircleMode(false);
+      setCircleCenter(null);
+      setArcMode(false);
+      setArcPoints([]);
       setPointsAndRef([]);
     }
-  }, [setTool, commitPolygon, setPointsAndRef, setRectangleMode, setRectCorner1]);
+    // P2-11: C key (inside draw tool) → toggle circle mode
+    if (e.key === 'c' || e.key === 'C') {
+      e.preventDefault();
+      e.stopPropagation(); // prevent outer 'c'→cut shortcut firing
+      setCircleMode((v) => !v);
+      setCircleCenter(null);
+      setRectangleMode(false);
+      setRectCorner1(null);
+      setArcMode(false);
+      setArcPoints([]);
+      setPointsAndRef([]);
+    }
+    // P2-10: A key (inside draw tool) → toggle arc mode (linear only)
+    if (e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      e.stopPropagation();
+      setArcMode((v) => !v);
+      setArcPoints([]);
+      setCircleMode(false);
+      setCircleCenter(null);
+      setRectangleMode(false);
+      setRectCorner1(null);
+      setPointsAndRef([]);
+    }
+  }, [setTool, commitPolygon, setPointsAndRef, setRectangleMode, setRectCorner1, setCircleMode, setCircleCenter, setArcMode, setArcPoints]);
 
   const hasScale = scale !== null && scale.pixelsPerUnit > 0;
   const ppu = scale?.pixelsPerUnit || 1;
@@ -351,6 +459,10 @@ export default function DrawingTool() {
   const vb = `0 0 ${baseDims.width} ${baseDims.height}`;
 
   return (
+    // P1-04: No isTrusted or synthetic-event guards on any drawing handler.
+    // Synthetic PointerEvents dispatched by CDP agents (isTrusted=false) pass
+    // through onClick/onMouseMove/onMouseDown without any filtering. This is
+    // intentional — agent-driven drawing must work identically to human input.
     <div
       ref={containerRef}
       data-testid="drawing-tool-container"
@@ -414,6 +526,39 @@ export default function DrawingTool() {
             {points.map((pt, i) => (
               <circle key={`p-${i}`} cx={pt.x} cy={pt.y} r={!isLinear && i === 0 && points.length >= 3 ? 8 : 5} fill={!isLinear && i === 0 ? '#10b981' : drawColor} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
             ))}
+            {/* P2-11: Circle preview — shown after first click (center set, awaiting edge) */}
+            {circleMode && circleCenter && cursor && (() => {
+              const r = Math.sqrt((cursor.x - circleCenter.x) ** 2 + (cursor.y - circleCenter.y) ** 2);
+              return r > 0 ? (
+                <circle
+                  data-testid="circle-preview"
+                  cx={circleCenter.x}
+                  cy={circleCenter.y}
+                  r={r}
+                  fill={hexToRgbaPreview(drawColor, 0.12)}
+                  stroke={drawColor}
+                  strokeWidth={2}
+                  strokeDasharray="8 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null;
+            })()}
+            {/* P2-10: Arc preview — after start+end placed, show bezier with cursor as control */}
+            {arcMode && arcPoints.length === 2 && cursor && (() => {
+              const [p0, p2] = arcPoints;
+              const p1 = cursor; // control point tracks mouse
+              return (
+                <path
+                  data-testid="arc-preview"
+                  d={`M ${p0.x},${p0.y} Q ${p1.x},${p1.y} ${p2.x},${p2.y}`}
+                  fill="none"
+                  stroke={drawColor}
+                  strokeWidth={2}
+                  strokeDasharray="8 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })()}
             {/* Snap indicator — cyan ring when cursor is snapped */}
             {snapIndicator && cursor && (
               <circle data-testid="snap-indicator" cx={cursor.x} cy={cursor.y} r={10} fill="none" stroke="#06b6d4" strokeWidth={2} vectorEffect="non-scaling-stroke" />
@@ -465,7 +610,7 @@ export default function DrawingTool() {
           </button>
           <button
             data-testid="tool-rectangle"
-            onClick={(e) => { e.stopPropagation(); setRectangleMode((v) => !v); setRectCorner1(null); setPointsAndRef([]); }}
+            onClick={(e) => { e.stopPropagation(); setRectangleMode((v) => !v); setRectCorner1(null); setCircleMode(false); setCircleCenter(null); setArcMode(false); setArcPoints([]); setPointsAndRef([]); }}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
             style={{
               background: rectangleMode ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
@@ -479,26 +624,87 @@ export default function DrawingTool() {
             </svg>
             Rect
           </button>
+          {/* P2-11: Circle mode button — available for area classifications */}
+          <button
+            data-testid="tool-circle"
+            onClick={(e) => { e.stopPropagation(); setCircleMode((v) => !v); setCircleCenter(null); setRectangleMode(false); setRectCorner1(null); setArcMode(false); setArcPoints([]); setPointsAndRef([]); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: circleMode ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
+              color: circleMode ? '#00d4ff' : '#d1d5db',
+              border: `1px solid ${circleMode ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Circle tool (C) — click center then edge"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <circle cx="6" cy="6" r="5" />
+            </svg>
+            Circle
+          </button>
+        </div>
+      )}
+      {/* P2-10: Arc mode button — available for linear classifications */}
+      {isLinear && (
+        <div className="absolute top-3 right-3 inline-flex items-center gap-2 pointer-events-auto">
+          <button
+            data-testid="snapping-toggle"
+            onClick={(e) => { e.stopPropagation(); setSnapping(!snappingEnabled); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: snappingEnabled ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
+              color: snappingEnabled ? '#00d4ff' : '#d1d5db',
+              border: `1px solid ${snappingEnabled ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Snapping"
+          >
+            Snap
+          </button>
+          <button
+            data-testid="tool-arc"
+            onClick={(e) => { e.stopPropagation(); setArcMode((v) => !v); setArcPoints([]); setCircleMode(false); setCircleCenter(null); setRectangleMode(false); setRectCorner1(null); setPointsAndRef([]); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: arcMode ? 'rgba(0,212,255,0.15)' : 'rgba(0,0,0,0.7)',
+              color: arcMode ? '#00d4ff' : '#d1d5db',
+              border: `1px solid ${arcMode ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Arc tool (A) — click start, end, then control point"
+          >
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M 1,10 Q 7,-2 13,10" />
+            </svg>
+            Arc
+          </button>
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
         {cls?.type === 'count'
           ? 'Click to place count marker · Esc to finish'
-          : rectangleMode
-            ? rectCorner1
-              ? 'Click second corner to complete rectangle'
-              : 'Click first corner · R=Rectangle mode (toggle)'
-            : isLinear
-              ? points.length === 0
-                ? 'Click to draw line — double-click or Enter to finish'
-                : points.length < 2
-                  ? `${points.length} point — need 1 more`
-                  : 'Click to add points · double-click or Enter to finish · Esc to cancel'
-              : points.length === 0
-                ? 'Click to start drawing polygon · R=Rectangle mode'
-              : points.length < 3
-                ? `${points.length} points — need ${3 - points.length} more to close`
-                : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
+          : circleMode
+            ? circleCenter
+              ? 'Click edge point to complete circle'
+              : 'Click center point · C=Circle mode (toggle)'
+            : arcMode
+              ? arcPoints.length === 0
+                ? 'Click start point of arc · A=Arc mode (toggle)'
+                : arcPoints.length === 1
+                  ? 'Click end point of arc'
+                  : 'Click control point to curve the arc'
+              : rectangleMode
+                ? rectCorner1
+                  ? 'Click second corner to complete rectangle'
+                  : 'Click first corner · R=Rectangle mode (toggle)'
+                : isLinear
+                  ? points.length === 0
+                    ? 'Click to draw line — double-click or Enter to finish · A=Arc mode'
+                    : points.length < 2
+                      ? `${points.length} point — need 1 more`
+                      : 'Click to add points · double-click or Enter to finish · Esc to cancel'
+                  : points.length === 0
+                    ? 'Click to start drawing polygon · R=Rect · C=Circle'
+                  : points.length < 3
+                    ? `${points.length} points — need ${3 - points.length} more to close`
+                    : 'Click first point (green), double-click, or Enter to close · Esc to cancel'}
       </div>
     </div>
   );
