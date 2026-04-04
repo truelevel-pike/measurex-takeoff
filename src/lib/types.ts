@@ -15,6 +15,16 @@ export interface Polygon {
   updatedAt?: string;
 }
 
+/** P2-14: A named door/window opening that is subtracted from a linear wall measurement. */
+export interface Backout {
+  id: string;
+  name: string;
+  /** Width in project units (ft, m, in, etc.) */
+  width: number;
+  /** Number of identical openings. Default 1. */
+  count: number;
+}
+
 export interface Classification {
   id: string;
   name: string;
@@ -42,6 +52,9 @@ export interface Classification {
   breakdowns?: { id: string; name: string; polygonIds: string[] }[];
   /** Arbitrary key-value metadata (e.g. height: "10ft", material: "hardwood"). */
   customProperties?: { key: string; value: string }[];
+  // ── P2-14: Door/Window Backouts ──────────────────────────────────────────
+  /** Explicit door/window openings to subtract from total linear measurement. */
+  backouts?: Backout[];
 }
 
 export interface Annotation {

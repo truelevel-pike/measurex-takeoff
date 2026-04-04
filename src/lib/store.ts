@@ -108,6 +108,10 @@ export interface Store extends ProjectState {
   setSelectedClassification: (id: string | null) => void;
   toggleClassification: (id: string) => void;
   mergeClassifications: (survivorId: string, mergedIds: string[]) => void;
+  // P2-14: Backout actions
+  addBackout: (classificationId: string, backout: Omit<import('@/lib/types').Backout, 'id'>) => void;
+  updateBackout: (classificationId: string, backoutId: string, patch: Partial<Omit<import('@/lib/types').Backout, 'id'>>) => void;
+  removeBackout: (classificationId: string, backoutId: string) => void;
 
   // Actions — Polygons
   addPolygon: (p: { points: Point[]; classificationId: string; pageNumber: number; area?: number; linearFeet?: number; label?: string; isComplete?: boolean; color?: string }) => string;
@@ -472,6 +476,30 @@ export const useStore = create<Store>()(
       undoStack: pushUndo(s.undoStack, before),
       redoStack: [],
     });
+  },
+
+  // P2-14: Backout actions — patch backouts array on the classification
+  addBackout: (classificationId, backout) => {
+    const s = get();
+    const cls = s.classifications.find((c) => c.id === classificationId);
+    if (!cls) return;
+    const newBackout = { ...backout, id: crypto.randomUUID() };
+    const updated = [...(cls.backouts ?? []), newBackout];
+    set({ classifications: s.classifications.map((c) => c.id === classificationId ? { ...c, backouts: updated } : c) });
+  },
+  updateBackout: (classificationId, backoutId, patch) => {
+    const s = get();
+    const cls = s.classifications.find((c) => c.id === classificationId);
+    if (!cls) return;
+    const updated = (cls.backouts ?? []).map((b) => b.id === backoutId ? { ...b, ...patch } : b);
+    set({ classifications: s.classifications.map((c) => c.id === classificationId ? { ...c, backouts: updated } : c) });
+  },
+  removeBackout: (classificationId, backoutId) => {
+    const s = get();
+    const cls = s.classifications.find((c) => c.id === classificationId);
+    if (!cls) return;
+    const updated = (cls.backouts ?? []).filter((b) => b.id !== backoutId);
+    set({ classifications: s.classifications.map((c) => c.id === classificationId ? { ...c, backouts: updated } : c) });
   },
 
   // Polygons

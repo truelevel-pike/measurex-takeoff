@@ -19,6 +19,7 @@ import ImportFromLibraryModal from './ImportFromLibraryModal';
 import UserPreferencesPanel from './UserPreferencesPanel';
 import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
 import type { AutoDeduction } from '@/server/geometry-engine';
+import BackoutPanel from './BackoutPanel';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -1840,7 +1841,9 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
           const deductionTotal = getDeductionTotal(classification);
           const autoDeductions = getAutoDeductionItems(classification.id);
           const autoDeductTotal = getAutoDeductionTotal(classification.id);
-          const netLinear = totals.lengthReal - deductionTotal - autoDeductTotal;
+          // P2-14: explicit backout deductions (door/window entries entered by user)
+          const backoutTotal = (classification.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+          const netLinear = Math.max(0, totals.lengthReal - deductionTotal - autoDeductTotal - backoutTotal);
           const isExpanded = expanded.has(classification.id);
           const isSelected = selectedClassification === classification.id;
           const isEditing = editingId === classification.id;
@@ -2275,7 +2278,15 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                     <>
                       <div className="text-[10px] py-0.5 text-gray-300 font-mono">
                         {classification.type === 'linear'
-                          ? `Total: ${totals.count} items - Raw ${formatLinear(totals.lengthReal, measurementSettings)} - Net ${formatLinear(netLinear, measurementSettings)}`
+                          ? (<>
+                              <span data-testid={`quantity-gross-${classification.id}`}>
+                                {`Total: ${totals.count} items - Gross ${formatLinear(totals.lengthReal, measurementSettings)}`}
+                              </span>
+                              {' - '}
+                              <span data-testid={`quantity-net-${classification.id}`}>
+                                {`Net ${formatLinear(netLinear, measurementSettings)}`}
+                              </span>
+                            </>)
                           : `Total: ${totals.count} items - ${formatArea(totals.areaReal, measurementSettings)} - ${formatLinear(totals.lengthReal, measurementSettings)}`}
                       </div>
                       {/* Wave 9B: slope-adjusted area display */}
@@ -2406,9 +2417,18 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                             )}
                           </div>
                           <div className="mt-1 text-[10px] text-[#00d4ff] font-mono">
-                            Net LF = {formatLinear(totals.lengthReal, measurementSettings)} - {formatLinear(deductionTotal, measurementSettings)} - {formatLinear(autoDeductTotal, measurementSettings)} = {formatLinear(netLinear, measurementSettings)}
+                            Net LF = {formatLinear(totals.lengthReal, measurementSettings)} - {formatLinear(deductionTotal, measurementSettings)} - {formatLinear(autoDeductTotal, measurementSettings)}{backoutTotal > 0 ? ` - ${formatLinear(backoutTotal, measurementSettings)} (backouts)` : ''} = {formatLinear(netLinear, measurementSettings)}
                           </div>
                         </div>
+                      )}
+
+                      {/* P2-14: BackoutPanel — explicit door/window backouts for linear classifications */}
+                      {classification.type === 'linear' && (
+                        <BackoutPanel
+                          classificationId={classification.id}
+                          grossLinear={totals.lengthReal}
+                          unit={measurementSettings.linearUnit ?? 'ft'}
+                        />
                       )}
                     </>
                   )}

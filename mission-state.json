@@ -4,8 +4,8 @@
   "currentPhase": 2,
   "phaseName": "Feature Gaps (Core)",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T01:00:00Z",
-  "nextAdmiral": "admiral8",
+  "lastUpdated": "2026-04-04T01:10:00Z",
+  "nextAdmiral": "admiral5",
   "tasks": {
     "phase1": [
       {
@@ -165,17 +165,18 @@
       {
         "id": "P2-13",
         "title": "Wall centerline auto-detection",
-        "status": "in-progress",
+        "status": "done",
         "assignedTo": "admiral7",
         "admiral": "admiral7",
-        "dispatchedAt": "2026-04-04T01:00:00Z"
+        "commit": "0da561c"
       },
       {
         "id": "P2-14",
         "title": "Door/window backout from wall linear measurements",
-        "status": "pending",
-        "assignedTo": null,
-        "admiral": null
+        "status": "in-progress",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "dispatchedAt": "2026-04-04T01:10:00Z"
       },
       {
         "id": "P2-15",
@@ -265,13 +266,14 @@
     "P2-09",
     "P2-10",
     "P2-11",
-    "P2-12"
+    "P2-12",
+    "P2-13"
   ],
   "blockers": [],
   "decisions": [],
   "corrections": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T01:00:00Z",
+  "lastBuildCheck": "2026-04-04T01:10:00Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
@@ -333,6 +335,14 @@
       "admiral": "admiral7",
       "task": "P2-13",
       "dispatchedAt": "2026-04-04T01:00:00Z",
+      "completedAt": "2026-04-04T01:10:00Z",
+      "commit": "0da561c",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral8",
+      "task": "P2-14",
+      "dispatchedAt": "2026-04-04T01:10:00Z",
       "completedAt": null,
       "commit": null,
       "result": "in-progress"
