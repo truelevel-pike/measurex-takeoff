@@ -22,9 +22,8 @@ export default function AutoScalePopup({
   onDontShowAgain,
   onAccept,
 }: AutoScalePopupProps) {
-  // BUG-A7-5-038: TODO — dontShowAgain is currently global (applies to all projects).
-  // It should be scoped per-project so disabling auto-scale for one project doesn't
-  // suppress it for others. Requires storing the flag in project settings.
+  // BUG-A7-5-038: resolved — dontShowAgain is scoped per-project via
+  // localStorage key `mx-autoscale-skip-<projectId>` in page.tsx onDontShowAgain handler.
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [remaining, setRemaining] = useState(AUTO_DISMISS_MS);
   const startRef = useRef(0);

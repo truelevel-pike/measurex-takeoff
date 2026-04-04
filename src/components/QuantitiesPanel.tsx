@@ -611,9 +611,11 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
     return totals;
   }, [classifications, polygonsByClassification, getPixelsPerUnitForPage]);
 
-  // Build a flat Record<classificationId, number> for EstimatesTab
+  // Build a flat Record<classificationId, number> for EstimatesTab + display overrides.
   // BUG-PIKE-010 fix: apply custom formula override when classification.formula is set.
-  const estimateQuantities = useMemo(() => {
+  // BUG-PIKE-030 fix: also expose formulaOverrideById so count-type display row and
+  //   clipboard copy use formula result instead of raw polygon count.
+  const { estimateQuantities, formulaOverrideById } = useMemo(() => {
     const classNames = classifications.map((c) => c.name);
 
     // Build a raw quantities map by name for formula references (lowercased)
@@ -627,6 +629,8 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
     }
 
     const result: Record<string, number> = {};
+    // formulaOverrideById: only set when a formula was successfully evaluated
+    const overrides: Record<string, number> = {};
     for (const c of classifications) {
       const t = totalsByClassification.get(c.id);
       if (!t) { result[c.id] = 0; continue; }
@@ -635,6 +639,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
       const formulaResult = applyCustomFormula(c.formula, classNames, rawByName);
       if (formulaResult !== null) {
         result[c.id] = formulaResult;
+        overrides[c.id] = formulaResult;
         continue;
       }
 
@@ -642,7 +647,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
       else if (c.type === 'linear') result[c.id] = t.lengthReal;
       else result[c.id] = t.count;
     }
-    return result;
+    return { estimateQuantities: result, formulaOverrideById: overrides };
   }, [classifications, totalsByClassification]);
 
   // Summary mode: top-10 classifications by primary metric
@@ -1417,16 +1422,23 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
             aria-label="Copy quantities table"
             className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
             onClick={() => {
+              // BUG-PIKE-031 fix: apply formula overrides so clipboard export
+              // matches the API quantities (consistent with Excel/contractor/share exports).
               const rows: string[] = ['Name\tType\tQuantity\tUnit'];
               for (const cls of classifications) {
                 const totals = totalsByClassification.get(cls.id);
                 if (!totals) continue;
-                const qty = cls.type === 'area'
-                  ? formatArea(totals.areaReal, measurementSettings)
-                  : cls.type === 'linear'
-                    ? formatLinear(totals.lengthReal, measurementSettings)
-                    : formatCount(totals.count);
-                const unit = cls.type === 'area' ? 'SF' : cls.type === 'linear' ? 'LF' : 'EA';
+                const formulaVal = formulaOverrideById[cls.id];
+                const unit = (formulaVal !== undefined && cls.formulaUnit)
+                  ? cls.formulaUnit
+                  : (cls.type === 'area' ? 'SF' : cls.type === 'linear' ? 'LF' : 'EA');
+                const qty = formulaVal !== undefined
+                  ? String(Math.round(formulaVal * 100) / 100)
+                  : cls.type === 'area'
+                    ? formatArea(totals.areaReal, measurementSettings)
+                    : cls.type === 'linear'
+                      ? formatLinear(totals.lengthReal, measurementSettings)
+                      : formatCount(totals.count);
                 rows.push(`${cls.name}\t${cls.type}\t${qty}\t${unit}`);
               }
               const text = rows.join('\n');
@@ -2167,7 +2179,10 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
 
                   {classification.type === 'count' ? (
                     <span className={`text-[14px] font-bold font-mono px-1.5 py-0.5 rounded ${totals.count === 0 ? 'text-gray-500 bg-[#0e1016]/50' : 'text-[#00d4ff] bg-[#0e1016]'}`}>
-                      {totals.count} EA
+                      {/* BUG-PIKE-030 fix: use formula override result when set, else raw count */}
+                      {formulaOverrideById[classification.id] !== undefined
+                        ? `${Math.round(formulaOverrideById[classification.id] * 100) / 100} ${classification.formulaUnit ?? 'EA'}`
+                        : `${totals.count} EA`}
                     </span>
                   ) : (
                     <>
