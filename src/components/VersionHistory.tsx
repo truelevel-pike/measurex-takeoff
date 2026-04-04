@@ -316,7 +316,7 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
   const hasRealData = apiEntries !== null && apiEntries.length > 0;
 
   return (
-    <div className="fixed right-0 top-0 w-80 h-full bg-gray-900 border-l border-gray-700 z-40 flex flex-col shadow-2xl">
+    <div data-testid="version-history-panel" className="fixed right-0 top-0 w-80 h-full bg-gray-900 border-l border-gray-700 z-40 flex flex-col shadow-2xl">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -478,7 +478,7 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
             const isExpanded = expandedEntryId === entry.id;
             const isFirst = idx === 0;
             return (
-              <div key={entry.id}>
+              <div key={entry.id} data-testid="version-entry">
                 <div
                   className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                     isExpanded ? 'bg-gray-800/80' : 'hover:bg-gray-800/60'
@@ -518,22 +518,34 @@ export default function VersionHistory({ onClose, onRestoreRun, onRerunWithModel
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleApiRestore(entry);
-                    }}
-                    disabled={restoringEntryId === entry.id}
-                    className="hidden group-hover:inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    {restoringEntryId === entry.id ? (
-                      <Loader2 size={10} className="animate-spin" />
-                    ) : (
-                      <RotateCcw size={10} />
-                    )}
-                    {restoringEntryId === entry.id ? 'Restoring…' : 'Restore'}
-                  </button>
+                  <div className="hidden group-hover:flex flex-col gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      data-testid="version-preview-btn"
+                      onClick={(e) => { e.stopPropagation(); toggleExpand(entry.id); }}
+                      className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors"
+                    >
+                      <ChevronRight size={10} />
+                      Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApiRestore(entry);
+                      }}
+                      disabled={restoringEntryId === entry.id}
+                      data-testid="version-restore-btn"
+                      className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 border border-gray-600 hover:border-gray-500 rounded px-1.5 py-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {restoringEntryId === entry.id ? (
+                        <Loader2 size={10} className="animate-spin" />
+                      ) : (
+                        <RotateCcw size={10} />
+                      )}
+                      {restoringEntryId === entry.id ? '…' : 'Restore'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Expanded detail view showing what changed */}

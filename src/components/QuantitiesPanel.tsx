@@ -1427,6 +1427,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
             className="p-1 rounded hover:bg-gray-700/60 text-gray-400 hover:text-gray-200 transition-colors"
             aria-label="Toggle version history"
             title="Version History"
+            data-testid="version-history-btn"
           >
             <History size={14} aria-hidden="true" />
           </button>
@@ -2218,7 +2219,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                   {/* Wave 10: Save to Org Library */}
                   <button
                     type="button"
-                    data-testid="save-to-library-btn"
+                    data-testid="save-to-org-btn"
                     onClick={(event) => {
                       event.stopPropagation();
                       try {

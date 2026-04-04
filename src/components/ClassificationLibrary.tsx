@@ -27,14 +27,30 @@ interface OrgLibraryItem {
   formula?: string;
 }
 
+const ORG_LIBRARY_KEY = 'mx-org-classifications';
+
 function loadOrgLibrary(): OrgLibraryItem[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('mx-org-library');
+    // Support both keys for backward compat
+    const raw = localStorage.getItem(ORG_LIBRARY_KEY) || localStorage.getItem('mx-org-library');
     return raw ? (JSON.parse(raw) as OrgLibraryItem[]) : [];
   } catch {
     return [];
   }
+}
+
+function saveOrgLibrary(items: OrgLibraryItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(ORG_LIBRARY_KEY, JSON.stringify(items));
+  } catch { /* non-fatal */ }
+}
+
+export function saveClassificationToOrgLibrary(item: Omit<OrgLibraryItem, 'id'>): void {
+  const existing = loadOrgLibrary();
+  if (existing.some((e) => e.name.toLowerCase() === item.name.toLowerCase())) return;
+  saveOrgLibrary([...existing, { ...item, id: crypto.randomUUID() }]);
 }
 
 export default function ClassificationLibrary({ open, onClose }: ClassificationLibraryProps) {
@@ -45,6 +61,9 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [orgLibrary, setOrgLibrary] = useState<OrgLibraryItem[]>([]);
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgManageMode, setOrgManageMode] = useState(false);
+  const [selectedOrgKeys, setSelectedOrgKeys] = useState<Set<string>>(new Set());
 
   // BUG-A6-037 fix: capture onClose in a ref so the Escape handler never triggers
   // re-registration when the parent passes a new function identity.
@@ -257,52 +276,135 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
             </div>
           </div>
 
-          {/* Wave 10: Org Library section */}
-          {orgLibrary.length > 0 && (
-            <div
-              data-testid="org-library-section"
-              className="border-t border-[#00d4ff]/15 px-4 py-3"
-            >
-              <div className="flex items-center gap-2 mb-2">
+          {/* P4-03: Org Library section */}
+          <div
+            data-testid="org-library-section"
+            className="border-t border-[#00d4ff]/15 px-4 py-3"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
                 <BookOpen size={13} className="text-amber-400" />
-                <span className="text-[11px] font-mono text-amber-300 uppercase tracking-wider">Org Library ({orgLibrary.length})</span>
+                <span className="text-[11px] font-mono text-amber-300 uppercase tracking-wider">
+                  Org Library ({orgLibrary.length})
+                </span>
               </div>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {orgLibrary.map((item) => {
-                  const alreadyExists = classifications.some((c) => c.name.toLowerCase() === item.name.toLowerCase());
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      disabled={alreadyExists}
-                      data-testid="import-from-org-btn"
-                      onClick={() => {
-                        if (alreadyExists) return;
-                        addClassification({
-                          name: item.name,
-                          type: item.type as 'area' | 'linear' | 'count',
-                          color: item.color,
-                          visible: true,
-                        });
-                        addToast(`Imported "${item.name}" from org library`, 'success');
-                      }}
-                      title={alreadyExists ? 'Already in project' : `Import "${item.name}"`}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                        alreadyExists
-                          ? 'cursor-not-allowed border-[#2f3a4d] bg-[#0f1725] text-[#64748b]'
-                          : 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:border-amber-400/60'
-                      }`}
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span>{item.name}</span>
-                      <span className="rounded bg-[#0b1220] px-1.5 py-0.5 text-[10px] uppercase text-[#8aa0b6]">{item.type}</span>
-                      {alreadyExists && <span className="text-[10px] uppercase">Added</span>}
-                    </button>
-                  );
-                })}
+              <div className="flex items-center gap-1.5">
+                {selectedOrgKeys.size > 0 && (
+                  <button
+                    type="button"
+                    data-testid="org-library-import-btn"
+                    onClick={() => {
+                      let imported = 0;
+                      for (const id of selectedOrgKeys) {
+                        const item = orgLibrary.find((x) => x.id === id);
+                        if (!item) continue;
+                        if (classifications.some((c) => c.name.toLowerCase() === item.name.toLowerCase())) continue;
+                        addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                        imported++;
+                      }
+                      setSelectedOrgKeys(new Set());
+                      if (imported > 0) addToast(`Imported ${imported} from org library`, 'success');
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded border border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                  >
+                    Import {selectedOrgKeys.size}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  data-testid="org-library-manage-btn"
+                  onClick={() => setOrgManageMode((v) => !v)}
+                  className="text-[10px] px-2 py-0.5 rounded border border-[#00d4ff]/25 text-[#7aebff] hover:bg-[#00d4ff]/10"
+                >
+                  {orgManageMode ? 'Done' : 'Manage'}
+                </button>
               </div>
             </div>
-          )}
+
+            {orgLibrary.length > 0 && (
+              <input
+                data-testid="org-library-search"
+                type="text"
+                placeholder="Search org library…"
+                value={orgSearch}
+                onChange={(e) => setOrgSearch(e.target.value)}
+                className="w-full mb-2 rounded border border-[#00d4ff]/20 bg-[#0b1220] px-2 py-1 text-[11px] text-[#e5e7eb] placeholder-[#4a5568] outline-none focus:border-[#00d4ff]/50"
+              />
+            )}
+
+            {orgLibrary.length === 0 ? (
+              <p className="text-[11px] text-[#4a5568] italic">No org library items yet. Save classifications from your project to build your library.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {orgLibrary
+                  .filter((item) => !orgSearch || item.name.toLowerCase().includes(orgSearch.toLowerCase()))
+                  .map((item) => {
+                    const alreadyExists = classifications.some((c) => c.name.toLowerCase() === item.name.toLowerCase());
+                    const isSelected = selectedOrgKeys.has(item.id);
+                    if (orgManageMode) {
+                      return (
+                        <div
+                          key={item.id}
+                          data-testid="org-library-item"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/8 px-3 py-1.5 text-xs text-amber-200"
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                          <span>{item.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = orgLibrary.filter((x) => x.id !== item.id);
+                              saveOrgLibrary(updated);
+                              setOrgLibrary(updated);
+                              addToast(`Removed "${item.name}" from org library`, 'info');
+                            }}
+                            className="ml-1 text-red-400 hover:text-red-300 text-[10px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        data-testid="org-library-item"
+                        onClick={() => {
+                          if (alreadyExists) return;
+                          setSelectedOrgKeys((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(item.id)) next.delete(item.id);
+                            else next.add(item.id);
+                            return next;
+                          });
+                        }}
+                        title={alreadyExists ? 'Already in project' : `Click to select · double-click to import "${item.name}"`}
+                        onDoubleClick={() => {
+                          if (alreadyExists) return;
+                          addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                          addToast(`Imported "${item.name}" from org library`, 'success');
+                        }}
+                        disabled={alreadyExists}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          alreadyExists
+                            ? 'cursor-not-allowed border-[#2f3a4d] bg-[#0f1725] text-[#64748b]'
+                            : isSelected
+                              ? 'border-amber-400/70 bg-amber-400/20 text-amber-100'
+                              : 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:border-amber-400/60'
+                        }`}
+                      >
+                        <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                        <span>{item.name}</span>
+                        <span className="rounded bg-[#0b1220] px-1.5 py-0.5 text-[10px] uppercase text-[#8aa0b6]">{item.type}</span>
+                        {alreadyExists && <span className="text-[10px] uppercase">Added</span>}
+                        {isSelected && !alreadyExists && <Check size={10} className="text-amber-300" />}
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center justify-between border-t border-[#00d4ff]/20 px-4 py-3">
             <button
