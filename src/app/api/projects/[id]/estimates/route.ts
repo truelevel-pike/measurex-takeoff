@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPolygons, getClassifications, getAssemblies, getScale, getProject, initDataDir } from '@/server/project-store';
+import { getPolygons, getClassifications, getAssemblies, getScale, listScales, getProject, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { z } from 'zod';
@@ -16,8 +16,44 @@ const EstimateBodySchema = z.object({
 });
 
 /**
+ * Build a page-number → pixelsPerUnit map from all per-page scales.
+ * Falls back to page-1 scale when a polygon's page has no dedicated scale.
+ */
+function buildScaleMap(
+  allScales: Array<{ pageNumber?: number; pixelsPerUnit: number; unit?: string }>,
+  fallbackScale: { pixelsPerUnit: number; unit?: string } | null,
+): Map<number, { pixelsPerUnit: number; unit: string }> {
+  const map = new Map<number, { pixelsPerUnit: number; unit: string }>();
+  for (const s of allScales) {
+    const pg = s.pageNumber ?? 1;
+    map.set(pg, {
+      pixelsPerUnit: s.pixelsPerUnit,
+      unit: s.unit ?? 'ft',
+    });
+  }
+  // Ensure page 1 has an entry (used as the ultimate fallback)
+  if (!map.has(1) && fallbackScale) {
+    map.set(1, { pixelsPerUnit: fallbackScale.pixelsPerUnit, unit: fallbackScale.unit ?? 'ft' });
+  }
+  return map;
+}
+
+/** Return per-page scale config for a polygon, falling back to page 1, then zero. */
+function scaleForPage(
+  scaleMap: Map<number, { pixelsPerUnit: number; unit: string }>,
+  pageNumber: number,
+): { pixelsPerFoot: number; unit: 'metric' | 'imperial' } {
+  const s = scaleMap.get(pageNumber) ?? scaleMap.get(1) ?? { pixelsPerUnit: 0, unit: 'ft' };
+  return {
+    pixelsPerFoot: s.pixelsPerUnit,
+    unit: (s.unit === 'm' || s.unit === 'mm') ? 'metric' : 'imperial',
+  };
+}
+
+/**
  * GET /api/projects/:id/estimates
  * Compute a cost estimate based on polygon quantities and optional unit costs.
+ * BUG-PIKE-012 fix: use per-page scales so multi-page projects compute correctly.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-118: add rate limiting to GET handler
@@ -31,31 +67,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const project = await getProject(id);
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-    const [polygons, classifications, assemblies, scale] = await Promise.all([
+    const [polygons, classifications, assemblies, fallbackScale, allScales] = await Promise.all([
       getPolygons(id),
       getClassifications(id),
       getAssemblies(id),
-      getScale(id),
+      getScale(id),       // page-1 scale (fallback)
+      listScales(id),     // all per-page scales
     ]);
 
-    // pixelsPerUnit is the scale factor (pixels per real-world unit, e.g. pixels per foot).
-    // Always recalculate from points using the geometry engine — the stored area/linearFeet
-    // fields are in pixel-space (from the client DrawingTool) and must not be used directly.
-    const ppu = scale?.pixelsPerUnit ?? 0;
-    const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
-    const scaleConfig = { pixelsPerFoot: ppu, unit };
+    // BUG-PIKE-012 fix: build per-page scale map instead of using a single ppu
+    const scaleMap = buildScaleMap(allScales, fallbackScale);
 
-    // Group polygons by classification and compute totals
+    // Group polygons by classification and compute totals using per-page scale
     const classificationMap = new Map(classifications.map((c) => [c.id, c]));
     const byClassification = new Map<string, { area: number; linearFeet: number; count: number }>();
     for (const p of polygons) {
       const cls = classificationMap.get(p.classificationId);
       const entry = byClassification.get(p.classificationId) ?? { area: 0, linearFeet: 0, count: 0 };
-      if (ppu > 0) {
+      const cfg = scaleForPage(scaleMap, p.pageNumber ?? 1);
+      if (cfg.pixelsPerFoot > 0) {
         if (cls?.type === 'area') {
-          entry.area += calculatePolygonArea(p.points, scaleConfig) ?? 0;
+          entry.area += calculatePolygonArea(p.points, cfg) ?? 0;
         } else if (cls?.type === 'linear') {
-          entry.linearFeet += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+          entry.linearFeet += calculateLinearLength(p.points, cfg, true) ?? 0;
         }
       }
       entry.count += 1;
@@ -88,6 +122,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 /**
  * POST /api/projects/:id/estimates
  * Compute a cost estimate with provided unit costs.
+ * BUG-PIKE-012 fix: use per-page scales so multi-page projects compute correctly.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-119: add rate limiting to POST handler
@@ -110,26 +145,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       (bodyResult.data.unitCosts ?? []).map((uc) => [uc.classificationId, uc]),
     );
 
-    const [polygons, classifications, scale] = await Promise.all([
+    const [polygons, classifications, fallbackScale, allScales] = await Promise.all([
       getPolygons(id),
       getClassifications(id),
-      getScale(id),
+      getScale(id),     // page-1 scale (fallback)
+      listScales(id),   // all per-page scales
     ]);
 
-    const ppu = scale?.pixelsPerUnit ?? 0;
-    const unit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
-    const scaleConfig = { pixelsPerFoot: ppu, unit };
+    // BUG-PIKE-012 fix: build per-page scale map instead of using a single ppu
+    const scaleMap = buildScaleMap(allScales, fallbackScale);
 
     const classificationMap = new Map(classifications.map((c) => [c.id, c]));
     const byClassification = new Map<string, { area: number; linearFeet: number; count: number }>();
     for (const p of polygons) {
       const cls = classificationMap.get(p.classificationId);
       const entry = byClassification.get(p.classificationId) ?? { area: 0, linearFeet: 0, count: 0 };
-      if (ppu > 0) {
+      const cfg = scaleForPage(scaleMap, p.pageNumber ?? 1);
+      if (cfg.pixelsPerFoot > 0) {
         if (cls?.type === 'area') {
-          entry.area += calculatePolygonArea(p.points, scaleConfig) ?? 0;
+          entry.area += calculatePolygonArea(p.points, cfg) ?? 0;
         } else if (cls?.type === 'linear') {
-          entry.linearFeet += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+          entry.linearFeet += calculateLinearLength(p.points, cfg, true) ?? 0;
         }
       }
       entry.count += 1;
