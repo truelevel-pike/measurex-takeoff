@@ -72,6 +72,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const existingClassifications = await getClassifications(id).catch(() => []);
     const validClassificationIds = new Set(existingClassifications.map((c) => c.id));
 
+    // BUG-PIKE-008: pre-load polygon IDs once (not inside each deletePolygon loop iteration)
+    // to avoid O(n) file reads when batch has many deletePolygon ops.
+    const existingPolygons = await getPolygons(id).catch(() => []);
+    const validPolygonIds = new Set(existingPolygons.map((p) => p.id));
+
     const results: Array<{ type: string; ok: boolean; id?: string; error?: string }> = [];
     // Track created polygons for the enriched response shape agents expect
     const createdPolygons: Polygon[] = [];
@@ -99,17 +104,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             });
             results.push({ type: op.type, ok: true, id: p.id });
             createdPolygons.push(p);
+            validPolygonIds.add(p.id); // keep set consistent for subsequent deletePolygon ops
             break;
           }
           case 'deletePolygon': {
             // BUG-A5-6-117: verify polygon belongs to project before deleting
-            const projectPolygons = await getPolygons(id);
-            const polygonExists = projectPolygons.some((p) => p.id === op.data.id);
-            if (!polygonExists) {
+            // BUG-PIKE-008 fix: use pre-loaded set, not a fresh getPolygons() per iteration
+            if (!validPolygonIds.has(op.data.id)) {
               results.push({ type: op.type, ok: false, id: op.data.id, error: 'Polygon not found in this project' });
               break;
             }
             await deletePolygonStore(id, op.data.id);
+            validPolygonIds.delete(op.data.id); // keep set consistent for subsequent ops
             results.push({ type: op.type, ok: true, id: op.data.id });
             break;
           }
