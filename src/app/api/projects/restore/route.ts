@@ -56,6 +56,8 @@ export async function POST(req: Request) {
     const classificationIdMap = new Map<string, string>();
 
     for (const c of classifications) {
+      // BUG-PIKE-032 fix: copy all extended fields (tileWidth/Height/Unit, slopeFactor)
+      // so restored project retains tile count and slope factor settings.
       const newC = await createClassification(created.id, {
         name: c.name as string,
         color: c.color as string,
@@ -64,6 +66,10 @@ export async function POST(req: Request) {
         formula: c.formula as string | undefined,
         formulaUnit: c.formulaUnit as string | undefined,
         formulaSavedToLibrary: c.formulaSavedToLibrary as boolean | undefined,
+        tileWidth: c.tileWidth as number | undefined,
+        tileHeight: c.tileHeight as number | undefined,
+        tileUnit: c.tileUnit as 'in' | 'ft' | undefined,
+        slopeFactor: c.slopeFactor as number | undefined,
       });
       if (c.id) classificationIdMap.set(c.id as string, newC.id);
     }

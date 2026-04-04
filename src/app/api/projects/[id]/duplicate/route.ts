@@ -49,6 +49,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const classificationIdMap = new Map<string, string>();
 
       for (const classification of classifications) {
+        // BUG-PIKE-032 fix: copy all extended fields (tileWidth/Height/Unit, slopeFactor)
+        // so duplicated project retains tile count and slope factor settings.
         const created = await createClassification(duplicated.id, {
           name: classification.name,
           color: classification.color,
@@ -57,6 +59,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           formula: classification.formula,
           formulaUnit: classification.formulaUnit,
           formulaSavedToLibrary: classification.formulaSavedToLibrary,
+          tileWidth: classification.tileWidth,
+          tileHeight: classification.tileHeight,
+          tileUnit: classification.tileUnit,
+          slopeFactor: classification.slopeFactor,
         });
         classificationIdMap.set(classification.id, created.id);
       }
