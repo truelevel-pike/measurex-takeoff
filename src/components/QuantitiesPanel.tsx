@@ -20,6 +20,7 @@ import UserPreferencesPanel from './UserPreferencesPanel';
 import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
 import type { AutoDeduction } from '@/server/geometry-engine';
 import BackoutPanel from './BackoutPanel';
+import CustomFormulas from './CustomFormulas';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -315,6 +316,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
   const [editSlopeFactor, setEditSlopeFactor] = useState<string>('');
   // Wave 10: custom properties edit state
   const [editCustomProperties, setEditCustomProperties] = useState<{ key: string; value: string }[]>([]);
+  const [formulaModalClassification, setFormulaModalClassification] = useState<Classification | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [showMeasurementSettings, setShowMeasurementSettings] = useState(false);
@@ -897,6 +899,10 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
       tileUnit: (tileW !== undefined || tileH !== undefined) ? editTileUnit : undefined,
       slopeFactor: slope,
       customProperties: customProperties.length > 0 ? customProperties : undefined,
+      // preserve existing formula fields
+      formula: classification.formula,
+      formulaUnit: classification.formulaUnit,
+      formulaSavedToLibrary: classification.formulaSavedToLibrary,
     });
 
     setEditingId(null);
@@ -2029,6 +2035,18 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                     ))}
                   </div>
 
+                  {/* P3-03: Custom Formula button */}
+                  <div className="mb-2">
+                    <button
+                      type="button"
+                      data-testid="custom-formula-btn"
+                      onClick={() => setFormulaModalClassification(classification)}
+                      className="w-full text-left text-[11px] text-[#00d4ff] hover:underline px-2 py-1 rounded border border-[#00d4ff]/20 bg-[#0a0a0f]"
+                    >
+                      {classification.formula ? `✓ Formula: ${classification.formula.slice(0, 30)}${classification.formula.length > 30 ? '…' : ''}` : '+ Custom Formula'}
+                    </button>
+                  </div>
+
                   {editError && <p className="text-[11px] text-red-400 mb-2">{editError}</p>}
 
                   <div className="flex gap-2 justify-end">
@@ -2793,10 +2811,36 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
     </>
   );
 
+  // P3-03: formula modal (shared across all layouts)
+  const formulaModal = formulaModalClassification ? (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Custom formula editor"
+    >
+      <div className="bg-[#0e1016] border border-[#00d4ff]/30 rounded-xl shadow-2xl w-[420px] max-w-[96vw] max-h-[90vh] overflow-y-auto">
+        <CustomFormulas
+          classification={formulaModalClassification}
+          onSave={(formula, unit, saveToLibrary) => {
+            updateClassification(formulaModalClassification.id, {
+              formula: formula || undefined,
+              formulaUnit: unit || undefined,
+              formulaSavedToLibrary: saveToLibrary,
+            });
+            setFormulaModalClassification(null);
+          }}
+          onClose={() => setFormulaModalClassification(null)}
+        />
+      </div>
+    </div>
+  ) : null;
+
   // Mobile: full-screen overlay when opened
   if (isMobile) {
     return (
       <>
+        {formulaModal}
         {showQuantitiesDrawer && (
           <div
             className="fixed inset-0 z-50 bg-[rgba(10,10,15,0.95)] backdrop-blur-md flex flex-col max-h-screen overflow-y-auto"
@@ -2828,6 +2872,7 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
   if (isTablet) {
     return (
       <>
+        {formulaModal}
         {showQuantitiesDrawer && (
           <div
             className="fixed inset-0 z-40"
@@ -2862,13 +2907,16 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
 
   // Desktop (lg+): always visible sidebar
   return (
-    <aside
-      className="hidden lg:flex bg-[rgba(18,18,26,0.8)] w-72 shrink-0 h-full flex-col border-l border-[#00d4ff]/20 text-[13px]"
-      aria-label="Quantities panel"
-      data-classification-count={classifications.length}
-    >
-      {panel}
-    </aside>
+    <>
+      {formulaModal}
+      <aside
+        className="hidden lg:flex bg-[rgba(18,18,26,0.8)] w-72 shrink-0 h-full flex-col border-l border-[#00d4ff]/20 text-[13px]"
+        aria-label="Quantities panel"
+        data-classification-count={classifications.length}
+      >
+        {panel}
+      </aside>
+    </>
   );
 });
 
