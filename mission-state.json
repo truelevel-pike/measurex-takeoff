@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T01:42:00Z",
+  "lastUpdated": "2026-04-04T01:50:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -47,9 +47,29 @@
     ]
   },
   "completedTasks": ["P1-01","P1-01b","P1-02","P1-03","P1-04","P1-05","P1-06","P2-01","P2-02","P2-03","P2-04","P2-05","P2-06","P2-07","P2-08","P2-09","P2-10","P2-11","P2-12","P2-13","P2-14","P2-15","P3-01","P3-02"],
+  "bugs": [
+    {
+      "id": "BUG-PIKE-001",
+      "file": "src/components/QuantitiesPanel.tsx",
+      "line": 2226,
+      "description": "save-to-org-btn used raw 'mx-org-library' localStorage key; ClassificationLibrary reads from 'mx-org-classifications'. Saved items never appeared in the org library panel.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "6164bc4"
+    },
+    {
+      "id": "BUG-PIKE-002",
+      "file": "src/components/QuantitiesPanel.tsx",
+      "line": 2334,
+      "description": "Assembly cost estimate cast as { unitCost?: number } but Assembly type has no unitCost field — always produced $0.00. Fixed to compute cost from materials[].unitCost * (1/coverageRate).",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "6164bc4"
+    }
+  ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T01:28:00Z",
+  "lastBuildCheck": "2026-04-04T01:50:00Z",
   "admiralDispatches": [
     {"admiral": "admiral5", "task": "P1-01", "completedAt": "2026-04-03T23:00:00Z", "commit": "fb38545"},
     {"admiral": "admiral6", "task": "P1-01b+P1-02+P1-03+P1-06", "completedAt": "2026-04-03T23:49:00Z", "commit": "4227d55"},
