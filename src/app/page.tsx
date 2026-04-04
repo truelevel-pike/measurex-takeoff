@@ -2808,30 +2808,34 @@ function PageInner() {
 
       <MXChat visible={showChat} onClose={() => setShowChat(false)} />
       {showImageSearch && (
-        <AIImageSearch
-          onClose={() => {
-            setShowImageSearch(false);
-            setCroppedImageBase64(null);
-          }}
-          hasPdf={!!pdfFile}
-          getPageCanvas={() => pdfViewerRef.current?.getPageCanvas?.() ?? null}
-          onStartCrop={() => {
-            setShowImageSearch(false);
-            setCropMode(true);
-            setTool('crop');
-          }}
-          croppedImageBase64={croppedImageBase64}
-        />
+        <div data-testid="ai-image-search-panel">
+          <AIImageSearch
+            onClose={() => {
+              setShowImageSearch(false);
+              setCroppedImageBase64(null);
+            }}
+            hasPdf={!!pdfFile}
+            getPageCanvas={() => pdfViewerRef.current?.getPageCanvas?.() ?? null}
+            onStartCrop={() => {
+              setShowImageSearch(false);
+              setCropMode(true);
+              setTool('crop');
+            }}
+            croppedImageBase64={croppedImageBase64}
+          />
+        </div>
       )}
 
       {/* Pattern Search (E26) */}
       {showPatternSearch && (
-        <PatternSearch
-          onClose={() => setShowPatternSearch(false)}
-          onAddToTakeoff={handlePatternSearchAdd}
-          pdfPageImageData={patternSearchPageImage}
-          currentPage={currentPageNum}
-        />
+        <div data-testid="pattern-search-panel">
+          <PatternSearch
+            onClose={() => setShowPatternSearch(false)}
+            onAddToTakeoff={handlePatternSearchAdd}
+            pdfPageImageData={patternSearchPageImage}
+            currentPage={currentPageNum}
+          />
+        </div>
       )}
 
       {/* Export panel */}
@@ -2841,14 +2845,16 @@ function PageInner() {
 
       {/* Compare panel */}
       {showCompare && projectId && (
-        <ComparePanel
-          currentProjectId={projectId}
-          onOverlay={setCompareOverlay}
-          onClose={() => {
-            setShowCompare(false);
-            setCompareOverlay(null);
-          }}
-        />
+        <div data-testid="drawing-comparison-panel">
+          <ComparePanel
+            currentProjectId={projectId}
+            onOverlay={setCompareOverlay}
+            onClose={() => {
+              setShowCompare(false);
+              setCompareOverlay(null);
+            }}
+          />
+        </div>
       )}
 
       {/* What's New modal */}
