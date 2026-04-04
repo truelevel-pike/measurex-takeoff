@@ -4,6 +4,8 @@ import React, { useEffect, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { calculatePolygonArea } from '@/lib/polygon-utils';
+import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
+import { applyCustomFormula } from '@/lib/formula-eval';
 import type { Assembly, Classification } from '@/lib/types';
 
 interface AssemblyRow {
@@ -74,19 +76,34 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
     return () => { cancelled = true; };
   }, [projectId, setAssemblies]);
 
+  const scales = useStore((s) => s.scales);
   const ppu = scale?.pixelsPerUnit || 1;
 
-  // Compute quantities per classification
+  // BUG-PIKE-044: use per-page scales + apply deductions + apply formula overrides
+  // (previously used single global ppu, no deductions, no formulas — inconsistent with QuantitiesPanel)
   const quantitiesByClass = useMemo(() => {
-    const map: Record<string, ClassQuantity> = {};
+    const fallbackUnit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
+    const fallbackCfg = { pixelsPerFoot: ppu, unit: fallbackUnit };
+
+    // Auto-deductions (door/window openings overlapping linear walls)
+    const autoDeductMap = ppu > 0
+      ? aggregateDeductions(computeDeductions(polygons, classifications, fallbackCfg))
+      : new Map<string, { total: number; items: unknown[] }>();
+
+    // First pass: raw quantities with per-page scale
+    const rawByName: Record<string, number> = {};
+    const rawMap: Record<string, ClassQuantity> = {};
     for (const cls of classifications) {
       const classPolygons = polygons.filter((p) => p.classificationId === cls.id && p.isComplete);
       let areaReal = 0;
       let lengthReal = 0;
       for (const p of classPolygons) {
+        // Per-page scale lookup
+        const pageScale = scales[p.pageNumber] ?? scale;
+        const pagePpu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : ppu;
         if (cls.type === 'area') {
           const areaPixels = calculatePolygonArea(p.points);
-          areaReal += areaPixels / (ppu * ppu);
+          areaReal += areaPixels / (pagePpu * pagePpu);
         } else if (cls.type === 'linear') {
           let perimPixels = 0;
           for (let i = 1; i < p.points.length; i++) {
@@ -94,13 +111,39 @@ export default function EstimateSummary({ onSwitchToQuantities, onSwitchToAssemb
             const dy = p.points[i].y - p.points[i - 1].y;
             perimPixels += Math.sqrt(dx * dx + dy * dy);
           }
-          lengthReal += perimPixels / ppu;
+          lengthReal += perimPixels / pagePpu;
         }
       }
-      map[cls.id] = { count: classPolygons.length, areaReal, lengthReal };
+      // Apply deductions to linear
+      if (cls.type === 'linear') {
+        const backoutTotal = (cls.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+        const autoDeductTotal = autoDeductMap.get(cls.id)?.total ?? 0;
+        const manualDeductTotal = (cls.deductions ?? []).reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+        lengthReal = Math.max(0, lengthReal - backoutTotal - autoDeductTotal - manualDeductTotal);
+      }
+      rawMap[cls.id] = { count: classPolygons.length, areaReal, lengthReal };
+      const rawVal = cls.type === 'area' ? areaReal : cls.type === 'linear' ? lengthReal : classPolygons.length;
+      rawByName[cls.name.toLowerCase()] = rawVal;
+    }
+
+    // Second pass: apply custom formula overrides
+    const classNames = classifications.map((c) => c.name);
+    const map: Record<string, ClassQuantity> = {};
+    for (const cls of classifications) {
+      const raw = rawMap[cls.id] ?? { count: 0, areaReal: 0, lengthReal: 0 };
+      const formulaResult = applyCustomFormula(cls.formula, classNames, rawByName);
+      if (formulaResult !== null) {
+        map[cls.id] = {
+          count: cls.type === 'count' ? formulaResult : raw.count,
+          areaReal: cls.type === 'area' ? formulaResult : raw.areaReal,
+          lengthReal: cls.type === 'linear' ? formulaResult : raw.lengthReal,
+        };
+      } else {
+        map[cls.id] = raw;
+      }
     }
     return map;
-  }, [classifications, polygons, ppu]);
+  }, [classifications, polygons, scale, scales, ppu]);
 
   function unitLabel(cls: Classification): string {
     if (cls.type === 'area') return 'SF';
