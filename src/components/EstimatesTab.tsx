@@ -20,6 +20,8 @@ interface AssemblyRow {
   unit: string;
   unitCost: number;
   quantityFormula: string;
+  // BUG-PIKE-009 fix: classificationId needed for per-classification cost matching
+  classificationId?: string;
 }
 
 const defaultUnit: Record<string, string> = {
@@ -140,17 +142,30 @@ export default function EstimatesTab({
     );
   }
 
-  const assemblyByType: Record<string, AssemblyRow | undefined> = {};
+  // BUG-PIKE-009 fix: match assemblies by classificationId first (exact match),
+  // then fall back to quantityFormula/type for unlinked classifications.
+  // The previous code keyed by quantityFormula which meant all "area" classifications
+  // shared the same assembly — ignoring per-classification unit cost assignments.
+  const assemblyByClassId = new Map<string, AssemblyRow>();
+  const assemblyByFormula = new Map<string, AssemblyRow>();
   for (const a of assemblies) {
-    if (!assemblyByType[a.quantityFormula]) {
-      assemblyByType[a.quantityFormula] = a;
+    if (a.classificationId) {
+      assemblyByClassId.set(a.classificationId, a);
+    }
+    // Keep first-seen per formula as fallback
+    if (!assemblyByFormula.has(a.quantityFormula)) {
+      assemblyByFormula.set(a.quantityFormula, a);
     }
   }
 
   const rows = classifications.map((c) => {
     const qty = quantities[c.id] ?? 0;
     const unit = c.unit || defaultUnit[c.type] || "EA";
-    const matchedAssembly = assemblyByType[c.type];
+    // Prefer exact classificationId match; fall back to formula/type match
+    const matchedAssembly =
+      assemblyByClassId.get(c.id) ??
+      assemblyByFormula.get(c.type) ??
+      undefined;
     const costPerUnit = matchedAssembly?.unitCost ?? 0;
     const subtotal = qty * costPerUnit;
     return { ...c, qty, unit, assembly: matchedAssembly, costPerUnit, subtotal };
