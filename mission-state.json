@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T02:49:25.498279Z",
+  "lastUpdated": "2026-04-04T03:05:00.000000Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -327,6 +327,15 @@
       "status": "fixed",
       "commit": "4454c2d",
       "fixedAt": "2026-04-04T02:49:25.497954Z"
+    },
+    {
+      "id": "BUG-PIKE-010",
+      "file": "src/components/QuantitiesPanel.tsx, src/components/CustomFormulas.tsx",
+      "line": 614,
+      "description": "Custom formulas (P3-03) were stored in classification.formula but never applied to estimateQuantities. Formula result was displayed in the modal preview only \u2014 it never overrode the raw area/linear/count used in EstimatesTab cost calculations. Fixed by: (1) extracting tokenizer/evaluator to shared src/lib/formula-eval.ts, (2) applying applyCustomFormula() in estimateQuantities useMemo before falling back to raw geometry values.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "1322ab3"
     }
   ],
   "blockers": [],
