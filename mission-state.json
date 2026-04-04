@@ -4,49 +4,244 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T01:50:00Z",
+  "lastUpdated": "2026-04-04T02:10:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
-      {"id": "P1-01", "title": "Audit all interactive elements for data-testid coverage", "status": "done", "commit": "fb38545"},
-      {"id": "P1-01b", "title": "Add data-testid to TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups", "status": "done", "commit": "3fa0847"},
-      {"id": "P1-02", "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding", "status": "done", "commit": "3fa0847"},
-      {"id": "P1-03", "title": "Verify SF labels always visible on every polygon type", "status": "done", "commit": "3fa0847"},
-      {"id": "P1-04", "title": "Canvas must accept standard PointerEvents for drawing", "status": "done", "commit": "bf2c2ef"},
-      {"id": "P1-05", "title": "Document canvas coordinate contract for agent programming", "status": "done"},
-      {"id": "P1-06", "title": "CDP interaction test suite — verify all draw tools", "status": "done", "commit": "4227d55"}
+      {
+        "id": "P1-01",
+        "title": "Audit all interactive elements for data-testid coverage",
+        "status": "done",
+        "commit": "fb38545"
+      },
+      {
+        "id": "P1-01b",
+        "title": "Add data-testid to TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups",
+        "status": "done",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-02",
+        "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding",
+        "status": "done",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-03",
+        "title": "Verify SF labels always visible on every polygon type",
+        "status": "done",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-04",
+        "title": "Canvas must accept standard PointerEvents for drawing",
+        "status": "done",
+        "commit": "bf2c2ef"
+      },
+      {
+        "id": "P1-05",
+        "title": "Document canvas coordinate contract for agent programming",
+        "status": "done"
+      },
+      {
+        "id": "P1-06",
+        "title": "CDP interaction test suite — verify all draw tools",
+        "status": "done",
+        "commit": "4227d55"
+      }
     ],
     "phase2": [
-      {"id": "P2-01", "title": "Auto-naming sheets from title blocks on upload", "status": "done", "commit": "faca9b9"},
-      {"id": "P2-02", "title": "Pattern Search — find repeated symbols across pages", "status": "done", "commit": "b772cac"},
-      {"id": "P2-03", "title": "AI Image Search improvements", "status": "done", "commit": "b772cac"},
-      {"id": "P2-04", "title": "Drawing Comparison — compare revisions, quantify changes", "status": "done", "commit": "b772cac"},
-      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "done", "commit": "5867d98"},
-      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "done", "commit": "5867d98"},
-      {"id": "P2-07", "title": "Cut/subtract tool — remove area from polygon", "status": "done", "commit": "6b6b716"},
-      {"id": "P2-08", "title": "Smart paste", "status": "done", "commit": "faca9b9"},
-      {"id": "P2-09", "title": "Flip, rotate, combine polygons", "status": "done", "commit": "faca9b9"},
-      {"id": "P2-10", "title": "Arc line tool", "status": "done", "commit": "a101681"},
-      {"id": "P2-11", "title": "Circle shortcut (C key)", "status": "done", "commit": "a101681"},
-      {"id": "P2-12", "title": "Edge snapping (auto + toggle)", "status": "done", "commit": "e589b2d"},
-      {"id": "P2-13", "title": "Wall centerline auto-detection", "status": "done", "commit": "cf06ab6"},
-      {"id": "P2-14", "title": "Door/window backout from wall linear measurements", "status": "done", "commit": "d679b98"},
-      {"id": "P2-15", "title": "Multi-select classifications", "status": "done", "commit": "5867d98"}
+      {
+        "id": "P2-01",
+        "title": "Auto-naming sheets from title blocks on upload",
+        "status": "done",
+        "commit": "faca9b9"
+      },
+      {
+        "id": "P2-02",
+        "title": "Pattern Search — find repeated symbols across pages",
+        "status": "done",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-03",
+        "title": "AI Image Search improvements",
+        "status": "done",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-04",
+        "title": "Drawing Comparison — compare revisions, quantify changes",
+        "status": "done",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-05",
+        "title": "Merge tool — fill gaps between polygons",
+        "status": "done",
+        "commit": "5867d98"
+      },
+      {
+        "id": "P2-06",
+        "title": "Split tool — divide polygon in two",
+        "status": "done",
+        "commit": "5867d98"
+      },
+      {
+        "id": "P2-07",
+        "title": "Cut/subtract tool — remove area from polygon",
+        "status": "done",
+        "commit": "6b6b716"
+      },
+      {
+        "id": "P2-08",
+        "title": "Smart paste",
+        "status": "done",
+        "commit": "faca9b9"
+      },
+      {
+        "id": "P2-09",
+        "title": "Flip, rotate, combine polygons",
+        "status": "done",
+        "commit": "faca9b9"
+      },
+      {
+        "id": "P2-10",
+        "title": "Arc line tool",
+        "status": "done",
+        "commit": "a101681"
+      },
+      {
+        "id": "P2-11",
+        "title": "Circle shortcut (C key)",
+        "status": "done",
+        "commit": "a101681"
+      },
+      {
+        "id": "P2-12",
+        "title": "Edge snapping (auto + toggle)",
+        "status": "done",
+        "commit": "e589b2d"
+      },
+      {
+        "id": "P2-13",
+        "title": "Wall centerline auto-detection",
+        "status": "done",
+        "commit": "cf06ab6"
+      },
+      {
+        "id": "P2-14",
+        "title": "Door/window backout from wall linear measurements",
+        "status": "done",
+        "commit": "d679b98"
+      },
+      {
+        "id": "P2-15",
+        "title": "Multi-select classifications",
+        "status": "done",
+        "commit": "5867d98"
+      }
     ],
     "phase3": [
-      {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "done", "commit": "6756f9f", "assignedTo": "admiral8", "admiral": "admiral8"},
-      {"id": "P3-02", "title": "Material library (reusable)", "status": "done", "commit": "6756f9f", "assignedTo": "admiral8", "admiral": "admiral8"},
-      {"id": "P3-03", "title": "Custom formulas (Excel-like syntax)", "status": "in-progress", "assignedTo": "admiral5", "admiral": "admiral5", "dispatchedAt": "2026-04-04T01:53:00Z", "notes": "CustomFormulas.tsx existed but was dead code — re-dispatched A5 to wire it in"},
-      {"id": "P3-04", "title": "Assembly export", "status": "in-progress", "assignedTo": "admiral5", "admiral": "admiral5", "dispatchedAt": "2026-04-04T01:53:00Z"}
+      {
+        "id": "P3-01",
+        "title": "Assemblies — link classifications to materials + costs",
+        "status": "done",
+        "commit": "6756f9f",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8"
+      },
+      {
+        "id": "P3-02",
+        "title": "Material library (reusable)",
+        "status": "done",
+        "commit": "6756f9f",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8"
+      },
+      {
+        "id": "P3-03",
+        "title": "Custom formulas (Excel-like syntax)",
+        "status": "in-progress",
+        "assignedTo": "admiral5",
+        "admiral": "admiral5",
+        "dispatchedAt": "2026-04-04T01:53:00Z",
+        "notes": "CustomFormulas.tsx existed but was dead code — re-dispatched A5 to wire it in"
+      },
+      {
+        "id": "P3-04",
+        "title": "Assembly export",
+        "status": "in-progress",
+        "assignedTo": "admiral5",
+        "admiral": "admiral5",
+        "dispatchedAt": "2026-04-04T01:53:00Z"
+      }
     ],
     "phase4": [
-      {"id": "P4-01", "title": "Multi-user real-time editing", "status": "done", "assignedTo": "admiral8", "admiral": "admiral8", "commit": "9f04fdc"},
-      {"id": "P4-02", "title": "External collaboration (no license, permission levels)", "status": "done", "assignedTo": "admiral8", "admiral": "admiral8", "commit": "9f04fdc"},
-      {"id": "P4-03", "title": "Organization-level classification library", "status": "done", "assignedTo": "admiral7", "admiral": "admiral7", "commit": "520e0a0"},
-      {"id": "P4-04", "title": "Version history", "status": "done", "assignedTo": "admiral7", "admiral": "admiral7", "commit": "520e0a0"}
+      {
+        "id": "P4-01",
+        "title": "Multi-user real-time editing",
+        "status": "done",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "commit": "9f04fdc"
+      },
+      {
+        "id": "P4-02",
+        "title": "External collaboration (no license, permission levels)",
+        "status": "done",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "commit": "9f04fdc"
+      },
+      {
+        "id": "P4-03",
+        "title": "Organization-level classification library",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "520e0a0"
+      },
+      {
+        "id": "P4-04",
+        "title": "Version history",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "520e0a0"
+      }
     ]
   },
-  "completedTasks": ["P1-01","P1-01b","P1-02","P1-03","P1-04","P1-05","P1-06","P2-01","P2-02","P2-03","P2-04","P2-05","P2-06","P2-07","P2-08","P2-09","P2-10","P2-11","P2-12","P2-13","P2-14","P2-15","P3-01","P3-02","P4-01","P4-02","P4-03","P4-04"],
+  "completedTasks": [
+    "P1-01",
+    "P1-01b",
+    "P1-02",
+    "P1-03",
+    "P1-04",
+    "P1-05",
+    "P1-06",
+    "P2-01",
+    "P2-02",
+    "P2-03",
+    "P2-04",
+    "P2-05",
+    "P2-06",
+    "P2-07",
+    "P2-08",
+    "P2-09",
+    "P2-10",
+    "P2-11",
+    "P2-12",
+    "P2-13",
+    "P2-14",
+    "P2-15",
+    "P3-01",
+    "P3-02",
+    "P4-01",
+    "P4-02",
+    "P4-03",
+    "P4-04"
+  ],
   "bugs": [
     {
       "id": "BUG-PIKE-001",
@@ -65,20 +260,82 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "6164bc4"
+    },
+    {
+      "id": "BUG-PIKE-003",
+      "file": "src/lib/ws-client.ts",
+      "line": 213,
+      "description": "cursor:update SSE event fell into default case — not routed to activity bus. useCollaboration hook never received cursor positions from other users. Fixed by adding cursor:update to the SSE event switch.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "31609bf"
+    },
+    {
+      "id": "BUG-PIKE-004",
+      "file": "src/components/CanvasOverlay.tsx",
+      "line": 1248,
+      "description": "Collaborator cursors read via useStore.getState() (non-reactive) — cursors would never update in the render without a forced re-render trigger. Fixed by adding reactive useStore selector for collaborators at component top-level.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "31609bf"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T01:50:00Z",
+  "lastBuildCheck": "2026-04-04T02:10:00Z",
   "admiralDispatches": [
-    {"admiral": "admiral5", "task": "P1-01", "completedAt": "2026-04-03T23:00:00Z", "commit": "fb38545"},
-    {"admiral": "admiral6", "task": "P1-01b+P1-02+P1-03+P1-06", "completedAt": "2026-04-03T23:49:00Z", "commit": "4227d55"},
-    {"admiral": "admiral7", "task": "P1-04+P2-10+P2-11", "completedAt": "2026-04-03T23:54:00Z", "commit": "bf2c2ef"},
-    {"admiral": "admiral6", "task": "P2-01+P2-08+P2-09", "completedAt": "2026-04-04T00:08:00Z", "commit": "faca9b9"},
-    {"admiral": "admiral5", "task": "P2-07+P2-12", "completedAt": "2026-04-04T01:10:00Z", "commit": "e589b2d"},
-    {"admiral": "admiral7", "task": "P2-02+P2-03+P2-04+P2-13+P2-14", "completedAt": "2026-04-04T01:17:00Z", "commit": "d679b98"},
-    {"admiral": "admiral7", "task": "P2-05+P2-06+P2-15", "completedAt": "2026-04-04T01:27:00Z", "commit": "5867d98"},
-    {"admiral": "admiral8", "task": "P3-01+P3-02", "completedAt": "2026-04-04T01:28:00Z", "commit": "6756f9f"},
-    {"admiral": "admiral5", "task": "P3-03", "dispatchedAt": "2026-04-04T01:28:00Z"}
+    {
+      "admiral": "admiral5",
+      "task": "P1-01",
+      "completedAt": "2026-04-03T23:00:00Z",
+      "commit": "fb38545"
+    },
+    {
+      "admiral": "admiral6",
+      "task": "P1-01b+P1-02+P1-03+P1-06",
+      "completedAt": "2026-04-03T23:49:00Z",
+      "commit": "4227d55"
+    },
+    {
+      "admiral": "admiral7",
+      "task": "P1-04+P2-10+P2-11",
+      "completedAt": "2026-04-03T23:54:00Z",
+      "commit": "bf2c2ef"
+    },
+    {
+      "admiral": "admiral6",
+      "task": "P2-01+P2-08+P2-09",
+      "completedAt": "2026-04-04T00:08:00Z",
+      "commit": "faca9b9"
+    },
+    {
+      "admiral": "admiral5",
+      "task": "P2-07+P2-12",
+      "completedAt": "2026-04-04T01:10:00Z",
+      "commit": "e589b2d"
+    },
+    {
+      "admiral": "admiral7",
+      "task": "P2-02+P2-03+P2-04+P2-13+P2-14",
+      "completedAt": "2026-04-04T01:17:00Z",
+      "commit": "d679b98"
+    },
+    {
+      "admiral": "admiral7",
+      "task": "P2-05+P2-06+P2-15",
+      "completedAt": "2026-04-04T01:27:00Z",
+      "commit": "5867d98"
+    },
+    {
+      "admiral": "admiral8",
+      "task": "P3-01+P3-02",
+      "completedAt": "2026-04-04T01:28:00Z",
+      "commit": "6756f9f"
+    },
+    {
+      "admiral": "admiral5",
+      "task": "P3-03",
+      "dispatchedAt": "2026-04-04T01:28:00Z"
+    }
   ]
 }
