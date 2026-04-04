@@ -1,6 +1,6 @@
 import type { DetectedElement } from './ai-takeoff';
 import type { Classification, Point, ScaleCalibration } from './types';
-import { calculatePolygonArea, calculateLinearFeet } from './polygon-utils';
+import { calculatePolygonArea } from './polygon-utils';
 import { emitActivity } from './ws-client';
 
 /**
@@ -13,8 +13,9 @@ export function loadAIResults(
     addPolygon: (p: { points: Point[]; classificationId: string; pageNumber: number; area: number; linearFeet: number; label?: string }) => string;
     classifications: Classification[];
     scale: ScaleCalibration | null;
+    scales?: Record<number, ScaleCalibration>;
     currentPage: number;
-    getState?: () => { classifications: Classification[]; scale: ScaleCalibration | null; currentPage: number };
+    getState?: () => { classifications: Classification[]; scale: ScaleCalibration | null; scales?: Record<number, ScaleCalibration>; currentPage: number };
   },
   opts?: { zoom?: number; pageNumber?: number }
 ): { areas: number; lines: number; counts: number } {
@@ -26,6 +27,7 @@ export function loadAIResults(
   const readState = () => store.getState?.() ?? {
     classifications: store.classifications,
     scale: store.scale,
+    scales: store.scales,
     currentPage: store.currentPage,
   };
 
@@ -60,8 +62,6 @@ export function loadAIResults(
   }
 
   const state = readState();
-  // BUG-A5-6-133: Use || so that explicit 0 also falls back to 1 (avoids division by zero).
-  const ppu = state.scale?.pixelsPerUnit || 1;
   const page = opts?.pageNumber ?? (state.currentPage || 1);
   const r = Math.max(5, Math.round((opts?.zoom ? 6 / opts.zoom : 6))); // count marker radius
 
@@ -80,8 +80,15 @@ export function loadAIResults(
       emitActivity('polygon:created', { id: polyId, label: el.name, classificationId: clsId, type: 'area' });
       stats.areas++;
     } else if (el.type === 'linear' && el.points.length >= 2) {
-      const lf = calculateLinearFeet(el.points, ppu, false);
-      const polyId = store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: 0, linearFeet: lf, label: el.name });
+      // BUG-PIKE-017 fix: store linearFeet as raw pixel length (ppu=1), consistent with
+      // server API and all other addPolygon call sites. Callers (quantities, assemblies, etc.)
+      // apply per-page ppu at read time to convert to real-world units.
+      let pixelLen = 0;
+      for (let i = 0; i < el.points.length - 1; i++) {
+        const a = el.points[i], b = el.points[i + 1];
+        pixelLen += Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      }
+      const polyId = store.addPolygon({ points: el.points, classificationId: clsId, pageNumber: page, area: 0, linearFeet: pixelLen, label: el.name });
       emitActivity('polygon:created', { id: polyId, label: el.name, classificationId: clsId, type: 'linear' });
       stats.lines++;
     } else if (el.type === 'count' && el.points.length >= 1) {
