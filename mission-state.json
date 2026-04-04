@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:45:02.080954Z",
+  "lastUpdated": "2026-04-04T03:46:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -438,6 +438,24 @@
       "status": "fixed",
       "commit": "8ed1760",
       "fixedAt": "2026-04-04T03:45:02.080792Z"
+    },
+    {
+      "id": "BUG-PIKE-021",
+      "file": "src/app/api/projects/[id]/export/json/route.ts",
+      "line": 17,
+      "description": "JSON export omitted assemblies \u2014 getAssemblies not fetched, assemblies not included in payload. Cost data was lost on export.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "f5f9fad"
+    },
+    {
+      "id": "BUG-PIKE-022",
+      "file": "src/components/PolygonGroupPanel.tsx",
+      "line": 209,
+      "description": "PolygonGroupPanel group summary stats (totalArea, totalLength) used global pixelsPerUnit instead of per-page PPU. Multi-page projects showed incorrect group totals.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "f5f9fad"
     }
   ],
   "blockers": [],
