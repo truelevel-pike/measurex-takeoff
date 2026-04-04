@@ -212,7 +212,8 @@ function handleSSEMessage(raw: MessageEvent) {
     }
     case 'viewer:joined':
     case 'viewer:left':
-    case 'viewer:count': {
+    case 'viewer:count':
+    case 'cursor:update': {
       emitActivity(parsed.event, parsed.data as Record<string, unknown>);
       break;
     }

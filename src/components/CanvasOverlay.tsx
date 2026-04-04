@@ -287,6 +287,7 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
   const calibrationMode = useStore((s) => s.calibrationMode);
   const calibrationPoints = useStore((s) => s.calibrationPoints);
   const addCalibrationPoint = useStore((s) => s.addCalibrationPoint);
+  const collaborators = useStore((s) => s.collaborators);
 
   const polygons = useMemo(
     () => allPolygons.filter((p) => p.pageNumber === currentPage),
@@ -1245,8 +1246,8 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
         )}
       </svg>
       {/* P4-01: Collaborator cursors — render other users' cursor positions */}
-      {useStore.getState().collaborators
-        .filter((c) => c.cursor && c.cursor.page === (useStore.getState().currentPage ?? 1))
+      {collaborators
+        .filter((c) => c.cursor && c.cursor.page === (currentPage ?? 1))
         .map((c) => {
           if (!c.cursor) return null;
           const pctX = (c.cursor.x / baseDims.width) * 100;
