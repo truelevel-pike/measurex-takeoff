@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:37:55.639592Z",
+  "lastUpdated": "2026-04-04T03:45:02.080954Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -423,6 +423,21 @@
       "status": "fixed",
       "commit": "64bfea6",
       "fixedAt": "2026-04-04T03:37:55.639803Z"
+    },
+    {
+      "id": "BUG-PIKE-020",
+      "files": [
+        "src/components/SmartTools.tsx",
+        "src/components/MXChat.tsx",
+        "src/components/ClassificationGroups.tsx",
+        "src/components/PolygonGroupPanel.tsx",
+        "src/components/PolygonProperties.tsx"
+      ],
+      "description": "Multiple display components summed/displayed polygon.linearFeet (raw pixels since BUG-PIKE-019 fix) without dividing by ppu. Affected: Wall Centerline total LF in SmartTools, all-page quantity sums in MXChat buildContext, classification group totals in ClassificationGroups, per-polygon and group stats in PolygonGroupPanel, and polygon detail display in PolygonProperties.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "8ed1760",
+      "fixedAt": "2026-04-04T03:45:02.080792Z"
     }
   ],
   "blockers": [],
