@@ -287,3 +287,90 @@ export function cutPolygonFromShape(polyPoints: Point[], cutShapePoints: Point[]
   }
   return results;
 }
+
+/**
+ * P2-05: Merge two polygons with gap-filling.
+ *
+ * First attempts direct union (existing mergePolygons). If that fails to merge
+ * (polygons don't touch/overlap), expands each polygon's bounding box by maxGap/2
+ * and retries. If still not merged, returns the convex hull of all combined points
+ * as a best-effort gap fill.
+ *
+ * NOTE: Turf buffer doesn't work correctly in pixel coordinate space (treats px as
+ * degrees). Instead we expand each polygon's AABB by maxGap/2 and create an
+ * expanded polygon, then union those. This works in any coordinate system.
+ */
+export function mergePolygonsWithGapFill(poly1: Point[], poly2: Point[], maxGap = 20): Point[] {
+  if (!poly1 || poly1.length < 3 || !poly2 || poly2.length < 3) return [...(poly1 || []), ...(poly2 || [])];
+
+  // Try direct union first
+  const direct = mergePolygons(poly1, poly2);
+
+  // If direct merge produced more than the sum of inputs OR looks like a real union
+  // (i.e. result is not just concatenation), it worked — return it.
+  // Heuristic: a successful union produces a polygon with ≤ (len1+len2) unique points
+  // but always fewer than the naive concatenation (which repeats all vertices).
+  const maxRaw = poly1.length + poly2.length;
+  if (direct.length < maxRaw) {
+    // Real union succeeded (result is smaller than naive concat)
+    return direct;
+  }
+
+  // Union failed — polygons don't overlap. Try expanding each by maxGap/2 using AABB expansion.
+  const expand = (pts: Point[], by: number): Point[] => {
+    const xs = pts.map(p => p.x);
+    const ys = pts.map(p => p.y);
+    const minX = Math.min(...xs) - by;
+    const maxX = Math.max(...xs) + by;
+    const minY = Math.min(...ys) - by;
+    const maxY = Math.max(...ys) + by;
+    return [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x: minX, y: maxY },
+    ];
+  };
+
+  const expanded1 = expand(poly1, maxGap / 2);
+  const expanded2 = expand(poly2, maxGap / 2);
+  const expandedMerge = mergePolygons(expanded1, expanded2);
+
+  if (expandedMerge.length < expanded1.length + expanded2.length) {
+    // Expanded union worked — now intersect with the convex hull of original points
+    // to avoid the result being too large. For simplicity, return the convex hull
+    // of both original point sets combined.
+    const all = [...poly1, ...poly2];
+    const hull = convexHull(all);
+    return hull.length >= 3 ? hull : expandedMerge;
+  }
+
+  // Last resort: convex hull of all points
+  const hull = convexHull([...poly1, ...poly2]);
+  return hull.length >= 3 ? hull : direct;
+}
+
+/**
+ * Compute convex hull of a set of 2D points (Graham scan).
+ * Returns the hull vertices in counter-clockwise order.
+ */
+function convexHull(pts: Point[]): Point[] {
+  if (pts.length < 3) return pts;
+  const sorted = [...pts].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+  const cross = (o: Point, a: Point, b: Point) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Point[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Point[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}

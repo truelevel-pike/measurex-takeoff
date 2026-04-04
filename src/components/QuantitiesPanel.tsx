@@ -244,6 +244,10 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
   const scale = useStore((s) => s.scale);
   const scales = useStore((s) => s.scales);
   const selectedClassification = useStore((s) => s.selectedClassification);
+  // P2-15: multi-select classifications
+  const selectedClassifications = useStore((s) => s.selectedClassifications);
+  const setSelectedClassifications = useStore((s) => s.setSelectedClassifications);
+  const toggleClassificationSelection = useStore((s) => s.toggleClassificationSelection);
 
   const addClassification = useStore((s) => s.addClassification);
   const updateClassification = useStore((s) => s.updateClassification);
@@ -1648,6 +1652,30 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
         </div>
       </div>
 
+      {/* P2-15: multi-select controls */}
+      {classifications.length > 0 && (
+        <div className="px-2 py-1 flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="classification-select-all-btn"
+            onClick={() => {
+              if (selectedClassifications.length === classifications.length) {
+                setSelectedClassifications([]);
+              } else {
+                setSelectedClassifications(classifications.map((c) => c.id));
+              }
+            }}
+            className="text-[10px] px-2 py-0.5 rounded border border-[#00d4ff]/25 text-[#7aebff] hover:bg-[#00d4ff]/10"
+          >
+            {selectedClassifications.length === classifications.length ? 'Deselect All' : 'Select All'}
+          </button>
+          {selectedClassifications.length > 0 && (
+            <span data-testid="classification-selected-count" className="text-[10px] text-[#00d4ff]/70">
+              {selectedClassifications.length} selected
+            </span>
+          )}
+        </div>
+      )}
       <div className="px-2 pb-2 flex gap-2">
         <button
           type="button"
@@ -2021,12 +2049,19 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                     : selectedClassificationId === classification.id ? 'bg-[#00d4ff]/5 border border-[#00d4ff]/20'
                     : 'hover:bg-[#0e1016]'
                   }`}
-                  onClick={() => { setSelectedClassificationId(classification.id); activateClassification(classification.id, isSelected); }}
+                  onClick={(e) => {
+                    setSelectedClassificationId(classification.id);
+                    // P2-15: multi-select with Ctrl/Cmd or Shift
+                    const multi = e.ctrlKey || e.metaKey || e.shiftKey;
+                    toggleClassificationSelection(classification.id, multi);
+                    activateClassification(classification.id, isSelected);
+                  }}
                   onKeyDown={(event) => handleClassificationRowKeyDown(event, classification.id)}
                   onFocus={() => setSelectedClassificationId(classification.id)}
                   onMouseEnter={() => setHoveredClassificationId(classification.id)}
                   onMouseLeave={() => setHoveredClassificationId(null)}
                   tabIndex={0}
+                  data-testid="classification-item"
                   data-classification-row
                   data-classification-id={classification.id}
                 >

@@ -5,7 +5,7 @@
   "phaseName": "Feature Gaps (Core)",
   "startedAt": "2026-04-03T22:42:00Z",
   "lastUpdated": "2026-04-04T01:17:00Z",
-  "nextAdmiral": "admiral7",
+  "nextAdmiral": "admiral8",
   "tasks": {
     "phase1": [
       {"id": "P1-01", "title": "Audit all interactive elements for data-testid coverage", "status": "done", "commit": "fb38545"},
@@ -21,8 +21,8 @@
       {"id": "P2-02", "title": "Pattern Search — find repeated symbols across pages", "status": "done", "commit": "b772cac"},
       {"id": "P2-03", "title": "AI Image Search improvements", "status": "done", "commit": "b772cac"},
       {"id": "P2-04", "title": "Drawing Comparison — compare revisions, quantify changes", "status": "done", "commit": "b772cac"},
-      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"},
+      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"},
       {"id": "P2-07", "title": "Cut/subtract tool — remove area from polygon", "status": "done", "commit": "6b6b716"},
       {"id": "P2-08", "title": "Smart paste", "status": "done", "commit": "faca9b9"},
       {"id": "P2-09", "title": "Flip, rotate, combine polygons", "status": "done", "commit": "faca9b9"},
@@ -31,7 +31,7 @@
       {"id": "P2-12", "title": "Edge snapping (auto + toggle)", "status": "done", "commit": "e589b2d"},
       {"id": "P2-13", "title": "Wall centerline auto-detection", "status": "done", "commit": "cf06ab6"},
       {"id": "P2-14", "title": "Door/window backout from wall linear measurements", "status": "done", "commit": "d679b98"},
-      {"id": "P2-15", "title": "Multi-select classifications", "status": "pending", "assignedTo": null, "admiral": null}
+      {"id": "P2-15", "title": "Multi-select classifications", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"}
     ],
     "phase3": [
       {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "pending", "assignedTo": null, "admiral": null},

@@ -12,7 +12,7 @@ import type {
   Annotation,
   RepeatingGroup,
 } from './types';
-import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea, flipPolygonH, flipPolygonV, rotatePolygon, combinePolygons, cutPolygonFromShape } from './polygon-utils';
+import { mergePolygons as mergePolygonPoints, mergePolygonsWithGapFill, splitPolygonByLine, calculatePolygonArea, flipPolygonH, flipPolygonV, rotatePolygon, combinePolygons, cutPolygonFromShape } from './polygon-utils';
 import { assignTradeGroup } from './trade-groups';
 
 // Helpers
@@ -88,6 +88,10 @@ export interface Store extends ProjectState {
   setShowScalePopup: (show: boolean) => void;
   setZoomLevel: (zoomLevel: number) => void;
   selectedClassification: string | null;
+  // P2-15: multi-select classifications
+  selectedClassifications: string[];
+  setSelectedClassifications: (ids: string[]) => void;
+  toggleClassificationSelection: (id: string, multi: boolean) => void;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
   selectedPolygons: string[];
@@ -314,6 +318,21 @@ export const useStore = create<Store>()(
   setShowScalePopup: (show) => set({ showScalePopup: show }),
   setZoomLevel: (zoomLevel) => set({ zoomLevel: Math.max(0.25, Math.min(4, zoomLevel)) }),
   selectedClassification: null,
+  selectedClassifications: [],
+  setSelectedClassifications: (ids) => set({ selectedClassifications: ids }),
+  toggleClassificationSelection: (id, multi) => {
+    const s = get();
+    if (!multi) {
+      // Single click: replace selection, also set the primary selectedClassification
+      set({ selectedClassifications: [id], selectedClassification: id });
+    } else {
+      // Ctrl/Cmd click: toggle individual
+      const next = s.selectedClassifications.includes(id)
+        ? s.selectedClassifications.filter((x) => x !== id)
+        : [...s.selectedClassifications, id];
+      set({ selectedClassifications: next, selectedClassification: next.length ? next[next.length - 1] : null });
+    }
+  },
   selectedPolygon: null,
   selectedPolygonId: null,
   selectedPolygons: [],
@@ -818,7 +837,8 @@ export const useStore = create<Store>()(
     const p2 = s.polygons.find((p) => p.id === id2);
     if (!p1 || !p2 || p1.classificationId !== p2.classificationId) return;
     const before = snapshot(s);
-    const mergedPoints = mergePolygonPoints(p1.points, p2.points);
+    // P2-05: use gap-fill merge — falls back to convex hull if polygons don't touch
+    const mergedPoints = mergePolygonsWithGapFill(p1.points, p2.points);
     const merged: Polygon = {
       ...p1,
       id: crypto.randomUUID(),

@@ -420,6 +420,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
 
   return (
     <aside
+      data-testid="assemblies-panel"
       className="bg-[rgba(18,18,26,0.8)] md:w-[240px] lg:w-72 shrink-0 h-full flex flex-col border-l border-[#00d4ff]/20 text-[13px]"
       aria-label="Assemblies panel"
     >
@@ -453,6 +454,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
       <div className="px-2 py-2">
         <button
           type="button"
+          data-testid="assembly-add-material-btn"
           onClick={() => {
             setEditingAssembly(null);
             setShowEditor(true);
@@ -474,7 +476,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
           const unit = displayUnit(assembly);
 
           return (
-            <div key={assembly.id}>
+            <div key={assembly.id} data-testid="assembly-item">
               <div
                 className="group flex items-center gap-1.5 px-1.5 py-1.5 rounded cursor-pointer hover:bg-[#0e1016]"
                 onClick={() => toggleExpanded(assembly.id)}
@@ -576,7 +578,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
                   </div>
                   <div className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2">
                     <span className="font-semibold text-[#00d4ff]">Projected Total</span>
-                    <span className="font-mono text-[#00d4ff] font-semibold">
+                    <span data-testid="assembly-total-cost" className="font-mono text-[#00d4ff] font-semibold">
                       ${(uc * projectedQuantity(assembly)).toFixed(2)}
                     </span>
                   </div>
@@ -585,13 +587,13 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
                   {assembly.materials.length > 0 && (
                     <>
                       <div className="text-[10px] text-[#8892a0] mt-1 mb-0.5 uppercase tracking-wider">Materials</div>
-                      {assembly.materials.map((mat) => (
+                      {assembly.materials.map((mat, mIdx) => (
                         <div
                           key={mat.id}
                           className="text-[11px] py-0.5 flex items-center justify-between text-[#8892a0] gap-2"
                         >
-                          <span className="truncate">{mat.name || 'Unnamed'}</span>
-                          <span className="font-mono text-[#e5e7eb] whitespace-nowrap">
+                          <span data-testid={`assembly-material-name-input-${mIdx}`} className="truncate">{mat.name || 'Unnamed'}</span>
+                          <span data-testid={`assembly-material-cost-input-${mIdx}`} className="font-mono text-[#e5e7eb] whitespace-nowrap">
                             ${mat.unitCost.toFixed(2)} | {mat.wasteFactor}% | {mat.unit}
                           </span>
                         </div>
