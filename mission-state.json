@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:13:28.757253Z",
+  "lastUpdated": "2026-04-04T03:20:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -373,6 +373,15 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "930bc3d"
+    },
+    {
+      "id": "BUG-PIKE-015",
+      "file": "src/components/CustomFormulas.tsx",
+      "line": 30,
+      "description": "CustomFormulas formula preview used single page-1 scale for all pages (multi-page inaccuracy) AND treated p.linearFeet as real-world units but it is raw pixels (linear_pixels in DB) \u2014 formula preview showed wildly inflated linear values. Fixed: use per-page scales from store.scales map and divide p.linearFeet by ppu.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "b2bfbac"
     }
   ],
   "blockers": [],
