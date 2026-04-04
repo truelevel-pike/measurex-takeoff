@@ -9,7 +9,9 @@ import {
   getScale,
   listScales,
   getPages,
+  getAssemblies,
 } from '@/server/project-store';
+import type { AssemblyRow } from '@/server/project-store';
 import { validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
@@ -107,6 +109,58 @@ function buildQuantitiesSheet(rows: QuantityRow[]): XLSX.WorkSheet {
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 10 }];
+  return ws;
+}
+
+function normalizeAssemblyFormula(formula: string): string {
+  const v = formula.trim().toLowerCase();
+  if (v === 'area' || v === 'sf') return 'SF';
+  if (v === 'linear' || v === 'lf' || v === 'ft') return 'LF';
+  if (v === 'count' || v === 'ea') return 'EA';
+  return formula;
+}
+
+// BUG-PIKE-036 fix: build an Assemblies sheet for share Excel export
+// (private /export/excel has this but share export was missing it entirely)
+function buildAssembliesSheet(
+  assemblies: AssemblyRow[],
+  classifications: Classification[],
+  quantityRows: QuantityRow[],
+): XLSX.WorkSheet {
+  const classMap = new Map(classifications.map((c) => [c.id, c]));
+  const quantityMap = new Map(quantityRows.map((r) => [r.name.toLowerCase(), r.quantity]));
+
+  interface AssemblyOutputRow {
+    name: string;
+    classificationName: string;
+    unit: string;
+    unitCost: number;
+    formula: string;
+    totalCost: number;
+  }
+
+  const rows: AssemblyOutputRow[] = assemblies.map((a) => {
+    const cls = a.classificationId ? classMap.get(a.classificationId) : undefined;
+    const classificationName = cls?.name ?? '';
+    const qty = cls ? (quantityMap.get(cls.name.toLowerCase()) ?? 0) : 0;
+    const totalCost = round2(qty * a.unitCost);
+    return {
+      name: a.name,
+      classificationName,
+      unit: a.unit,
+      unitCost: a.unitCost,
+      formula: normalizeAssemblyFormula(a.quantityFormula),
+      totalCost,
+    };
+  });
+
+  const aoa: Array<Array<string | number>> = [
+    ['Assembly Name', 'Classification', 'Unit', 'Unit Cost', 'Formula', 'Total Cost'],
+    ...rows.map((r) => [r.name, r.classificationName, r.unit, round2(r.unitCost), r.formula, round2(r.totalCost)]),
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 28 }, { wch: 28 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
   return ws;
 }
 
@@ -249,12 +303,14 @@ export async function GET(
 
     // BUG-A5-6-058: log errors instead of silently swallowing them
     // BUG-PIKE-018 fix: also fetch all per-page scales for multi-page accuracy
-    const [classifications, polygons, scale, allPageScales, pages] = await Promise.all([
+    // BUG-PIKE-035/036 fix: fetch assemblies so share export includes cost engine data
+    const [classifications, polygons, scale, allPageScales, pages, assemblies] = await Promise.all([
       getClassifications(project.id).catch((err) => { console.error('[share export] getClassifications failed:', err); return [] as Classification[]; }),
       getPolygons(project.id).catch((err) => { console.error('[share export] getPolygons failed:', err); return [] as Polygon[]; }),
       getScale(project.id).catch((err) => { console.error('[share export] getScale failed:', err); return null; }),
       listScales(project.id).catch((err) => { console.error('[share export] listScales failed:', err); return []; }),
       getPages(project.id).catch((err) => { console.error('[share export] getPages failed:', err); return [] as PageInfo[]; }),
+      getAssemblies(project.id).catch((err) => { console.error('[share export] getAssemblies failed:', err); return [] as AssemblyRow[]; }),
     ]);
 
     const ppu = scale?.pixelsPerUnit ?? null;
@@ -270,7 +326,8 @@ export async function GET(
 
     // --- JSON format ---
     if (format === 'json') {
-      const payload = { project, pages, classifications, polygons, scale };
+      // BUG-PIKE-035 fix: include assemblies in share JSON export (was missing cost engine data)
+      const payload = { project, pages, classifications, polygons, scale, assemblies };
       const json = JSON.stringify(payload, null, 2);
       return new Response(json, {
         status: 200,
@@ -291,6 +348,11 @@ export async function GET(
       const wb = XLSX.utils.book_new();
       const quantitiesSheet = buildQuantitiesSheet(rows);
       XLSX.utils.book_append_sheet(wb, quantitiesSheet, 'Quantities');
+      // BUG-PIKE-036 fix: include Assemblies sheet in share Excel export (was missing)
+      if (assemblies.length > 0) {
+        const assembliesSheet = buildAssembliesSheet(assemblies, classifications, rows);
+        XLSX.utils.book_append_sheet(wb, assembliesSheet, 'Assemblies');
+      }
 
       const buf = XLSX.write(wb, {
         bookType: 'xlsx',
