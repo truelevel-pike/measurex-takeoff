@@ -414,6 +414,7 @@ function PageInner() {
     setSheetName,
     setShow3D,
     toggleShow3D,
+    toggleWallCenterline,
   } = React.useMemo(() => useStore.getState(), []);
 
   const { addToast } = useToast();
@@ -1245,6 +1246,10 @@ function PageInner() {
       } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         pdfViewerRef.current?.fitToPage();
+      } else if (e.key.toLowerCase() === 'w' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // P2-13: W = toggle wall centerline auto-detection
+        e.preventDefault();
+        toggleWallCenterline();
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey && toolKeys[e.key.toLowerCase() as keyof typeof toolKeys]) {
         // Only activate tool shortcuts when no modifier key is held — prevents
         // conflicts with browser shortcuts (Ctrl+C, Ctrl+S, etc.)
@@ -1253,7 +1258,7 @@ function PageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId, totalPages, safeGoToPage, setCurrentPageNum, setCurrentPage]);
+  }, [redo, undo, setTool, setSelectedPolygon, setSelectedClassification, setZoomLevel, zoomLevel, deletePolygon, selectedPolygon, toggleShow3D, toggleWallCenterline, closeContextMenu, currentTool, addToast, handleAITakeoff, projectId, totalPages, safeGoToPage, setCurrentPageNum, setCurrentPage]);
 
   // Listen for custom event from SmartTools pattern search button
   useEffect(() => {
