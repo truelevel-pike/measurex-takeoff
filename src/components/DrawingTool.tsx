@@ -230,9 +230,12 @@ export default function DrawingTool() {
       ? (detectWallCenterline(currentPoints) ?? currentPoints)
       : currentPoints;
     const areaPx = linear ? 0 : calculatePolygonArea(finalPoints);
+    // BUG-PIKE-019 fix: store linearFeet as raw pixel length (consistent with ai-results-loader
+    // and updateClassification). All callers (QuantitiesPanel, AssembliesPanel, CustomFormulas,
+    // server APIs) apply per-page ppu at read time. Passing ppu=1 gives raw pixel distance.
     const linearFeet = linear
-      ? calculateLinearFeet(finalPoints, ppu, false)
-      : calculateLinearFeet(finalPoints, ppu, true);
+      ? calculateLinearFeet(finalPoints, 1, false)
+      : calculateLinearFeet(finalPoints, 1, true);
     addPolygon({
       points: finalPoints,
       classificationId: cls.id,
