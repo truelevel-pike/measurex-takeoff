@@ -39,6 +39,7 @@ import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toast';
 import { calculatePolygonArea, calculateLinearFeet, detectSelfIntersection } from '@/lib/polygon-utils';
 import { findNearestSnapPoint, type SnapPoint } from '@/lib/snap-utils';
+import { detectWallCenterline } from '@/lib/wall-centerline';
 import type { Point } from '@/lib/types';
 
 const SNAP_SCREEN_PX = 15;
@@ -99,6 +100,8 @@ export default function DrawingTool() {
   // BUG-A5-H01: read snap/grid settings from store instead of hardcoded constants
   const snappingEnabled = useStore((s) => s.snappingEnabled);
   const edgeSnappingEnabled = useStore((s) => s.edgeSnappingEnabled);
+  const wallCenterlineEnabled = useStore((s) => s.wallCenterlineEnabled);
+  const toggleWallCenterline = useStore((s) => s.toggleWallCenterline);
   const setSnapping = useStore((s) => s.setSnapping);
   const gridEnabled = useStore((s) => s.gridEnabled);
   const gridSize = useStore((s) => s.gridSize);
@@ -222,12 +225,16 @@ export default function DrawingTool() {
     if (!linear && currentPoints.length >= 4 && detectSelfIntersection(currentPoints)) {
       addToast('Warning: polygon edges cross — area measurement may be inaccurate', 'warning');
     }
-    const areaPx = linear ? 0 : calculatePolygonArea(currentPoints);
+    // P2-13: wall centerline auto-detection — snap linear polylines to inferred wall center
+    const finalPoints = (linear && wallCenterlineEnabled && currentPoints.length >= 2)
+      ? (detectWallCenterline(currentPoints) ?? currentPoints)
+      : currentPoints;
+    const areaPx = linear ? 0 : calculatePolygonArea(finalPoints);
     const linearFeet = linear
-      ? calculateLinearFeet(currentPoints, ppu, false)
-      : calculateLinearFeet(currentPoints, ppu, true);
+      ? calculateLinearFeet(finalPoints, ppu, false)
+      : calculateLinearFeet(finalPoints, ppu, true);
     addPolygon({
-      points: currentPoints,
+      points: finalPoints,
       classificationId: cls.id,
       pageNumber: drawingPage,
       area: areaPx,
@@ -253,7 +260,7 @@ export default function DrawingTool() {
     setArcMode(false);
     setArcPoints([]);
     setTool('select');
-  }, [getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale, setPointsAndRef]);
+  }, [getSelectedClassification, addPolygon, drawingPage, setTool, addToast, scale, setPointsAndRef, wallCenterlineEnabled]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -676,6 +683,26 @@ export default function DrawingTool() {
               <path d="M 1,10 Q 7,-2 13,10" />
             </svg>
             Arc
+          </button>
+          {/* P2-13: Wall centerline auto-detection toggle */}
+          <button
+            data-testid="wall-centerline-toggle"
+            onClick={(e) => { e.stopPropagation(); toggleWallCenterline(); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: wallCenterlineEnabled ? 'rgba(251,191,36,0.18)' : 'rgba(0,0,0,0.7)',
+              color: wallCenterlineEnabled ? '#fbbf24' : '#d1d5db',
+              border: `1px solid ${wallCenterlineEnabled ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+            title="Wall centerline auto-detection — snaps linear lines to wall centerlines"
+            aria-pressed={wallCenterlineEnabled}
+          >
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <line x1="1" y1="2" x2="13" y2="2" strokeDasharray="2 1" />
+              <line x1="1" y1="6" x2="13" y2="6" strokeWidth="2" />
+              <line x1="1" y1="10" x2="13" y2="10" strokeDasharray="2 1" />
+            </svg>
+            CL
           </button>
         </div>
       )}

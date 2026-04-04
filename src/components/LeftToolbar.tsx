@@ -53,6 +53,8 @@ export default function LeftToolbar() {
   const redo = useStore((s) => s.redo);
   const edgeSnappingEnabled = useStore((s) => s.edgeSnappingEnabled);
   const toggleEdgeSnapping = useStore((s) => s.toggleEdgeSnapping);
+  const wallCenterlineEnabled = useStore((s) => s.wallCenterlineEnabled);
+  const toggleWallCenterline = useStore((s) => s.toggleWallCenterline);
   const [smartOpen, setSmartOpen] = React.useState(false);
 
   const smartPanelRef = useRef<HTMLDivElement>(null);
@@ -289,6 +291,36 @@ export default function LeftToolbar() {
       )}
 
       <div style={{ flexGrow: 1 }} />
+      {/* P2-13: Wall Centerline toggle */}
+      <button
+        data-testid="wall-centerline-toggle"
+        aria-label={wallCenterlineEnabled ? 'Wall centerline: on' : 'Wall centerline: off'}
+        aria-pressed={wallCenterlineEnabled}
+        title={wallCenterlineEnabled ? 'Wall centerline auto-detect: ON' : 'Wall centerline auto-detect: OFF'}
+        onClick={toggleWallCenterline}
+        style={{
+          width: 36,
+          height: 36,
+          margin: '4px 0',
+          background: wallCenterlineEnabled ? 'rgba(251,191,36,0.14)' : '#12121a',
+          color: wallCenterlineEnabled ? '#fbbf24' : '#b9bedc',
+          border: `1px solid ${wallCenterlineEnabled ? 'rgba(251,191,36,0.5)' : 'rgba(0,212,255,0.15)'}`,
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: wallCenterlineEnabled ? '0 0 8px rgba(251,191,36,0.22) inset' : 'none',
+        }}
+      >
+        {/* Centerline icon: two dashed lines flanking a solid line */}
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <line x1="1" y1="2" x2="17" y2="2" strokeDasharray="2 1.5" />
+          <line x1="1" y1="7" x2="17" y2="7" strokeWidth="2" />
+          <line x1="1" y1="12" x2="17" y2="12" strokeDasharray="2 1.5" />
+        </svg>
+        <span className="sr-only">Wall centerline</span>
+      </button>
       {/* P2-12: Edge Snapping toggle */}
       <button
         data-testid="tool-edge-snap"
