@@ -4,7 +4,7 @@
   "currentPhase": 4,
   "phaseName": "MISSION COMPLETE",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T18:13:52.004Z",
+  "lastUpdated": "2026-04-04T18:16:57.942Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -664,11 +664,21 @@
       "status": "fixed",
       "commit": "822a63a",
       "fixedAt": "2026-04-04T18:13:52.004Z"
+    },
+    {
+      "id": "BUG-PIKE-044",
+      "file": "src/components/EstimateSummary.tsx",
+      "line": 85,
+      "description": "EstimateSummary quantitiesByClass used single global ppu (page-1 only) for all polygons, never applied backout/auto/manual deductions to linearFeet, never applied custom formula overrides. The sidebar cost summary was inconsistent with QuantitiesPanel for multi-page projects, projects with door/window backouts, or classifications with custom formulas. Fixed: per-page scale lookup, computeDeductions + aggregateDeductions auto-deductions, cls.backouts + cls.deductions passes, applyCustomFormula override on second pass.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "0754ba2",
+      "fixedAt": "2026-04-04T18:16:57.941Z"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T18:13:52.004Z",
+  "lastBuildCheck": "2026-04-04T18:16:57.942Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
@@ -726,9 +736,10 @@
   ],
   "bugsFoundThisCycle": [
     "BUG-PIKE-042b",
-    "BUG-PIKE-043"
+    "BUG-PIKE-043",
+    "BUG-PIKE-044"
   ],
-  "bugsFixedTotal": 43,
+  "bugsFixedTotal": 44,
   "auditLog": [
     {
       "cycle": "A+B+C+D+E",
@@ -791,7 +802,7 @@
     {
       "cycle": "A+D+E",
       "runAt": "2026-04-04T18:13:52.004Z",
-      "result": "PASS (2 bugs found + fixed)",
+      "result": "PASS (3 bugs found + fixed)",
       "notes": [
         "Build: clean (exit 0)",
         "TypeScript: 0 errors",
@@ -801,7 +812,8 @@
         "BUG-PIKE-043: ExportPanel computeClassificationTotals missing deduction pass — screen-view Excel/CSV/Markdown showed gross LF not net LF. Fixed: imported computeDeductions + aggregateDeductions, applied deduction pass in rawByName build and totalLinear accumulation.",
         "Both routes now consistently apply: cls.backouts[] + autoDeductMap (geometry-engine) + cls.deductions[] — all three deduction types, matching QuantitiesPanel.",
         "All 43 bugs confirmed fixed in source. Full deduction coverage now: QuantitiesPanel, /api/quantities, /api/estimates GET+POST, /api/export/excel, /api/export/contractor, /api/share/export, ExportPanel client preview.",
-        "Regression sweep: 2 files changed, 59 insertions — clean diff, no unintended changes"
+        "Regression sweep: 2 files changed, 59 insertions — clean diff, no unintended changes",
+        "BUG-PIKE-044: EstimateSummary sidebar cost summary used single-page ppu, no deductions, no formula overrides — fixed with per-page scales + full deduction pass + formula override"
       ]
     }
   ]
