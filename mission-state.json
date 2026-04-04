@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:20:00Z",
+  "lastUpdated": "2026-04-04T03:25:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -382,6 +382,15 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "b2bfbac"
+    },
+    {
+      "id": "BUG-PIKE-016",
+      "file": "src/app/page.tsx",
+      "line": 2033,
+      "description": "AI takeoff summary used single global ppu for all pages + poly.linearFeet (raw pixels) instead of recalculating linear from points. Multi-page projects showed wrong LF totals.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "23df328"
     }
   ],
   "blockers": [],
