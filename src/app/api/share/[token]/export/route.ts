@@ -13,6 +13,7 @@ import {
 import { validationError } from '@/lib/api-schemas';
 import { rateLimitResponse } from '@/lib/rate-limit';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
+import { applyCustomFormula } from '@/lib/formula-eval';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
 import type { PageInfo } from '@/server/project-store';
@@ -59,12 +60,15 @@ function buildQuantityRows(
   scaleConfig: ScaleConfig,
   pageScaleMap?: Map<number, ScaleConfig>,
 ): QuantityRow[] {
-  return classifications.map((c) => {
+  // BUG-PIKE-024 fix: first pass to build raw quantities for formula evaluation
+  const rawByName: Record<string, number> = {};
+  const classNames = classifications.map((c) => c.name);
+  const rawTotals = new Map<string, number>();
+
+  for (const c of classifications) {
     const classPolygons = polygons.filter((p) => p.classificationId === c.id);
     let quantity = 0;
-
     for (const p of classPolygons) {
-      // BUG-PIKE-018 fix: use per-page scale when available
       const sc = (pageScaleMap?.get(p.pageNumber ?? 1)) ?? scaleConfig;
       if (c.type === 'area') {
         quantity += calculatePolygonArea(p.points, sc) ?? 0;
@@ -74,11 +78,22 @@ function buildQuantityRows(
         quantity += 1;
       }
     }
+    rawTotals.set(c.id, quantity);
+    rawByName[c.name.toLowerCase()] = quantity;
+  }
+
+  return classifications.map((c) => {
+    const rawQuantity = rawTotals.get(c.id) ?? 0;
+    // BUG-PIKE-024: apply formula override when classification has a custom formula
+    const formulaResult = c.formula
+      ? applyCustomFormula(c.formula, classNames, rawByName)
+      : null;
+    const effectiveQuantity = formulaResult !== null ? formulaResult : rawQuantity;
 
     return {
       name: c.name,
       type: c.type,
-      quantity: round2(quantity),
+      quantity: round2(effectiveQuantity),
       unit: unitLabel(c.type),
     };
   });
