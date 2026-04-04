@@ -26,20 +26,26 @@ export default function CustomFormulas({ classification, onSave, onClose }: Cust
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  // BUG-PIKE-015 fix: use per-page scales for accurate multi-page quantity preview
+  const scales = useStore((s) => s.scales);
 
   // Build quantities map: classification name -> total quantity value
   const quantities = useMemo(() => {
     const map: Record<string, number> = {};
+    const fallbackPpu = scale?.pixelsPerUnit ?? 0;
     for (const c of classifications) {
       const classPolygons = polygons.filter((p) => p.classificationId === c.id);
       let total = 0;
       for (const p of classPolygons) {
+        // BUG-PIKE-015 fix: use per-page scale when available, fall back to page-1 scale
+        const pagePpu = (scales[p.pageNumber]?.pixelsPerUnit ?? scales[1]?.pixelsPerUnit ?? fallbackPpu);
+        const ppu = pagePpu > 0 ? pagePpu : fallbackPpu;
         if (c.type === 'area') {
-          total += scale ? p.area / (scale.pixelsPerUnit * scale.pixelsPerUnit) : p.area;
+          total += ppu > 0 ? p.area / (ppu * ppu) : p.area;
         } else if (c.type === 'linear') {
-          // BUG-A6-5-017 fix: p.linearFeet is already stored in real-world units (feet).
-          // Do NOT divide by pixelsPerUnit — that would produce a double-conversion.
-          total += p.linearFeet;
+          // BUG-PIKE-015 fix: p.linearFeet is raw pixel length (stored as linear_pixels).
+          // Must divide by ppu to convert to real-world units — prior comment was incorrect.
+          total += ppu > 0 ? p.linearFeet / ppu : p.linearFeet;
         } else {
           total += 1; // count
         }
@@ -47,7 +53,7 @@ export default function CustomFormulas({ classification, onSave, onClose }: Cust
       map[c.name.toLowerCase()] = total;
     }
     return map;
-  }, [classifications, polygons, scale]);
+  }, [classifications, polygons, scale, scales]);
 
   // Validate and compute result
   const validation = useMemo(() => {
