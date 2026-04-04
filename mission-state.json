@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:56:44.000Z",
+  "lastUpdated": "2026-04-04T16:21:35.000Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -486,6 +486,26 @@
       "status": "fixed",
       "commit": "419212c",
       "fixedAt": "2026-04-04T03:56:44.000Z"
+    },
+    {
+      "id": "BUG-PIKE-026",
+      "file": "src/app/api/projects/[id]/export/contractor/route.ts, src/app/api/share/[token]/export/route.ts",
+      "line": 0,
+      "description": "Contractor export and share export applied formula quantity overrides (BUG-025/024 fixes) but always used unitLabel(cls.type) as the unit, ignoring classification.formulaUnit. Excel export correctly used formulaUnit \u2014 unit mismatch across export formats.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "ccf1b7d",
+      "fixedAt": "2026-04-04T16:21:35.000Z"
+    },
+    {
+      "id": "BUG-PIKE-027",
+      "file": "src/lib/measurex-api.ts",
+      "line": 64,
+      "description": "measurex-api getTotals() used single global s.scale.pixelsPerUnit for all polygons across all pages. Multi-page projects reported incorrect totals in the agent automation API because different pages may have different scales.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "19712bc",
+      "fixedAt": "2026-04-04T16:21:35.000Z"
     }
   ],
   "blockers": [],
