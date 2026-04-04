@@ -3002,6 +3002,14 @@ function PageInner() {
         data-testid="sse-status"
         style={{ display: 'none' }}
       />
+      {/* P2-08: paste indicator — agent can check for clipboard content */}
+      <span
+        data-testid="paste-indicator"
+        data-has-clipboard={String(clipboardPolygons.length > 0)}
+        data-clipboard-count={String(clipboardPolygons.length)}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      />
     </div>
   );
 }

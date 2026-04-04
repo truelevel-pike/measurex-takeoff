@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Camera, ChevronRight, Copy, Info, Tag, Trash } from 'lucide-react';
+import { Camera, ChevronRight, Combine, Copy, FlipHorizontal2, FlipVertical2, Info, RotateCw, Tag, Trash } from 'lucide-react';
 
 interface ContextMenuProps {
   x: number;
@@ -21,6 +21,13 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
   const setSelectedPolygon = useStore((s) => s.setSelectedPolygon);
   const projectId = useStore((s) => s.projectId);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
+  // P2-09: transform actions
+  const selectedPolygons = useStore((s) => s.selectedPolygons);
+  const flipSelectedH = useStore((s) => s.flipSelectedH);
+  const flipSelectedV = useStore((s) => s.flipSelectedV);
+  const rotateSelected = useStore((s) => s.rotateSelected);
+  const combineSelected = useStore((s) => s.combineSelected);
+  const canCombine = selectedPolygons.length >= 2;
 
   const menuRef = useRef<HTMLDivElement>(null);
   // BUG-A6-5-013 fix: track the snapshot close timer so it can be cancelled on unmount
@@ -233,6 +240,44 @@ export default function ContextMenu({ x, y, polygonId, onClose, onOpenProperties
       >
         <Tag size={14} className="text-slate-400" /> Jump to Classification
       </button>
+
+      <div className="my-1 border-t border-slate-700/50" />
+
+      {/* P2-09: Transform operations */}
+      <button
+        role="menuitem"
+        data-testid="context-menu-flip-h"
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors hover:bg-white/[0.07]"
+        onClick={() => { flipSelectedH(); onClose(); }}
+      >
+        <FlipHorizontal2 size={14} className="text-slate-400" /> Flip Horizontal
+      </button>
+      <button
+        role="menuitem"
+        data-testid="context-menu-flip-v"
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors hover:bg-white/[0.07]"
+        onClick={() => { flipSelectedV(); onClose(); }}
+      >
+        <FlipVertical2 size={14} className="text-slate-400" /> Flip Vertical
+      </button>
+      <button
+        role="menuitem"
+        data-testid="context-menu-rotate-90"
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors hover:bg-white/[0.07]"
+        onClick={() => { rotateSelected(90); onClose(); }}
+      >
+        <RotateCw size={14} className="text-slate-400" /> Rotate 90°
+      </button>
+      {canCombine && (
+        <button
+          role="menuitem"
+          data-testid="context-menu-combine"
+          className="flex items-center gap-2 w-full px-3 py-1.5 text-[13px] rounded text-left transition-colors hover:bg-white/[0.07]"
+          onClick={() => { combineSelected(); onClose(); }}
+        >
+          <Combine size={14} className="text-slate-400" /> Combine ({selectedPolygons.length})
+        </button>
+      )}
 
       <div className="my-1 border-t border-slate-700/50" />
 
