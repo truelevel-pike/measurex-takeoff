@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T02:19:10.705250Z",
+  "lastUpdated": "2026-04-04T02:27:58.951102Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -297,6 +297,16 @@
       "status": "fixed",
       "commit": "1995a21",
       "fixedAt": "2026-04-04T02:19:10.705173Z"
+    },
+    {
+      "id": "BUG-PIKE-007",
+      "file": "src/components/ExportPanel.tsx",
+      "line": 377,
+      "description": "handleFullExport was client-side ExcelJS with only a flat quantities sheet \u2014 assemblies, estimates, and custom properties were never included in the download. Fixed by delegating to server-side /api/projects/[id]/export/excel route which generates all 5 sheets (Summary, Quantities, Assemblies, Estimates, Custom Properties).",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "2e0713f",
+      "fixedAt": "2026-04-04T02:27:58.951244Z"
     }
   ],
   "blockers": [],
