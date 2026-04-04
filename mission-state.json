@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T16:21:35.000Z",
+  "lastUpdated": "2026-04-04T16:35:00.000Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -22,7 +22,7 @@
       },
       {
         "id": "P1-02",
-        "title": "Add ?agent=1 mode \u2014 suppress all modals/tooltips/onboarding",
+        "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding",
         "status": "done",
         "commit": "3fa0847"
       },
@@ -45,7 +45,7 @@
       },
       {
         "id": "P1-06",
-        "title": "CDP interaction test suite \u2014 verify all draw tools",
+        "title": "CDP interaction test suite — verify all draw tools",
         "status": "done",
         "commit": "4227d55"
       }
@@ -59,7 +59,7 @@
       },
       {
         "id": "P2-02",
-        "title": "Pattern Search \u2014 find repeated symbols across pages",
+        "title": "Pattern Search — find repeated symbols across pages",
         "status": "done",
         "commit": "b772cac"
       },
@@ -71,25 +71,25 @@
       },
       {
         "id": "P2-04",
-        "title": "Drawing Comparison \u2014 compare revisions, quantify changes",
+        "title": "Drawing Comparison — compare revisions, quantify changes",
         "status": "done",
         "commit": "b772cac"
       },
       {
         "id": "P2-05",
-        "title": "Merge tool \u2014 fill gaps between polygons",
+        "title": "Merge tool — fill gaps between polygons",
         "status": "done",
         "commit": "5867d98"
       },
       {
         "id": "P2-06",
-        "title": "Split tool \u2014 divide polygon in two",
+        "title": "Split tool — divide polygon in two",
         "status": "done",
         "commit": "5867d98"
       },
       {
         "id": "P2-07",
-        "title": "Cut/subtract tool \u2014 remove area from polygon",
+        "title": "Cut/subtract tool — remove area from polygon",
         "status": "done",
         "commit": "6b6b716"
       },
@@ -145,7 +145,7 @@
     "phase3": [
       {
         "id": "P3-01",
-        "title": "Assemblies \u2014 link classifications to materials + costs",
+        "title": "Assemblies — link classifications to materials + costs",
         "status": "done",
         "commit": "6756f9f",
         "assignedTo": "admiral8",
@@ -166,7 +166,7 @@
         "assignedTo": "admiral5",
         "admiral": "admiral5",
         "dispatchedAt": "2026-04-04T01:53:00Z",
-        "notes": "CustomFormulas.tsx existed but was dead code \u2014 re-dispatched A5 to wire it in"
+        "notes": "CustomFormulas.tsx existed but was dead code — re-dispatched A5 to wire it in"
       },
       {
         "id": "P3-04",
@@ -256,7 +256,7 @@
       "id": "BUG-PIKE-002",
       "file": "src/components/QuantitiesPanel.tsx",
       "line": 2334,
-      "description": "Assembly cost estimate cast as { unitCost?: number } but Assembly type has no unitCost field \u2014 always produced $0.00. Fixed to compute cost from materials[].unitCost * (1/coverageRate).",
+      "description": "Assembly cost estimate cast as { unitCost?: number } but Assembly type has no unitCost field — always produced $0.00. Fixed to compute cost from materials[].unitCost * (1/coverageRate).",
       "severity": "medium",
       "status": "fixed",
       "commit": "6164bc4"
@@ -265,7 +265,7 @@
       "id": "BUG-PIKE-003",
       "file": "src/lib/ws-client.ts",
       "line": 213,
-      "description": "cursor:update SSE event fell into default case \u2014 not routed to activity bus. useCollaboration hook never received cursor positions from other users. Fixed by adding cursor:update to the SSE event switch.",
+      "description": "cursor:update SSE event fell into default case — not routed to activity bus. useCollaboration hook never received cursor positions from other users. Fixed by adding cursor:update to the SSE event switch.",
       "severity": "high",
       "status": "fixed",
       "commit": "31609bf"
@@ -274,7 +274,7 @@
       "id": "BUG-PIKE-004",
       "file": "src/components/CanvasOverlay.tsx",
       "line": 1248,
-      "description": "Collaborator cursors read via useStore.getState() (non-reactive) \u2014 cursors would never update in the render without a forced re-render trigger. Fixed by adding reactive useStore selector for collaborators at component top-level.",
+      "description": "Collaborator cursors read via useStore.getState() (non-reactive) — cursors would never update in the render without a forced re-render trigger. Fixed by adding reactive useStore selector for collaborators at component top-level.",
       "severity": "medium",
       "status": "fixed",
       "commit": "31609bf"
@@ -302,7 +302,7 @@
       "id": "BUG-PIKE-007",
       "file": "src/components/ExportPanel.tsx",
       "line": 377,
-      "description": "handleFullExport was client-side ExcelJS with only a flat quantities sheet \u2014 assemblies, estimates, and custom properties were never included in the download. Fixed by delegating to server-side /api/projects/[id]/export/excel route which generates all 5 sheets (Summary, Quantities, Assemblies, Estimates, Custom Properties).",
+      "description": "handleFullExport was client-side ExcelJS with only a flat quantities sheet — assemblies, estimates, and custom properties were never included in the download. Fixed by delegating to server-side /api/projects/[id]/export/excel route which generates all 5 sheets (Summary, Quantities, Assemblies, Estimates, Custom Properties).",
       "severity": "high",
       "status": "fixed",
       "commit": "2e0713f",
@@ -312,7 +312,7 @@
       "id": "BUG-PIKE-008",
       "file": "src/app/api/projects/[id]/batch/route.ts",
       "line": 107,
-      "description": "deletePolygon ops in batch route called getPolygons(id) inside the loop \u2014 O(n) file reads for n deletePolygon ops (up to 500 ops = 500 file reads). Fixed by pre-loading all polygon IDs before the loop and using a Set for O(1) membership checks. Also update set on createPolygon/deletePolygon to keep consistent within same batch.",
+      "description": "deletePolygon ops in batch route called getPolygons(id) inside the loop — O(n) file reads for n deletePolygon ops (up to 500 ops = 500 file reads). Fixed by pre-loading all polygon IDs before the loop and using a Set for O(1) membership checks. Also update set on createPolygon/deletePolygon to keep consistent within same batch.",
       "severity": "medium",
       "status": "fixed",
       "commit": "4e5f2f5",
@@ -322,7 +322,7 @@
       "id": "BUG-PIKE-009",
       "file": "src/components/EstimatesTab.tsx",
       "line": 143,
-      "description": "EstimatesTab built assemblyByType keyed by quantityFormula (\"area\"/\"linear\"/\"count\") \u2014 all classifications of the same type shared one assembly's unit cost, ignoring per-classification assembly assignments. Fixed by matching on classificationId first, falling back to formula/type match for unlinked classifications.",
+      "description": "EstimatesTab built assemblyByType keyed by quantityFormula (\"area\"/\"linear\"/\"count\") — all classifications of the same type shared one assembly's unit cost, ignoring per-classification assembly assignments. Fixed by matching on classificationId first, falling back to formula/type match for unlinked classifications.",
       "severity": "medium",
       "status": "fixed",
       "commit": "4454c2d",
@@ -332,7 +332,7 @@
       "id": "BUG-PIKE-010",
       "file": "src/components/QuantitiesPanel.tsx, src/components/CustomFormulas.tsx",
       "line": 614,
-      "description": "Custom formulas (P3-03) were stored in classification.formula but never applied to estimateQuantities. Formula result was displayed in the modal preview only \u2014 it never overrode the raw area/linear/count used in EstimatesTab cost calculations. Fixed by: (1) extracting tokenizer/evaluator to shared src/lib/formula-eval.ts, (2) applying applyCustomFormula() in estimateQuantities useMemo before falling back to raw geometry values.",
+      "description": "Custom formulas (P3-03) were stored in classification.formula but never applied to estimateQuantities. Formula result was displayed in the modal preview only — it never overrode the raw area/linear/count used in EstimatesTab cost calculations. Fixed by: (1) extracting tokenizer/evaluator to shared src/lib/formula-eval.ts, (2) applying applyCustomFormula() in estimateQuantities useMemo before falling back to raw geometry values.",
       "severity": "high",
       "status": "fixed",
       "commit": "1322ab3"
@@ -341,7 +341,7 @@
       "id": "BUG-PIKE-011",
       "file": "src/components/AssembliesPanel.tsx",
       "line": 108,
-      "description": "AssembliesPanel used single project-level ppu for all pages \u2014 multi-page projects with per-page scales computed wrong quantities in Assemblies tab. Fixed to use scales[polygon.pageNumber] with fallback (mirrors QuantitiesPanel pattern).",
+      "description": "AssembliesPanel used single project-level ppu for all pages — multi-page projects with per-page scales computed wrong quantities in Assemblies tab. Fixed to use scales[polygon.pageNumber] with fallback (mirrors QuantitiesPanel pattern).",
       "severity": "medium",
       "status": "fixed",
       "commit": "770d725"
@@ -350,7 +350,7 @@
       "id": "BUG-PIKE-012",
       "file": "src/app/api/projects/[id]/estimates/route.ts",
       "line": 44,
-      "description": "GET and POST /api/estimates used single project-level ppu (getScale page-1 only) for all polygons across all pages. Multi-page projects computed wrong quantities server-side. Same root cause as BUG-PIKE-011 (AssembliesPanel). Fixed by importing listScales() and building per-page scale map with page-1 fallback \u2014 mirrors excel export route pattern.",
+      "description": "GET and POST /api/estimates used single project-level ppu (getScale page-1 only) for all polygons across all pages. Multi-page projects computed wrong quantities server-side. Same root cause as BUG-PIKE-011 (AssembliesPanel). Fixed by importing listScales() and building per-page scale map with page-1 fallback — mirrors excel export route pattern.",
       "severity": "medium",
       "status": "fixed",
       "commit": "cd70632",
@@ -360,7 +360,7 @@
       "id": "BUG-PIKE-013",
       "file": "src/app/api/projects/[id]/quantities/route.ts",
       "line": 18,
-      "description": "/api/quantities used single page-1 ppu for all polygons \u2014 multi-page projects had incorrect quantity calculations on API/export side",
+      "description": "/api/quantities used single page-1 ppu for all polygons — multi-page projects had incorrect quantity calculations on API/export side",
       "severity": "medium",
       "status": "fixed",
       "commit": "930bc3d"
@@ -369,7 +369,7 @@
       "id": "BUG-PIKE-014",
       "file": "src/app/api/projects/[id]/quantities/route.ts, src/app/api/projects/[id]/export/excel/route.ts",
       "line": 0,
-      "description": "Server-side quantities API and Excel export did not apply classification.formula overrides \u2014 client QuantitiesPanel showed formula results but API/export returned raw area/linear/count, creating data mismatch",
+      "description": "Server-side quantities API and Excel export did not apply classification.formula overrides — client QuantitiesPanel showed formula results but API/export returned raw area/linear/count, creating data mismatch",
       "severity": "medium",
       "status": "fixed",
       "commit": "930bc3d"
@@ -378,7 +378,7 @@
       "id": "BUG-PIKE-015",
       "file": "src/components/CustomFormulas.tsx",
       "line": 30,
-      "description": "CustomFormulas formula preview used single page-1 scale for all pages (multi-page inaccuracy) AND treated p.linearFeet as real-world units but it is raw pixels (linear_pixels in DB) \u2014 formula preview showed wildly inflated linear values. Fixed: use per-page scales from store.scales map and divide p.linearFeet by ppu.",
+      "description": "CustomFormulas formula preview used single page-1 scale for all pages (multi-page inaccuracy) AND treated p.linearFeet as real-world units but it is raw pixels (linear_pixels in DB) — formula preview showed wildly inflated linear values. Fixed: use per-page scales from store.scales map and divide p.linearFeet by ppu.",
       "severity": "medium",
       "status": "fixed",
       "commit": "b2bfbac"
@@ -398,7 +398,7 @@
         "src/lib/ai-results-loader.ts",
         "src/lib/store.ts"
       ],
-      "description": "linearFeet stored as real-world units in ai-results-loader (pre-divided by ppu) and in updateClassification type-change recalc \u2014 inconsistent with all other code paths that store raw pixel length",
+      "description": "linearFeet stored as real-world units in ai-results-loader (pre-divided by ppu) and in updateClassification type-change recalc — inconsistent with all other code paths that store raw pixel length",
       "severity": "medium",
       "status": "fixed",
       "commit": "8546e8e",
@@ -408,7 +408,7 @@
       "id": "BUG-PIKE-018",
       "file": "src/app/api/share/[token]/export/route.ts",
       "line": 43,
-      "description": "Share export (excel/pdf) used single global scale instead of per-page scales \u2014 multi-page projects would export wrong quantities",
+      "description": "Share export (excel/pdf) used single global scale instead of per-page scales — multi-page projects would export wrong quantities",
       "severity": "high",
       "status": "fixed",
       "commit": "26d5a54",
@@ -418,7 +418,7 @@
       "id": "BUG-PIKE-019",
       "file": "src/components/DrawingTool.tsx",
       "line": 232,
-      "description": "DrawingTool stored linearFeet as real-world feet (divided by ppu) \u2014 inconsistent with ai-results-loader (BUG-PIKE-017 fix) and updateClassification which store raw pixel length. CustomFormulas.tsx line 48 treats p.linearFeet as raw pixels (divides by ppu again), causing 2x error for DrawingTool-drawn polygons. Fixed: DrawingTool now passes ppu=1 to calculateLinearFeet \u2014 stores raw pixel length consistently.",
+      "description": "DrawingTool stored linearFeet as real-world feet (divided by ppu) — inconsistent with ai-results-loader (BUG-PIKE-017 fix) and updateClassification which store raw pixel length. CustomFormulas.tsx line 48 treats p.linearFeet as raw pixels (divides by ppu again), causing 2x error for DrawingTool-drawn polygons. Fixed: DrawingTool now passes ppu=1 to calculateLinearFeet — stores raw pixel length consistently.",
       "severity": "medium",
       "status": "fixed",
       "commit": "64bfea6",
@@ -443,7 +443,7 @@
       "id": "BUG-PIKE-021",
       "file": "src/app/api/projects/[id]/export/json/route.ts",
       "line": 17,
-      "description": "JSON export omitted assemblies \u2014 getAssemblies not fetched, assemblies not included in payload. Cost data was lost on export.",
+      "description": "JSON export omitted assemblies — getAssemblies not fetched, assemblies not included in payload. Cost data was lost on export.",
       "severity": "high",
       "status": "fixed",
       "commit": "f5f9fad"
@@ -461,7 +461,7 @@
       "id": "BUG-PIKE-023",
       "file": "src/app/api/projects/[id]/estimates/route.ts",
       "line": 0,
-      "description": "GET and POST /api/estimates computed raw area/linear/count but never applied classification.formula overrides. /api/quantities and Excel export did apply formulas \u2014 estimates route was the odd one out, causing EstimatesTab cost calculations to ignore custom formulas set by users.",
+      "description": "GET and POST /api/estimates computed raw area/linear/count but never applied classification.formula overrides. /api/quantities and Excel export did apply formulas — estimates route was the odd one out, causing EstimatesTab cost calculations to ignore custom formulas set by users.",
       "severity": "high",
       "status": "fixed",
       "commit": "37b43ef",
@@ -471,7 +471,7 @@
       "id": "BUG-PIKE-024",
       "file": "src/app/api/share/[token]/export/route.ts",
       "line": 0,
-      "description": "Share export (excel/pdf) buildQuantityRows did not apply classification.formula overrides \u2014 shared contractor reports showed raw geometry quantities instead of formula-adjusted values.",
+      "description": "Share export (excel/pdf) buildQuantityRows did not apply classification.formula overrides — shared contractor reports showed raw geometry quantities instead of formula-adjusted values.",
       "severity": "medium",
       "status": "fixed",
       "commit": "83ee2c4",
@@ -481,7 +481,7 @@
       "id": "BUG-PIKE-025",
       "file": "src/app/api/projects/[id]/export/contractor/route.ts",
       "line": 0,
-      "description": "Contractor export buildQuantityRows did not apply classification.formula overrides \u2014 contractor HTML report showed raw geometry quantities instead of formula-adjusted values.",
+      "description": "Contractor export buildQuantityRows did not apply classification.formula overrides — contractor HTML report showed raw geometry quantities instead of formula-adjusted values.",
       "severity": "medium",
       "status": "fixed",
       "commit": "419212c",
@@ -491,7 +491,7 @@
       "id": "BUG-PIKE-026",
       "file": "src/app/api/projects/[id]/export/contractor/route.ts, src/app/api/share/[token]/export/route.ts",
       "line": 0,
-      "description": "Contractor export and share export applied formula quantity overrides (BUG-025/024 fixes) but always used unitLabel(cls.type) as the unit, ignoring classification.formulaUnit. Excel export correctly used formulaUnit \u2014 unit mismatch across export formats.",
+      "description": "Contractor export and share export applied formula quantity overrides (BUG-025/024 fixes) but always used unitLabel(cls.type) as the unit, ignoring classification.formulaUnit. Excel export correctly used formulaUnit — unit mismatch across export formats.",
       "severity": "medium",
       "status": "fixed",
       "commit": "ccf1b7d",
@@ -506,11 +506,31 @@
       "status": "fixed",
       "commit": "19712bc",
       "fixedAt": "2026-04-04T16:21:35.000Z"
+    },
+    {
+      "id": "BUG-PIKE-028",
+      "file": "src/app/api/projects/[id]/quantities/route.ts, src/app/api/projects/[id]/estimates/route.ts",
+      "line": 0,
+      "description": "Formula override not applied to count-type classifications in quantities API and estimates GET handler. count stayed as raw polygon count even when classification.formula was set. quantities route returned stale raw count; estimates GET built effectiveArea/effectiveLinear for area/linear only — count type was never overridden.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "9c6791a",
+      "fixedAt": "2026-04-04T16:28:00.000Z"
+    },
+    {
+      "id": "BUG-PIKE-029",
+      "file": "src/components/ClassificationLibrary.tsx, src/components/QuantitiesPanel.tsx",
+      "line": 0,
+      "description": "Org library save/import silently dropped formula, formulaUnit, tileWidth, tileHeight, and slopeFactor. OrgLibraryItem type missing formulaUnit; save-to-org-btn omitted formulaUnit; both import paths (bulk + double-click) only passed name/type/color/visible to addClassification. Round-tripping a formula classification through the org library lost all extended config.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "6bf7cf9",
+      "fixedAt": "2026-04-04T16:35:00.000Z"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T02:10:00Z",
+  "lastBuildCheck": "2026-04-04T16:35:00Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
