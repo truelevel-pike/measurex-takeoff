@@ -373,52 +373,14 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
     if (getNotificationPrefs().exportReady) showToast('Screen view exported!');
   }, [previewRows, columns, showToast]);
 
-  // ── Export: Full Export (flat dump, all columns, no grouping) ──
-  const handleFullExport = useCallback(async () => {
-    const ExcelJS = (await import('exceljs')).default;
-    const allRows = computeClassificationTotals(
-      filteredClassifications,
-      filteredPolygons,
-      scale,
-      scales
-    );
-
-    const wb = new ExcelJS.Workbook();
-    const headers = ['Name', 'Type', 'Area', 'Linear', 'Count', 'Per Page', 'Total', 'Unit'];
-    const aoa: (string | number)[][] = [headers];
-
-    for (const row of allRows) {
-      aoa.push([
-        row.name,
-        row.type,
-        row.area,
-        row.linear,
-        row.count,
-        row.perPage,
-        row.total,
-        row.unit,
-      ]);
-    }
-
-    const ws = wb.addWorksheet('Full Export');
-    ws.columns = headers.map((h: string) => ({ header: h, width: 18 }));
-    for (const row of aoa.slice(1)) {
-      ws.addRow(row);
-    }
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'measurex-full-export.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if (getNotificationPrefs().exportReady) showToast('Full export completed!');
-  }, [filteredClassifications, filteredPolygons, scale, scales, showToast]);
+  // ── Export: Full Export (server-side — includes Quantities, Assemblies, Estimates, Custom Props) ──
+  // BUG-PIKE-007 fix: was client-side ExcelJS with only a flat quantities sheet — assemblies,
+  // estimates, and custom properties were never included. Now delegates to the server-side
+  // /api/projects/[id]/export/excel route which generates all 5 sheets correctly.
+  const handleFullExport = useCallback(() => {
+    window.open(`/api/projects/${projectId}/export/excel`, '_blank');
+    if (getNotificationPrefs().exportReady) showToast('Full export downloaded!');
+  }, [projectId, showToast]);
 
   // ── Export: Print / PDF ──
   const handlePrintExport = useCallback(() => {
