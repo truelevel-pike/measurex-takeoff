@@ -36,7 +36,47 @@ export const ClassificationCreateSchema = z.object({
   visible: z.boolean().optional(),
 });
 
-export const ClassificationUpdateSchema = ClassificationCreateSchema.partial();
+// BUG-PIKE-006: ClassificationUpdateSchema must include ALL updatable fields.
+// The base create schema only has name/type/color/visible — extended fields like
+// formula, tradeGroup, tileWidth, slopeFactor, customProperties etc. were being
+// silently stripped by Zod validation on every PATCH/PUT to /classifications/[cid].
+export const ClassificationUpdateSchema = ClassificationCreateSchema.partial().extend({
+  // Custom formulas (P3-03)
+  formula: z.string().optional(),
+  formulaUnit: z.string().optional(),
+  formulaSavedToLibrary: z.boolean().optional(),
+  // Trade group (smart grouping)
+  tradeGroup: z.enum(['STRUCTURAL', 'MECHANICAL', 'ARCHITECTURAL', 'SITEWORK', 'OTHER']).optional(),
+  // Tile count (Wave 9B)
+  tileWidth: z.number().positive().optional(),
+  tileHeight: z.number().positive().optional(),
+  tileUnit: z.enum(['in', 'ft']).optional(),
+  // Slope factor (Wave 9B)
+  slopeFactor: z.number().min(1).max(3).optional(),
+  // Breakdowns (Wave 10)
+  breakdowns: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    polygonIds: z.array(z.string()),
+  })).optional(),
+  // Custom properties (Wave 10)
+  customProperties: z.array(z.object({
+    key: z.string(),
+    value: z.string(),
+  })).optional(),
+  // Backouts (P2-14)
+  backouts: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    width: z.number(),
+    count: z.number().int().positive().default(1),
+  })).optional(),
+  // Deductions
+  deductions: z.array(z.object({
+    label: z.string(),
+    quantity: z.number(),
+  })).optional(),
+});
 
 // Project
 export const ProjectCreateSchema = z.object({
