@@ -12,6 +12,7 @@ import {
 import type { PageInfo } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { calculateLinearLength, calculatePolygonArea } from '@/server/geometry-engine';
+import { applyCustomFormula } from '@/lib/formula-eval';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
 
@@ -73,10 +74,14 @@ function buildQuantityRows(
   allScales: ScaleCalibration[],
   fallbackScale: ScaleCalibration | null,
 ): QuantityRow[] {
-  return classifications.map((cls) => {
+  // BUG-PIKE-025 fix: first pass to build raw quantities for formula evaluation
+  const classNames = classifications.map((c) => c.name);
+  const rawByName: Record<string, number> = {};
+  const rawTotals = new Map<string, number>();
+
+  for (const cls of classifications) {
     const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
     let quantity = 0;
-
     for (const poly of clsPolygons) {
       const sc = buildScaleConfig(pickScale(poly.pageNumber, allScales, fallbackScale));
       if (cls.type === 'area') {
@@ -87,13 +92,24 @@ function buildQuantityRows(
         quantity += 1;
       }
     }
+    rawTotals.set(cls.id, quantity);
+    rawByName[cls.name.toLowerCase()] = quantity;
+  }
+
+  return classifications.map((cls) => {
+    const rawQuantity = rawTotals.get(cls.id) ?? 0;
+    // BUG-PIKE-025: apply formula override when classification has a custom formula
+    const formulaResult = cls.formula
+      ? applyCustomFormula(cls.formula, classNames, rawByName)
+      : null;
+    const effectiveQuantity = formulaResult !== null ? formulaResult : rawQuantity;
 
     return {
       classificationId: cls.id,
       name: cls.name,
       color: cls.color,
       type: cls.type,
-      quantity: round2(quantity),
+      quantity: round2(effectiveQuantity),
       unit: unitLabel(cls.type),
     };
   });
