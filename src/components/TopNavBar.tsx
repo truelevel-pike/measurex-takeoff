@@ -54,6 +54,7 @@ interface TopNavBarProps {
   onProjectNameSaved?: (name: string) => void;
   onChat?: () => void;
   onToggleImageSearch?: () => void;
+  onToggleAssemblies?: () => void;
   onCompare?: () => void;
   aiAllPagesMode?: boolean;
   onAiAllPagesModeChange?: (v: boolean) => void;
@@ -80,6 +81,7 @@ const TopNavBar = React.memo(function TopNavBar({
   onAITakeoff,
   onChat,
   onToggleImageSearch,
+  onToggleAssemblies,
   onCompare,
   aiLoading,
   hasScale,
@@ -664,6 +666,32 @@ const TopNavBar = React.memo(function TopNavBar({
               >
                 <MessageSquare size={14} aria-hidden="true" />
                 MX Chat
+              </button>
+              <button
+                data-testid="assemblies-manager-btn"
+                aria-label="Open Assembly Manager"
+                onClick={onToggleAssemblies}
+                style={{
+                  background: '#12121a',
+                  color: '#e0e0e0',
+                  border: '1px solid rgba(0,212,255,0.2)',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.5)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.2)')}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <rect x="1" y="1" width="5" height="5" rx="1" /><rect x="8" y="1" width="5" height="5" rx="1" />
+                  <rect x="1" y="8" width="5" height="5" rx="1" /><rect x="8" y="8" width="5" height="5" rx="1" />
+                </svg>
+                Assemblies
               </button>
               <button
                 data-testid="ai-image-search-btn"

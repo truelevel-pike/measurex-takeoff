@@ -250,6 +250,8 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
   const toggleClassificationSelection = useStore((s) => s.toggleClassificationSelection);
 
   const addClassification = useStore((s) => s.addClassification);
+  // P3-01: project-scoped assemblies for cost display in the quantities list
+  const storeAssemblies = useStore((s) => s.assemblies);
   const updateClassification = useStore((s) => s.updateClassification);
   const deleteClassification = useStore((s) => s.deleteClassification);
   const setSelectedClassification = useStore((s) => s.setSelectedClassification);
@@ -2324,6 +2326,24 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                             </>)
                           : `Total: ${totals.count} items - ${formatArea(totals.areaReal, measurementSettings)} - ${formatLinear(totals.lengthReal, measurementSettings)}`}
                       </div>
+                      {/* P3-01: Assembly cost estimate for this classification */}
+                      {(() => {
+                        const linkedAsm = storeAssemblies.find((a) => a.classificationId === classification.id);
+                        if (!linkedAsm) return null;
+                        const uc = (linkedAsm as { unitCost?: number }).unitCost ?? 0;
+                        const qty = classification.type === 'area' ? totals.areaReal : classification.type === 'linear' ? netLinear : totals.count;
+                        const estCost = uc * qty;
+                        return (
+                          <div
+                            data-testid={`assembly-cost-${classification.id}`}
+                            className="text-[10px] py-0.5 font-mono flex items-center gap-1"
+                            style={{ color: '#34d399' }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1" y="1" width="3" height="3" rx="0.5"/><rect x="6" y="1" width="3" height="3" rx="0.5"/><rect x="1" y="6" width="3" height="3" rx="0.5"/><rect x="6" y="6" width="3" height="3" rx="0.5"/></svg>
+                            Est. Cost: ${estCost.toFixed(2)}
+                          </div>
+                        );
+                      })()}
                       {/* Wave 9B: slope-adjusted area display */}
                       {classification.type === 'area' && classification.slopeFactor != null && classification.slopeFactor > 1 && (() => {
                         const adjusted = totals.areaReal * classification.slopeFactor;

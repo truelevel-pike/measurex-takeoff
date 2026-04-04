@@ -59,6 +59,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import QuickTakeoffMode from '@/components/QuickTakeoffMode';
 import ReTogal from '@/components/ReTogal';
+import GlobalAssemblyManager from '@/components/GlobalAssemblyManager';
 import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
 import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
@@ -460,6 +461,7 @@ function PageInner() {
   // Chat & Image Search panel state
   const [showChat, setShowChat] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
+  const [showAssemblyManager, setShowAssemblyManager] = useState(false);
   const [cropMode, setCropMode] = useState(false);
   const [croppedImageBase64, setCroppedImageBase64] = useState<string | null>(null);
   const [showPatternSearch, setShowPatternSearch] = useState(false);
@@ -2243,6 +2245,7 @@ function PageInner() {
         }}
         onChat={() => setShowChat((v) => !v)}
         onToggleImageSearch={() => setShowImageSearch((v) => !v)}
+        onToggleAssemblies={() => setShowAssemblyManager((v) => !v)}
         onCompare={() => setShowCompare(true)}
         sheetName={sheetNames[currentPageNum] || `Page ${currentPageNum}`}
         pageIndex={pdfFile && pdfPageCountReady ? currentPageNum - 1 : undefined}
@@ -2829,6 +2832,11 @@ function PageInner() {
             croppedImageBase64={croppedImageBase64}
           />
         </div>
+      )}
+
+      {/* P3-01/P3-02: Global Assembly Manager */}
+      {showAssemblyManager && (
+        <GlobalAssemblyManager onClose={() => setShowAssemblyManager(false)} />
       )}
 
       {/* Pattern Search (E26) */}
