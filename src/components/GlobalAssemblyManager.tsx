@@ -185,7 +185,7 @@ export default function GlobalAssemblyManager({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60">
       <div
-        data-testid="assemblies-panel"
+        data-testid="assembly-manager-panel"
         className="relative bg-[#12121a] border border-[#00d4ff]/25 rounded-xl shadow-2xl flex flex-col"
         style={{ width: 720, maxHeight: '88vh', overflow: 'hidden' }}
       >
@@ -328,7 +328,7 @@ export default function GlobalAssemblyManager({ onClose }: Props) {
                 const isExp = expanded.has(asm.id);
                 const totalCost = asm.materials.reduce((s, m) => s + m.unitCost * m.quantityPerUnit, 0);
                 return (
-                  <div key={asm.id} data-testid="assembly-item" className="mb-2 rounded-lg border border-[#00d4ff]/15 overflow-hidden">
+                  <div key={asm.id} data-testid="manager-assembly-item" className="mb-2 rounded-lg border border-[#00d4ff]/15 overflow-hidden">
                     <div
                       className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[#0e1016] transition-colors group"
                       onClick={() => setExpanded((p) => { const n = new Set(p); n.has(asm.id) ? n.delete(asm.id) : n.add(asm.id); return n; })}
@@ -341,7 +341,7 @@ export default function GlobalAssemblyManager({ onClose }: Props) {
                         </span>
                       )}
                       <span className="text-[11px] text-[#8892a0] font-mono">{asm.materials.length} mat{asm.materials.length !== 1 ? 's' : ''}</span>
-                      <span data-testid="assembly-total-cost" className="text-[11px] font-mono text-emerald-400 font-semibold">
+                      <span data-testid="manager-assembly-total-cost" className="text-[11px] font-mono text-emerald-400 font-semibold">
                         ${totalCost.toFixed(2)}/unit
                       </span>
                       <button

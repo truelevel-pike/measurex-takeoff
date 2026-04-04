@@ -608,7 +608,7 @@ export default function DrawingTool() {
       {cls?.type !== 'count' && !isLinear && (
         <div className="absolute top-3 right-3 inline-flex items-center gap-2 pointer-events-auto">
           <button
-            data-testid="snapping-toggle"
+            data-testid="draw-snapping-toggle"
             onClick={(e) => { e.stopPropagation(); setSnapping(!snappingEnabled); }}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
             style={{
@@ -659,7 +659,7 @@ export default function DrawingTool() {
       {isLinear && (
         <div className="absolute top-3 right-3 inline-flex items-center gap-2 pointer-events-auto">
           <button
-            data-testid="snapping-toggle"
+            data-testid="draw-linear-snapping-toggle"
             onClick={(e) => { e.stopPropagation(); setSnapping(!snappingEnabled); }}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
             style={{
@@ -689,7 +689,7 @@ export default function DrawingTool() {
           </button>
           {/* P2-13: Wall centerline auto-detection toggle */}
           <button
-            data-testid="wall-centerline-toggle"
+            data-testid="draw-wall-centerline-toggle"
             onClick={(e) => { e.stopPropagation(); toggleWallCenterline(); }}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors"
             style={{

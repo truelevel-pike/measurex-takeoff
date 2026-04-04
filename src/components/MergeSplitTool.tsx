@@ -188,7 +188,7 @@ export default function MergeSplitTool() {
           {/* P2-06: split line preview */}
           {isSplit && splitPts.length === 1 && cursor && (
             <line
-              data-testid="split-preview-line split-line-preview"
+              data-testid="split-preview-line"
               x1={splitPts[0].x}
               y1={splitPts[0].y}
               x2={cursor.x}

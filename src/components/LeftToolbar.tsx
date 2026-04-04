@@ -293,7 +293,7 @@ export default function LeftToolbar() {
       <div style={{ flexGrow: 1 }} />
       {/* P2-13: Wall Centerline toggle */}
       <button
-        data-testid="wall-centerline-toggle"
+        data-testid="draw-wall-centerline-toggle"
         aria-label={wallCenterlineEnabled ? 'Wall centerline: on' : 'Wall centerline: off'}
         aria-pressed={wallCenterlineEnabled}
         title={wallCenterlineEnabled ? 'Wall centerline auto-detect: ON' : 'Wall centerline auto-detect: OFF'}

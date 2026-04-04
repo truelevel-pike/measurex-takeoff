@@ -474,31 +474,32 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
     if (getNotificationPrefs().exportReady) showToast('IFC stub exported!');
   }, [filteredPolygons, classifications, scale, scales, showToast]);
 
-  // ── Export: CSV (coordinates) ──
+  // ── Export: CSV (quantities) — BUG-PIKE-039 fix ──
+  // Previous version exported raw polygon coordinates — not useful for estimators.
+  // Correct behaviour: quantities table matching the Excel full export.
   const handleCsvCoordinatesExport = useCallback(() => {
-    const lines = ['polygon_id,polygon_name,classification,point_index,x,y'];
+    const quantityRows = previewRows.filter((r) => !r.isGroupHeader);
+    const lines = ['Classification,Type,Quantity,Unit'];
 
-    for (const poly of filteredPolygons) {
-      const cls = classifications.find((c) => c.id === poly.classificationId);
-      const name = (poly.label || cls?.name || '').replace(/,/g, ' ');
-      const classification = (cls?.name || 'Unclassified').replace(/,/g, ' ');
-      for (let i = 0; i < poly.points.length; i++) {
-        const pt = poly.points[i];
-        lines.push(`${poly.id},${name},${classification},${i},${pt.x},${pt.y}`);
-      }
+    for (const row of quantityRows) {
+      const name = row.name.replace(/,/g, ' ');
+      const type = row.type;
+      const qty = round2(row.total);
+      const unit = row.unit;
+      lines.push(`${name},${type},${qty},${unit}`);
     }
 
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'export-coordinates.csv';
+    a.download = 'measurex-quantities.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    if (getNotificationPrefs().exportReady) showToast('CSV coordinates exported!');
-  }, [filteredPolygons, classifications, showToast]);
+    if (getNotificationPrefs().exportReady) showToast('CSV quantities exported!');
+  }, [previewRows, showToast]);
 
   // ── Export: Markdown Report ──
   const handleMarkdownExport = useCallback(() => {
@@ -935,11 +936,11 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
           <button
             onClick={handleCsvCoordinatesExport}
             data-testid="export-csv-btn"
-            aria-label="Export CSV with coordinates"
+            aria-label="Export quantities as CSV"
             className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
-            CSV (coordinates)
+            CSV (quantities)
           </button>
           <button
             data-testid="export-markdown-btn"

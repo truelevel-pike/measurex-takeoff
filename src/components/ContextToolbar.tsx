@@ -191,7 +191,7 @@ export default function ContextToolbar({
             label="Snap"
             onClick={onToggleSnapping}
             active={snappingEnabled}
-            data-testid="snapping-toggle"
+            data-testid="context-snapping-toggle"
           />
         </>
       )}
