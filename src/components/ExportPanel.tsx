@@ -502,6 +502,8 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
   }, [previewRows, showToast]);
 
   // ── Export: Markdown Report ──
+  // BUG-PIKE-040 fix: polygon list showed Area:0 for linear/count polygons;
+  // summary "Total Area" incorrectly summed all types. Now shows correct value+unit per type.
   const handleMarkdownExport = useCallback(() => {
     const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const projectName = params.get('name')?.trim() || 'Untitled Project';
@@ -509,21 +511,30 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
 
     const summaryRows = previewRows.filter((r) => !r.isGroupHeader);
     const totalPolygons = filteredPolygons.length;
-    const totalArea = summaryRows.reduce((sum, r) => sum + r.area, 0);
+    const totalAreaSF = round2(summaryRows.filter((r) => r.type === 'AREA').reduce((s, r) => s + r.total, 0));
+    const totalLinearLF = round2(summaryRows.filter((r) => r.type === 'LINEAR').reduce((s, r) => s + r.total, 0));
+    const totalCount = summaryRows.filter((r) => r.type === 'COUNT').reduce((s, r) => s + r.total, 0);
 
     // Classification table
     const classTable = summaryRows.map(
-      (r) => `| ${r.name} | ${r.count || summaryRows.filter((s) => s.name === r.name).length} | ${r.total} ${r.unit} |`,
+      (r) => `| ${r.name} | ${r.type} | ${r.total} ${r.unit} |`,
     );
 
-    // Polygon list
+    // Polygon list — show correct value per type
     const polyList = filteredPolygons.map((poly) => {
       const cls = classifications.find((c) => c.id === poly.classificationId);
       const pageScale = pickScaleForPage(poly.pageNumber, scales, scale);
       const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
-      const area = cls?.type === 'area' ? round2(poly.area / (ppu * ppu)) : 0;
       const name = poly.label || cls?.name || `Polygon ${poly.id.slice(0, 6)}`;
-      return `- **${name}** — Classification: ${cls?.name || 'Unclassified'}, Area: ${area}`;
+      let measurement = '';
+      if (!cls || cls.type === 'area') {
+        measurement = `${round2(poly.area / (ppu * ppu))} SF`;
+      } else if (cls.type === 'linear') {
+        measurement = `${round2(calculateLinearFeet(poly.points, ppu, false))} LF`;
+      } else {
+        measurement = '1 EA';
+      }
+      return `- **${name}** — Classification: ${cls?.name || 'Unclassified'}, Measurement: ${measurement}`;
     });
 
     const md = [
@@ -535,11 +546,13 @@ export default function ExportPanel({ onClose }: ExportPanelProps) {
       `## Project Summary`,
       ``,
       `- Total Polygons: ${totalPolygons}`,
-      `- Total Area: ${round2(totalArea)}`,
+      ...(totalAreaSF > 0 ? [`- Total Area: ${totalAreaSF} SF`] : []),
+      ...(totalLinearLF > 0 ? [`- Total Linear: ${totalLinearLF} LF`] : []),
+      ...(totalCount > 0 ? [`- Total Count: ${totalCount} EA`] : []),
       ``,
       `## Classification Breakdown`,
       ``,
-      `| Classification | Count | Total Area |`,
+      `| Classification | Type | Total |`,
       `| --- | --- | --- |`,
       ...classTable,
       ``,
