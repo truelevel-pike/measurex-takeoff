@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T01:28:00Z",
+  "lastUpdated": "2026-04-04T01:42:00Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -37,13 +37,13 @@
       {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "done", "commit": "6756f9f", "assignedTo": "admiral8", "admiral": "admiral8"},
       {"id": "P3-02", "title": "Material library (reusable)", "status": "done", "commit": "6756f9f", "assignedTo": "admiral8", "admiral": "admiral8"},
       {"id": "P3-03", "title": "Custom formulas (Excel-like syntax)", "status": "in-progress", "assignedTo": "admiral5", "admiral": "admiral5", "dispatchedAt": "2026-04-04T01:28:00Z"},
-      {"id": "P3-04", "title": "Assembly export", "status": "pending", "assignedTo": null, "admiral": null}
+      {"id": "P3-04", "title": "Assembly export", "status": "in-progress", "assignedTo": "admiral6", "admiral": "admiral6", "dispatchedAt": "2026-04-04T01:42:00Z"}
     ],
     "phase4": [
-      {"id": "P4-01", "title": "Multi-user real-time editing", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-02", "title": "External collaboration (no license, permission levels)", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-03", "title": "Organization-level classification library", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-04", "title": "Version history", "status": "pending", "assignedTo": null, "admiral": null}
+      {"id": "P4-01", "title": "Multi-user real-time editing", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8", "dispatchedAt": "2026-04-04T01:42:00Z"},
+      {"id": "P4-02", "title": "External collaboration (no license, permission levels)", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8", "dispatchedAt": "2026-04-04T01:42:00Z"},
+      {"id": "P4-03", "title": "Organization-level classification library", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:42:00Z"},
+      {"id": "P4-04", "title": "Version history", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:42:00Z"}
     ]
   },
   "completedTasks": ["P1-01","P1-01b","P1-02","P1-03","P1-04","P1-05","P1-06","P2-01","P2-02","P2-03","P2-04","P2-05","P2-06","P2-07","P2-08","P2-09","P2-10","P2-11","P2-12","P2-13","P2-14","P2-15","P3-01","P3-02"],
