@@ -8,6 +8,7 @@ import { calculateLinearFeet } from '@/lib/polygon-utils';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 import { getNotificationPrefs } from '@/components/NotificationSettings';
 import { applyCustomFormula } from '@/lib/formula-eval';
+import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,16 @@ function computeClassificationTotals(
 ): PreviewRow[] {
   const rows: PreviewRow[] = [];
 
+  // BUG-PIKE-043: compute auto-deductions (door/window openings overlapping linear walls)
+  // Use page-1 (fallback) scale for spatial computation — same approach as /api/quantities
+  const fallbackPpu = scale?.pixelsPerUnit ?? 0;
+  const fallbackUnit = (scale?.unit === 'm' || scale?.unit === 'mm') ? 'metric' as const : 'imperial' as const;
+  const autoDeductMap = fallbackPpu > 0
+    ? aggregateDeductions(computeDeductions(polygons, classifications, { pixelsPerFoot: fallbackPpu, unit: fallbackUnit }))
+    : new Map<string, { total: number; items: unknown[] }>();
+
   // BUG-PIKE-041: build raw-by-name map for formula references (mirrors QuantitiesPanel + server-side routes)
+  // BUG-PIKE-043: apply backout + deductions to linear values before formula cross-references
   const rawByName: Record<string, number> = {};
   for (const cls of classifications) {
     const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
@@ -71,6 +81,12 @@ function computeClassificationTotals(
       if (cls.type === 'area') raw += poly.area / (ppu * ppu);
       else if (cls.type === 'linear') raw += calculateLinearFeet(poly.points, ppu, false);
       else raw += 1;
+    }
+    if (cls.type === 'linear') {
+      const backoutTotal = (cls.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+      const autoDeductTotal = (autoDeductMap.get(cls.id)?.total ?? 0);
+      const manualDeductTotal = (cls.deductions ?? []).reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+      raw = Math.max(0, raw - backoutTotal - autoDeductTotal - manualDeductTotal);
     }
     rawByName[cls.name.toLowerCase()] = raw;
   }
@@ -101,6 +117,16 @@ function computeClassificationTotals(
         totalCount += 1;
         pageMap.set(poly.pageNumber, (pageMap.get(poly.pageNumber) ?? 0) + 1);
       }
+    }
+
+    // BUG-PIKE-043: apply backout + deductions to totalLinear before formula override
+    if (cls.type === 'linear') {
+      const backoutTotal = (cls.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+      const autoDeductTotal = (autoDeductMap.get(cls.id)?.total ?? 0);
+      const manualDeductTotal = (cls.deductions ?? []).reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+      totalLinear = Math.max(0, totalLinear - backoutTotal - autoDeductTotal - manualDeductTotal);
+      // Recompute page-level breakdown to also reflect deductions proportionally is complex;
+      // pageMap entries are left as raw for per-page display (acceptable approximation for screen view).
     }
 
     const pageScale = pickScaleForPage(clsPolygons[0].pageNumber, scales, scale);

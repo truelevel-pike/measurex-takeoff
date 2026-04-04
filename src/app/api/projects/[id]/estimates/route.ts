@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getAssemblies, getScale, listScales, getProject, initDataDir } from '@/server/project-store';
-import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
+import { calculatePolygonArea, calculateLinearLength, computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { applyCustomFormula } from '@/lib/formula-eval';
 import { z } from 'zod';
@@ -97,6 +97,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       }
       entry.count += 1;
       byClassification.set(p.classificationId, entry);
+    }
+
+    // BUG-PIKE-042 fix: apply backout deductions to linear quantities (consistent with /api/quantities)
+    const fallbackCfg = scaleForPage(scaleMap, 1);
+    const autoDeductMapGet = aggregateDeductions(
+      computeDeductions(polygons, classifications, fallbackCfg),
+    );
+    for (const cls of classifications) {
+      if (cls.type !== 'linear') continue;
+      const entry = byClassification.get(cls.id);
+      if (!entry) continue;
+      const backoutTotal = (cls.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+      const autoDeductTotal = autoDeductMapGet.get(cls.id)?.total ?? 0;
+      const manualDeductTotal = (cls.deductions ?? []).reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+      entry.linearFeet = Math.max(0, entry.linearFeet - backoutTotal - autoDeductTotal - manualDeductTotal);
+      byClassification.set(cls.id, entry);
     }
 
     // BUG-PIKE-023 fix: build raw-quantity map for formula evaluation (same pattern as /api/quantities)
@@ -201,6 +217,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       entry.count += 1;
       byClassification.set(p.classificationId, entry);
+    }
+
+    // BUG-PIKE-042 fix: apply backout deductions to linear quantities (consistent with /api/quantities)
+    const fallbackCfgPost = scaleForPage(scaleMap, 1);
+    const autoDeductMapPost = aggregateDeductions(
+      computeDeductions(polygons, classifications, fallbackCfgPost),
+    );
+    for (const cls of classifications) {
+      if (cls.type !== 'linear') continue;
+      const entry = byClassification.get(cls.id);
+      if (!entry) continue;
+      const backoutTotal = (cls.backouts ?? []).reduce((sum, b) => sum + (b.width || 0) * (b.count || 1), 0);
+      const autoDeductTotal = autoDeductMapPost.get(cls.id)?.total ?? 0;
+      const manualDeductTotal = (cls.deductions ?? []).reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+      entry.linearFeet = Math.max(0, entry.linearFeet - backoutTotal - autoDeductTotal - manualDeductTotal);
+      byClassification.set(cls.id, entry);
     }
 
     // BUG-PIKE-023 fix: build raw-quantity map for formula evaluation
