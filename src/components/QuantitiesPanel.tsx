@@ -14,7 +14,7 @@ import VersionHistory from './VersionHistory';
 import AssembliesPanel from './AssembliesPanel';
 import EstimatesTab from './EstimatesTab';
 import MeasurementSettingsPanel from './MeasurementSettings';
-import ClassificationLibrary from './ClassificationLibrary';
+import ClassificationLibrary, { saveClassificationToOrgLibrary } from './ClassificationLibrary';
 import ImportFromLibraryModal from './ImportFromLibraryModal';
 import UserPreferencesPanel from './UserPreferencesPanel';
 import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine';
@@ -2223,22 +2223,22 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                     onClick={(event) => {
                       event.stopPropagation();
                       try {
-                        const raw = localStorage.getItem('mx-org-library');
-                        const lib: Array<{ id: string; name: string; type: string; color: string; tileWidth?: number; tileHeight?: number; slopeFactor?: number; formula?: string }> = raw ? JSON.parse(raw) : [];
-                        const exists = lib.some((item) => item.name.toLowerCase() === classification.name.toLowerCase());
-                        if (!exists) {
-                          lib.push({
-                            id: crypto.randomUUID(),
-                            name: classification.name,
-                            type: classification.type,
-                            color: classification.color,
-                            tileWidth: classification.tileWidth,
-                            tileHeight: classification.tileHeight,
-                            slopeFactor: classification.slopeFactor,
-                            formula: classification.formula,
-                          });
-                          localStorage.setItem('mx-org-library', JSON.stringify(lib));
-                        }
+                        // BUG-PIKE-001 fix: use saveClassificationToOrgLibrary so both
+                        // QuantitiesPanel and ClassificationLibrary share the same 'mx-org-classifications' key.
+                        const before = (typeof window !== 'undefined' ? localStorage.getItem('mx-org-classifications') : null) ?? '[]';
+                        const beforeCount = (JSON.parse(before) as Array<unknown>).length;
+                        saveClassificationToOrgLibrary({
+                          name: classification.name,
+                          type: classification.type,
+                          color: classification.color,
+                          tileWidth: classification.tileWidth,
+                          tileHeight: classification.tileHeight,
+                          slopeFactor: classification.slopeFactor,
+                          formula: classification.formula,
+                        });
+                        const after = (typeof window !== 'undefined' ? localStorage.getItem('mx-org-classifications') : null) ?? '[]';
+                        const afterCount = (JSON.parse(after) as Array<unknown>).length;
+                        const exists = afterCount === beforeCount;
                         addToast(exists ? `"${classification.name}" already in library` : `"${classification.name}" saved to library`, 'success');
                       } catch {
                         addToast('Failed to save to library', 'error');
@@ -2331,7 +2331,12 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                       {(() => {
                         const linkedAsm = storeAssemblies.find((a) => a.classificationId === classification.id);
                         if (!linkedAsm) return null;
-                        const uc = (linkedAsm as { unitCost?: number }).unitCost ?? 0;
+                        // BUG-PIKE-002 fix: Assembly type has no unitCost field — compute it
+                        // from materials as sum(unitCost * quantityPerUnit) per unit of measure.
+                        const uc = linkedAsm.materials.reduce(
+                          (sum, m) => sum + (m.unitCost ?? 0) * (m.coverageRate > 0 ? 1 / m.coverageRate : 1),
+                          0,
+                        );
                         const qty = classification.type === 'area' ? totals.areaReal : classification.type === 'linear' ? netLinear : totals.count;
                         const estCost = uc * qty;
                         return (
