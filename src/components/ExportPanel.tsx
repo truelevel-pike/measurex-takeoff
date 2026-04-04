@@ -7,6 +7,7 @@ import { useStore } from '@/lib/store';
 import { calculateLinearFeet } from '@/lib/polygon-utils';
 import type { Classification, Polygon, ScaleCalibration } from '@/lib/types';
 import { getNotificationPrefs } from '@/components/NotificationSettings';
+import { applyCustomFormula } from '@/lib/formula-eval';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,22 @@ function computeClassificationTotals(
 ): PreviewRow[] {
   const rows: PreviewRow[] = [];
 
+  // BUG-PIKE-041: build raw-by-name map for formula references (mirrors QuantitiesPanel + server-side routes)
+  const rawByName: Record<string, number> = {};
+  for (const cls of classifications) {
+    const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
+    let raw = 0;
+    for (const poly of clsPolygons) {
+      const pageScale = pickScaleForPage(poly.pageNumber, scales, scale);
+      const ppu = pageScale?.pixelsPerUnit && pageScale.pixelsPerUnit > 0 ? pageScale.pixelsPerUnit : 1;
+      if (cls.type === 'area') raw += poly.area / (ppu * ppu);
+      else if (cls.type === 'linear') raw += calculateLinearFeet(poly.points, ppu, false);
+      else raw += 1;
+    }
+    rawByName[cls.name.toLowerCase()] = raw;
+  }
+  const classNames = classifications.map((c) => c.name);
+
   for (const cls of classifications) {
     const clsPolygons = polygons.filter((p) => p.classificationId === cls.id);
     if (clsPolygons.length === 0) continue;
@@ -88,11 +105,15 @@ function computeClassificationTotals(
 
     const pageScale = pickScaleForPage(clsPolygons[0].pageNumber, scales, scale);
     const baseUnit = pageScale?.unit ?? 'px';
-    const unit =
-      cls.type === 'area' ? `sq ${baseUnit}` : cls.type === 'linear' ? baseUnit : 'ea';
 
-    const totalValue =
+    // BUG-PIKE-041: apply custom formula override (Excel-like) — mirrors QuantitiesPanel estimateQuantities
+    const formulaResult = applyCustomFormula(cls.formula, classNames, rawByName);
+    const rawTotal =
       cls.type === 'area' ? totalArea : cls.type === 'linear' ? totalLinear : totalCount;
+    const totalValue = formulaResult !== null ? formulaResult : rawTotal;
+    const unit = formulaResult !== null && cls.formulaUnit
+      ? cls.formulaUnit
+      : cls.type === 'area' ? `sq ${baseUnit}` : cls.type === 'linear' ? baseUnit : 'ea';
 
     const pageEntries = Array.from(pageMap.entries());
     const perPageStr = pageEntries
