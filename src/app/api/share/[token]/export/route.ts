@@ -94,7 +94,8 @@ function buildQuantityRows(
       name: c.name,
       type: c.type,
       quantity: round2(effectiveQuantity),
-      unit: unitLabel(c.type),
+      // BUG-PIKE-026 fix: use formulaUnit when formula is applied (consistent with Excel export)
+      unit: (formulaResult !== null && c.formulaUnit) ? c.formulaUnit : unitLabel(c.type),
     };
   });
 }

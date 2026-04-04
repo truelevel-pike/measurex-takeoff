@@ -22,7 +22,7 @@ interface QuantityRow {
   color: string;
   type: Classification['type'];
   quantity: number;
-  unit: 'SF' | 'LF' | 'EA';
+  unit: string; // 'SF' | 'LF' | 'EA' or custom formulaUnit
 }
 
 interface PageMeasurement {
@@ -110,7 +110,8 @@ function buildQuantityRows(
       color: cls.color,
       type: cls.type,
       quantity: round2(effectiveQuantity),
-      unit: unitLabel(cls.type),
+      // BUG-PIKE-026 fix: use formulaUnit when formula is applied (consistent with Excel export)
+      unit: (formulaResult !== null && cls.formulaUnit) ? cls.formulaUnit : unitLabel(cls.type),
     };
   });
 }
