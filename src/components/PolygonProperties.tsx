@@ -24,10 +24,12 @@ export default function PolygonProperties({ onClose }: PolygonPropertiesProps) {
   if (!polygon) return <aside className="p-4 text-gray-400">No polygon selected</aside>;
   const classification = classifications.find((c) => c.id === polygon.classificationId);
 
-  const ppu = scale?.pixelsPerUnit || 1;
+  const scales = useStore((s) => s.scales);
+  const ppu = (scales[polygon.pageNumber] ?? scale)?.pixelsPerUnit || 1;
   const unit = scale?.unit || 'ft';
   const areaReal = polygon.area / (ppu * ppu);
-  const lengthReal = polygon.linearFeet || 0;
+  // BUG-PIKE-020 fix: linearFeet stored as raw pixels — divide by ppu for display
+  const lengthReal = ppu > 0 ? (polygon.linearFeet || 0) / ppu : (polygon.linearFeet || 0);
 
   const persistLabel = () => {
     const next = label.trim();

@@ -25,8 +25,10 @@ function formatArea(area: number, pixelsPerUnit: number, unit: string): string {
   return `${realArea.toFixed(1)} sq ${unit}`;
 }
 
-function formatLength(length: number, unit: string): string {
-  return `${length.toFixed(1)} ${unit}`;
+// BUG-PIKE-020 fix: accept pixelsPerUnit so raw-pixel linearFeet is converted to LF before display
+function formatLength(length: number, pixelsPerUnit: number, unit: string): string {
+  const realLength = pixelsPerUnit > 0 ? length / pixelsPerUnit : length;
+  return `${realLength.toFixed(1)} ${unit}`;
 }
 
 function seedPolygonGroupsFromClassifications(
@@ -55,6 +57,7 @@ export default function PolygonGroupPanel({
   const storeClassifications = useStore((s) => s.classifications);
   const classificationGroups = useStore((s) => s.groups);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
 
   const polygons = polygonsProp ?? storePolygons;
   const classifications = classificationsProp ?? storeClassifications;
@@ -204,7 +207,7 @@ export default function PolygonGroupPanel({
                 <div className="mt-1 flex flex-wrap gap-2 text-xs text-[#94a3b8]">
                   <span>{stats.polygonCount} polygons</span>
                   <span>{formatArea(stats.totalArea, pixelsPerUnit, unit)}</span>
-                  <span>{formatLength(stats.totalLength, unit)}</span>
+                  <span>{formatLength(stats.totalLength, pixelsPerUnit, unit)}</span>
                 </div>
 
                 {!group.visible && (
@@ -241,7 +244,7 @@ export default function PolygonGroupPanel({
                     {' | '}
                     A {formatArea(polygon.area || 0, pixelsPerUnit, unit)}
                     {' | '}
-                    L {formatLength(polygon.linearFeet || 0, unit)}
+                    L {formatLength(polygon.linearFeet || 0, (scales[polygon.pageNumber] ?? scale)?.pixelsPerUnit ?? pixelsPerUnit, unit)}
                   </p>
                 </div>
 

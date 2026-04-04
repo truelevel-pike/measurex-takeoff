@@ -79,6 +79,9 @@ export default function SmartTools() {
   const updatePolygon = useStore((s) => s.updatePolygon);
   const updateClassification = useStore((s) => s.updateClassification);
   const currentPage = useStore((s) => s.currentPage);
+  // BUG-PIKE-020 fix: need per-page scale so we can convert raw-pixel linearFeet to LF for display
+  const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
 
   const [doorWidth, setDoorWidth] = useState(DEFAULT_DOOR_WIDTH);
   const [windowWidth, setWindowWidth] = useState(DEFAULT_WINDOW_WIDTH);
@@ -177,11 +180,14 @@ export default function SmartTools() {
       type: 'linear',
     });
 
-    let totalLf = 0;
+    // BUG-PIKE-020 fix: linearFeet is stored as raw pixels — divide by ppu for display
+    const ppu = (scales[currentPage] ?? scale)?.pixelsPerUnit ?? 1;
+    let totalLfPx = 0;
     for (const wp of wallPolys) {
       updatePolygon(wp.id, { classificationId: clsId });
-      totalLf += wp.linearFeet;
+      totalLfPx += wp.linearFeet;
     }
+    const totalLf = ppu > 0 ? totalLfPx / ppu : totalLfPx;
 
     showStatus(`Wall Centerline: ${wallPolys.length} segments, ${totalLf.toFixed(1)} LF total`);
     recordAction('Auto-classify Wall Centerline', () => { wallCenterlineRef.current?.(); });

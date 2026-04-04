@@ -23,6 +23,7 @@ export default function ClassificationGroups() {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
   const groups = useStore((s) => s.groups);
   const addGroup = useStore((s) => s.addGroup);
   const updateGroup = useStore((s) => s.updateGroup);
@@ -110,14 +111,21 @@ export default function ClassificationGroups() {
     const totals = new Map<string, { count: number; area: number; linear: number }>();
     for (const c of classifications) {
       const items = polygons.filter((p) => p.classificationId === c.id);
+      // BUG-PIKE-020 fix: use per-page ppu so multi-page projects display accurate totals
       totals.set(c.id, {
         count: items.length,
-        area: items.reduce((sum, p) => sum + p.area, 0) / (ppu * ppu),
-        linear: items.reduce((sum, p) => sum + (p.linearFeet || 0), 0),
+        area: items.reduce((sum, p) => {
+          const pgPpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit || ppu;
+          return sum + p.area / (pgPpu * pgPpu);
+        }, 0),
+        linear: items.reduce((sum, p) => {
+          const pgPpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit || ppu;
+          return sum + (p.linearFeet || 0) / pgPpu;
+        }, 0),
       });
     }
     return totals;
-  }, [classifications, polygons, ppu]);
+  }, [classifications, polygons, ppu, scale, scales]);
 
   // Group totals
   const groupTotals = useCallback(

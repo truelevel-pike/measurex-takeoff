@@ -154,6 +154,7 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  const scales = useStore((s) => s.scales);
   const currentPage = useStore((s) => s.currentPage);
   const totalPages = useStore((s) => s.totalPages);
   const ppu = scale?.pixelsPerUnit ?? 1;
@@ -195,14 +196,20 @@ export default function MXChat({ onClose, visible = true }: MXChatProps) {
       if (c.type === 'count') {
         return { name: c.name, type: c.type, value: classPolygons.length, unit: 'count', count: classPolygons.length };
       }
-      const totalRaw = classPolygons.reduce((sum, p) => {
-        return sum + (c.type === 'linear' ? p.linearFeet : p.area);
+      // BUG-PIKE-020 fix: use per-page ppu so multi-page projects compute accurately
+      const scaled = classPolygons.reduce((sum, p) => {
+        const pagePpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit ?? ppu;
+        if (pagePpu <= 0) return sum;
+        return sum + (c.type === 'linear' ? p.linearFeet / pagePpu : p.area / (pagePpu * pagePpu));
       }, 0);
-      const scaled = c.type === 'linear' ? totalRaw / ppu : totalRaw / (ppu * ppu);
       return { name: c.name, type: c.type, value: scaled, unit: c.type === 'linear' ? unit : `sq ${unit}`, count: classPolygons.length };
     });
 
-    const totalArea = polygons.reduce((sum, p) => sum + p.area, 0) / (ppu * ppu);
+    // BUG-PIKE-020 fix: use per-page ppu for total area as well
+    const totalArea = polygons.reduce((sum, p) => {
+      const pagePpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit ?? ppu;
+      return sum + (pagePpu > 0 ? p.area / (pagePpu * pagePpu) : 0);
+    }, 0);
 
     // Per-page breakdown so the AI can answer page-specific questions
     const pageBreakdown: Record<number, { classificationId: string; name: string; count: number }[]> = {};
