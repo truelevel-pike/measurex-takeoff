@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:05:45.921823Z",
+  "lastUpdated": "2026-04-04T03:10:01.316249Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -345,6 +345,16 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "770d725"
+    },
+    {
+      "id": "BUG-PIKE-012",
+      "file": "src/app/api/projects/[id]/estimates/route.ts",
+      "line": 44,
+      "description": "GET and POST /api/estimates used single project-level ppu (getScale page-1 only) for all polygons across all pages. Multi-page projects computed wrong quantities server-side. Same root cause as BUG-PIKE-011 (AssembliesPanel). Fixed by importing listScales() and building per-page scale map with page-1 fallback \u2014 mirrors excel export route pattern.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "cd70632",
+      "fixedAt": "2026-04-04T03:10:01.316161Z"
     }
   ],
   "blockers": [],
