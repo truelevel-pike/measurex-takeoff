@@ -18,6 +18,7 @@ import {
   getClassifications,
   getScale,
   getPages,
+  getAssemblies,
   initDataDir,
 } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
@@ -32,12 +33,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
 
-    const [project, polygons, classifications, scale, pages] = await Promise.all([
+    const [project, polygons, classifications, scale, pages, assemblies] = await Promise.all([
       getProject(id),
       getPolygons(id),
       getClassifications(id),
       getScale(id),
       getPages(id),
+      getAssemblies(id),
     ]);
 
     if (!project) {
@@ -48,11 +50,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     // BUG-A5-5-030: add Cache-Control: no-store to prevent CDN caching
+    // BUG-PIKE-034: include assemblies so cost engine data is present in snapshot
     return new Response(
       JSON.stringify({
         version: 1,
         exportedAt: new Date().toISOString(),
-        project: { ...project, pages, classifications, polygons, scale },
+        project: { ...project, pages, classifications, polygons, scale, assemblies },
       }),
       {
         status: 200,
