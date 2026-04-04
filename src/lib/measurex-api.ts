@@ -61,17 +61,19 @@ export function installMeasurexAPI() {
     getTotals() {
       const s = useStore.getState();
       let areaSF = 0, lf = 0, count = 0;
-      const ppu = s.scale?.pixelsPerUnit || 1;
+      // BUG-PIKE-027 fix: use per-page ppu so multi-page projects sum correctly
+      const globalPpu = s.scale?.pixelsPerUnit || 1;
       s.polygons.forEach((p) => {
         const c = s.classifications.find((x) => x.id === p.classificationId);
+        const pagePpu = s.scales[p.pageNumber]?.pixelsPerUnit || globalPpu;
         if (c?.type === 'area') {
           areaSF += (p.area || (p.points?.length >= 3
             ? Math.abs(p.points.reduce((a, b, i) =>
                 a + b.x * (p.points[(i + 1) % p.points.length].y - p.points[(i - 1 + p.points.length) % p.points.length].y),
               0) / 2)
-            : 0)) / (ppu * ppu);
+            : 0)) / (pagePpu * pagePpu);
         } else if (c?.type === 'linear') {
-          lf += (p.linearFeet || 0) / ppu;
+          lf += (p.linearFeet || 0) / pagePpu;
         } else if (c?.type === 'count') {
           count++;
         }
