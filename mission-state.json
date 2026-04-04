@@ -4,7 +4,7 @@
   "currentPhase": 4,
   "phaseName": "MISSION COMPLETE",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T17:48:32.443Z",
+  "lastUpdated": "2026-04-04T17:54:57.385Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -634,11 +634,21 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "cf4c0d5"
+    },
+    {
+      "id": "BUG-PIKE-041",
+      "file": "src/components/ExportPanel.tsx",
+      "line": 54,
+      "description": "computeClassificationTotals (ExportPanel) never applied classification.formula overrides — screen-view Excel export, CSV export, and Markdown report classification table all showed raw geometry values instead of formula-adjusted quantities. Fixed by building rawByName map and calling applyCustomFormula() before computing totalValue and unit, mirroring QuantitiesPanel and all server-side routes.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "6ddaff5",
+      "fixedAt": "2026-04-04T17:54:57.385Z"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T17:48:32.444Z",
+  "lastBuildCheck": "2026-04-04T17:54:57.385Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
@@ -695,12 +705,9 @@
     }
   ],
   "bugsFoundThisCycle": [
-    "BUG-PIKE-037",
-    "BUG-PIKE-038",
-    "BUG-PIKE-039",
-    "BUG-PIKE-040"
+    "BUG-PIKE-041"
   ],
-  "bugsFixedTotal": 40,
+  "bugsFixedTotal": 41,
   "auditLog": [
     {
       "cycle": "A+B+C+D+E",
@@ -740,6 +747,24 @@
         "All export formats verified: Excel 5-sheet, PDF, JSON, CSV (quantities), IFC-JSON, Markdown, contractor report",
         "Collaboration: cursor:update SSE, version history, share permissions — all wired",
         "Assemblies: materials+costs, project assemblies, org library — all wired"
+      ]
+    },
+    {
+      "cycle": "A+D+E",
+      "runAt": "2026-04-04T17:54:57.385Z",
+      "result": "PASS (1 bug found + fixed)",
+      "notes": [
+        "Build: clean (exit 0)",
+        "TypeScript: 0 errors",
+        "isTrusted: zero blocking occurrences (comments only)",
+        "data-testid coverage: 288 instances — all agent-critical testids verified",
+        "Regression sweep HEAD~5: all 5 changed files reviewed — diffs clean",
+        "BUG-PIKE-041: ExportPanel computeClassificationTotals ignored custom formula overrides — screen-view Excel/CSV/Markdown showed raw geometry instead of formula values. Fixed: applyCustomFormula() now called in computeClassificationTotals, rawByName map pre-built for cross-classification references",
+        "Formula override coverage now complete: QuantitiesPanel + all server routes + ExportPanel client preview all consistent",
+        "Agent mode ?agent=1: 14 modal/tooltip suppression points verified",
+        "Share permissions (view/edit/manage): verified in CollaborationPanel + share page",
+        "Version history: GET /history + POST /history/:entryId/restore both verified",
+        "IFC export: stub format, linear/count type area=0 is acceptable for IFC-JSON stub"
       ]
     }
   ]
