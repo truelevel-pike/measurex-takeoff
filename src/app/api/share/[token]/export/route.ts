@@ -7,6 +7,7 @@ import {
   getClassifications,
   getPolygons,
   getScale,
+  listScales,
   getPages,
 } from '@/server/project-store';
 import { validationError } from '@/lib/api-schemas';
@@ -37,20 +38,38 @@ interface QuantityRow {
   unit: string;
 }
 
+// BUG-PIKE-018 fix: build per-page scale map so multi-page share exports compute correctly.
+function buildPageScaleMap(
+  allScales: Array<{ pageNumber?: number; pixelsPerUnit: number; unit?: string }>,
+  fallbackConfig: ScaleConfig,
+): Map<number, ScaleConfig> {
+  const map = new Map<number, ScaleConfig>();
+  for (const s of allScales) {
+    const pg = s.pageNumber ?? 1;
+    const u = s.unit === 'm' || s.unit === 'mm' ? ('metric' as const) : ('imperial' as const);
+    map.set(pg, { pixelsPerFoot: s.pixelsPerUnit, unit: u });
+  }
+  if (!map.has(1)) map.set(1, fallbackConfig);
+  return map;
+}
+
 function buildQuantityRows(
   classifications: Classification[],
   polygons: Polygon[],
   scaleConfig: ScaleConfig,
+  pageScaleMap?: Map<number, ScaleConfig>,
 ): QuantityRow[] {
   return classifications.map((c) => {
     const classPolygons = polygons.filter((p) => p.classificationId === c.id);
     let quantity = 0;
 
     for (const p of classPolygons) {
+      // BUG-PIKE-018 fix: use per-page scale when available
+      const sc = (pageScaleMap?.get(p.pageNumber ?? 1)) ?? scaleConfig;
       if (c.type === 'area') {
-        quantity += calculatePolygonArea(p.points, scaleConfig) ?? 0;
+        quantity += calculatePolygonArea(p.points, sc) ?? 0;
       } else if (c.type === 'linear') {
-        quantity += calculateLinearLength(p.points, scaleConfig, true) ?? 0;
+        quantity += calculateLinearLength(p.points, sc, true) ?? 0;
       } else {
         quantity += 1;
       }
@@ -213,10 +232,12 @@ export async function GET(
     }
 
     // BUG-A5-6-058: log errors instead of silently swallowing them
-    const [classifications, polygons, scale, pages] = await Promise.all([
+    // BUG-PIKE-018 fix: also fetch all per-page scales for multi-page accuracy
+    const [classifications, polygons, scale, allPageScales, pages] = await Promise.all([
       getClassifications(project.id).catch((err) => { console.error('[share export] getClassifications failed:', err); return [] as Classification[]; }),
       getPolygons(project.id).catch((err) => { console.error('[share export] getPolygons failed:', err); return [] as Polygon[]; }),
       getScale(project.id).catch((err) => { console.error('[share export] getScale failed:', err); return null; }),
+      listScales(project.id).catch((err) => { console.error('[share export] listScales failed:', err); return []; }),
       getPages(project.id).catch((err) => { console.error('[share export] getPages failed:', err); return [] as PageInfo[]; }),
     ]);
 
@@ -226,6 +247,8 @@ export async function GET(
         ? ('metric' as const)
         : ('imperial' as const);
     const scaleConfig: ScaleConfig = { pixelsPerFoot: ppu, unit };
+    // BUG-PIKE-018 fix: build per-page map for multi-page export accuracy
+    const pageScaleMap = buildPageScaleMap(allPageScales, scaleConfig);
     const projectName = project.name || 'Untitled Project';
     const safeName = projectName.replace(/[^a-zA-Z0-9-_]/g, '-');
 
@@ -244,7 +267,8 @@ export async function GET(
     }
 
     // Build quantity rows (shared by excel and pdf)
-    const rows = buildQuantityRows(classifications, polygons, scaleConfig);
+    // BUG-PIKE-018 fix: pass pageScaleMap for per-page accuracy
+    const rows = buildQuantityRows(classifications, polygons, scaleConfig, pageScaleMap);
 
     // --- Excel format ---
     if (format === 'excel') {
