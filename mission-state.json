@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T16:35:00.000Z",
+  "lastUpdated": "2026-04-04T16:43:29.772Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -526,6 +526,24 @@
       "status": "fixed",
       "commit": "6bf7cf9",
       "fixedAt": "2026-04-04T16:35:00.000Z"
+    },
+    {
+      "id": "BUG-PIKE-030",
+      "file": "src/components/QuantitiesPanel.tsx",
+      "line": 2168,
+      "description": "count-type classification row displayed raw polygon count even when custom formula override was set — should show formula result + formulaUnit",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "5764ab9"
+    },
+    {
+      "id": "BUG-PIKE-031",
+      "file": "src/components/QuantitiesPanel.tsx",
+      "line": 1426,
+      "description": "Copy to clipboard button ignored custom formula overrides for all types — clipboard output was inconsistent with API exports",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "5764ab9"
     }
   ],
   "blockers": [],
