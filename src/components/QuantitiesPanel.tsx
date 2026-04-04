@@ -21,6 +21,7 @@ import { computeDeductions, aggregateDeductions } from '@/server/geometry-engine
 import type { AutoDeduction } from '@/server/geometry-engine';
 import BackoutPanel from './BackoutPanel';
 import CustomFormulas from './CustomFormulas';
+import { applyCustomFormula } from '@/lib/formula-eval';
 
 const TYPE_OPTIONS = [
   { value: 'area', label: 'Area (SF)' },
@@ -611,11 +612,32 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
   }, [classifications, polygonsByClassification, getPixelsPerUnitForPage]);
 
   // Build a flat Record<classificationId, number> for EstimatesTab
+  // BUG-PIKE-010 fix: apply custom formula override when classification.formula is set.
   const estimateQuantities = useMemo(() => {
+    const classNames = classifications.map((c) => c.name);
+
+    // Build a raw quantities map by name for formula references (lowercased)
+    const rawByName: Record<string, number> = {};
+    for (const c of classifications) {
+      const t = totalsByClassification.get(c.id);
+      if (!t) { rawByName[c.name.toLowerCase()] = 0; continue; }
+      if (c.type === 'area') rawByName[c.name.toLowerCase()] = t.areaReal;
+      else if (c.type === 'linear') rawByName[c.name.toLowerCase()] = t.lengthReal;
+      else rawByName[c.name.toLowerCase()] = t.count;
+    }
+
     const result: Record<string, number> = {};
     for (const c of classifications) {
       const t = totalsByClassification.get(c.id);
       if (!t) { result[c.id] = 0; continue; }
+
+      // Prefer custom formula result when defined and evaluates successfully
+      const formulaResult = applyCustomFormula(c.formula, classNames, rawByName);
+      if (formulaResult !== null) {
+        result[c.id] = formulaResult;
+        continue;
+      }
+
       if (c.type === 'area') result[c.id] = t.areaReal;
       else if (c.type === 'linear') result[c.id] = t.lengthReal;
       else result[c.id] = t.count;

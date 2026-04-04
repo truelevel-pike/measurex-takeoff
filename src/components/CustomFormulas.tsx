@@ -4,163 +4,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Check, AlertCircle, Plus } from 'lucide-react';
 import type { Classification } from '@/lib/types';
 import { useStore } from '@/lib/store';
+import { tokenizeFormula, evaluateFormula } from '@/lib/formula-eval';
 
 export interface CustomFormulasProps {
   classification?: Classification;
   onSave: (formula: string, unit: string, saveToLibrary: boolean) => void;
   onClose: () => void;
-}
-
-// Tokenize a formula string into numbers, operators, parentheses, and references
-type Token =
-  | { type: 'number'; value: number }
-  | { type: 'op'; value: string }
-  | { type: 'paren'; value: '(' | ')' }
-  | { type: 'ref'; name: string };
-
-function tokenize(input: string, classificationNames: string[]): Token[] {
-  const tokens: Token[] = [];
-  let i = 0;
-  const s = input.trim();
-
-  // Sort names by length descending so longer names match first
-  const sortedNames = [...classificationNames].sort((a, b) => b.length - a.length);
-
-  while (i < s.length) {
-    // Skip whitespace
-    if (/\s/.test(s[i])) { i++; continue; }
-
-    // Number (including decimals)
-    if (/[\d.]/.test(s[i])) {
-      let num = '';
-      while (i < s.length && /[\d.]/.test(s[i])) { num += s[i]; i++; }
-      const parsed = parseFloat(num);
-      if (isNaN(parsed)) throw new Error(`Invalid number: ${num}`);
-      tokens.push({ type: 'number', value: parsed });
-      continue;
-    }
-
-    // Operators
-    if ('+-*/^'.includes(s[i])) {
-      tokens.push({ type: 'op', value: s[i] });
-      i++;
-      continue;
-    }
-
-    // Parentheses
-    if (s[i] === '(' || s[i] === ')') {
-      tokens.push({ type: 'paren', value: s[i] as '(' | ')' });
-      i++;
-      continue;
-    }
-
-    // Try to match a classification name reference
-    let matched = false;
-    for (const name of sortedNames) {
-      if (s.substring(i, i + name.length).toLowerCase() === name.toLowerCase()) {
-        tokens.push({ type: 'ref', name });
-        i += name.length;
-        matched = true;
-        break;
-      }
-    }
-    if (matched) continue;
-
-    throw new Error(`Unexpected character: "${s[i]}"`);
-  }
-
-  return tokens;
-}
-
-// Evaluate tokenized formula using a simple recursive descent parser
-// Supports: +, -, *, /, ^ with correct precedence
-function evaluate(tokens: Token[], quantities: Record<string, number>): number {
-  let pos = 0;
-
-  function peek(): Token | undefined { return tokens[pos]; }
-  function consume(): Token { return tokens[pos++]; }
-
-  function opValue(t: Token | undefined): string | undefined {
-    return t && t.type === 'op' ? t.value : undefined;
-  }
-
-  function parseExpr(): number {
-    let left = parseTerm();
-    let op = opValue(peek());
-    while (op === '+' || op === '-') {
-      consume();
-      const right = parseTerm();
-      left = op === '+' ? left + right : left - right;
-      op = opValue(peek());
-    }
-    return left;
-  }
-
-  function parseTerm(): number {
-    let left = parsePower();
-    let op = opValue(peek());
-    while (op === '*' || op === '/') {
-      consume();
-      const right = parsePower();
-      left = op === '*' ? left * right : left / right;
-      op = opValue(peek());
-    }
-    return left;
-  }
-
-  function parsePower(): number {
-    let base = parseUnary();
-    while (opValue(peek()) === '^') {
-      consume();
-      const exp = parseUnary();
-      base = Math.pow(base, exp);
-    }
-    return base;
-  }
-
-  function parseUnary(): number {
-    const op = opValue(peek());
-    if (op === '+' || op === '-') {
-      consume();
-      const val = parseAtom();
-      return op === '-' ? -val : val;
-    }
-    return parseAtom();
-  }
-
-  function parseAtom(): number {
-    const t = peek();
-    if (!t) throw new Error('Unexpected end of formula');
-
-    if (t.type === 'number') {
-      consume();
-      return t.value;
-    }
-
-    if (t.type === 'ref') {
-      consume();
-      const val = quantities[t.name.toLowerCase()];
-      if (val === undefined) throw new Error(`Unknown reference: "${t.name}"`);
-      return val;
-    }
-
-    if (t.type === 'paren' && t.value === '(') {
-      consume();
-      const val = parseExpr();
-      const closing = peek();
-      if (!closing || closing.type !== 'paren' || (closing.type === 'paren' && closing.value !== ')')) {
-        throw new Error('Missing closing parenthesis');
-      }
-      consume();
-      return val;
-    }
-
-    throw new Error(`Unexpected token`);
-  }
-
-  const result = parseExpr();
-  if (pos < tokens.length) throw new Error('Unexpected tokens after expression');
-  return result;
 }
 
 const EXAMPLE_CHIPS = [
@@ -207,9 +56,9 @@ export default function CustomFormulas({ classification, onSave, onClose }: Cust
 
     try {
       const names = classifications.map((c) => c.name);
-      const tokens = tokenize(raw, names);
+      const tokens = tokenizeFormula(raw, names);
       if (tokens.length === 0) return { valid: false, error: 'Empty formula', result: null };
-      const result = evaluate(tokens, quantities);
+      const result = evaluateFormula(tokens, quantities);
       if (!isFinite(result)) return { valid: false, error: 'Result is not a finite number', result: null };
       return { valid: true, error: null, result };
     } catch (err) {
