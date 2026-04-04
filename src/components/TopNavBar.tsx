@@ -666,6 +666,7 @@ const TopNavBar = React.memo(function TopNavBar({
                 MX Chat
               </button>
               <button
+                data-testid="ai-image-search-btn"
                 aria-label="Toggle AI Image Search"
                 onClick={onToggleImageSearch}
                 style={{
@@ -757,7 +758,7 @@ const TopNavBar = React.memo(function TopNavBar({
               )}
               <NavIconButton ariaLabel="Show quantities" srLabel="Show quantities" icon={<List size={17} aria-hidden="true" />} tooltip="Quantities" testId="tab-quantities" />
               <NavIconButton ariaLabel="Grid view" srLabel="Grid view" icon={<Grid3X3 size={17} aria-hidden="true" />} tooltip="Grid View" />
-              <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} />
+              <NavIconButton ariaLabel="Compare" srLabel="Compare" icon={<GitCompare size={17} aria-hidden="true" />} tooltip="Compare" onClick={onCompare} testId="drawing-comparison-btn" />
               <NavIconButton ariaLabel="Print Blueprint" srLabel="Print Blueprint" icon={<Printer size={17} aria-hidden="true" />} tooltip="Print Blueprint" onClick={onPrintBlueprint} />
               <NavIconButton ariaLabel="Export" srLabel="Export" icon={<FileSpreadsheet size={17} aria-hidden="true" />} tooltip="Export" onClick={onExportPanel} testId="export-btn" />
               <NavIconButton ariaLabel="Quick Export Excel" srLabel="Quick Export Excel" icon={<Download size={17} aria-hidden="true" />} tooltip="Quick Export Excel" onClick={onExportExcel} />

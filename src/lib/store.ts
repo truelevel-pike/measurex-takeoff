@@ -12,7 +12,7 @@ import type {
   Annotation,
   RepeatingGroup,
 } from './types';
-import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea, flipPolygonH, flipPolygonV, rotatePolygon, combinePolygons } from './polygon-utils';
+import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea, flipPolygonH, flipPolygonV, rotatePolygon, combinePolygons, cutPolygonFromShape } from './polygon-utils';
 import { assignTradeGroup } from './trade-groups';
 
 // Helpers
@@ -833,16 +833,9 @@ export const useStore = create<Store>()(
     if (!poly || cutShape.length < 3) return;
     const before = snapshot(s);
     try {
-      const turf = require('@turf/turf');
-      const polyRing: [number, number][] = poly.points.map((p) => [p.x, p.y]);
-      polyRing.push([poly.points[0].x, poly.points[0].y]);
-      const cutRing: [number, number][] = cutShape.map((p) => [p.x, p.y]);
-      cutRing.push([cutShape[0].x, cutShape[0].y]);
-      const turfPoly = turf.polygon([polyRing]);
-      const turfCut = turf.polygon([cutRing]);
-      const fc = turf.featureCollection([turfPoly, turfCut]);
-      const diff = turf.difference(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
-      if (!diff) {
+      // P2-07: Use ESM-safe cutPolygonFromShape (replaces require('@turf/turf'))
+      const resultPointArrays = cutPolygonFromShape(poly.points, cutShape);
+      if (resultPointArrays.length === 0) {
         // Cut removed entire polygon
         set({
           polygons: s.polygons.filter((p) => p.id !== id),
@@ -854,22 +847,12 @@ export const useStore = create<Store>()(
         });
         return;
       }
-      const results: Polygon[] = [];
-      const extractRing = (coords: number[][]) =>
-        coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
-      if (diff.geometry.type === 'Polygon') {
-        const pts = extractRing(diff.geometry.coordinates[0]);
-        if (pts.length >= 3) {
-          results.push({ ...poly, id: crypto.randomUUID(), points: pts, area: calculatePolygonArea(pts) });
-        }
-      } else {
-        for (const rings of (diff.geometry as GeoJSON.MultiPolygon).coordinates) {
-          const pts = extractRing(rings[0]);
-          if (pts.length >= 3) {
-            results.push({ ...poly, id: crypto.randomUUID(), points: pts, area: calculatePolygonArea(pts) });
-          }
-        }
-      }
+      const results: Polygon[] = resultPointArrays.map((pts) => ({
+        ...poly,
+        id: crypto.randomUUID(),
+        points: pts,
+        area: calculatePolygonArea(pts),
+      }));
       if (results.length === 0) {
         set({
           polygons: s.polygons.filter((p) => p.id !== id),

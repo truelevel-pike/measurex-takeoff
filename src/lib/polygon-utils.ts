@@ -255,3 +255,35 @@ export function combinePolygons(polys: Point[][]): Point[] {
     return polys[0]; // fallback
   }
 }
+
+/**
+ * P2-07: Cut a shape out of a polygon using turf.difference (ESM-safe).
+ * Returns an array of resulting Point arrays (may be empty if cut removes all, or
+ * multiple if the result is a MultiPolygon).
+ */
+export function cutPolygonFromShape(polyPoints: Point[], cutShapePoints: Point[]): Point[][] {
+  if (polyPoints.length < 3 || cutShapePoints.length < 3) return [];
+  const toRing = (pts: Point[]): [number, number][] => {
+    const ring = pts.map((p): [number, number] => [p.x, p.y]);
+    ring.push([pts[0].x, pts[0].y]); // close ring
+    return ring;
+  };
+  const turfPoly = turf.polygon([toRing(polyPoints)]);
+  const turfCut = turf.polygon([toRing(cutShapePoints)]);
+  const fc = turf.featureCollection([turfPoly, turfCut]);
+  const diff = turf.difference(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
+  if (!diff) return [];
+  const results: Point[][] = [];
+  const extractRing = (coords: number[][]): Point[] =>
+    coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
+  if (diff.geometry.type === 'Polygon') {
+    const pts = extractRing(diff.geometry.coordinates[0]);
+    if (pts.length >= 3) results.push(pts);
+  } else if (diff.geometry.type === 'MultiPolygon') {
+    for (const rings of diff.geometry.coordinates) {
+      const pts = extractRing(rings[0]);
+      if (pts.length >= 3) results.push(pts);
+    }
+  }
+  return results;
+}
