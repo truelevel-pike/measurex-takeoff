@@ -9,6 +9,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { useStore } from '@/lib/store';
 import type { Classification, DetectedElement, PDFViewerHandle, Polygon, ProjectState } from '@/lib/types';
 import { detectScaleFromText, detectedToCalibration, isNotToScale, DetectedScale } from '@/lib/auto-scale';
+import { calculateLinearFeet } from '@/lib/polygon-utils';
 import { extractSheetName } from '@/lib/sheet-namer';
 import { capturePageScreenshot, triggerAITakeoff } from '@/lib/ai-takeoff';
 import { useIsMobile } from '@/lib/utils';
@@ -2025,13 +2026,17 @@ function PageInner() {
       const allClassifications = useStore.getState().classifications;
       const classById = new Map(allClassifications.map((c: Classification) => [c.id, c]));
       const scaleState = useStore.getState().scale;
-      const ppu = scaleState?.pixelsPerUnit ?? 1;
+      const scalesState = useStore.getState().scales;
+      const fallbackPpu = scaleState?.pixelsPerUnit ?? 1;
       let areaCount = 0, areaTotalSF = 0, linearCount = 0, linearTotalLF = 0, countItems = 0;
       for (const poly of allPolygons) {
         const cls = classById.get(poly.classificationId);
         if (!cls) continue;
-        if (cls.type === 'area') { areaCount++; areaTotalSF += ppu > 0 ? poly.area / (ppu * ppu) : 0; }
-        else if (cls.type === 'linear') { linearCount++; linearTotalLF += ppu > 0 ? poly.linearFeet / ppu : 0; }
+        // BUG-PIKE-016 fix: use per-page scale for multi-page accuracy; recalculate linear from points
+        const ppu = scalesState[poly.pageNumber ?? 1]?.pixelsPerUnit ?? scalesState[1]?.pixelsPerUnit ?? fallbackPpu;
+        const effectivePpu = ppu > 0 ? ppu : fallbackPpu;
+        if (cls.type === 'area') { areaCount++; areaTotalSF += effectivePpu > 0 ? poly.area / (effectivePpu * effectivePpu) : 0; }
+        else if (cls.type === 'linear') { linearCount++; linearTotalLF += calculateLinearFeet(poly.points, effectivePpu, true); }
         else if (cls.type === 'count') countItems++;
       }
       // Show celebratory summary
