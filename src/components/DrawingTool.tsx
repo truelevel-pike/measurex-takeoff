@@ -98,10 +98,12 @@ export default function DrawingTool() {
   const baseDims = useStore((s) => s.pageBaseDimensions[s.currentPage] ?? { width: 1, height: 1 });
   // BUG-A5-H01: read snap/grid settings from store instead of hardcoded constants
   const snappingEnabled = useStore((s) => s.snappingEnabled);
+  const edgeSnappingEnabled = useStore((s) => s.edgeSnappingEnabled);
   const setSnapping = useStore((s) => s.setSnapping);
   const gridEnabled = useStore((s) => s.gridEnabled);
   const gridSize = useStore((s) => s.gridSize);
-  const snapOptions = { vertices: snappingEnabled, midpoints: snappingEnabled, edges: false, grid: gridEnabled, gridSize };
+  // P2-12: wire edgeSnappingEnabled — snap to polygon edges when enabled
+  const snapOptions = { vertices: snappingEnabled, midpoints: snappingEnabled, edges: edgeSnappingEnabled, grid: gridEnabled, gridSize };
   // BUG-A7-4-050: memoize snapPolygons to prevent useCallback invalidation
   const snapPolygons = useMemo(() => polygons.filter((polygon) => polygon.pageNumber === drawingPage), [polygons, drawingPage]);
   // BUG-A7-4-051: disable snapping when baseDims are placeholder values

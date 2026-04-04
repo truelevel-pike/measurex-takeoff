@@ -223,9 +223,11 @@ export interface Store extends ProjectState {
 
   // Snapping & Grid
   snappingEnabled: boolean;
+  edgeSnappingEnabled: boolean;
   gridEnabled: boolean;
   gridSize: number;
   setSnapping: (enabled: boolean) => void;
+  toggleEdgeSnapping: () => void;
   setGrid: (enabled: boolean) => void;
   setGridSize: (size: number) => void;
 
@@ -1249,9 +1251,11 @@ export const useStore = create<Store>()(
 
   // ─── Snapping & Grid ───
   snappingEnabled: true,
+  edgeSnappingEnabled: true,
   gridEnabled: false,
   gridSize: 20,
   setSnapping: (enabled) => set({ snappingEnabled: enabled }),
+  toggleEdgeSnapping: () => set((s) => ({ edgeSnappingEnabled: !s.edgeSnappingEnabled })),
   setGrid: (enabled) => set({ gridEnabled: enabled }),
   setGridSize: (size) => set({ gridSize: size }),
 
@@ -1353,6 +1357,7 @@ export const useStore = create<Store>()(
         markups: state.markups,
         showMarkups: state.showMarkups,
         snappingEnabled: state.snappingEnabled,
+        edgeSnappingEnabled: state.edgeSnappingEnabled,
         gridEnabled: state.gridEnabled,
         gridSize: state.gridSize,
         pageBaseDimensions: state.pageBaseDimensions,

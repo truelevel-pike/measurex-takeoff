@@ -16,6 +16,7 @@ import {
   Undo2,
   Redo2,
   MessageCircle,
+  Magnet,
   Wand2,
   ChevronUp,
 } from 'lucide-react';
@@ -50,6 +51,8 @@ export default function LeftToolbar() {
   const setTool = useStore((s) => s.setTool);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
+  const edgeSnappingEnabled = useStore((s) => s.edgeSnappingEnabled);
+  const toggleEdgeSnapping = useStore((s) => s.toggleEdgeSnapping);
   const [smartOpen, setSmartOpen] = React.useState(false);
 
   const smartPanelRef = useRef<HTMLDivElement>(null);
@@ -286,6 +289,31 @@ export default function LeftToolbar() {
       )}
 
       <div style={{ flexGrow: 1 }} />
+      {/* P2-12: Edge Snapping toggle */}
+      <button
+        data-testid="tool-edge-snap"
+        aria-label={edgeSnappingEnabled ? 'Edge snapping on' : 'Edge snapping off'}
+        aria-pressed={edgeSnappingEnabled}
+        title={edgeSnappingEnabled ? 'Edge snapping: ON (click to disable)' : 'Edge snapping: OFF (click to enable)'}
+        onClick={toggleEdgeSnapping}
+        style={{
+          width: 36,
+          height: 36,
+          margin: '4px 0',
+          background: edgeSnappingEnabled ? 'rgba(0,212,255,0.14)' : '#12121a',
+          color: edgeSnappingEnabled ? '#00d4ff' : '#b9bedc',
+          border: `1px solid ${edgeSnappingEnabled ? 'rgba(0,212,255,0.5)' : 'rgba(0,212,255,0.15)'}`,
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: edgeSnappingEnabled ? '0 0 8px rgba(0,212,255,0.25) inset' : 'none',
+        }}
+      >
+        <Magnet size={18} aria-hidden="true" />
+        <span className="sr-only">Edge snapping</span>
+      </button>
       <button
         aria-label="Open chat"
         title="Chat"

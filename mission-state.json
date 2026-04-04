@@ -4,63 +4,330 @@
   "currentPhase": 2,
   "phaseName": "Feature Gaps (Core)",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T00:08:00Z",
-  "nextAdmiral": "admiral5",
+  "lastUpdated": "2026-04-04T00:31:00Z",
+  "nextAdmiral": "admiral7",
   "tasks": {
     "phase1": [
-      {"id": "P1-01", "title": "Audit all interactive elements for data-testid coverage", "status": "done", "assignedTo": "admiral5", "admiral": "admiral5", "commit": "fb38545"},
-      {"id": "P1-01b", "title": "Add data-testid to TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "3fa0847"},
-      {"id": "P1-02", "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "3fa0847"},
-      {"id": "P1-03", "title": "Verify SF labels always visible on every polygon type", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "3fa0847"},
-      {"id": "P1-04", "title": "Canvas must accept standard PointerEvents for drawing (no isTrusted block)", "status": "done", "assignedTo": "admiral7", "admiral": "admiral7", "commit": "bf2c2ef"},
-      {"id": "P1-05", "title": "Document canvas coordinate contract for agent programming", "status": "done", "assignedTo": null, "admiral": null, "notes": "Already documented in DrawingTool.tsx header + /agent page. No changes needed."},
-      {"id": "P1-06", "title": "CDP interaction test suite — verify all draw tools", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "4227d55"}
+      {
+        "id": "P1-01",
+        "title": "Audit all interactive elements for data-testid coverage",
+        "status": "done",
+        "assignedTo": "admiral5",
+        "admiral": "admiral5",
+        "commit": "fb38545"
+      },
+      {
+        "id": "P1-01b",
+        "title": "Add data-testid to TopNavBar, QuantitiesPanel, ScalePanel, ClassificationGroups",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-02",
+        "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-03",
+        "title": "Verify SF labels always visible on every polygon type",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "3fa0847"
+      },
+      {
+        "id": "P1-04",
+        "title": "Canvas must accept standard PointerEvents for drawing (no isTrusted block)",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "bf2c2ef"
+      },
+      {
+        "id": "P1-05",
+        "title": "Document canvas coordinate contract for agent programming",
+        "status": "done",
+        "assignedTo": null,
+        "admiral": null,
+        "notes": "Already documented in DrawingTool.tsx header + /agent page. No changes needed."
+      },
+      {
+        "id": "P1-06",
+        "title": "CDP interaction test suite — verify all draw tools",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "4227d55"
+      }
     ],
     "phase2": [
-      {"id": "P2-01", "title": "Auto-naming sheets from title blocks on upload", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "62a0bf7"},
-      {"id": "P2-02", "title": "Pattern Search — find repeated symbols across pages", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8"},
-      {"id": "P2-03", "title": "AI Image Search improvements", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8"},
-      {"id": "P2-04", "title": "Drawing Comparison — compare revisions, quantify changes", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8"},
-      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P2-07", "title": "Cut/subtract tool — remove area from polygon", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7"},
-      {"id": "P2-08", "title": "Smart paste", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "62a0bf7"},
-      {"id": "P2-09", "title": "Flip, rotate, combine polygons", "status": "done", "assignedTo": "admiral6", "admiral": "admiral6", "commit": "62a0bf7", "notes": "polygon-utils + store done; ContextMenu entries still needed — will add in next wave"},
-      {"id": "P2-10", "title": "Arc line tool", "status": "done", "assignedTo": "admiral7", "admiral": "admiral7", "commit": "a101681"},
-      {"id": "P2-11", "title": "Circle shortcut (C key)", "status": "done", "assignedTo": "admiral7", "admiral": "admiral7", "commit": "a101681"},
-      {"id": "P2-12", "title": "Edge snapping (auto + toggle)", "status": "pending", "assignedTo": null, "admiral": null, "notes": "A5 dispatch did not produce commit, re-queue"},
-      {"id": "P2-13", "title": "Wall centerline auto-detection", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P2-14", "title": "Door/window backout from wall linear measurements", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P2-15", "title": "Multi-select classifications", "status": "pending", "assignedTo": null, "admiral": null, "notes": "A5 dispatch did not produce commit, re-queue"}
+      {
+        "id": "P2-01",
+        "title": "Auto-naming sheets from title blocks on upload",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "62a0bf7"
+      },
+      {
+        "id": "P2-02",
+        "title": "Pattern Search — find repeated symbols across pages",
+        "status": "done",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-03",
+        "title": "AI Image Search improvements",
+        "status": "done",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-04",
+        "title": "Drawing Comparison — compare revisions, quantify changes",
+        "status": "done",
+        "assignedTo": "admiral8",
+        "admiral": "admiral8",
+        "commit": "b772cac"
+      },
+      {
+        "id": "P2-05",
+        "title": "Merge tool — fill gaps between polygons",
+        "status": "done",
+        "assignedTo": null,
+        "admiral": null,
+        "notes": "Already implemented: MergeSplitTool.tsx, mergePolygons in store.ts, polygon-utils.ts, LeftToolbar G shortcut. No code changes needed."
+      },
+      {
+        "id": "P2-06",
+        "title": "Split tool — divide polygon in two",
+        "status": "done",
+        "assignedTo": null,
+        "admiral": null,
+        "notes": "Already implemented: MergeSplitTool.tsx, splitPolygonByLine in store.ts, polygon-utils.ts, LeftToolbar S shortcut. No code changes needed."
+      },
+      {
+        "id": "P2-07",
+        "title": "Cut/subtract tool — remove area from polygon",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "6b6b716"
+      },
+      {
+        "id": "P2-08",
+        "title": "Smart paste",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "62a0bf7"
+      },
+      {
+        "id": "P2-09",
+        "title": "Flip, rotate, combine polygons",
+        "status": "done",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "commit": "62a0bf7"
+      },
+      {
+        "id": "P2-10",
+        "title": "Arc line tool",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "a101681"
+      },
+      {
+        "id": "P2-11",
+        "title": "Circle shortcut (C key)",
+        "status": "done",
+        "assignedTo": "admiral7",
+        "admiral": "admiral7",
+        "commit": "a101681"
+      },
+      {
+        "id": "P2-12",
+        "title": "Edge snapping (auto + toggle)",
+        "status": "in-progress",
+        "assignedTo": "admiral6",
+        "admiral": "admiral6",
+        "lastChecked": "2026-04-04T00:55:00Z",
+        "notes": "No new commits yet — admiral6 still working"
+      },
+      {
+        "id": "P2-13",
+        "title": "Wall centerline auto-detection",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P2-14",
+        "title": "Door/window backout from wall linear measurements",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P2-15",
+        "title": "Multi-select classifications",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      }
     ],
     "phase3": [
-      {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P3-02", "title": "Material library (reusable)", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P3-03", "title": "Custom formulas (Excel-like syntax)", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P3-04", "title": "Assembly export", "status": "pending", "assignedTo": null, "admiral": null}
+      {
+        "id": "P3-01",
+        "title": "Assemblies — link classifications to materials + costs",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P3-02",
+        "title": "Material library (reusable)",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P3-03",
+        "title": "Custom formulas (Excel-like syntax)",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P3-04",
+        "title": "Assembly export",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      }
     ],
     "phase4": [
-      {"id": "P4-01", "title": "Multi-user real-time editing", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-02", "title": "External collaboration (no license, permission levels)", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-03", "title": "Organization-level classification library", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P4-04", "title": "Version history", "status": "pending", "assignedTo": null, "admiral": null}
+      {
+        "id": "P4-01",
+        "title": "Multi-user real-time editing",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P4-02",
+        "title": "External collaboration (no license, permission levels)",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P4-03",
+        "title": "Organization-level classification library",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      },
+      {
+        "id": "P4-04",
+        "title": "Version history",
+        "status": "pending",
+        "assignedTo": null,
+        "admiral": null
+      }
     ]
   },
-  "completedTasks": ["P1-01", "P1-01b", "P1-02", "P1-03", "P1-04", "P1-05", "P1-06", "P2-01", "P2-08", "P2-09", "P2-10", "P2-11"],
+  "completedTasks": [
+    "P1-01",
+    "P1-01b",
+    "P1-02",
+    "P1-03",
+    "P1-04",
+    "P1-05",
+    "P1-06",
+    "P2-01",
+    "P2-02",
+    "P2-03",
+    "P2-04",
+    "P2-05",
+    "P2-06",
+    "P2-07",
+    "P2-08",
+    "P2-09",
+    "P2-10",
+    "P2-11"
+  ],
   "blockers": [],
   "decisions": [],
   "corrections": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-03T23:54:00Z",
+  "lastBuildCheck": "2026-04-04T00:22:00Z",
   "admiralDispatches": [
-    {"admiral": "admiral5", "task": "P1-01", "dispatchedAt": "2026-04-03T22:46:00Z", "completedAt": "2026-04-03T23:00:00Z", "commit": "fb38545", "result": "done"},
-    {"admiral": "admiral6", "task": "P1-01b+P1-02+P1-03+P1-06", "dispatchedAt": "2026-04-03T23:34:00Z", "completedAt": "2026-04-03T23:49:00Z", "commit": "4227d55", "result": "done"},
-    {"admiral": "admiral7", "task": "P1-04+P2-10+P2-11", "dispatchedAt": "2026-04-03T23:49:00Z", "completedAt": "2026-04-03T23:54:00Z", "commit": "bf2c2ef", "result": "done"},
-    {"admiral": "admiral5", "task": "P2-07+P2-12+P2-15", "dispatchedAt": "2026-04-03T23:54:00Z", "completedAt": null, "commit": null, "result": "in-progress"},
-    {"admiral": "admiral6", "task": "P2-01+P2-08+P2-09", "dispatchedAt": "2026-04-03T23:54:00Z", "completedAt": "2026-04-04T00:08:00Z", "commit": "62a0bf7+faca9b9", "result": "done — auto-name wired, smart paste Ctrl+C/V, flip/rotate/combine with ContextMenu entries"},
-    {"admiral": "admiral5", "task": "P2-07+P2-12+P2-15", "dispatchedAt": "2026-04-03T23:54:00Z", "completedAt": "2026-04-03T23:58:00Z", "commit": null, "result": "NO COMMIT — re-dispatched P2-07 to A7"},
-    {"admiral": "admiral7", "task": "P2-07", "dispatchedAt": "2026-04-04T00:13:00Z", "completedAt": null, "commit": null, "result": "in-progress"},
-    {"admiral": "admiral8", "task": "P2-02+P2-03+P2-04", "dispatchedAt": "2026-04-04T00:13:00Z", "completedAt": null, "commit": null, "result": "in-progress"}
+    {
+      "admiral": "admiral5",
+      "task": "P1-01",
+      "dispatchedAt": "2026-04-03T22:46:00Z",
+      "completedAt": "2026-04-03T23:00:00Z",
+      "commit": "fb38545",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral6",
+      "task": "P1-01b+P1-02+P1-03+P1-06",
+      "dispatchedAt": "2026-04-03T23:34:00Z",
+      "completedAt": "2026-04-03T23:49:00Z",
+      "commit": "4227d55",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral7",
+      "task": "P1-04+P2-10+P2-11",
+      "dispatchedAt": "2026-04-03T23:49:00Z",
+      "completedAt": "2026-04-03T23:54:00Z",
+      "commit": "bf2c2ef",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral6",
+      "task": "P2-01+P2-08+P2-09",
+      "dispatchedAt": "2026-04-03T23:54:00Z",
+      "completedAt": "2026-04-04T00:08:00Z",
+      "commit": "62a0bf7+faca9b9",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral7",
+      "task": "P2-07",
+      "dispatchedAt": "2026-04-04T00:13:00Z",
+      "completedAt": "2026-04-04T00:22:00Z",
+      "commit": "6b6b716",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral8",
+      "task": "P2-02+P2-03+P2-04",
+      "dispatchedAt": "2026-04-04T00:13:00Z",
+      "completedAt": "2026-04-04T00:22:00Z",
+      "commit": "b772cac",
+      "result": "done"
+    },
+    {
+      "admiral": "admiral6",
+      "task": "P2-12",
+      "dispatchedAt": "2026-04-04T00:22:00Z",
+      "completedAt": null,
+      "commit": null,
+      "result": "in-progress"
+    }
   ],
   "dailySummaries": []
 }
