@@ -4,7 +4,7 @@
   "currentPhase": 4,
   "phaseName": "MISSION COMPLETE",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T17:28:36.439Z",
+  "lastUpdated": "2026-04-04T17:48:32.443Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -598,11 +598,47 @@
       "status": "fixed",
       "commit": "24c0f27",
       "fixedBy": "PIKE"
+    },
+    {
+      "id": "BUG-PIKE-037",
+      "file": "src/components/DrawingTool.tsx",
+      "line": "611,662",
+      "description": "DrawingTool had two identical data-testid=\"snapping-toggle\" elements — one in area branch (non-count, non-linear) and one in linear branch. Duplicate testids cause agent snapshot ambiguity. Renamed to draw-snapping-toggle (area) and draw-linear-snapping-toggle (linear).",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "0ae34d5"
+    },
+    {
+      "id": "BUG-PIKE-038",
+      "file": "src/components/LeftToolbar.tsx",
+      "line": "296",
+      "description": "LeftToolbar wall-centerline toggle used old testid wall-centerline-toggle — DrawingTool was renamed to draw-wall-centerline-toggle in a prior commit but LeftToolbar was missed, creating testid fragmentation. Fixed by aligning to draw-wall-centerline-toggle.",
+      "severity": "low",
+      "status": "fixed",
+      "commit": "0ae34d5"
+    },
+    {
+      "id": "BUG-PIKE-039",
+      "file": "src/components/ExportPanel.tsx",
+      "line": "477",
+      "description": "CSV export produced raw polygon coordinates (polygon_id, x, y per point) — useless for estimators. Should produce quantities table matching Excel export (Classification, Type, Quantity, Unit). Fixed handleCsvCoordinatesExport to iterate previewRows (formula-aware) and output CSV quantities. Button label updated to CSV (quantities).",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "0ae34d5"
+    },
+    {
+      "id": "BUG-PIKE-040",
+      "file": "src/components/ExportPanel.tsx",
+      "line": "503",
+      "description": "Markdown export polygon list showed Area: 0 for every linear and count polygon (always used poly.area / ppu²). Summary header \"Total Area\" summed area+linear+count totals together into one meaningless number. Fixed: polygon list now shows correct measurement+unit per type (SF/LF/EA); summary shows separate area/linear/count totals only when non-zero.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "cf4c0d5"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T17:28:36.439Z",
+  "lastBuildCheck": "2026-04-04T17:48:32.444Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
@@ -659,10 +695,12 @@
     }
   ],
   "bugsFoundThisCycle": [
-    "BUG-PIKE-035",
-    "BUG-PIKE-036"
+    "BUG-PIKE-037",
+    "BUG-PIKE-038",
+    "BUG-PIKE-039",
+    "BUG-PIKE-040"
   ],
-  "bugsFixedTotal": 36,
+  "bugsFixedTotal": 40,
   "auditLog": [
     {
       "cycle": "A+B+C+D+E",
@@ -680,6 +718,28 @@
         "Share export BUG-035/036: assemblies in JSON+Excel verified in code",
         "No TODOs/FIXMEs/HAKs in codebase",
         "All 36 bugs confirmed fixed in source"
+      ]
+    },
+    {
+      "cycle": "A+B+C+D",
+      "runAt": "2026-04-04T17:48:32.444Z",
+      "result": "PASS",
+      "notes": [
+        "Build: clean (exit 0)",
+        "TypeScript: 0 errors",
+        "isTrusted: zero blocking occurrences (comments/docs only)",
+        "data-testid coverage: 288 instances — all critical agent testids verified",
+        "verify-testids.sh: ALL TESTIDS PRESENT",
+        "BUG-PIKE-037: duplicate snapping-toggle testids in DrawingTool — fixed",
+        "BUG-PIKE-038: LeftToolbar wall-centerline-toggle not renamed with DrawingTool — fixed",
+        "BUG-PIKE-039: CSV export was raw coordinates not quantities — fixed to output quantities table",
+        "BUG-PIKE-040: Markdown export polygon list showed Area:0 for linear/count; summary mixed all types — fixed",
+        "Togal parity: scale presets 13+11+15=39 verified",
+        "Agent mode ?agent=1: modals suppressed, mx-agent-state span present",
+        "Multi-page AI takeoff: all-pages route verified with 300s maxDuration",
+        "All export formats verified: Excel 5-sheet, PDF, JSON, CSV (quantities), IFC-JSON, Markdown, contractor report",
+        "Collaboration: cursor:update SSE, version history, share permissions — all wired",
+        "Assemblies: materials+costs, project assemblies, org library — all wired"
       ]
     }
   ]
