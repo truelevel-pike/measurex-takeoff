@@ -4,7 +4,7 @@
   "currentPhase": 4,
   "phaseName": "MISSION COMPLETE",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T17:54:57.385Z",
+  "lastUpdated": "2026-04-04T18:13:52.004Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -644,11 +644,31 @@
       "status": "fixed",
       "commit": "6ddaff5",
       "fixedAt": "2026-04-04T17:54:57.385Z"
+    },
+    {
+      "id": "BUG-PIKE-042b",
+      "file": "src/app/api/projects/[id]/estimates/route.ts",
+      "line": 0,
+      "description": "GET + POST /api/estimates computed linearFeet totals without applying backout deductions (explicit door/window entries cls.backouts[], manual deductions cls.deductions[], auto-deductions from geometry-engine). Estimates were inconsistent with /api/quantities which DID apply deductions. Cost calculations used gross LF instead of net LF for any project with door/window backouts.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "822a63a",
+      "fixedAt": "2026-04-04T18:13:52.003Z"
+    },
+    {
+      "id": "BUG-PIKE-043",
+      "file": "src/components/ExportPanel.tsx",
+      "line": 0,
+      "description": "computeClassificationTotals in ExportPanel did not apply backout/deduction passes to totalLinear or rawByName before formula evaluation. Screen-view Excel, CSV quantities, and Markdown exports showed undeducted linear footage — inconsistent with QuantitiesPanel display and all server-side routes. Fixed by importing computeDeductions + aggregateDeductions and applying same deduction pass as quantities route.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "822a63a",
+      "fixedAt": "2026-04-04T18:13:52.004Z"
     }
   ],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T17:54:57.385Z",
+  "lastBuildCheck": "2026-04-04T18:13:52.004Z",
   "admiralDispatches": [
     {
       "admiral": "admiral5",
@@ -705,9 +725,10 @@
     }
   ],
   "bugsFoundThisCycle": [
-    "BUG-PIKE-041"
+    "BUG-PIKE-042b",
+    "BUG-PIKE-043"
   ],
-  "bugsFixedTotal": 41,
+  "bugsFixedTotal": 43,
   "auditLog": [
     {
       "cycle": "A+B+C+D+E",
@@ -765,6 +786,22 @@
         "Share permissions (view/edit/manage): verified in CollaborationPanel + share page",
         "Version history: GET /history + POST /history/:entryId/restore both verified",
         "IFC export: stub format, linear/count type area=0 is acceptable for IFC-JSON stub"
+      ]
+    },
+    {
+      "cycle": "A+D+E",
+      "runAt": "2026-04-04T18:13:52.004Z",
+      "result": "PASS (2 bugs found + fixed)",
+      "notes": [
+        "Build: clean (exit 0)",
+        "TypeScript: 0 errors",
+        "isTrusted: zero blocking occurrences (comments/docs only)",
+        "data-testid coverage: 288 instances",
+        "BUG-PIKE-042b: /api/estimates GET+POST applied formula overrides but not backout/deduction pass — LF inconsistent with /api/quantities. Fixed: added computeDeductions + aggregateDeductions + backouts + manualDeductions pass to both handlers before rawByName build.",
+        "BUG-PIKE-043: ExportPanel computeClassificationTotals missing deduction pass — screen-view Excel/CSV/Markdown showed gross LF not net LF. Fixed: imported computeDeductions + aggregateDeductions, applied deduction pass in rawByName build and totalLinear accumulation.",
+        "Both routes now consistently apply: cls.backouts[] + autoDeductMap (geometry-engine) + cls.deductions[] — all three deduction types, matching QuantitiesPanel.",
+        "All 43 bugs confirmed fixed in source. Full deduction coverage now: QuantitiesPanel, /api/quantities, /api/estimates GET+POST, /api/export/excel, /api/export/contractor, /api/share/export, ExportPanel client preview.",
+        "Regression sweep: 2 files changed, 59 insertions — clean diff, no unintended changes"
       ]
     }
   ]
