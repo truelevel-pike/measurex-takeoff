@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T02:10:00Z",
+  "lastUpdated": "2026-04-04T02:15:40Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -22,7 +22,7 @@
       },
       {
         "id": "P1-02",
-        "title": "Add ?agent=1 mode — suppress all modals/tooltips/onboarding",
+        "title": "Add ?agent=1 mode \u2014 suppress all modals/tooltips/onboarding",
         "status": "done",
         "commit": "3fa0847"
       },
@@ -45,7 +45,7 @@
       },
       {
         "id": "P1-06",
-        "title": "CDP interaction test suite — verify all draw tools",
+        "title": "CDP interaction test suite \u2014 verify all draw tools",
         "status": "done",
         "commit": "4227d55"
       }
@@ -59,7 +59,7 @@
       },
       {
         "id": "P2-02",
-        "title": "Pattern Search — find repeated symbols across pages",
+        "title": "Pattern Search \u2014 find repeated symbols across pages",
         "status": "done",
         "commit": "b772cac"
       },
@@ -71,25 +71,25 @@
       },
       {
         "id": "P2-04",
-        "title": "Drawing Comparison — compare revisions, quantify changes",
+        "title": "Drawing Comparison \u2014 compare revisions, quantify changes",
         "status": "done",
         "commit": "b772cac"
       },
       {
         "id": "P2-05",
-        "title": "Merge tool — fill gaps between polygons",
+        "title": "Merge tool \u2014 fill gaps between polygons",
         "status": "done",
         "commit": "5867d98"
       },
       {
         "id": "P2-06",
-        "title": "Split tool — divide polygon in two",
+        "title": "Split tool \u2014 divide polygon in two",
         "status": "done",
         "commit": "5867d98"
       },
       {
         "id": "P2-07",
-        "title": "Cut/subtract tool — remove area from polygon",
+        "title": "Cut/subtract tool \u2014 remove area from polygon",
         "status": "done",
         "commit": "6b6b716"
       },
@@ -145,7 +145,7 @@
     "phase3": [
       {
         "id": "P3-01",
-        "title": "Assemblies — link classifications to materials + costs",
+        "title": "Assemblies \u2014 link classifications to materials + costs",
         "status": "done",
         "commit": "6756f9f",
         "assignedTo": "admiral8",
@@ -166,7 +166,7 @@
         "assignedTo": "admiral5",
         "admiral": "admiral5",
         "dispatchedAt": "2026-04-04T01:53:00Z",
-        "notes": "CustomFormulas.tsx existed but was dead code — re-dispatched A5 to wire it in"
+        "notes": "CustomFormulas.tsx existed but was dead code \u2014 re-dispatched A5 to wire it in"
       },
       {
         "id": "P3-04",
@@ -256,7 +256,7 @@
       "id": "BUG-PIKE-002",
       "file": "src/components/QuantitiesPanel.tsx",
       "line": 2334,
-      "description": "Assembly cost estimate cast as { unitCost?: number } but Assembly type has no unitCost field — always produced $0.00. Fixed to compute cost from materials[].unitCost * (1/coverageRate).",
+      "description": "Assembly cost estimate cast as { unitCost?: number } but Assembly type has no unitCost field \u2014 always produced $0.00. Fixed to compute cost from materials[].unitCost * (1/coverageRate).",
       "severity": "medium",
       "status": "fixed",
       "commit": "6164bc4"
@@ -265,7 +265,7 @@
       "id": "BUG-PIKE-003",
       "file": "src/lib/ws-client.ts",
       "line": 213,
-      "description": "cursor:update SSE event fell into default case — not routed to activity bus. useCollaboration hook never received cursor positions from other users. Fixed by adding cursor:update to the SSE event switch.",
+      "description": "cursor:update SSE event fell into default case \u2014 not routed to activity bus. useCollaboration hook never received cursor positions from other users. Fixed by adding cursor:update to the SSE event switch.",
       "severity": "high",
       "status": "fixed",
       "commit": "31609bf"
@@ -274,10 +274,19 @@
       "id": "BUG-PIKE-004",
       "file": "src/components/CanvasOverlay.tsx",
       "line": 1248,
-      "description": "Collaborator cursors read via useStore.getState() (non-reactive) — cursors would never update in the render without a forced re-render trigger. Fixed by adding reactive useStore selector for collaborators at component top-level.",
+      "description": "Collaborator cursors read via useStore.getState() (non-reactive) \u2014 cursors would never update in the render without a forced re-render trigger. Fixed by adding reactive useStore selector for collaborators at component top-level.",
       "severity": "medium",
       "status": "fixed",
       "commit": "31609bf"
+    },
+    {
+      "id": "BUG-PIKE-005",
+      "file": "src/components/QuantitiesPanel.tsx",
+      "line": 0,
+      "description": "CustomFormulas component (P3-03) was built but never imported or wired into QuantitiesPanel. Users had no way to access custom formula editor. Fixed by: adding import, formulaModalClassification state, edit-row button with preview, modal render in all layouts, formula field preservation in saveEditing.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "ca21f24"
     }
   ],
   "blockers": [],
