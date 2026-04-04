@@ -25,6 +25,8 @@ interface OrgLibraryItem {
   tileHeight?: number;
   slopeFactor?: number;
   formula?: string;
+  // BUG-PIKE-029 fix: persist formulaUnit so org library round-trip preserves custom formula units
+  formulaUnit?: string;
 }
 
 const ORG_LIBRARY_KEY = 'mx-org-classifications';
@@ -57,6 +59,7 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
   const { addToast } = useToast();
   const classifications = useStore((s) => s.classifications);
   const addClassification = useStore((s) => s.addClassification);
+  const updateClassification = useStore((s) => s.updateClassification);
 
   const [activeTab, setActiveTab] = useState<ClassificationPresetCategory>('RESIDENTIAL');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -299,7 +302,11 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
                         const item = orgLibrary.find((x) => x.id === id);
                         if (!item) continue;
                         if (classifications.some((c) => c.name.toLowerCase() === item.name.toLowerCase())) continue;
-                        addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                        // BUG-PIKE-029 fix: add then patch extended fields (formula, formulaUnit, tile dims, slope)
+                        const newId = addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                        if (item.formula || item.formulaUnit || item.tileWidth || item.tileHeight || item.slopeFactor) {
+                          updateClassification(newId, { formula: item.formula, formulaUnit: item.formulaUnit, tileWidth: item.tileWidth, tileHeight: item.tileHeight, slopeFactor: item.slopeFactor });
+                        }
                         imported++;
                       }
                       setSelectedOrgKeys(new Set());
@@ -382,7 +389,11 @@ export default function ClassificationLibrary({ open, onClose }: ClassificationL
                         title={alreadyExists ? 'Already in project' : `Click to select · double-click to import "${item.name}"`}
                         onDoubleClick={() => {
                           if (alreadyExists) return;
-                          addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                          // BUG-PIKE-029 fix: add then patch extended fields (formula, formulaUnit, tile dims, slope)
+                          const newId = addClassification({ name: item.name, type: item.type, color: item.color, visible: true });
+                          if (item.formula || item.formulaUnit || item.tileWidth || item.tileHeight || item.slopeFactor) {
+                            updateClassification(newId, { formula: item.formula, formulaUnit: item.formulaUnit, tileWidth: item.tileWidth, tileHeight: item.tileHeight, slopeFactor: item.slopeFactor });
+                          }
                           addToast(`Imported "${item.name}" from org library`, 'success');
                         }}
                         disabled={alreadyExists}

@@ -2275,6 +2275,8 @@ const QuantitiesPanel = React.memo(function QuantitiesPanel({ showTakeoffSearch 
                           tileHeight: classification.tileHeight,
                           slopeFactor: classification.slopeFactor,
                           formula: classification.formula,
+                          // BUG-PIKE-029 fix: include formulaUnit so org library round-trip preserves custom formula unit labels
+                          formulaUnit: classification.formulaUnit,
                         });
                         const after = (typeof window !== 'undefined' ? localStorage.getItem('mx-org-classifications') : null) ?? '[]';
                         const afterCount = (JSON.parse(after) as Array<unknown>).length;
