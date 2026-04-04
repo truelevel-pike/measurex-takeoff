@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
+  createAssembly,
   createClassification,
   createPage,
   createPolygon,
   createProject,
   deleteProject,
+  getAssemblies,
   getClassifications,
   getPages,
   getPolygons,
@@ -36,11 +38,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const sourceName = sourceProject.name?.trim() || 'Untitled Project';
     const finalName = customName || `Copy of ${sourceName}`;
 
-    const [classifications, polygons, scale, pages] = await Promise.all([
+    const [classifications, polygons, scale, pages, assemblies] = await Promise.all([
       getClassifications(id),
       getPolygons(id),
       getScale(id),
       getPages(id),
+      getAssemblies(id),
     ]);
 
     const duplicated = await createProject(finalName);
@@ -109,6 +112,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       if (pages.length > 0) {
         await updateProject(duplicated.id, { totalPages: pages.length });
+      }
+
+      // BUG-PIKE-033 fix: copy assemblies so duplicated project retains cost engine data.
+      // classificationId references are remapped to the new classification IDs.
+      for (const assembly of assemblies) {
+        const mappedClassId = assembly.classificationId
+          ? classificationIdMap.get(assembly.classificationId)
+          : undefined;
+        await createAssembly(duplicated.id, {
+          name: assembly.name,
+          unit: assembly.unit,
+          unitCost: assembly.unitCost,
+          quantityFormula: assembly.quantityFormula,
+          ...(mappedClassId ? { classificationId: mappedClassId } : {}),
+        });
       }
 
       const newProject = await getProject(duplicated.id);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  createAssembly,
   createProject,
   createClassification,
   createPolygon,
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
     const polygons = (project.polygons as Array<Record<string, unknown>>) || [];
     const pages = (project.pages as Array<Record<string, unknown>>) || [];
     const scale = project.scale as Record<string, unknown> | null | undefined;
+    const assemblies = (project.assemblies as Array<Record<string, unknown>>) || [];
 
     const classificationIdMap = new Map<string, string>();
 
@@ -113,6 +115,21 @@ export async function POST(req: Request) {
 
     if (pages.length > 0) {
       await updateProject(created.id, { totalPages: pages.length });
+    }
+
+    // BUG-PIKE-033 fix: restore assemblies so cost engine data survives JSON import.
+    // classificationId references are remapped to the new classification IDs.
+    for (const a of assemblies) {
+      const mappedClassId = a.classificationId
+        ? classificationIdMap.get(a.classificationId as string)
+        : undefined;
+      await createAssembly(created.id, {
+        name: a.name as string,
+        unit: (a.unit as string) ?? 'SF',
+        unitCost: (a.unitCost as number) ?? 0,
+        quantityFormula: (a.quantityFormula as string) ?? 'area',
+        ...(mappedClassId ? { classificationId: mappedClassId } : {}),
+      });
     }
 
     const newProject = await getProject(created.id);
