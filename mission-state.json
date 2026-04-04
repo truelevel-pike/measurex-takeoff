@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:25:00Z",
+  "lastUpdated": "2026-04-04T03:28:12.025175Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -391,6 +391,18 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "23df328"
+    },
+    {
+      "id": "BUG-PIKE-017",
+      "files": [
+        "src/lib/ai-results-loader.ts",
+        "src/lib/store.ts"
+      ],
+      "description": "linearFeet stored as real-world units in ai-results-loader (pre-divided by ppu) and in updateClassification type-change recalc \u2014 inconsistent with all other code paths that store raw pixel length",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "8546e8e",
+      "fixedAt": "2026-04-04T03:28:12.024931Z"
     }
   ],
   "blockers": [],
