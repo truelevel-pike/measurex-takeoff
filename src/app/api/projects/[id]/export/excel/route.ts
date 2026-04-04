@@ -6,6 +6,7 @@ import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { rateLimitResponse } from '@/lib/rate-limit';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
+import { applyCustomFormula } from '@/lib/formula-eval';
 import type { Classification, Polygon } from '@/lib/types';
 import type { ScaleConfig } from '@/server/geometry-engine';
 import type { UnitCostMap } from '@/types/estimates';
@@ -47,6 +48,25 @@ function buildQuantityRows(
   // Key = pageNumber (1-based), value = ScaleConfig for that page.
   pageScales?: Map<number, ScaleConfig>,
 ): QuantityRow[] {
+  // BUG-PIKE-014 fix: build name→rawValue map for custom formula references
+  const classNames = classifications.map((c) => c.name);
+  const rawByName: Record<string, number> = {};
+
+  // First pass: compute raw totals for all classifications (needed for formula cross-refs)
+  const rawTotals = new Map<string, number>();
+  for (const c of classifications) {
+    const classPolygons = polygons.filter((p) => p.classificationId === c.id);
+    let qty = 0;
+    for (const p of classPolygons) {
+      const sc = pageScales?.get(p.pageNumber) ?? scaleConfig;
+      if (c.type === 'area') qty += calculatePolygonArea(p.points, sc) ?? 0;
+      else if (c.type === 'linear') qty += calculateLinearLength(p.points, sc, true) ?? 0;
+      else qty += 1;
+    }
+    rawTotals.set(c.id, qty);
+    rawByName[c.name.toLowerCase()] = qty;
+  }
+
   return classifications.map((c) => {
     const classPolygons = polygons.filter((p) => p.classificationId === c.id);
     let quantity = 0;
@@ -63,12 +83,17 @@ function buildQuantityRows(
       }
     }
 
+    // BUG-PIKE-014 fix: apply custom formula override when classification.formula is set
+    const formulaResult = applyCustomFormula(c.formula, classNames, rawByName);
+    const finalQuantity = formulaResult !== null ? formulaResult : quantity;
+    const finalUnit = formulaResult !== null && c.formulaUnit ? c.formulaUnit : unitLabel(c.type);
+
     return {
       classificationId: c.id,
       name: c.name,
       type: c.type,
-      quantity: round2(quantity),
-      unit: unitLabel(c.type),
+      quantity: round2(finalQuantity),
+      unit: finalUnit,
     };
   });
 }
