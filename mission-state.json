@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:46:00Z",
+  "lastUpdated": "2026-04-04T03:56:44.000Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -456,6 +456,36 @@
       "severity": "medium",
       "status": "fixed",
       "commit": "f5f9fad"
+    },
+    {
+      "id": "BUG-PIKE-023",
+      "file": "src/app/api/projects/[id]/estimates/route.ts",
+      "line": 0,
+      "description": "GET and POST /api/estimates computed raw area/linear/count but never applied classification.formula overrides. /api/quantities and Excel export did apply formulas \u2014 estimates route was the odd one out, causing EstimatesTab cost calculations to ignore custom formulas set by users.",
+      "severity": "high",
+      "status": "fixed",
+      "commit": "37b43ef",
+      "fixedAt": "2026-04-04T03:56:44.000Z"
+    },
+    {
+      "id": "BUG-PIKE-024",
+      "file": "src/app/api/share/[token]/export/route.ts",
+      "line": 0,
+      "description": "Share export (excel/pdf) buildQuantityRows did not apply classification.formula overrides \u2014 shared contractor reports showed raw geometry quantities instead of formula-adjusted values.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "83ee2c4",
+      "fixedAt": "2026-04-04T03:56:44.000Z"
+    },
+    {
+      "id": "BUG-PIKE-025",
+      "file": "src/app/api/projects/[id]/export/contractor/route.ts",
+      "line": 0,
+      "description": "Contractor export buildQuantityRows did not apply classification.formula overrides \u2014 contractor HTML report showed raw geometry quantities instead of formula-adjusted values.",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "419212c",
+      "fixedAt": "2026-04-04T03:56:44.000Z"
     }
   ],
   "blockers": [],
