@@ -80,6 +80,8 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
   const scale = useStore((s) => s.scale);
+  // BUG-PIKE-011 fix: use per-page scales for accurate multi-page quantity computation
+  const scales = useStore((s) => s.scales);
   const addAssembly = useStore((s) => s.addAssembly);
   const setAssemblies = useStore((s) => s.setAssemblies);
   const updateAssembly = useStore((s) => s.updateAssembly);
@@ -104,14 +106,16 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
   }, []);
 
   // Compute quantities per classification from polygons + scale (mirrors QuantitiesPanel logic)
+  // BUG-PIKE-011 fix: use per-page scale (scales[pageNumber]) so multi-page projects compute correctly
   const quantitiesByClass = useMemo(() => {
-    const ppu = scale?.pixelsPerUnit || 1;
     const map: Record<string, ClassQuantity> = {};
     for (const cls of classifications) {
       const classPolygons = polygons.filter((p) => p.classificationId === cls.id && p.isComplete);
       let areaReal = 0;
       let lengthReal = 0;
       for (const p of classPolygons) {
+        // Use page-specific scale when available; fall back to project-level scale
+        const ppu = scales[p.pageNumber]?.pixelsPerUnit || scale?.pixelsPerUnit || 1;
         if (cls.type === 'area') {
           const areaPixels = calculatePolygonArea(p.points);
           areaReal += areaPixels / (ppu * ppu);
@@ -128,7 +132,7 @@ export default function AssembliesPanel({ onSwitchToQuantities, onSwitchToEstima
       map[cls.id] = { count: classPolygons.length, areaReal, lengthReal };
     }
     return map;
-  }, [classifications, polygons, scale]);
+  }, [classifications, polygons, scale, scales]);
 
   // Fetch assemblies from API on mount / when projectId changes; auto-seed defaults if empty
   useEffect(() => {
