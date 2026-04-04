@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:10:01.316249Z",
+  "lastUpdated": "2026-04-04T03:13:28.757253Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -355,6 +355,24 @@
       "status": "fixed",
       "commit": "cd70632",
       "fixedAt": "2026-04-04T03:10:01.316161Z"
+    },
+    {
+      "id": "BUG-PIKE-013",
+      "file": "src/app/api/projects/[id]/quantities/route.ts",
+      "line": 18,
+      "description": "/api/quantities used single page-1 ppu for all polygons \u2014 multi-page projects had incorrect quantity calculations on API/export side",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "930bc3d"
+    },
+    {
+      "id": "BUG-PIKE-014",
+      "file": "src/app/api/projects/[id]/quantities/route.ts, src/app/api/projects/[id]/export/excel/route.ts",
+      "line": 0,
+      "description": "Server-side quantities API and Excel export did not apply classification.formula overrides \u2014 client QuantitiesPanel showed formula results but API/export returned raw area/linear/count, creating data mismatch",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "930bc3d"
     }
   ],
   "blockers": [],
