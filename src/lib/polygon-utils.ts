@@ -189,3 +189,69 @@ export function splitPolygonByLine(polygon: Point[], lineStart: Point, lineEnd: 
     return [polygon, []];
   }
 }
+
+// ── P2-09: Polygon transformations ──────────────────────────────────────────
+
+/** Flip polygon horizontally around its centroid. */
+export function flipPolygonH(points: Point[]): Point[] {
+  if (points.length === 0) return [];
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  return points.map(p => ({ x: 2 * cx - p.x, y: p.y }));
+}
+
+/** Flip polygon vertically around its centroid. */
+export function flipPolygonV(points: Point[]): Point[] {
+  if (points.length === 0) return [];
+  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+  return points.map(p => ({ x: p.x, y: 2 * cy - p.y }));
+}
+
+/** Rotate polygon around its centroid by angleDeg degrees (positive = clockwise). */
+export function rotatePolygon(points: Point[], angleDeg: number): Point[] {
+  if (points.length === 0) return [];
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return points.map(p => ({
+    x: cx + (p.x - cx) * cos - (p.y - cy) * sin,
+    y: cy + (p.x - cx) * sin + (p.y - cy) * cos,
+  }));
+}
+
+/**
+ * Union N polygons into one using turf.union iteratively.
+ * Falls back to the first polygon if union fails.
+ */
+export function combinePolygons(polys: Point[][]): Point[] {
+  if (polys.length === 0) return [];
+  if (polys.length === 1) return polys[0];
+
+  const toRing = (pts: Point[]): [number, number][] => {
+    const ring: [number, number][] = pts.map(p => [p.x, p.y]);
+    // Close the ring
+    if (ring.length > 0 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+      ring.push([ring[0][0], ring[0][1]]);
+    }
+    return ring;
+  };
+
+  try {
+    let result = turf.polygon([toRing(polys[0])]);
+    for (let i = 1; i < polys.length; i++) {
+      if (polys[i].length < 3) continue;
+      const next = turf.polygon([toRing(polys[i])]);
+      const fc = turf.featureCollection([result, next]);
+      const united = turf.union(fc as GeoJSON.FeatureCollection<GeoJSON.Polygon>);
+      if (united && united.geometry.type === 'Polygon') {
+        result = united as GeoJSON.Feature<GeoJSON.Polygon>;
+      }
+      // If MultiPolygon or null, keep current result (best effort)
+    }
+    const coords = result.geometry.coordinates[0];
+    return coords.slice(0, -1).map((c) => ({ x: c[0], y: c[1] }));
+  } catch {
+    return polys[0]; // fallback
+  }
+}

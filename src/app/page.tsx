@@ -63,6 +63,7 @@ import { useQuickTakeoff } from '@/lib/quick-takeoff';
 import TakeoffProgressModal from '@/components/TakeoffProgressModal';
 import type { PageStatus, TakeoffSummary } from '@/components/TakeoffProgressModal';
 import FirstRunTooltips from '@/components/FirstRunTooltips';
+import AutoNameTool from '@/components/AutoNameTool';
 import { DEMO_PROJECT_ID, isDemoProject, loadDemoProject, saveDemoProject, DEMO_PROJECT_STATE } from '@/lib/demo-data';
 
 const toolKeys: Record<string, 'select' | 'pan' | 'draw' | 'merge' | 'split' | 'cut' | 'measure' | 'annotate' | 'ai'> = {
@@ -385,6 +386,7 @@ function PageInner() {
   const zoomLevel = useStore((s) => s.zoomLevel);
   const classifications = useStore((s) => s.classifications);
   const polygons = useStore((s) => s.polygons);
+  const clipboardPolygons = useStore((s) => s.clipboardPolygons);
   const selectedClassificationId = useStore((s) => s.selectedClassification);
   const annotations = useStore((s) => s.annotations);
   const scale = useStore((s) => s.scale);
@@ -462,6 +464,8 @@ function PageInner() {
   const [showPatternSearch, setShowPatternSearch] = useState(false);
   const [patternSearchPageImage, setPatternSearchPageImage] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
+  // P2-01: Auto-name sheets tool
+  const [showAutoNameTool, setShowAutoNameTool] = useState(false);
   const [showExport, setShowExport] = useState(false);
   // BUG-W14-001: replace window.prompt with proper modal for project naming
   const [showNameModal, setShowNameModal] = useState(false);
@@ -1114,6 +1118,28 @@ function PageInner() {
       const isEditable = tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement as HTMLElement)?.isContentEditable;
       if (isEditable) return;
 
+      // P2-08: Smart paste
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && !e.shiftKey) {
+        const state = useStore.getState();
+        const hasSelected = state.selectedPolygons.length > 0 || state.selectedPolygon;
+        if (hasSelected) {
+          e.preventDefault();
+          state.copyPolygons();
+          addToast(`Copied ${state.selectedPolygons.length || 1} polygon(s)`, 'info');
+        }
+        // fall through to browser copy if nothing selected
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && !e.shiftKey) {
+        const state = useStore.getState();
+        if (state.clipboardPolygons.length > 0) {
+          e.preventDefault();
+          const newIds = state.pastePolygons(currentPageNum);
+          addToast(`Pasted ${newIds.length} polygon(s)`, 'success');
+        }
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         const state = useStore.getState();
@@ -1500,6 +1526,10 @@ function PageInner() {
           const uploadResult = await api.uploadPDF(project.id, file);
           if (uploadResult.detectedScale) {
             setUploadDetectedScale(uploadResult.detectedScale);
+          }
+          // P2-01: trigger auto-naming tool after upload if not in agent mode
+          if (!agentMode) {
+            setTimeout(() => setShowAutoNameTool(true), 1500);
           }
         } catch (uploadErr) {
           console.error('PDF upload failed — cleaning up orphaned project:', uploadErr);
@@ -2823,6 +2853,19 @@ function PageInner() {
 
       {/* What's New modal */}
       {!agentMode && whatsNew.show && <WhatsNewModal onClose={whatsNew.dismiss} />}
+
+      {/* P2-01: Auto-name sheets tool — triggered after upload or from TopNavBar */}
+      {!agentMode && showAutoNameTool && projectId && (
+        <div
+          data-testid="auto-name-tool"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowAutoNameTool(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl mx-4">
+            <AutoNameTool projects={projectId ? [{ id: projectId, name: projectName || 'Project' }] : []} />
+          </div>
+        </div>
+      )}
 
       {/* BUG-W14-001: Project name modal — replaces window.prompt */}
       {showNameModal && (

@@ -12,7 +12,7 @@ import type {
   Annotation,
   RepeatingGroup,
 } from './types';
-import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea } from './polygon-utils';
+import { mergePolygons as mergePolygonPoints, splitPolygonByLine, calculatePolygonArea, flipPolygonH, flipPolygonV, rotatePolygon, combinePolygons } from './polygon-utils';
 import { assignTradeGroup } from './trade-groups';
 
 // Helpers
@@ -119,6 +119,17 @@ export interface Store extends ProjectState {
   clearPolygonSelection: () => void;
   deleteSelectedPolygons: () => void;
   batchUpdatePolygons: (patches: Array<{ id: string; patch: Partial<Polygon> }>) => void;
+
+  // P2-08: Smart clipboard
+  clipboardPolygons: Polygon[];
+  copyPolygons: () => void;
+  pastePolygons: (targetPage?: number) => string[];
+
+  // P2-09: Polygon transforms
+  flipSelectedH: () => void;
+  flipSelectedV: () => void;
+  rotateSelected: (angle: number) => void;
+  combineSelected: () => void;
 
   // Actions — Annotations
   addAnnotation: (a: Omit<Annotation, 'id'>) => string;
@@ -298,6 +309,7 @@ export const useStore = create<Store>()(
   selectedPolygon: null,
   selectedPolygonId: null,
   selectedPolygons: [],
+  clipboardPolygons: [],
   showQuantitiesDrawer: false,
   setShowQuantitiesDrawer: (show) => set({ showQuantitiesDrawer: show }),
   showMobileMenu: false,
@@ -575,6 +587,133 @@ export const useStore = create<Store>()(
       method: 'DELETE',
       body: JSON.stringify({ ids: idsToDelete }),
     });
+  },
+
+  // P2-08: Smart clipboard — copy selected polygons, paste to target page
+  copyPolygons: () => {
+    const s = get();
+    const ids = s.selectedPolygons.length > 0 ? s.selectedPolygons : (s.selectedPolygon ? [s.selectedPolygon] : []);
+    const copied = s.polygons.filter((p) => ids.includes(p.id));
+    set({ clipboardPolygons: structuredClone(copied) });
+  },
+
+  pastePolygons: (targetPage?: number) => {
+    const s = get();
+    if (s.clipboardPolygons.length === 0) return [];
+    const page = targetPage ?? s.currentPage;
+    const before = snapshot(s);
+    const newIds: string[] = [];
+    const newPolygons: Polygon[] = s.clipboardPolygons.map((src) => {
+      const isSamePage = src.pageNumber === page;
+      const offsetX = isSamePage ? 20 : 0;
+      const offsetY = isSamePage ? 20 : 0;
+      const newId = crypto.randomUUID();
+      newIds.push(newId);
+      return {
+        ...structuredClone(src),
+        id: newId,
+        pageNumber: page,
+        points: src.points.map((pt) => ({ x: pt.x + offsetX, y: pt.y + offsetY })),
+      };
+    });
+    set({
+      polygons: [...s.polygons, ...newPolygons],
+      selectedPolygons: newIds,
+      selectedPolygon: newIds[0] ?? null,
+      selectedPolygonId: newIds[0] ?? null,
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    // Sync to API
+    if (s.projectId) {
+      for (const p of newPolygons) {
+        apiSync(`/api/projects/${s.projectId}/polygons`, {
+          method: 'POST',
+          body: JSON.stringify(p),
+        });
+      }
+    }
+    return newIds;
+  },
+
+  // P2-09: Polygon transform actions
+  flipSelectedH: () => {
+    const s = get();
+    const id = s.selectedPolygon ?? s.selectedPolygons[0];
+    if (!id) return;
+    const poly = s.polygons.find((p) => p.id === id);
+    if (!poly) return;
+    const before = snapshot(s);
+    const newPoints = flipPolygonH(poly.points);
+    set({
+      polygons: s.polygons.map((p) => p.id === id ? { ...p, points: newPoints, area: calculatePolygonArea(newPoints) } : p),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    if (s.projectId) apiSync(`/api/projects/${s.projectId}/polygons/${id}`, { method: 'PUT', body: JSON.stringify({ points: newPoints }) });
+  },
+
+  flipSelectedV: () => {
+    const s = get();
+    const id = s.selectedPolygon ?? s.selectedPolygons[0];
+    if (!id) return;
+    const poly = s.polygons.find((p) => p.id === id);
+    if (!poly) return;
+    const before = snapshot(s);
+    const newPoints = flipPolygonV(poly.points);
+    set({
+      polygons: s.polygons.map((p) => p.id === id ? { ...p, points: newPoints, area: calculatePolygonArea(newPoints) } : p),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    if (s.projectId) apiSync(`/api/projects/${s.projectId}/polygons/${id}`, { method: 'PUT', body: JSON.stringify({ points: newPoints }) });
+  },
+
+  rotateSelected: (angle: number) => {
+    const s = get();
+    const id = s.selectedPolygon ?? s.selectedPolygons[0];
+    if (!id) return;
+    const poly = s.polygons.find((p) => p.id === id);
+    if (!poly) return;
+    const before = snapshot(s);
+    const newPoints = rotatePolygon(poly.points, angle);
+    set({
+      polygons: s.polygons.map((p) => p.id === id ? { ...p, points: newPoints, area: calculatePolygonArea(newPoints) } : p),
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    if (s.projectId) apiSync(`/api/projects/${s.projectId}/polygons/${id}`, { method: 'PUT', body: JSON.stringify({ points: newPoints }) });
+  },
+
+  combineSelected: () => {
+    const s = get();
+    const ids = s.selectedPolygons.length >= 2 ? s.selectedPolygons : null;
+    if (!ids) return;
+    const polys = s.polygons.filter((p) => ids.includes(p.id));
+    if (polys.length < 2) return;
+    const before = snapshot(s);
+    const combined = combinePolygons(polys.map((p) => p.points));
+    const survivor = polys[0];
+    const newArea = calculatePolygonArea(combined);
+    const newPoly = { ...survivor, points: combined, area: newArea };
+    const idsToRemove = new Set(ids.slice(1));
+    set({
+      polygons: [
+        ...s.polygons.filter((p) => !ids.includes(p.id)),
+        newPoly,
+      ],
+      selectedPolygon: survivor.id,
+      selectedPolygonId: survivor.id,
+      selectedPolygons: [survivor.id],
+      undoStack: pushUndo(s.undoStack, before),
+      redoStack: [],
+    });
+    if (s.projectId) {
+      apiSync(`/api/projects/${s.projectId}/polygons/${survivor.id}`, { method: 'PUT', body: JSON.stringify({ points: combined, area: newArea }) });
+      for (const rid of idsToRemove) {
+        apiSync(`/api/projects/${s.projectId}/polygons/${rid}`, { method: 'DELETE' });
+      }
+    }
   },
 
   // BUG-A7-4-007: batch update polygons with a single undo snapshot
