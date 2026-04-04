@@ -4,7 +4,7 @@
   "currentPhase": 3,
   "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T03:05:00.000000Z",
+  "lastUpdated": "2026-04-04T03:05:45.921823Z",
   "nextAdmiral": "admiral6",
   "tasks": {
     "phase1": [
@@ -336,6 +336,15 @@
       "severity": "high",
       "status": "fixed",
       "commit": "1322ab3"
+    },
+    {
+      "id": "BUG-PIKE-011",
+      "file": "src/components/AssembliesPanel.tsx",
+      "line": 108,
+      "description": "AssembliesPanel used single project-level ppu for all pages \u2014 multi-page projects with per-page scales computed wrong quantities in Assemblies tab. Fixed to use scales[polygon.pageNumber] with fallback (mirrors QuantitiesPanel pattern).",
+      "severity": "medium",
+      "status": "fixed",
+      "commit": "770d725"
     }
   ],
   "blockers": [],
