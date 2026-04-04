@@ -178,6 +178,13 @@ export interface Store extends ProjectState {
   updateAssembly: (id: string, updates: Partial<Assembly>) => void;
   deleteAssembly: (id: string) => void;
 
+  // P4-01: Collaboration state — tracks other active viewers/editors
+  collaborators: Array<{ id: string; name: string; color: string; cursor?: { x: number; y: number; page: number }; lastSeen: number }>;
+  addCollaborator: (id: string, name: string, color: string) => void;
+  removeCollaborator: (id: string) => void;
+  updateCollaboratorCursor: (id: string, cursor: { x: number; y: number; page: number }) => void;
+  setCollaborators: (collaborators: Array<{ id: string; name: string; color: string; cursor?: { x: number; y: number; page: number }; lastSeen: number }>) => void;
+
   // 3D View
   show3D: boolean;
   toggleShow3D: () => void;
@@ -1146,6 +1153,19 @@ export const useStore = create<Store>()(
     const before = snapshot(s);
     set({ assemblies: s.assemblies.filter((a) => a.id !== id), undoStack: pushUndo(s.undoStack, before), redoStack: [] });
   },
+
+  // P4-01: Collaboration actions
+  collaborators: [],
+  setCollaborators: (collaborators) => set({ collaborators }),
+  addCollaborator: (id, name, color) => set((s) => ({
+    collaborators: s.collaborators.some((c) => c.id === id)
+      ? s.collaborators.map((c) => c.id === id ? { ...c, name, color, lastSeen: Date.now() } : c)
+      : [...s.collaborators, { id, name, color, lastSeen: Date.now() }],
+  })),
+  removeCollaborator: (id) => set((s) => ({ collaborators: s.collaborators.filter((c) => c.id !== id) })),
+  updateCollaboratorCursor: (id, cursor) => set((s) => ({
+    collaborators: s.collaborators.map((c) => c.id === id ? { ...c, cursor, lastSeen: Date.now() } : c),
+  })),
 
   // ─── 3D View ───
   show3D: false,

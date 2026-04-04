@@ -1244,6 +1244,47 @@ function CanvasOverlay({ onPolygonContextMenu, onCanvasPointerDown, highlightedP
           />
         )}
       </svg>
+      {/* P4-01: Collaborator cursors — render other users' cursor positions */}
+      {useStore.getState().collaborators
+        .filter((c) => c.cursor && c.cursor.page === (useStore.getState().currentPage ?? 1))
+        .map((c) => {
+          if (!c.cursor) return null;
+          const pctX = (c.cursor.x / baseDims.width) * 100;
+          const pctY = (c.cursor.y / baseDims.height) * 100;
+          return (
+            <div
+              key={c.id}
+              data-testid="collaborator-cursor"
+              style={{
+                position: 'absolute',
+                left: `${pctX}%`,
+                top: `${pctY}%`,
+                pointerEvents: 'none',
+                transform: 'translate(-2px, -2px)',
+                zIndex: 50,
+              }}
+            >
+              <svg width="16" height="20" viewBox="0 0 16 20" fill={c.color} aria-hidden="true">
+                <path d="M0 0 L0 16 L4 12 L7 18 L9 17 L6 11 L11 11 Z" stroke="#fff" strokeWidth="1" />
+              </svg>
+              <span style={{
+                position: 'absolute',
+                top: 16,
+                left: 4,
+                background: c.color,
+                color: '#fff',
+                fontSize: 9,
+                fontWeight: 700,
+                padding: '1px 4px',
+                borderRadius: 3,
+                whiteSpace: 'nowrap',
+                fontFamily: 'monospace',
+              }}>
+                {c.name}
+              </span>
+            </div>
+          );
+        })}
       {/* Hover tooltip for polygon measurements */}
       {hoveredPoly && (() => {
         const poly = polygons.find((p) => p.id === hoveredPoly.id);

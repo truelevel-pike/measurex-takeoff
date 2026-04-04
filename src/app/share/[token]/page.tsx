@@ -400,6 +400,31 @@ export default function SharedViewPage() {
       }
     `}</style>
     <div data-testid="share-page-container" className="h-screen w-screen flex flex-col" style={{ background: '#0a0a0f', color: '#e0e0e0' }}>
+      {/* P4-02: Permission banner — always visible at top of share page */}
+      <div
+        data-testid="share-permission-banner"
+        className="no-print"
+        style={{
+          background: sharePermission === 'view'
+            ? 'rgba(234,179,8,0.08)'
+            : sharePermission === 'manage'
+              ? 'rgba(0,212,255,0.08)'
+              : 'rgba(34,197,94,0.08)',
+          borderBottom: `1px solid ${sharePermission === 'view' ? 'rgba(234,179,8,0.2)' : sharePermission === 'manage' ? 'rgba(0,212,255,0.2)' : 'rgba(34,197,94,0.2)'}`,
+          padding: '6px 16px',
+          fontSize: 11,
+          fontFamily: 'monospace',
+          color: sharePermission === 'view' ? '#d97706' : sharePermission === 'manage' ? '#00d4ff' : '#22c55e',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        {sharePermission === 'view' ? '👁 View Only' : sharePermission === 'manage' ? '🔑 Can Manage' : '✏️ Can Edit'}
+        {' '}— You are viewing this project as{' '}
+        <strong>{sharePermission === 'view' ? 'Viewer' : sharePermission === 'manage' ? 'Manager' : 'Editor'}</strong>.
+        {sharePermission === 'view' && ' Drawing tools are disabled.'}
+      </div>
       {/* Print-only header */}
       <div className="print-only" style={{ padding: '32px 24px 16px', borderBottom: '2px solid #333' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111', margin: 0 }}>{project.name}</h1>
