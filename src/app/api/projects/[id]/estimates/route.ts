@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPolygons, getClassifications, getAssemblies, getScale, listScales, getProject, initDataDir } from '@/server/project-store';
 import { calculatePolygonArea, calculateLinearLength } from '@/server/geometry-engine';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
+import { applyCustomFormula } from '@/lib/formula-eval';
 import { z } from 'zod';
 import { rateLimitResponse } from '@/lib/rate-limit';
 
@@ -54,6 +55,8 @@ function scaleForPage(
  * GET /api/projects/:id/estimates
  * Compute a cost estimate based on polygon quantities and optional unit costs.
  * BUG-PIKE-012 fix: use per-page scales so multi-page projects compute correctly.
+ * BUG-PIKE-023 fix: apply classification.formula overrides so custom formulas
+ *   affect the quantity used in cost estimates (consistent with /api/quantities).
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-118: add rate limiting to GET handler
@@ -96,15 +99,38 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       byClassification.set(p.classificationId, entry);
     }
 
+    // BUG-PIKE-023 fix: build raw-quantity map for formula evaluation (same pattern as /api/quantities)
+    const classNames = classifications.map((c) => c.name);
+    const rawByName: Record<string, number> = {};
+    for (const [clsId, totals] of byClassification.entries()) {
+      const cls = classificationMap.get(clsId);
+      if (!cls) continue;
+      const raw = cls.type === 'linear' ? totals.linearFeet
+        : cls.type === 'count' ? totals.count
+        : totals.area;
+      rawByName[cls.name.toLowerCase()] = raw;
+    }
+
     const lines = Array.from(byClassification.entries()).map(([clsId, totals]) => {
       const cls = classificationMap.get(clsId);
+      // BUG-PIKE-023: apply formula override when classification has a custom formula
+      const formulaResult = cls?.formula
+        ? applyCustomFormula(cls.formula, classNames, rawByName)
+        : null;
+      const effectiveArea = (formulaResult !== null && cls?.type === 'area')
+        ? formulaResult
+        : totals.area;
+      const effectiveLinear = (formulaResult !== null && cls?.type === 'linear')
+        ? formulaResult
+        : totals.linearFeet;
       return {
         classificationId: clsId,
         name: cls?.name ?? 'Unknown',
         type: cls?.type ?? 'area',
-        totalArea: Math.round(totals.area * 100) / 100,
-        totalLinearFeet: Math.round(totals.linearFeet * 100) / 100,
+        totalArea: Math.round(effectiveArea * 100) / 100,
+        totalLinearFeet: Math.round(effectiveLinear * 100) / 100,
         count: totals.count,
+        formulaOverride: formulaResult !== null ? Math.round(formulaResult * 100) / 100 : undefined,
       };
     });
 
@@ -123,6 +149,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
  * POST /api/projects/:id/estimates
  * Compute a cost estimate with provided unit costs.
  * BUG-PIKE-012 fix: use per-page scales so multi-page projects compute correctly.
+ * BUG-PIKE-023 fix: apply classification.formula overrides before computing cost.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // BUG-A5-6-119: add rate limiting to POST handler
@@ -171,6 +198,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       entry.count += 1;
       byClassification.set(p.classificationId, entry);
     }
+
+    // BUG-PIKE-023 fix: build raw-quantity map for formula evaluation
+    const classNames = classifications.map((c) => c.name);
+    const rawByName: Record<string, number> = {};
+    for (const [clsId, totals] of byClassification.entries()) {
+      const cls = classificationMap.get(clsId);
+      if (!cls) continue;
+      const raw = cls.type === 'linear' ? totals.linearFeet
+        : cls.type === 'count' ? totals.count
+        : totals.area;
+      rawByName[cls.name.toLowerCase()] = raw;
+    }
+
     let totalCost = 0;
 
     const lines = Array.from(byClassification.entries()).map(([clsId, totals]) => {
@@ -179,7 +219,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const rawQuantity = cls?.type === 'linear' ? totals.linearFeet
         : cls?.type === 'count' ? totals.count
         : totals.area;
-      const quantity = Math.round(rawQuantity * 100) / 100;
+      // BUG-PIKE-023: apply formula override when classification has a custom formula
+      const formulaResult = cls?.formula
+        ? applyCustomFormula(cls.formula, classNames, rawByName)
+        : null;
+      const effectiveQuantity = formulaResult !== null ? formulaResult : rawQuantity;
+      const quantity = Math.round(effectiveQuantity * 100) / 100;
       const lineCost = uc ? quantity * uc.unitCost : 0;
       totalCost += lineCost;
       return {
@@ -189,6 +234,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         quantity,
         unitCost: uc?.unitCost ?? 0,
         lineCost,
+        formulaOverride: formulaResult !== null ? Math.round(formulaResult * 100) / 100 : undefined,
       };
     });
 
