@@ -182,6 +182,17 @@ export default function PolygonGroupPanel({
         ) : (
           groups.map((group) => {
             const stats = getGroupStats(group, polygons);
+            // BUG-PIKE-022 fix: group summary stats use per-page PPU so multi-page projects
+            // display accurate totals instead of using a single global pixelsPerUnit.
+            const groupPolygons = polygons.filter((p) => group.polygonIds.includes(p.id));
+            const groupAreaReal = groupPolygons.reduce((sum, p) => {
+              const pgPpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit ?? pixelsPerUnit;
+              return sum + (pgPpu > 0 ? p.area / (pgPpu * pgPpu) : p.area);
+            }, 0);
+            const groupLengthReal = groupPolygons.reduce((sum, p) => {
+              const pgPpu = (scales[p.pageNumber] ?? scale)?.pixelsPerUnit ?? pixelsPerUnit;
+              return sum + (pgPpu > 0 ? (p.linearFeet || 0) / pgPpu : (p.linearFeet || 0));
+            }, 0);
             return (
               <div key={group.id} className="mb-2 rounded border border-[#00d4ff]/15 bg-[#0b1220]/60 p-2">
                 <div className="flex items-center justify-between gap-2">
@@ -206,8 +217,8 @@ export default function PolygonGroupPanel({
 
                 <div className="mt-1 flex flex-wrap gap-2 text-xs text-[#94a3b8]">
                   <span>{stats.polygonCount} polygons</span>
-                  <span>{formatArea(stats.totalArea, pixelsPerUnit, unit)}</span>
-                  <span>{formatLength(stats.totalLength, pixelsPerUnit, unit)}</span>
+                  <span>{groupAreaReal.toFixed(1)} sq {unit}</span>
+                  <span>{groupLengthReal.toFixed(1)} {unit}</span>
                 </div>
 
                 {!group.visible && (

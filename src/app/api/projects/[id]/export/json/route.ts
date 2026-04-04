@@ -1,4 +1,4 @@
-import { getProject, getPolygons, getClassifications, getScale, getPages, initDataDir } from '@/server/project-store';
+import { getProject, getPolygons, getClassifications, getAssemblies, getScale, getPages, initDataDir } from '@/server/project-store';
 import { ProjectIdSchema, validationError } from '@/lib/api-schemas';
 import { fireWebhook } from '@/lib/webhooks';
 import { rateLimitResponse } from '@/lib/rate-limit';
@@ -13,10 +13,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const paramsResult = ProjectIdSchema.safeParse(await params);
     if (!paramsResult.success) return validationError(paramsResult.error);
     const { id } = paramsResult.data;
-    const [project, polygons, classifications, scale, pages] = await Promise.all([
+    // P3-04 fix (BUG-PIKE-021): include assemblies in JSON export
+    const [project, polygons, classifications, assemblies, scale, pages] = await Promise.all([
       getProject(id),
       getPolygons(id),
       getClassifications(id),
+      getAssemblies(id),
       getScale(id),
       getPages(id),
     ]);
@@ -33,7 +35,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return cleaned;
     };
     const cleanedProject = stripInternal(project as unknown as Record<string, unknown>);
-    const payload = { project: cleanedProject, pages, classifications, polygons, scale };
+    // P3-04 fix (BUG-PIKE-021): include assemblies so full cost data is exported
+    const payload = { project: cleanedProject, pages, classifications, polygons, assemblies, scale };
     const json = JSON.stringify(payload, null, 2);
     const safeName = (project.name || 'project').replace(/[^a-zA-Z0-9-_]/g, '-');
 
