@@ -102,7 +102,8 @@ export const GET = withCache({ noStore: true }, async function GET(_req: Request
           name: c.name,
           type: c.type,
           color: c.color,
-          count: raw.count,
+          // BUG-PIKE-028 fix: apply formula override to count type as well as area/linear
+          count: c.type === 'count' ? Math.round(formulaResult * 100) / 100 : raw.count,
           area: c.type === 'area' ? Math.round(formulaResult * 100) / 100 : Math.round(raw.area * 100) / 100,
           linearFeet: c.type === 'linear' ? Math.round(formulaResult * 100) / 100 : Math.round(raw.linearFeet * 100) / 100,
           formulaOverride: Math.round(formulaResult * 100) / 100,

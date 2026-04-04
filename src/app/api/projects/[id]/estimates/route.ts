@@ -123,13 +123,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const effectiveLinear = (formulaResult !== null && cls?.type === 'linear')
         ? formulaResult
         : totals.linearFeet;
+      // BUG-PIKE-028 fix: apply formula override to count type as well
+      const effectiveCount = (formulaResult !== null && cls?.type === 'count')
+        ? formulaResult
+        : totals.count;
       return {
         classificationId: clsId,
         name: cls?.name ?? 'Unknown',
         type: cls?.type ?? 'area',
         totalArea: Math.round(effectiveArea * 100) / 100,
         totalLinearFeet: Math.round(effectiveLinear * 100) / 100,
-        count: totals.count,
+        count: Math.round(effectiveCount * 100) / 100,
         formulaOverride: formulaResult !== null ? Math.round(formulaResult * 100) / 100 : undefined,
       };
     });
