@@ -10,13 +10,23 @@ import {
   ChevronDown,
   Download,
   Loader2,
+  Package,
+  Pencil,
   Plus,
+  Search,
   Trash2,
   User,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { isConfigured } from '@/lib/supabase';
+import {
+  loadMaterialLibrary,
+  saveMaterialLibrary,
+  allCategories,
+  DEFAULT_MATERIALS,
+  type LibraryMaterial,
+} from '@/lib/material-library';
 
 interface LibraryItem {
   id: string;
@@ -48,6 +58,65 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function LibraryPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'classifications' | 'materials'>('classifications');
+
+  // P3-02: Material library state (localStorage-backed)
+  const [matLibrary, setMatLibrary] = useState<LibraryMaterial[]>([]);
+  const [matSearch, setMatSearch] = useState('');
+  const [matCategory, setMatCategory] = useState<string>('');
+  const [editingMat, setEditingMat] = useState<LibraryMaterial | null>(null);
+  const [matFormOpen, setMatFormOpen] = useState(false);
+  const [matFormName, setMatFormName] = useState('');
+  const [matFormUnit, setMatFormUnit] = useState<LibraryMaterial['unit']>('sf');
+  const [matFormCost, setMatFormCost] = useState('0');
+  const [matFormCategory, setMatFormCategory] = useState('');
+
+  useEffect(() => { setMatLibrary(loadMaterialLibrary()); }, []);
+
+  const handleSaveMat = () => {
+    const name = matFormName.trim();
+    if (!name) return;
+    const cost = parseFloat(matFormCost) || 0;
+    const category = matFormCategory.trim() || 'Custom';
+    let updated: LibraryMaterial[];
+    if (editingMat) {
+      updated = matLibrary.map((m) =>
+        m.id === editingMat.id ? { ...m, name, unit: matFormUnit, costPerUnit: cost, category } : m
+      );
+    } else {
+      updated = [...matLibrary, { id: crypto.randomUUID(), name, unit: matFormUnit, costPerUnit: cost, category }];
+    }
+    setMatLibrary(updated);
+    saveMaterialLibrary(updated);
+    setMatFormOpen(false);
+    setEditingMat(null);
+    setMatFormName(''); setMatFormUnit('sf'); setMatFormCost('0'); setMatFormCategory('');
+  };
+
+  const handleDeleteMat = (id: string) => {
+    const mat = matLibrary.find((m) => m.id === id);
+    if (mat?.isDefault) return; // protect defaults
+    const updated = matLibrary.filter((m) => m.id !== id);
+    setMatLibrary(updated);
+    saveMaterialLibrary(updated);
+  };
+
+  const openEditMat = (mat: LibraryMaterial) => {
+    setEditingMat(mat);
+    setMatFormName(mat.name);
+    setMatFormUnit(mat.unit);
+    setMatFormCost(String(mat.costPerUnit));
+    setMatFormCategory(mat.category);
+    setMatFormOpen(true);
+  };
+
+  const filteredMats = matLibrary.filter((m) => {
+    const q = matSearch.toLowerCase();
+    const matchesSearch = !q || m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+    const matchesCat = !matCategory || m.category === matCategory;
+    return matchesSearch && matchesCat;
+  });
+
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -256,7 +325,23 @@ export default function LibraryPage() {
         <div style={{ width: 1, height: 24, background: 'rgba(0,212,255,0.2)' }} />
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-[#00d4ff]" />
-          <span className="font-mono tracking-wider text-[#00d4ff] text-sm">CLASSIFICATION LIBRARY</span>
+          <span className="font-mono tracking-wider text-[#00d4ff] text-sm">LIBRARY</span>
+        </div>
+        <div className="flex items-center gap-1 ml-4">
+          <button
+            onClick={() => setActiveTab('classifications')}
+            className={`px-3 py-1 rounded text-xs font-mono transition-colors ${activeTab === 'classifications' ? 'bg-[rgba(0,212,255,0.15)] text-[#00d4ff] border border-[rgba(0,212,255,0.4)]' : 'text-[#8892a0] hover:text-[#e0e0e0]'}`}
+          >
+            Classifications
+          </button>
+          <button
+            data-testid="material-library-tab"
+            onClick={() => setActiveTab('materials')}
+            className={`px-3 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1 ${activeTab === 'materials' ? 'bg-[rgba(0,212,255,0.15)] text-[#00d4ff] border border-[rgba(0,212,255,0.4)]' : 'text-[#8892a0] hover:text-[#e0e0e0]'}`}
+          >
+            <Package size={12} />
+            Materials
+          </button>
         </div>
       </header>
       <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, rgba(0,212,255,0) 0%, rgba(0,212,255,0.6) 50%, rgba(0,212,255,0) 100%)' }} />
@@ -278,7 +363,163 @@ export default function LibraryPage() {
           </div>
         )}
 
-        {!loading && (
+        {/* P3-02: Materials tab */}
+        {activeTab === 'materials' && (
+          <div>
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8892a0]" />
+                <input
+                  data-testid="material-search-input"
+                  type="text"
+                  placeholder="Search materials…"
+                  value={matSearch}
+                  onChange={(e) => setMatSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none focus:border-[rgba(0,212,255,0.5)]"
+                />
+              </div>
+              <select
+                value={matCategory}
+                onChange={(e) => setMatCategory(e.target.value)}
+                className="px-3 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none"
+              >
+                <option value="">All categories</option>
+                {allCategories(matLibrary).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <button
+                data-testid="material-add-btn"
+                onClick={() => { setEditingMat(null); setMatFormName(''); setMatFormUnit('sf'); setMatFormCost('0'); setMatFormCategory(''); setMatFormOpen(true); }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-400 text-sm hover:bg-emerald-500/10 transition-colors"
+              >
+                <Plus size={14} /> Add Material
+              </button>
+            </div>
+
+            {/* Add/Edit form */}
+            {matFormOpen && (
+              <div className="mb-6 p-4 rounded-lg border border-[rgba(0,212,255,0.3)] bg-[rgba(10,10,15,0.8)]">
+                <h3 className="text-sm font-semibold text-[#00d4ff] mb-3">{editingMat ? 'Edit Material' : 'New Material'}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-[11px] text-[#8892a0] block mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={matFormName}
+                      onChange={(e) => setMatFormName(e.target.value)}
+                      placeholder="Material name"
+                      className="w-full px-2 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none focus:border-[rgba(0,212,255,0.5)]"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#8892a0] block mb-1">Unit</label>
+                    <select
+                      value={matFormUnit}
+                      onChange={(e) => setMatFormUnit(e.target.value as LibraryMaterial['unit'])}
+                      className="w-full px-2 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none"
+                    >
+                      {(['sf', 'lf', 'ea', 'cy', 'sy'] as const).map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#8892a0] block mb-1">Cost / unit ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={matFormCost}
+                      onChange={(e) => setMatFormCost(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-4">
+                    <label className="text-[11px] text-[#8892a0] block mb-1">Category</label>
+                    <input
+                      type="text"
+                      value={matFormCategory}
+                      onChange={(e) => setMatFormCategory(e.target.value)}
+                      placeholder="e.g. Flooring, Walls, Trim…"
+                      list="mat-categories"
+                      className="w-full px-2 py-1.5 rounded border border-[rgba(0,212,255,0.2)] bg-[#0a0a0f] text-[#e0e0e0] text-sm outline-none"
+                    />
+                    <datalist id="mat-categories">
+                      {allCategories(matLibrary).map((c) => <option key={c} value={c} />)}
+                    </datalist>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={handleSaveMat} disabled={!matFormName.trim()} className="px-4 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 disabled:opacity-40">Save</button>
+                  <button onClick={() => { setMatFormOpen(false); setEditingMat(null); }} className="px-4 py-1.5 rounded border border-[rgba(0,212,255,0.2)] text-[#8892a0] text-sm hover:text-white">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Materials table */}
+            <div className="rounded-lg border border-[rgba(0,212,255,0.2)] overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[rgba(10,10,15,0.8)] text-[#8892a0] text-[11px] uppercase tracking-wider">
+                    <th className="text-left px-4 py-2.5 font-medium">Name</th>
+                    <th className="text-left px-3 py-2.5 font-medium w-24">Category</th>
+                    <th className="text-left px-3 py-2.5 font-medium w-16">Unit</th>
+                    <th className="text-right px-4 py-2.5 font-medium w-24">Cost/unit</th>
+                    <th className="w-20" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[rgba(0,212,255,0.07)]">
+                  {filteredMats.length === 0 && (
+                    <tr><td colSpan={5} className="text-center text-[#8892a0] py-8 text-sm">No materials match your search.</td></tr>
+                  )}
+                  {filteredMats.map((mat) => (
+                    <tr key={mat.id} data-testid="material-item" className="group hover:bg-[rgba(0,212,255,0.03)] transition-colors">
+                      <td className="px-4 py-2.5 text-[#e0e0e0]">
+                        {mat.name}
+                        {mat.isDefault && <span className="ml-1.5 text-[9px] text-[#8892a0] border border-[#8892a0]/30 rounded px-1 py-0.5">default</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-[#8892a0] text-[12px]">{mat.category}</td>
+                      <td className="px-3 py-2.5 text-[#8892a0] font-mono text-[12px]">{mat.unit}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-[#00d4ff]">${mat.costPerUnit.toFixed(2)}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            data-testid="material-import-btn"
+                            onClick={() => navigator.clipboard?.writeText(JSON.stringify({ name: mat.name, unit: mat.unit, costPerUnit: mat.costPerUnit })).catch(() => {})}
+                            className="text-[#00d4ff] hover:text-white text-[11px] flex items-center gap-0.5"
+                            title="Copy to clipboard for import"
+                          >
+                            <Download size={12} />
+                          </button>
+                          <button
+                            onClick={() => openEditMat(mat)}
+                            className="text-[#8892a0] hover:text-[#00d4ff] text-[11px]"
+                            title="Edit"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          {!mat.isDefault && (
+                            <button
+                              onClick={() => handleDeleteMat(mat.id)}
+                              className="text-red-400 hover:text-red-300 text-[11px]"
+                              title="Delete"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-[#8892a0] mt-3">{filteredMats.length} of {matLibrary.length} materials · {DEFAULT_MATERIALS.length} defaults included</p>
+          </div>
+        )}
+
+        {activeTab === 'classifications' && !loading && (
           <>
             {/* Wave 17B Bug 3: combined empty state when library has no items at all */}
             {orgItems.length === 0 && myItems.length === 0 && (

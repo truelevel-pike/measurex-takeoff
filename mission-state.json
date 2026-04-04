@@ -1,11 +1,11 @@
 {
   "mission": "MeasureX Togal Feature Parity",
   "status": "active",
-  "currentPhase": 2,
-  "phaseName": "Feature Gaps (Core)",
+  "currentPhase": 3,
+  "phaseName": "Assemblies & Cost Engine",
   "startedAt": "2026-04-03T22:42:00Z",
-  "lastUpdated": "2026-04-04T01:17:00Z",
-  "nextAdmiral": "admiral8",
+  "lastUpdated": "2026-04-04T01:27:00Z",
+  "nextAdmiral": "admiral5",
   "tasks": {
     "phase1": [
       {"id": "P1-01", "title": "Audit all interactive elements for data-testid coverage", "status": "done", "commit": "fb38545"},
@@ -21,8 +21,8 @@
       {"id": "P2-02", "title": "Pattern Search — find repeated symbols across pages", "status": "done", "commit": "b772cac"},
       {"id": "P2-03", "title": "AI Image Search improvements", "status": "done", "commit": "b772cac"},
       {"id": "P2-04", "title": "Drawing Comparison — compare revisions, quantify changes", "status": "done", "commit": "b772cac"},
-      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"},
-      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"},
+      {"id": "P2-05", "title": "Merge tool — fill gaps between polygons", "status": "done", "commit": "5867d98"},
+      {"id": "P2-06", "title": "Split tool — divide polygon in two", "status": "done", "commit": "5867d98"},
       {"id": "P2-07", "title": "Cut/subtract tool — remove area from polygon", "status": "done", "commit": "6b6b716"},
       {"id": "P2-08", "title": "Smart paste", "status": "done", "commit": "faca9b9"},
       {"id": "P2-09", "title": "Flip, rotate, combine polygons", "status": "done", "commit": "faca9b9"},
@@ -31,11 +31,11 @@
       {"id": "P2-12", "title": "Edge snapping (auto + toggle)", "status": "done", "commit": "e589b2d"},
       {"id": "P2-13", "title": "Wall centerline auto-detection", "status": "done", "commit": "cf06ab6"},
       {"id": "P2-14", "title": "Door/window backout from wall linear measurements", "status": "done", "commit": "d679b98"},
-      {"id": "P2-15", "title": "Multi-select classifications", "status": "in-progress", "assignedTo": "admiral7", "admiral": "admiral7", "dispatchedAt": "2026-04-04T01:19:00Z"}
+      {"id": "P2-15", "title": "Multi-select classifications", "status": "done", "commit": "5867d98"}
     ],
     "phase3": [
-      {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "pending", "assignedTo": null, "admiral": null},
-      {"id": "P3-02", "title": "Material library (reusable)", "status": "pending", "assignedTo": null, "admiral": null},
+      {"id": "P3-01", "title": "Assemblies — link classifications to materials + costs", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8", "dispatchedAt": "2026-04-04T01:27:00Z"},
+      {"id": "P3-02", "title": "Material library (reusable)", "status": "in-progress", "assignedTo": "admiral8", "admiral": "admiral8", "dispatchedAt": "2026-04-04T01:27:00Z"},
       {"id": "P3-03", "title": "Custom formulas (Excel-like syntax)", "status": "pending", "assignedTo": null, "admiral": null},
       {"id": "P3-04", "title": "Assembly export", "status": "pending", "assignedTo": null, "admiral": null}
     ],
@@ -46,16 +46,18 @@
       {"id": "P4-04", "title": "Version history", "status": "pending", "assignedTo": null, "admiral": null}
     ]
   },
-  "completedTasks": ["P1-01","P1-01b","P1-02","P1-03","P1-04","P1-05","P1-06","P2-01","P2-02","P2-03","P2-04","P2-07","P2-08","P2-09","P2-10","P2-11","P2-12","P2-13","P2-14"],
+  "completedTasks": ["P1-01","P1-01b","P1-02","P1-03","P1-04","P1-05","P1-06","P2-01","P2-02","P2-03","P2-04","P2-05","P2-06","P2-07","P2-08","P2-09","P2-10","P2-11","P2-12","P2-13","P2-14","P2-15"],
   "blockers": [],
   "buildStatus": "green",
-  "lastBuildCheck": "2026-04-04T01:17:00Z",
+  "lastBuildCheck": "2026-04-04T01:27:00Z",
   "admiralDispatches": [
     {"admiral": "admiral5", "task": "P1-01", "completedAt": "2026-04-03T23:00:00Z", "commit": "fb38545"},
     {"admiral": "admiral6", "task": "P1-01b+P1-02+P1-03+P1-06", "completedAt": "2026-04-03T23:49:00Z", "commit": "4227d55"},
     {"admiral": "admiral7", "task": "P1-04+P2-10+P2-11", "completedAt": "2026-04-03T23:54:00Z", "commit": "bf2c2ef"},
     {"admiral": "admiral6", "task": "P2-01+P2-08+P2-09", "completedAt": "2026-04-04T00:08:00Z", "commit": "faca9b9"},
     {"admiral": "admiral5", "task": "P2-07+P2-12", "completedAt": "2026-04-04T01:10:00Z", "commit": "e589b2d"},
-    {"admiral": "admiral7", "task": "P2-02+P2-03+P2-04+P2-13+P2-14", "completedAt": "2026-04-04T01:17:00Z", "commit": "d679b98"}
+    {"admiral": "admiral7", "task": "P2-02+P2-03+P2-04+P2-13+P2-14", "completedAt": "2026-04-04T01:17:00Z", "commit": "d679b98"},
+    {"admiral": "admiral7", "task": "P2-05+P2-06+P2-15", "completedAt": "2026-04-04T01:27:00Z", "commit": "5867d98"},
+    {"admiral": "admiral8", "task": "P3-01+P3-02", "dispatchedAt": "2026-04-04T01:27:00Z"}
   ]
 }

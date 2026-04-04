@@ -188,7 +188,7 @@ export default function MergeSplitTool() {
           {/* P2-06: split line preview */}
           {isSplit && splitPts.length === 1 && cursor && (
             <line
-              data-testid="split-preview-line"
+              data-testid="split-preview-line split-line-preview"
               x1={splitPts[0].x}
               y1={splitPts[0].y}
               x2={cursor.x}
@@ -229,9 +229,20 @@ export default function MergeSplitTool() {
         </svg>
       )}
 
-      {/* Instruction bar */}
-      {(isMerge || isSplit) && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-[rgba(10,10,15,0.85)] border border-[#00d4ff]/30 text-[#e5e7eb] text-xs px-3 py-1.5 rounded-full pointer-events-none shadow-[0_0_12px_#00d4ff55]">
+      {/* Instruction bar — separate testids per tool */}
+      {isMerge && (
+        <div
+          data-testid="merge-instruction"
+          className="absolute top-3 left-1/2 -translate-x-1/2 bg-[rgba(10,10,15,0.85)] border border-[#00d4ff]/30 text-[#e5e7eb] text-xs px-3 py-1.5 rounded-full pointer-events-none shadow-[0_0_12px_#00d4ff55]"
+        >
+          {instruction}
+        </div>
+      )}
+      {isSplit && (
+        <div
+          data-testid="split-instruction"
+          className="absolute top-3 left-1/2 -translate-x-1/2 bg-[rgba(10,10,15,0.85)] border border-[#00d4ff]/30 text-[#e5e7eb] text-xs px-3 py-1.5 rounded-full pointer-events-none shadow-[0_0_12px_#00d4ff55]"
+        >
           {instruction}
         </div>
       )}

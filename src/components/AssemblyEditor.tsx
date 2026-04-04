@@ -163,6 +163,7 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
                     <tr key={mat.id} className="border-t border-[#00d4ff]/10">
                       <td className="px-1 py-1">
                         <input
+                          data-testid={`assembly-material-name-input`}
                           value={mat.name}
                           onChange={(e) => updateMaterial(i, { name: e.target.value })}
                           className="w-full px-1 py-0.5 bg-transparent text-[#e5e7eb] outline-none border-b border-transparent focus:border-[#00d4ff]/30 text-[12px]"
@@ -171,6 +172,7 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          data-testid={`assembly-material-cost-input`}
                           type="number"
                           value={mat.unitCost}
                           onChange={(e) => updateMaterial(i, { unitCost: parseFloat(e.target.value) || 0 })}
@@ -179,6 +181,7 @@ export default function AssemblyEditor({ assembly, onClose, onSave }: AssemblyEd
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          data-testid={`assembly-material-qty-input`}
                           type="number"
                           value={mat.wasteFactor}
                           onChange={(e) => updateMaterial(i, { wasteFactor: parseFloat(e.target.value) || 0 })}

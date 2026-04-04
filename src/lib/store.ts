@@ -92,6 +92,10 @@ export interface Store extends ProjectState {
   selectedClassifications: string[];
   setSelectedClassifications: (ids: string[]) => void;
   toggleClassificationSelection: (id: string, multi: boolean) => void;
+  // Set-based multi-select API (used by ClassificationGroups)
+  selectedClassificationIds: Set<string>;
+  clearClassificationSelection: () => void;
+  setClassificationSelection: (ids: string[]) => void;
   selectedPolygon: string | null;
   selectedPolygonId: string | null;
   selectedPolygons: string[];
@@ -319,18 +323,21 @@ export const useStore = create<Store>()(
   setZoomLevel: (zoomLevel) => set({ zoomLevel: Math.max(0.25, Math.min(4, zoomLevel)) }),
   selectedClassification: null,
   selectedClassifications: [],
-  setSelectedClassifications: (ids) => set({ selectedClassifications: ids }),
+  selectedClassificationIds: new Set<string>(),
+  setSelectedClassifications: (ids) => set({ selectedClassifications: ids, selectedClassificationIds: new Set(ids) }),
+  clearClassificationSelection: () => set({ selectedClassifications: [], selectedClassificationIds: new Set<string>() }),
+  setClassificationSelection: (ids) => set({ selectedClassifications: ids, selectedClassificationIds: new Set(ids) }),
   toggleClassificationSelection: (id, multi) => {
     const s = get();
     if (!multi) {
-      // Single click: replace selection, also set the primary selectedClassification
-      set({ selectedClassifications: [id], selectedClassification: id });
+      // Single click: replace selection
+      set({ selectedClassifications: [id], selectedClassificationIds: new Set([id]), selectedClassification: id });
     } else {
       // Ctrl/Cmd click: toggle individual
       const next = s.selectedClassifications.includes(id)
         ? s.selectedClassifications.filter((x) => x !== id)
         : [...s.selectedClassifications, id];
-      set({ selectedClassifications: next, selectedClassification: next.length ? next[next.length - 1] : null });
+      set({ selectedClassifications: next, selectedClassificationIds: new Set(next), selectedClassification: next.length ? next[next.length - 1] : null });
     }
   },
   selectedPolygon: null,

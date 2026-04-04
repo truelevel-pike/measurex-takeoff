@@ -27,6 +27,11 @@ export default function ClassificationGroups() {
   const addGroup = useStore((s) => s.addGroup);
   const updateGroup = useStore((s) => s.updateGroup);
   const deleteGroup = useStore((s) => s.deleteGroup);
+  // P2-15: multi-select
+  const selectedClassificationIds = useStore((s) => s.selectedClassificationIds);
+  const toggleClassificationSelection = useStore((s) => s.toggleClassificationSelection);
+  const clearClassificationSelection = useStore((s) => s.clearClassificationSelection);
+  const deleteClassification = useStore((s) => s.deleteClassification);
   // BUG-A6-009 fix: use the new reorderGroups store action.
   const reorderGroups = useStore((s) => s.reorderGroups);
   const moveClassificationToGroup = useStore((s) => s.moveClassificationToGroup);
@@ -66,6 +71,24 @@ export default function ClassificationGroups() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // P2-15: Ctrl+A = select all; Delete = bulk delete when multi-selected
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        useStore.getState().setClassificationSelection(classifications.map((c) => c.id));
+      }
+      if (e.key === 'Delete' && selectedClassificationIds.size >= 2) {
+        for (const id of selectedClassificationIds) useStore.getState().deleteClassification(id);
+        useStore.getState().clearClassificationSelection();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [classifications, selectedClassificationIds]);
 
   // All classification IDs that belong to some group
   const groupedClassificationIds = useMemo(() => {
@@ -214,11 +237,12 @@ export default function ClassificationGroups() {
     return (
       <div
         key={classificationId}
-        data-testid="classification-item"
+        data-testid={`classification-row-${classificationId}`}
         data-classification-id={classificationId}
-        className="flex items-center gap-1.5 px-2 py-0.5 text-[12px] text-[#e5e7eb] hover:bg-[#0e1016] rounded cursor-default"
+        className={`flex items-center gap-1.5 px-2 py-0.5 text-[12px] text-[#e5e7eb] hover:bg-[#0e1016] rounded cursor-default ${selectedClassificationIds.has(classificationId) ? 'ring-1 ring-[#00d4ff]/40 bg-[#00d4ff]/5' : ''}`}
         draggable={draggable}
         onDragStart={(e) => handleClassificationDragStart(e, classificationId)}
+        onClick={(e) => { toggleClassificationSelection(classificationId, e.ctrlKey || e.metaKey); }}
       >
         <div
           className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
@@ -543,6 +567,35 @@ export default function ClassificationGroups() {
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {/* P2-15: Multi-select bulk action bar — shown when ≥2 classifications selected */}
+      {selectedClassificationIds.size >= 2 && (
+        <div
+          data-testid="multi-select-bar"
+          className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0e1016] border-t border-[#00d4ff]/20 text-[11px] text-[#e5e7eb]"
+        >
+          <span>{selectedClassificationIds.size} selected</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                for (const id of selectedClassificationIds) deleteClassification(id);
+                clearClassificationSelection();
+              }}
+              className="text-red-400 hover:text-red-300 font-medium px-2 py-0.5 rounded border border-red-500/30 hover:bg-red-500/10"
+            >
+              Delete All
+            </button>
+            <button
+              type="button"
+              onClick={clearClassificationSelection}
+              className="text-[#8892a0] hover:text-white px-2 py-0.5 rounded border border-white/10"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
 
